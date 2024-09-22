@@ -4,7 +4,7 @@ import "./globals.css";
 import { ThemeProvider } from "@/components/theme-provider";
 // import StickyHeader from "@/components/sticky-header";
 import { GlobalFinanceProvider } from "@/contexts/GlobalFinanceContext";
-import MyMenu from "@/components/my-menu";
+// import MyMenu from "@/components/my-menu";
 
 const geistSans = localFont({
   src: "./fonts/GeistVF.woff",

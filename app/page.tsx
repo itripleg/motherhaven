@@ -5,7 +5,6 @@ import { Container } from "@/components/craft";
 import { Dashboard } from "@/components/dashboard";
 import Chart from "@/components/chart"; // Assume you have a Chart component
 import MyMenu from "@/components/my-menu"; // Your Menubar component
-import TradingViewWidget from "@/components/chart";
 
 type View = "dashboard" | "chart";
 

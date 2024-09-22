@@ -12,7 +12,11 @@ type ProjectionProps = {
   onUpdate: (newSpending: number, newTarget: number) => void;
 };
 
-export function Projection({ spending, target, onUpdate }: ProjectionProps) {
+export default function Projection({
+  spending,
+  target,
+  onUpdate,
+}: ProjectionProps) {
   const [currentSpending, setCurrentSpending] = useState(spending);
   const [targetBudget, setTargetBudget] = useState(target);
 

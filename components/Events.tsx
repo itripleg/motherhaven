@@ -1,7 +1,8 @@
 "use client";
 
 import { useState } from "react";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Card, CardContent } from "@/components/ui/card";
+// import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import {
@@ -11,6 +12,7 @@ import {
   DialogTitle,
   DialogTrigger,
 } from "@/components/ui/dialog";
+import { useGlobalFinance } from "@/contexts/GlobalFinanceContext";
 import {
   Select,
   SelectContent,
@@ -18,7 +20,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import { useGlobalFinance } from "../contexts/GlobalFinanceContext";
+// import { useGlobalFinance } from "../contexts/GlobalFinanceContext";
 
 type FinancialEvent = {
   id?: string;
@@ -113,7 +115,7 @@ export function Events() {
         <CardTitle>Financial Events</CardTitle>
       </CardHeader> */}
       <CardContent>
-        {/* <div className="space-y-4">
+        <div className="space-y-4 hidden">
           <div className="grid grid-cols-2 gap-4">
             <Input
               type="number"
@@ -149,7 +151,7 @@ export function Events() {
             </Select>
           </div>
           <Button onClick={handleAddEvent}>Add Event</Button>
-        </div> */}
+        </div>
 
         <div className="mt-8">
           <h3 className="text-lg font-semibold mb-4">Upcoming Events</h3>

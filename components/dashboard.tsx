@@ -1,14 +1,13 @@
 "use client";
 import { CalendarComponent } from "./CalendarComponent";
-import { Projection } from "./Projection";
+import Projection from "./projection";
 import { RecurringRevenueComponent } from "./RecurringRevenue";
 import { BalanceOverview } from "./BalanceOverview";
 import { Events } from "./Events";
 import { useGlobalFinance } from "@/contexts/GlobalFinanceContext";
-import { BudgetManager } from "./BudgetManager";
+// import { BudgetManager } from "./BudgetManager";
 
 export function Dashboard() {
-  // You would typically fetch these values from your state management solution or API
   const currentSpending = 1500;
   const targetBudget = 2000;
 

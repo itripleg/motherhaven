@@ -1,13 +1,13 @@
 "use client";
 
-import { useGlobalTotalContext } from "../contexts/GlobalTotalContext";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { useState } from "react";
+import { useGlobalFinance } from "@/contexts/GlobalFinanceContext";
 
 export function GlobalTotalDisplay() {
-  const { globalTotal, updateGlobalTotal, loading } = useGlobalTotalContext();
+  const { globalTotal, updateGlobalTotal, loading } = useGlobalFinance();
   const [newTotal, setNewTotal] = useState<string>("");
 
   const handleUpdateTotal = () => {

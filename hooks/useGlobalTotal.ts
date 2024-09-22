@@ -1,6 +1,6 @@
 import { useState, useEffect } from "react";
 import { doc, getDoc, setDoc, onSnapshot } from "firebase/firestore";
-import { db } from "/firebase";
+import { db } from "@/firebase";
 
 export function useGlobalTotal() {
   const [globalTotal, setGlobalTotal] = useState<number>(0);

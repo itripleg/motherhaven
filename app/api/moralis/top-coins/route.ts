@@ -10,7 +10,7 @@ export async function GET() {
 
     // Fetch top cryptocurrencies by market cap
     const response =
-      await Moralis.EvmApi.marketData.getTopCryptoCurrenciesByMarketCap({});
+      await Moralis.EvmApi.marketData.getTopCryptoCurrenciesByMarketCap();
 
     // Log the raw response for debugging purposes
     console.log(response.raw);

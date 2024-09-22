@@ -32,6 +32,7 @@ type FinancialEvent = {
   description: string;
   date: Date;
   type: "income" | "expense";
+  isReceived: boolean;
 };
 
 type DailyEvents = {
@@ -47,6 +48,7 @@ export function CalendarComponent() {
     description: "",
     date: new Date(),
     type: "expense",
+    isReceived: false,
   });
 
   useEffect(() => {
@@ -69,12 +71,7 @@ export function CalendarComponent() {
       await addFinancialEvent({
         ...newEvent,
         date: date,
-      });
-      setNewEvent({
-        amount: 0,
-        description: "",
-        date: new Date(),
-        type: "expense",
+        isReceived: newEvent.isReceived ?? false,
       });
     }
   };
