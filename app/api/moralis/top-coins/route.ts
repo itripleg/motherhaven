@@ -1,19 +1,25 @@
 import Moralis from "moralis";
 import { NextResponse } from "next/server";
 
+// Flag to check if Moralis is initialized
+let isMoralisInitialized = false;
+
 export async function GET() {
   try {
-    // Start Moralis with API key from environment variables
-    await Moralis.start({
-      apiKey: process.env.MORALIS_API_KEY,
-    });
+    // Check if Moralis has already been initialized
+    if (!isMoralisInitialized) {
+      await Moralis.start({
+        apiKey: process.env.MORALIS_API_KEY,
+      });
+      isMoralisInitialized = true;
+    }
 
     // Fetch top cryptocurrencies by market cap
     const response =
       await Moralis.EvmApi.marketData.getTopCryptoCurrenciesByMarketCap();
 
     // Log the raw response for debugging purposes
-    console.log(response.raw);
+    // console.log(response.raw);
 
     // Return the response as a JSON object
     return NextResponse.json(response.raw, { status: 200 });
