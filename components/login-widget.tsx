@@ -37,7 +37,8 @@ function LoginWidget({}: Props) {
           <p className="mt-4 text-lg">
             Please{" "}
             <LoginLink
-              postLoginRedirectURL="/dashboard"
+              // postLoginRedirectURL={"/"}
+              // postLoginRedirectURL="/dashboard"
               className="text-white md:hover:underline underline md:no-underline"
             >
               login
