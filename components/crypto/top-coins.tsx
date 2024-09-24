@@ -45,7 +45,7 @@ export default function TopCoins() {
   return (
     <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-4">
       {coins.map((coin) => (
-        <Card key={coin.symbol}>
+        <Card key={coin.name}>
           <CardContent>
             <div className="flex items-center space-x-4">
               {/* Display the coin logo */}
