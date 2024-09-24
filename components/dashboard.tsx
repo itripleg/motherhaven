@@ -15,8 +15,10 @@ export function Dashboard() {
 
   return (
     <div className="container mx-auto p-4 space-y-8">
-      <div className="flex justify-between">
-        <h1 className="text-3xl font-bold text-primary">Budget Dashboard</h1>
+      <div className="flex text-center justify-center md:justify-between">
+        <h1 className="text-3xl font-bold text-primary hidden md:block">
+          Budget Dashboard
+        </h1>
         <h1 className="text- text-6xl font-bold text-primary ">
           ${globalTotal}
         </h1>
