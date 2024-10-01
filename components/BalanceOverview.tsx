@@ -192,16 +192,16 @@ export function BalanceOverview() {
             </div>
           ))}
         </div>
+        <div className="flex items-center space-x-2 justify-center">
+          <Input
+            placeholder="New Source Name"
+            value={newSource}
+            onChange={(e) => setNewSource(e.target.value)}
+            className="w-40 mt-2"
+          />
+          <Button onClick={addNewSource}>Add Source</Button>
+        </div>
       </CardContent>
-      <div className="flex items-center space-x-2 justify-center">
-        <Input
-          placeholder="New Source Name"
-          value={newSource}
-          onChange={(e) => setNewSource(e.target.value)}
-          className="w-40"
-        />
-        <Button onClick={addNewSource}>Add Source</Button>
-      </div>
     </Card>
   );
 }

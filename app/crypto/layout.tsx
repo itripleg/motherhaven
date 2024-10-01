@@ -7,7 +7,7 @@ function layout({
 }: Readonly<{
   children: React.ReactNode;
 }>) {
-  return <div className="bg-black">{children}</div>;
+  return <div className="bg-background">{children}</div>;
 }
 
 export default layout;

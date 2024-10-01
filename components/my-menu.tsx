@@ -25,8 +25,8 @@ export default function MyMenu2({ setCurrentView }: MyMenuProps) {
           <MenubarItem onClick={() => setCurrentView("dashboard")}>
             Dashboard<MenubarShortcut>⌘T</MenubarShortcut>
           </MenubarItem>
-          <MenubarItem onClick={() => setCurrentView("chart")}>
-            Chart
+          <MenubarItem>
+            <a href="/crypto">Crypto</a>
           </MenubarItem>
           {/* Add more menu items for different views */}
         </MenubarContent>

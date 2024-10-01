@@ -3,10 +3,16 @@
 import React from "react";
 import { motion } from "framer-motion";
 import { Button } from "@/components/ui/button";
-import { ChevronRight, BarChart2, DollarSign, TrendingUp } from "lucide-react";
+import {
+  ChevronRight,
+  BarChart2,
+  ClipboardList,
+  DollarSign,
+  CheckCircle,
+} from "lucide-react"; // Icons for different features
 import Link from "next/link";
 
-export default function LandingPage() {
+export function GeneralLandingPage() {
   const containerVariants = {
     hidden: { opacity: 0 },
     visible: {
@@ -27,7 +33,7 @@ export default function LandingPage() {
   };
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-gray-900 to-gray-800 text-white ">
+    <div className="min-h-screen bg-background text-foreground">
       <motion.div
         className="container mx-auto px-4 py-16"
         variants={containerVariants}
@@ -38,13 +44,14 @@ export default function LandingPage() {
           className="text-5xl md:text-7xl font-bold mb-6 text-center"
           variants={itemVariants}
         >
-          CryptoTracker
+          Personal Finance & Task Management
         </motion.h1>
         <motion.p
           className="text-xl md:text-2xl text-center mb-12"
           variants={itemVariants}
         >
-          Your all-in-one solution for tracking and managing cryptocurrencies
+          Simplify your finances and stay on top of your tasks, all in one
+          place.
         </motion.p>
 
         <motion.div
@@ -69,38 +76,38 @@ export default function LandingPage() {
           variants={containerVariants}
         >
           <motion.div
-            className="bg-gray-800 p-6 rounded-lg shadow-lg"
-            variants={itemVariants}
-          >
-            <BarChart2 className="h-12 w-12 mb-4 text-blue-400" />
-            <h2 className="text-2xl font-semibold mb-2">Real-time Tracking</h2>
-            <p>
-              Monitor your favorite cryptocurrencies with up-to-the-minute price
-              updates and market data.
-            </p>
-          </motion.div>
-          <motion.div
-            className="bg-gray-800 p-6 rounded-lg shadow-lg"
+            className="bg-muted text-muted-foreground p-6 rounded-lg shadow-lg dark:bg-muted dark:text-muted-foreground"
             variants={itemVariants}
           >
             <DollarSign className="h-12 w-12 mb-4 text-green-400" />
             <h2 className="text-2xl font-semibold mb-2">
-              Portfolio Management
+              Manage Your Finances
             </h2>
             <p>
-              Easily manage and track your crypto portfolio with intuitive tools
-              and visualizations.
+              Track your expenses, set budgets, and gain insights into your
+              personal finances with easy-to-use tools.
             </p>
           </motion.div>
           <motion.div
-            className="bg-gray-800 p-6 rounded-lg shadow-lg"
+            className="bg-muted text-muted-foreground p-6 rounded-lg shadow-lg dark:bg-muted dark:text-muted-foreground"
             variants={itemVariants}
           >
-            <TrendingUp className="h-12 w-12 mb-4 text-purple-400" />
-            <h2 className="text-2xl font-semibold mb-2">Market Insights</h2>
+            <ClipboardList className="h-12 w-12 mb-4 text-yellow-400" />
+            <h2 className="text-2xl font-semibold mb-2">Task Management</h2>
             <p>
-              Get valuable insights and analytics to make informed decisions
-              about your crypto investments.
+              Stay organized with to-do lists, task tracking, and reminders to
+              make sure nothing slips through the cracks.
+            </p>
+          </motion.div>
+          <motion.div
+            className="bg-muted text-muted-foreground p-6 rounded-lg shadow-lg dark:bg-muted dark:text-muted-foreground"
+            variants={itemVariants}
+          >
+            <CheckCircle className="h-12 w-12 mb-4 text-purple-400" />
+            <h2 className="text-2xl font-semibold mb-2">Financial Goals</h2>
+            <p>
+              Set and achieve financial goals, monitor your progress, and stay
+              motivated with personalized insights.
             </p>
           </motion.div>
         </motion.div>

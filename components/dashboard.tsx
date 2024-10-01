@@ -14,7 +14,7 @@ export function Dashboard() {
   const { globalTotal } = useGlobalFinance();
 
   return (
-    <div className="container mx-auto p-4 space-y-8">
+    <div className="container mx-auto p-4 space-y-8 scrollbar scrollbar-hide">
       <div className="flex text-center justify-center md:justify-between">
         <h1 className="text-3xl font-bold text-primary hidden md:block">
           Budget Dashboard

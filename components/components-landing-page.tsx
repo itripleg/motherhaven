@@ -6,7 +6,7 @@ import { Button } from "@/components/ui/button";
 import { ChevronRight, BarChart2, DollarSign, TrendingUp } from "lucide-react";
 import Link from "next/link";
 
-export default function LandingPage() {
+export function LandingPage() {
   const containerVariants = {
     hidden: { opacity: 0 },
     visible: {
