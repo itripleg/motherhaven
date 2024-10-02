@@ -3,10 +3,16 @@
 import { useState, useEffect } from "react";
 import { Button } from "@/components/ui/button";
 import { MoonIcon, SunIcon } from "lucide-react";
+import { useAccount, useConnect, useDisconnect } from "wagmi";
+import { metaMask } from "@wagmi/connectors";
 
 export default function LandingPage() {
   const [theme, setTheme] = useState("light");
-  const [walletConnected, setWalletConnected] = useState(false);
+  const { address, isConnected } = useAccount();
+
+  // Use useConnect hook and pass the MetaMask connector
+  const { connect, connectors, isLoading } = useConnect();
+  const { disconnect } = useDisconnect();
 
   useEffect(() => {
     document.body.className = theme;
@@ -17,9 +23,17 @@ export default function LandingPage() {
   };
 
   const connectWallet = async () => {
-    // This is a placeholder for actual web3 wallet connection logic
-    console.log("Connecting wallet...");
-    setWalletConnected(true);
+    try {
+      // Use the MetaMask connector to connect
+      const metamaskConnector = connectors.find((c) => c.id === "metaMask");
+      if (metamaskConnector) {
+        await connect({ connector: metamaskConnector });
+      } else {
+        console.error("MetaMask connector not found");
+      }
+    } catch (error) {
+      console.error("Error connecting to MetaMask:", error);
+    }
   };
 
   return (
@@ -38,9 +52,15 @@ export default function LandingPage() {
           <p className="text-xl mb-8">
             Experience the thrill of decentralized gaming
           </p>
-          <Button size="lg" onClick={connectWallet}>
-            {walletConnected ? "Wallet Connected" : "Connect Wallet"}
-          </Button>
+          {!isConnected ? (
+            <Button size="lg" onClick={connectWallet}>
+              {isLoading ? "Connecting..." : "Connect Wallet"}
+            </Button>
+          ) : (
+            <Button size="lg" onClick={disconnect}>
+              Disconnect {address?.slice(0, 6)}...{address?.slice(-4)}
+            </Button>
+          )}
         </div>
       </main>
       <footer className="p-4 text-center">
