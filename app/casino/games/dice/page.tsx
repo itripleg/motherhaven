@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useRef, useEffect } from "react";
-import { Canvas, useFrame } from "@react-three/fiber";
+import { Canvas } from "@react-three/fiber";
 import { OrbitControls, Box } from "@react-three/drei";
 import { Button } from "@/components/ui/button";
 import { Slider } from "@/components/ui/slider";
@@ -18,34 +18,7 @@ import { parseUnits, parseEther, formatUnits, Address } from "viem";
 import { useRouter } from "next/navigation"; // Import useRouter from Next.js
 import * as THREE from "three";
 import metadata from "@/contracts/magic-dice/MagicDice_metadata.json";
-
-function Scene() {
-  const cube1Ref = useRef<THREE.Mesh>(null);
-  const cube2Ref = useRef<THREE.Mesh>(null);
-
-  useFrame(() => {
-    if (cube1Ref.current && cube2Ref.current) {
-      cube1Ref.current.rotation.x += 0.01;
-      cube1Ref.current.rotation.y += 0.01;
-      cube2Ref.current.rotation.x -= 0.01;
-      cube2Ref.current.rotation.y -= 0.01;
-    }
-  });
-
-  return (
-    <>
-      <ambientLight intensity={0.1} />
-      <directionalLight position={[10, 10, 10]} />
-      <pointLight position={[10, 10, 10]} />
-      <Box ref={cube1Ref} position={[-1.5, 0, 0]}>
-        <meshStandardMaterial color="hotpink" />
-      </Box>
-      <Box ref={cube2Ref} position={[1.5, 0, 0]}>
-        <meshStandardMaterial color="lightblue" />
-      </Box>
-    </>
-  );
-}
+import Scene from "./scene";
 
 export default function DiceGame() {
   const [betRange, setBetRange] = useState<[number, number]>([11, 100]);
@@ -55,10 +28,11 @@ export default function DiceGame() {
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
 
   const { address, isConnected } = useAccount();
-  const { connect, connectors, loading } = useConnect(); // No pendingConnector, use isLoading
+  const { connect, connectors } = useConnect(); // No pendingConnector, use isLoading
   const router = useRouter();
   const contractAddress =
-    "0xd50d3638d617f6b15fc3024421e2f4110e7bf249" as Address;
+    // "0xd50d3638d617f6b15fc3024421e2f4110e7bf249" as Address;
+    "0x4DE43b9754839d98f7521bf3F4d992951a666Df1" as Address;
   const contractABI = metadata.output.abi;
 
   const contractConfig = {

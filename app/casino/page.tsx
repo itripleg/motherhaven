@@ -1,16 +1,16 @@
 "use client";
 
 import { useState, useEffect } from "react";
+import { useRouter } from "next/navigation"; // Import useRouter
 import { Button } from "@/components/ui/button";
 import { MoonIcon, SunIcon } from "lucide-react";
 import { useAccount, useConnect, useDisconnect } from "wagmi";
-import { metaMask } from "@wagmi/connectors";
+import { WalletOptions } from "./wallet-options";
 
 export default function LandingPage() {
   const [theme, setTheme] = useState("light");
+  const router = useRouter(); // Initialize useRouter
   const { address, isConnected } = useAccount();
-
-  // Use useConnect hook and pass the MetaMask connector
   const { connect, connectors, isLoading } = useConnect();
   const { disconnect } = useDisconnect();
 
@@ -24,7 +24,6 @@ export default function LandingPage() {
 
   const connectWallet = async () => {
     try {
-      // Use the MetaMask connector to connect
       const metamaskConnector = connectors.find((c) => c.id === "metaMask");
       if (metamaskConnector) {
         await connect({ connector: metamaskConnector });
@@ -36,8 +35,17 @@ export default function LandingPage() {
     }
   };
 
+  // Redirect to /casino/lobby if connected
+  useEffect(() => {
+    if (isConnected) {
+      router.push("/casino/lobby");
+    }
+  }, [isConnected, router]);
+
   return (
     <div className="min-h-screen flex flex-col">
+      {/* Remove WalletOptions if not needed */}
+      {/* <WalletOptions /> */}
       <header className="p-4 flex justify-between items-center">
         <h1 className="text-2xl font-bold">CryptoComfort Casino</h1>
         <Button variant="ghost" size="icon" onClick={toggleTheme}>
