@@ -1,31 +1,22 @@
 "use client";
-import { useAccount } from "wagmi";
+import { useAccount, useChainId, useSwitchChain } from "wagmi";
 import { useState, useEffect } from "react";
 import { Button } from "@/components/ui/button";
 import { motion } from "framer-motion";
-import { useRouter } from "next/router";
+import { useRouter } from "next/navigation";
 
 export default function Dashboard() {
-  const {
-    address,
-    addresses,
-    connector,
-    status,
-    isConnected,
-    isConnecting,
-    isReconnecting,
-  } = useAccount();
+  const { address, addresses, connector, status, isConnected } = useAccount();
+  const chainId = useChainId();
+  const [loading, setLoading] = useState(true);
+  const router = useRouter();
 
-  const [chain, setChain] = useState(true);
-  const [loading, setLoading] = useState(false);
-  // const router = useRouter();
-
-  // Simulate a loading screen and redirect
+  // Loading screen logic based on connection status
   useEffect(() => {
     if (isConnected) {
-      setTimeout(() => {
-        setLoading(false);
-      }, 2000); // Simulate loading
+      setTimeout(() => setLoading(false), 2000); // Simulate loading
+    } else {
+      setLoading(false);
     }
   }, [isConnected]);
 
@@ -62,11 +53,9 @@ export default function Dashboard() {
               <strong>All Addresses:</strong> {addresses.join(", ")}
             </p>
           )}
-          {chain && (
-            <p className="text-sm mb-2">
-              <strong>Network:</strong> {chain.name} (Chain ID: {chain.id})
-            </p>
-          )}
+          <p className="text-sm mb-2">
+            <strong>Network:</strong> Chain ID {chainId}
+          </p>
           {connector && (
             <p className="text-sm mb-2">
               <strong>Connector:</strong> {connector.name}
