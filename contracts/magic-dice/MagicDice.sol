@@ -1,147 +1,157 @@
-pragma solidity >=0.8.0 <0.9.0;
-//SPDX-License-Identifier: MIT
+// SPDX-License-Identifier: MIT
+pragma solidity 0.8.20;
 
-import "@chainlink/contracts/src/v0.8/VRFConsumerBase.sol";
-import "@openzeppelin/contracts/access/Ownable.sol";
+import {VRFConsumerBaseV2Plus} from "@chainlink/contracts@1.2.0/src/v0.8/vrf/dev/VRFConsumerBaseV2Plus.sol";
+import {VRFV2PlusClient} from "@chainlink/contracts@1.2.0/src/v0.8/vrf/dev/libraries/VRFV2PlusClient.sol";
 import "@openzeppelin/contracts/token/ERC1155/ERC1155.sol";
 import "@openzeppelin/contracts/token/ERC1155/utils/ERC1155Receiver.sol";
 
-contract MagicDice is VRFConsumerBase, Ownable, ERC1155, ERC1155Receiver {
-    // Events
+contract MagicDiceV2 is VRFConsumerBaseV2Plus, ERC1155, ERC1155Receiver {
     event DiceRolled(
-        bytes32 indexed requestId,
+        uint256 requestId,
         uint32 lowBet,
         uint32 highBet,
-        uint256 betAmount
+        uint256 betAmount,
+        address roller
     );
-    event DiceLanded(
-        bytes32 indexed requestId,
-        uint256 rollResult,
-        uint256 payout
-    );
+    event DiceLanded(uint256 requestId, uint256 rollResult);
 
-    // Chainlink VRF Variables
-    uint256 private chainlinkFee = 0.1 * 10 ** 18;
-    bytes32 private keyHash =
+    // Chainlink VRF V2+ settings
+    address public vrfCoordinator = 0x5C210eF41CD1a72de73bF76eC39637bB0d3d7BEE;
+    bytes32 public keyHash =
         0xc799bd1e3bd4d1a41cd4968997a4e03dfd2a3c7c04b695881138580163f42887;
-    address VRFCoordinator = 0x5C210eF41CD1a72de73bF76eC39637bB0d3d7BEE;
-    address linkAddress = 0x0b9d5D9136855f6FEc3c0993feE6E9CE8a297846;
+    uint64 public subscriptionId =
+        24915438184029020066046542738515064588751826918193183938224033441802731076774;
+    uint32 public callbackGasLimit = 100000;
+    uint16 public requestConfirmations = 3;
+    uint32 public numWords = 1;
 
-    // ERC1155 Token Variables
-    uint256 public constant DICEPOINTS = 0; // Token ID for DICEPOINTS
-
-    // Struct to store bet details
+    // Betting state
     struct Bet {
         uint32 lowBet;
         uint32 highBet;
         uint256 betAmount;
-        bool resolved;
+        address bettor;
+        bool fulfilled;
+        uint256 rollResult;
+        bool winner;
         uint256 payout;
     }
 
-    // Mappings
-    mapping(bytes32 => address) public payoutRequests; // Maps requestId to player address
-    mapping(bytes32 => Bet) public bets; // Maps requestId to Bet details
+    mapping(uint256 => Bet) public bets; // Request ID to Bet
+    mapping(address => uint256[]) public userBets; // Address to array of Request IDs
+    uint256 public totalRolls;
+    uint256 public constant DICEPOINTS = 0; // Token ID for dice points
 
-    // Constructor
-    constructor() ERC1155("") VRFConsumerBase(VRFCoordinator, linkAddress) {
-        _mint(address(this), DICEPOINTS, 1000 ether, ""); // Mint initial DICEPOINTS to the contract
+    constructor() VRFConsumerBaseV2Plus(vrfCoordinator) ERC1155("") {
+        // Mint initial dice points to contract
+        _mint(address(this), DICEPOINTS, 1000 ether, "");
     }
 
-    // Function to buy DICEPOINTS
+    // Allow users to buy into the game by getting dice points (ERC1155 token)
     function buyIn() public payable {
-        require(msg.value >= 0.001 ether, "Minimum buy-in is 0.001 ether");
+        require(msg.value >= .001 ether, "Must send at least 1 finney");
         _setApprovalForAll(address(this), msg.sender, true);
         safeTransferFrom(address(this), msg.sender, DICEPOINTS, msg.value, "");
         _setApprovalForAll(address(this), msg.sender, false);
     }
 
-    // Function to place a bet and roll the dice
+    // Function to place a bet and request randomness from Chainlink VRF
     function roll(
         uint32 _lowBet,
         uint32 _highBet,
         uint256 _betAmount
-    ) public returns (bytes32) {
-        // Input validations
+    ) public returns (uint256 requestId) {
+        require(LINK.balanceOf(address(this)) >= 0, "Not enough LINK"); // Subscription covers the cost
+        require(_lowBet >= 10 && _highBet <= 100, "Invalid bet range");
         require(
-            LINK.balanceOf(address(this)) >= chainlinkFee,
-            "Not enough LINK in contract"
-        );
-        require(
-            _lowBet >= 1 && _lowBet <= 100,
-            "lowBet must be between 1 and 100"
-        );
-        require(
-            _highBet >= _lowBet && _highBet <= 100,
-            "highBet must be between lowBet and 100"
-        );
-        require(
-            _betAmount >= 0.001 ether,
-            "Bet amount must be at least 0.001 ether"
+            _highBet >= _lowBet,
+            "High bet must be greater or equal to low bet"
         );
 
-        // Transfer DICEPOINTS from player to contract
+        // Transfer bet amount to contract
         safeTransferFrom(msg.sender, address(this), DICEPOINTS, _betAmount, "");
 
-        // Request random number from Chainlink VRF
-        bytes32 requestId = requestRandomness(keyHash, chainlinkFee);
+        // Request randomness
+        requestId = s_vrfCoordinator.requestRandomWords(
+            VRFV2PlusClient.RandomWordsRequest({
+                keyHash: keyHash,
+                subId: subscriptionId,
+                requestConfirmations: requestConfirmations,
+                callbackGasLimit: callbackGasLimit,
+                numWords: numWords,
+                extraArgs: VRFV2PlusClient._argsToBytes(
+                    VRFV2PlusClient.ExtraArgsV1({nativePayment: false})
+                )
+            })
+        );
 
         // Store bet details
-        payoutRequests[requestId] = msg.sender;
-        bets[requestId] = Bet(_lowBet, _highBet, _betAmount, false, 0);
+        bets[requestId] = Bet({
+            lowBet: _lowBet,
+            highBet: _highBet,
+            betAmount: _betAmount,
+            bettor: msg.sender,
+            fulfilled: false,
+            rollResult: 0,
+            winner: false,
+            payout: 0
+        });
 
-        // Emit event
-        emit DiceRolled(requestId, _lowBet, _highBet, _betAmount);
+        // Store the request ID in the user's bet history
+        userBets[msg.sender].push(requestId);
 
+        totalRolls += 1;
+
+        // Emit the event with requestId, bet details, and roller's address
+        emit DiceRolled(requestId, _lowBet, _highBet, _betAmount, msg.sender);
         return requestId;
     }
 
-    // Callback function used by Chainlink VRF Coordinator
-    function fulfillRandomness(
-        bytes32 requestId,
-        uint256 randomness
+    // Chainlink VRF callback function
+    function fulfillRandomWords(
+        uint256 _requestId,
+        uint256[] calldata _randomWords
     ) internal override {
-        Bet storage bet = bets[requestId];
-        require(!bet.resolved, "Bet already resolved");
+        Bet storage bet = bets[_requestId];
+        require(!bet.fulfilled, "Bet already fulfilled");
 
-        // Calculate roll result between 1 and 100
-        uint256 rollResult = (randomness % 100) + 1;
+        uint256 rollResult = (_randomWords[0] % 100) + 1;
+        bet.rollResult = rollResult;
+        bet.fulfilled = true;
 
-        address player = payoutRequests[requestId];
-        bool isWinner = rollResult >= bet.lowBet && rollResult <= bet.highBet;
+        if (rollResult >= bet.lowBet && rollResult <= bet.highBet) {
+            bet.winner = true;
+            bet.payout =
+                (10000 / (bet.highBet * 100 - bet.lowBet * 100)) *
+                bet.betAmount;
 
-        uint256 payout = 0;
-        if (isWinner) {
-            // Calculate payout based on odds
-            payout = (bet.betAmount * 100) / (bet.highBet - bet.lowBet + 1);
-            // Transfer winnings to player
-            safeTransferFrom(address(this), player, DICEPOINTS, payout, "");
-            bet.payout = payout;
+            // Transfer payout
+            _setApprovalForAll(address(this), bet.bettor, true);
+            safeTransferFrom(
+                address(this),
+                bet.bettor,
+                DICEPOINTS,
+                bet.payout,
+                ""
+            );
+            _setApprovalForAll(address(this), bet.bettor, false);
         }
 
-        bet.resolved = true;
-
-        // Emit event with the result
-        emit DiceLanded(requestId, rollResult, payout);
+        emit DiceLanded(_requestId, rollResult);
     }
 
-    // Function for the owner to withdraw Ether from the contract
-    function withdrawEther(uint256 amount) public onlyOwner {
-        require(amount <= address(this).balance, "Insufficient balance");
-        payable(owner()).transfer(amount);
+    // Allows the owner to withdraw Ether
+    function withdrawEther() public onlyOwner {
+        payable(msg.sender).transfer(address(this).balance);
     }
 
-    // Function for the owner to withdraw DICEPOINTS from the contract
-    function withdrawDicePoints(uint256 amount) public onlyOwner {
-        safeTransferFrom(address(this), msg.sender, DICEPOINTS, amount, "");
+    // Get all the request IDs for a specific user
+    function getUserBets(address user) public view returns (uint256[] memory) {
+        return userBets[user];
     }
 
-    // Function to get the LINK token balance of the contract
-    function getLinkBalance() public view returns (uint256) {
-        return LINK.balanceOf(address(this));
-    }
-
-    // Override functions to support ERC1155Receiver
+    // Support ERC1155 interface
     function supportsInterface(
         bytes4 interfaceId
     ) public view virtual override(ERC1155, ERC1155Receiver) returns (bool) {

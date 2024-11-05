@@ -5,24 +5,37 @@ import {
   collection,
   addDoc,
   getDocs,
+  getDoc,
   updateDoc,
   doc,
   deleteDoc,
+  DocumentData,
+  QueryDocumentSnapshot,
 } from "firebase/firestore";
 import { db } from "@/firebase";
+import { useKindeBrowserClient } from "@kinde-oss/kinde-auth-nextjs"; // Correct client-side hook
+
+// Define User and FinancialEvent types
+type User = {
+  uid: string;
+  email: string;
+  displayName?: string;
+};
 
 type FinancialEvent = {
-  isReceived: boolean;
   id?: string;
   date: Date;
   amount: number;
   description: string;
   type: "income" | "expense";
+  isReceived: boolean;
   recurring?: boolean;
   frequency?: "weekly" | "biweekly" | "monthly";
 };
 
+// Define the context type
 type GlobalFinanceContextType = {
+  user: User | null;
   globalTotal: number;
   updateGlobalTotal: (newTotal: number) => Promise<void>;
   financialEvents: FinancialEvent[];
@@ -38,113 +51,178 @@ type GlobalFinanceContextType = {
   recurringEvents: FinancialEvent[];
 };
 
+// Create the context
 const GlobalFinanceContext = createContext<
   GlobalFinanceContextType | undefined
 >(undefined);
 
+// Provider component
 export function GlobalFinanceProvider({
   children,
 }: {
   children: React.ReactNode;
 }) {
-  const [globalTotal, setGlobalTotal] = useState(0);
+  const {
+    isAuthenticated,
+    user: kindeUser,
+    isLoading,
+    error,
+  } = useKindeBrowserClient(); // Use the client-side hook
+
+  const [user, setUser] = useState<User | null>(null);
+  const [globalTotal, setGlobalTotal] = useState<number>(0);
   const [financialEvents, setFinancialEvents] = useState<FinancialEvent[]>([]);
-  const [loading, setLoading] = useState(true);
-  const [last30DaysIn, setLast30DaysIn] = useState(0);
-  const [last30DaysOut, setLast30DaysOut] = useState(0);
-  const [totalIncome, setTotalIncome] = useState(0);
-  const [totalExpenses, setTotalExpenses] = useState(0);
+  const [loading, setLoading] = useState<boolean>(true);
+  const [last30DaysIn, setLast30DaysIn] = useState<number>(0);
+  const [last30DaysOut, setLast30DaysOut] = useState<number>(0);
+  const [totalIncome, setTotalIncome] = useState<number>(0);
+  const [totalExpenses, setTotalExpenses] = useState<number>(0);
   const [pendingPayments, setPendingPayments] = useState<FinancialEvent[]>([]);
   const [recurringEvents, setRecurringEvents] = useState<FinancialEvent[]>([]);
 
   useEffect(() => {
-    fetchFinancialData();
-  }, []);
+    const initializeData = async () => {
+      if (isLoading) return; // Wait until loading is complete
 
-  const fetchFinancialData = async () => {
-    setLoading(true);
+      if (isAuthenticated) {
+        const currentUser: User = {
+          uid: kindeUser.id,
+          email: kindeUser.email,
+          displayName:
+            kindeUser.name || kindeUser.given_name || kindeUser.email,
+        };
+        setUser(currentUser);
+        await fetchFinancialData(currentUser.uid);
+      } else {
+        setUser(null);
+        setLoading(false);
+      }
+    };
 
-    // Fetch financial events from Firestore
-    const eventsCollection = collection(db, "financialEvents");
-    const eventsSnapshot = await getDocs(eventsCollection);
-    const eventsList = eventsSnapshot.docs.map(
-      (doc) =>
-        ({
-          id: doc.id,
-          ...doc.data(),
-          date: new Date(doc.data().date.toDate()),
-        } as FinancialEvent)
-    );
+    initializeData();
+    // Only run when authentication status or loading state changes
+  }, [isAuthenticated, isLoading]);
 
-    setFinancialEvents(eventsList);
+  // Fetch financial data for the authenticated user
+  const fetchFinancialData = async (userId: string) => {
+    try {
+      setLoading(true);
 
-    // Separate recurring and pending payments
-    const recurring = eventsList.filter((event) => event.recurring);
-    const pending = eventsList.filter((event) => !event.isReceived);
+      // Fetch financial events
+      const eventsCollection = collection(
+        db,
+        "users",
+        userId,
+        "financialEvents"
+      );
+      const eventsSnapshot = await getDocs(eventsCollection);
+      const eventsList: FinancialEvent[] = eventsSnapshot.docs.map(
+        (doc: QueryDocumentSnapshot<DocumentData>) => {
+          const data = doc.data();
+          return {
+            id: doc.id,
+            ...data,
+            date: data.date.toDate(), // Convert Firestore Timestamp to JS Date
+          } as FinancialEvent;
+        }
+      );
 
-    setRecurringEvents(recurring);
-    setPendingPayments(pending);
+      setFinancialEvents(eventsList);
 
-    // Calculate totals for the last 30 days, income, and expenses
-    const last30DaysIn = eventsList
-      .filter((event) => event.type === "income")
-      .reduce((acc, event) => acc + event.amount, 0);
+      // Separate recurring and pending payments
+      const recurring = eventsList.filter((event) => event.recurring);
+      const pending = eventsList.filter((event) => !event.isReceived);
 
-    const last30DaysOut = eventsList
-      .filter((event) => event.type === "expense")
-      .reduce((acc, event) => acc + event.amount, 0);
+      setRecurringEvents(recurring);
+      setPendingPayments(pending);
 
-    setLast30DaysIn(last30DaysIn);
-    setLast30DaysOut(last30DaysOut);
+      // Calculate totals for the last 30 days
+      const now = new Date();
+      const past30Days = new Date();
+      past30Days.setDate(now.getDate() - 30);
 
-    const totalIncome = eventsList
-      .filter((event) => event.type === "income")
-      .reduce((acc, event) => acc + event.amount, 0);
+      const last30DaysEvents = eventsList.filter(
+        (event) => event.date >= past30Days && event.date <= now
+      );
 
-    const totalExpenses = eventsList
-      .filter((event) => event.type === "expense")
-      .reduce((acc, event) => acc + event.amount, 0);
+      const last30DaysIn = last30DaysEvents
+        .filter((event) => event.type === "income")
+        .reduce((acc, event) => acc + event.amount, 0);
 
-    setTotalIncome(totalIncome);
-    setTotalExpenses(totalExpenses);
+      const last30DaysOut = last30DaysEvents
+        .filter((event) => event.type === "expense")
+        .reduce((acc, event) => acc + event.amount, 0);
 
-    // Fetch global total from Firestore
-    const totalDoc = await getDocs(collection(db, "globalValues"));
-    const totalData = totalDoc.docs[0]?.data();
-    setGlobalTotal(totalData?.total || 0);
+      setLast30DaysIn(last30DaysIn);
+      setLast30DaysOut(last30DaysOut);
 
-    setLoading(false);
+      // Calculate total income and expenses
+      const totalIncome = eventsList
+        .filter((event) => event.type === "income")
+        .reduce((acc, event) => acc + event.amount, 0);
+
+      const totalExpenses = eventsList
+        .filter((event) => event.type === "expense")
+        .reduce((acc, event) => acc + event.amount, 0);
+
+      setTotalIncome(totalIncome);
+      setTotalExpenses(totalExpenses);
+
+      // Fetch global total
+      const totalDocRef = doc(db, "users", userId, "globalValues", "total");
+      const totalDoc = await getDoc(totalDocRef);
+      const totalData = totalDoc.data();
+      setGlobalTotal(totalData?.total || 0);
+    } catch (error) {
+      console.error("Error fetching financial data:", error);
+    } finally {
+      setLoading(false);
+    }
   };
 
+  // Update global total
   const updateGlobalTotal = async (newTotal: number) => {
-    const totalRef = doc(db, "globalValues", "total");
+    if (!user) return;
+    const totalRef = doc(db, "users", user.uid, "globalValues", "total");
     await updateDoc(totalRef, { total: newTotal });
     setGlobalTotal(newTotal);
   };
 
+  // Add a new financial event
   const addFinancialEvent = async (event: Omit<FinancialEvent, "id">) => {
-    const docRef = await addDoc(collection(db, "financialEvents"), event);
+    if (!user) return;
+    const docRef = await addDoc(
+      collection(db, "users", user.uid, "financialEvents"),
+      event
+    );
     const newEvent = { ...event, id: docRef.id };
-    setFinancialEvents([...financialEvents, newEvent]);
+    setFinancialEvents((prevEvents) => [...prevEvents, newEvent]);
   };
 
+  // Update an existing financial event
   const updateFinancialEvent = async (event: FinancialEvent) => {
-    if (event.id) {
-      await updateDoc(doc(db, "financialEvents", event.id), event);
-      setFinancialEvents(
-        financialEvents.map((e) => (e.id === event.id ? event : e))
-      );
-    }
+    if (!user || !event.id) return;
+    await updateDoc(
+      doc(db, "users", user.uid, "financialEvents", event.id),
+      event
+    );
+    setFinancialEvents((prevEvents) =>
+      prevEvents.map((e) => (e.id === event.id ? event : e))
+    );
   };
 
+  // Delete a financial event
   const deleteFinancialEvent = async (id: string) => {
-    await deleteDoc(doc(db, "financialEvents", id));
-    setFinancialEvents(financialEvents.filter((e) => e.id !== id));
+    if (!user) return;
+    await deleteDoc(doc(db, "users", user.uid, "financialEvents", id));
+    setFinancialEvents((prevEvents) => prevEvents.filter((e) => e.id !== id));
   };
 
+  // Provide context values
   return (
     <GlobalFinanceContext.Provider
       value={{
+        user,
         globalTotal,
         updateGlobalTotal,
         financialEvents,
@@ -165,6 +243,7 @@ export function GlobalFinanceProvider({
   );
 }
 
+// Custom hook to use the finance context
 export function useGlobalFinance() {
   const context = useContext(GlobalFinanceContext);
   if (context === undefined) {
