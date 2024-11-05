@@ -84,12 +84,11 @@ export function GlobalFinanceProvider({
     const initializeData = async () => {
       if (isLoading) return; // Wait until loading is complete
 
-      if (isAuthenticated) {
+      if (isAuthenticated && kindeUser) {
         const currentUser: User = {
           uid: kindeUser.id,
-          email: kindeUser.email,
-          displayName:
-            kindeUser.name || kindeUser.given_name || kindeUser.email,
+          email: kindeUser.email || "",
+          displayName: kindeUser.given_name || kindeUser.email || "",
         };
         setUser(currentUser);
         await fetchFinancialData(currentUser.uid);

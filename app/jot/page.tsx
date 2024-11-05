@@ -44,7 +44,7 @@ export default function ThoughtJotter() {
         <div>
           <h3>Generated Venn Diagram</h3>
           {/* Render the diagram */}
-          <img src={generatedDiagram.url} alt="Venn Diagram" />
+          {/* <img src={generatedDiagram.url} alt="Venn Diagram" /> */}
         </div>
       )}
     </div>
