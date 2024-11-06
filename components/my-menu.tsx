@@ -26,7 +26,7 @@ export default function MyMenu2({ setCurrentView }: MyMenuProps) {
             Dashboard<MenubarShortcut>⌘T</MenubarShortcut>
           </MenubarItem>
           <MenubarItem>
-            <a href="/crypto">Crypto</a>
+            <a href="/casino">Casino</a>
           </MenubarItem>
           {/* Add more menu items for different views */}
         </MenubarContent>

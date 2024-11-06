@@ -23,12 +23,11 @@ export function Dashboard() {
 
   const Nav = () => {
     return (
-      <div className="text-black ">
+      <div className="text-black">
         <NavigationMenu className="border border-white w-full p-2 space-x-2">
           <NavigationMenuList>
             <NavigationMenuItem>
               <NavigationMenuTrigger>Item One</NavigationMenuTrigger>
-              <span className="text-white">{globalTotal}</span>
               <NavigationMenuContent>
                 <NavigationMenuLink>Link</NavigationMenuLink>
               </NavigationMenuContent>
@@ -41,21 +40,17 @@ export function Dashboard() {
 
   return (
     <div className="container mx-auto p-4 space-y-8 scrollbar scrollbar-hide">
-      <Nav />
-      <div className="flex text-center justify-center md:justify-between hidden">
-        <h1 className="text-3xl font-bold text-primary hidden md:block">
-          Budget Dashboard
-        </h1>
-        <h1 className="text- text-6xl font-bold text-primary ">
+      <div className="flex text-center justify-center md:justify-between">
+        <h1 className="text- text-6xl font-bold text-primary">
           ${globalTotal}
         </h1>
       </div>
 
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
-        <div className="items-center text-center ">
-          <CalendarComponent />
+      <div className="grid grid-cols-1 gap-8">
+        <div className="w-full md:col-span-full">
+          <BalanceOverview />
         </div>
-        <div className="space-y-8">
+        {/* <div className="space-y-8">
           <Projection
             spending={currentSpending}
             target={targetBudget}
@@ -63,12 +58,18 @@ export function Dashboard() {
               console.log("projection updated");
             }}
           />
+        </div> */}
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-8 items-start">
+          <div className="text-center">
+            <CalendarComponent />
+          </div>
+          <div className="text-center">
+            <Events />
+          </div>
         </div>
-        <Events />
-        <BalanceOverview />
-        <div className="space-y-8 col-span-1 md:col-span-2">
+        {/* <div className="space-y-8 col-span-1 md:col-span-2">
           <RecurringRevenueComponent />
-        </div>
+        </div> */}
       </div>
     </div>
   );

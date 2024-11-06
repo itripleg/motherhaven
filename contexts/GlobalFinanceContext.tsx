@@ -13,7 +13,7 @@ import {
   QueryDocumentSnapshot,
 } from "firebase/firestore";
 import { db } from "@/firebase";
-import { useKindeBrowserClient } from "@kinde-oss/kinde-auth-nextjs"; // Correct client-side hook
+import { useKindeBrowserClient } from "@kinde-oss/kinde-auth-nextjs";
 
 // Define User and FinancialEvent types
 type User = {
@@ -37,11 +37,7 @@ type FinancialEvent = {
 type GlobalFinanceContextType = {
   user: User | null;
   globalTotal: number;
-  updateGlobalTotal: (newTotal: number) => Promise<void>;
   financialEvents: FinancialEvent[];
-  addFinancialEvent: (event: Omit<FinancialEvent, "id">) => Promise<void>;
-  updateFinancialEvent: (event: FinancialEvent) => Promise<void>;
-  deleteFinancialEvent: (id: string) => Promise<void>;
   loading: boolean;
   last30DaysIn: number;
   last30DaysOut: number;
@@ -49,6 +45,10 @@ type GlobalFinanceContextType = {
   totalExpenses: number;
   pendingPayments: FinancialEvent[];
   recurringEvents: FinancialEvent[];
+  updateGlobalTotal: (newTotal: number) => Promise<void>;
+  addFinancialEvent: (event: Omit<FinancialEvent, "id">) => Promise<void>;
+  updateFinancialEvent: (event: FinancialEvent) => Promise<void>;
+  deleteFinancialEvent: (id: string) => Promise<void>;
 };
 
 // Create the context
@@ -56,7 +56,6 @@ const GlobalFinanceContext = createContext<
   GlobalFinanceContextType | undefined
 >(undefined);
 
-// Provider component
 export function GlobalFinanceProvider({
   children,
 }: {
@@ -66,8 +65,7 @@ export function GlobalFinanceProvider({
     isAuthenticated,
     user: kindeUser,
     isLoading,
-    error,
-  } = useKindeBrowserClient(); // Use the client-side hook
+  } = useKindeBrowserClient();
 
   const [user, setUser] = useState<User | null>(null);
   const [globalTotal, setGlobalTotal] = useState<number>(0);
@@ -80,27 +78,23 @@ export function GlobalFinanceProvider({
   const [pendingPayments, setPendingPayments] = useState<FinancialEvent[]>([]);
   const [recurringEvents, setRecurringEvents] = useState<FinancialEvent[]>([]);
 
+  // Load initial user and financial data
   useEffect(() => {
-    const initializeData = async () => {
-      if (isLoading) return; // Wait until loading is complete
+    if (isLoading) return;
 
-      if (isAuthenticated && kindeUser) {
-        const currentUser: User = {
-          uid: kindeUser.id,
-          email: kindeUser.email || "",
-          displayName: kindeUser.given_name || kindeUser.email || "",
-        };
-        setUser(currentUser);
-        await fetchFinancialData(currentUser.uid);
-      } else {
-        setUser(null);
-        setLoading(false);
-      }
-    };
-
-    initializeData();
-    // Only run when authentication status or loading state changes
-  }, [isAuthenticated, isLoading]);
+    if (isAuthenticated && kindeUser) {
+      const currentUser: User = {
+        uid: kindeUser.id || "",
+        email: kindeUser.email || "",
+        displayName: kindeUser.family_name || kindeUser.given_name || "User",
+      };
+      setUser(currentUser);
+      fetchFinancialData(currentUser.uid);
+    } else {
+      setUser(null);
+      setLoading(false);
+    }
+  }, [isAuthenticated, isLoading, kindeUser]);
 
   // Fetch financial data for the authenticated user
   const fetchFinancialData = async (userId: string) => {
@@ -121,57 +115,23 @@ export function GlobalFinanceProvider({
           return {
             id: doc.id,
             ...data,
-            date: data.date.toDate(), // Convert Firestore Timestamp to JS Date
+            date: data.date.toDate(),
           } as FinancialEvent;
         }
       );
-
       setFinancialEvents(eventsList);
 
       // Separate recurring and pending payments
-      const recurring = eventsList.filter((event) => event.recurring);
-      const pending = eventsList.filter((event) => !event.isReceived);
+      setRecurringEvents(eventsList.filter((event) => event.recurring));
+      setPendingPayments(eventsList.filter((event) => !event.isReceived));
 
-      setRecurringEvents(recurring);
-      setPendingPayments(pending);
-
-      // Calculate totals for the last 30 days
-      const now = new Date();
-      const past30Days = new Date();
-      past30Days.setDate(now.getDate() - 30);
-
-      const last30DaysEvents = eventsList.filter(
-        (event) => event.date >= past30Days && event.date <= now
-      );
-
-      const last30DaysIn = last30DaysEvents
-        .filter((event) => event.type === "income")
-        .reduce((acc, event) => acc + event.amount, 0);
-
-      const last30DaysOut = last30DaysEvents
-        .filter((event) => event.type === "expense")
-        .reduce((acc, event) => acc + event.amount, 0);
-
-      setLast30DaysIn(last30DaysIn);
-      setLast30DaysOut(last30DaysOut);
-
-      // Calculate total income and expenses
-      const totalIncome = eventsList
-        .filter((event) => event.type === "income")
-        .reduce((acc, event) => acc + event.amount, 0);
-
-      const totalExpenses = eventsList
-        .filter((event) => event.type === "expense")
-        .reduce((acc, event) => acc + event.amount, 0);
-
-      setTotalIncome(totalIncome);
-      setTotalExpenses(totalExpenses);
+      // Calculate 30-day totals, income, and expenses
+      calculateTotals(eventsList);
 
       // Fetch global total
       const totalDocRef = doc(db, "users", userId, "globalValues", "total");
       const totalDoc = await getDoc(totalDocRef);
-      const totalData = totalDoc.data();
-      setGlobalTotal(totalData?.total || 0);
+      setGlobalTotal(totalDoc.data()?.total || 0);
     } catch (error) {
       console.error("Error fetching financial data:", error);
     } finally {
@@ -179,7 +139,39 @@ export function GlobalFinanceProvider({
     }
   };
 
-  // Update global total
+  // Helper to calculate total income, expenses, and 30-day totals
+  const calculateTotals = (eventsList: FinancialEvent[]) => {
+    const now = new Date();
+    const past30Days = new Date();
+    past30Days.setDate(now.getDate() - 30);
+
+    const last30DaysEvents = eventsList.filter(
+      (event) => event.date >= past30Days && event.date <= now
+    );
+    setLast30DaysIn(
+      last30DaysEvents
+        .filter((event) => event.type === "income")
+        .reduce((acc, event) => acc + event.amount, 0)
+    );
+    setLast30DaysOut(
+      last30DaysEvents
+        .filter((event) => event.type === "expense")
+        .reduce((acc, event) => acc + event.amount, 0)
+    );
+
+    setTotalIncome(
+      eventsList
+        .filter((event) => event.type === "income")
+        .reduce((acc, event) => acc + event.amount, 0)
+    );
+    setTotalExpenses(
+      eventsList
+        .filter((event) => event.type === "expense")
+        .reduce((acc, event) => acc + event.amount, 0)
+    );
+  };
+
+  // CRUD functions for financial events
   const updateGlobalTotal = async (newTotal: number) => {
     if (!user) return;
     const totalRef = doc(db, "users", user.uid, "globalValues", "total");
@@ -187,18 +179,18 @@ export function GlobalFinanceProvider({
     setGlobalTotal(newTotal);
   };
 
-  // Add a new financial event
   const addFinancialEvent = async (event: Omit<FinancialEvent, "id">) => {
     if (!user) return;
     const docRef = await addDoc(
       collection(db, "users", user.uid, "financialEvents"),
       event
     );
-    const newEvent = { ...event, id: docRef.id };
-    setFinancialEvents((prevEvents) => [...prevEvents, newEvent]);
+    setFinancialEvents((prevEvents) => [
+      ...prevEvents,
+      { ...event, id: docRef.id },
+    ]);
   };
 
-  // Update an existing financial event
   const updateFinancialEvent = async (event: FinancialEvent) => {
     if (!user || !event.id) return;
     await updateDoc(
@@ -210,24 +202,18 @@ export function GlobalFinanceProvider({
     );
   };
 
-  // Delete a financial event
   const deleteFinancialEvent = async (id: string) => {
     if (!user) return;
     await deleteDoc(doc(db, "users", user.uid, "financialEvents", id));
     setFinancialEvents((prevEvents) => prevEvents.filter((e) => e.id !== id));
   };
 
-  // Provide context values
   return (
     <GlobalFinanceContext.Provider
       value={{
         user,
         globalTotal,
-        updateGlobalTotal,
         financialEvents,
-        addFinancialEvent,
-        updateFinancialEvent,
-        deleteFinancialEvent,
         loading,
         last30DaysIn,
         last30DaysOut,
@@ -235,6 +221,10 @@ export function GlobalFinanceProvider({
         totalExpenses,
         pendingPayments,
         recurringEvents,
+        updateGlobalTotal,
+        addFinancialEvent,
+        updateFinancialEvent,
+        deleteFinancialEvent,
       }}
     >
       {children}
@@ -245,10 +235,9 @@ export function GlobalFinanceProvider({
 // Custom hook to use the finance context
 export function useGlobalFinance() {
   const context = useContext(GlobalFinanceContext);
-  if (context === undefined) {
+  if (!context)
     throw new Error(
       "useGlobalFinance must be used within a GlobalFinanceProvider"
     );
-  }
   return context;
 }
