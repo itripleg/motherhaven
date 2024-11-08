@@ -15,6 +15,12 @@ export default function LandingPage() {
   const [loading, setLoading] = useState(false);
   const router = useRouter();
 
+  // Ensure component only renders on the client side
+  const [hasMounted, setHasMounted] = useState(false);
+  useEffect(() => {
+    setHasMounted(true);
+  }, []);
+
   // Handle theme setting
   useEffect(() => {
     document.body.className = theme;
@@ -30,7 +36,6 @@ export default function LandingPage() {
     if (!isConnected) {
       setLoading(true); // Start loading when attempting to connect
       await connect({ connector: injected() });
-      console.log("Connecting wallet...");
       setWalletConnected(true);
       setTimeout(() => {
         router.push("/casino/lobby"); // Redirect after 2 seconds for effect
@@ -53,26 +58,30 @@ export default function LandingPage() {
     );
   }
 
+  // Avoid rendering until the component has mounted on the client side
+  if (!hasMounted) {
+    return null;
+  }
+
   return (
     <div className="min-h-screen flex flex-col">
-      {/* Remove WalletOptions if not needed */}
-      {/* <WalletOptions /> */}
-      <header className="p-4 flex justify-between items-center">
+      {/* <header className="p-4 flex justify-between items-center">
         <h1 className="text-2xl font-bold">The House</h1>
         <Button variant="ghost" size="icon" onClick={toggleTheme}>
           {theme === "light" ? <MoonIcon /> : <SunIcon />}
         </Button>
-      </header>
+      </header> */}
       <main className="flex-grow flex items-center justify-center">
         <div className="text-center">
           <h2 className="text-4xl font-bold mb-4">
             Welcome back,
-            <span className="">{isConnected ? address : "Guest"}</span>
+            <span className="">
+              {isConnected
+                ? `0x${address?.substring(2, 5)}...${address?.slice(-3)}`
+                : "Guest"}
+            </span>
           </h2>
-          <p className="text-xl mb-8">
-            {/* Experience the thrill of decentralized gaming */}
-            May the odds ever be in your favor.
-          </p>
+          <p className="text-xl mb-8">May the odds ever be in your favor.</p>
           <Button size="lg" onClick={connectWallet}>
             {isConnected ? "Wallet Connected" : "Connect Wallet"}
           </Button>

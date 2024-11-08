@@ -10,11 +10,11 @@ import {
 } from "@/components/ui/menubar";
 import { ModeToggle } from "./mode-toggle";
 
-type MyMenuProps = {
-  setCurrentView: (view: "dashboard" | "chart") => void; // Define the type of setCurrentView
-};
+// type MyMenuProps = {
+//   setCurrentView: (view: "dashboard" | "chart") => void; // Define the type of setCurrentView
+// };
 
-export default function MyMenu2({ setCurrentView }: MyMenuProps) {
+export default function MyMenu2() {
   return (
     <Menubar className="text-primary rounded-md max-w-[300px] md:max-w-xl justify-center mx-auto mt-4 ">
       <MenubarMenu>
@@ -22,7 +22,7 @@ export default function MyMenu2({ setCurrentView }: MyMenuProps) {
           Munny
         </MenubarTrigger>
         <MenubarContent>
-          <MenubarItem onClick={() => setCurrentView("dashboard")}>
+          <MenubarItem>
             Dashboard<MenubarShortcut>⌘T</MenubarShortcut>
           </MenubarItem>
           <MenubarItem>

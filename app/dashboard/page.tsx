@@ -45,7 +45,7 @@ function Page() {
   return (
     <div>
       {/* Pass setCurrentView to MyMenu */}
-      <MyMenu setCurrentView={setCurrentView} />
+      {/* <MyMenu setCurrentView={setCurrentView} /> */}
       <Container className="mt-8">{renderView()}</Container>
     </div>
   );

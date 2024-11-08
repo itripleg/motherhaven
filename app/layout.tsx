@@ -5,6 +5,8 @@ import { ThemeProvider } from "@/components/theme-provider";
 // import StickyHeader from "@/components/sticky-header";
 import { GlobalFinanceProvider } from "@/contexts/GlobalFinanceContext";
 import StickyHeader from "@/components/sticky-header";
+import MyMenu from "@/components/my-menu";
+import { useState } from "react";
 // import MyMenu from "@/components/my-menu";
 
 const geistSans = localFont({
@@ -40,6 +42,7 @@ export default function RootLayout({
         suppressHydrationWarning
         className={`${geistSans.variable} ${geistMono.variable} antialiased`}
       >
+        <MyMenu />
         <ThemeProvider>
           {/* <StickyHeader /> */}
           {/* <MyMenu /> */}
