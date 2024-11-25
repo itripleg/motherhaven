@@ -7,17 +7,17 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { useToast } from "@/hooks/use-toast";
 import tk_metadata from "@/contracts/token-factory/Token_metadata.json";
-import tf_metadata from "@/contracts/token-factory/TokenFactory_metadata.json";
+// import tf_metadata from "@/contracts/token-factory/TokenFactory_metadata.json";
+import streamlineABI from "@/contracts/token-factory/StreamlineABI.json";
+
 import { config } from "@/wagmi-config";
 
 export function BuyTokenForm() {
   const tokenABI = tk_metadata.output.abi;
-  const tokenFactoryABI = tf_metadata.output.abi;
+  const tokenFactoryABI = streamlineABI;
   const isLoading = false;
 
-  // const FACTORY_ADDRESS = "0x59A612625c2c7cad58159c4F5f136adc213d9537";
-  // const FACTORY_ADDRESS = "0xb5cf4a81DCDB1e2e1df566DAEC536CE090960De3";
-  const FACTORY_ADDRESS = "0x1AAF6086ecD61E2dAc4EA3Af1e512e5AA75f463c";
+  const FACTORY_ADDRESS = "0x5CefB1c5efc02aba182242D593554AAEf30f2631";
   const [tokenAddress, setTokenAddress] = useState("");
   const [amount, setAmount] = useState("");
   const { toast } = useToast();
@@ -26,13 +26,16 @@ export function BuyTokenForm() {
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+    console.log("Token Address: ", tokenAddress);
+    console.log("Amount in AVAX: ", amount);
+
     try {
       const result = await writeContract({
         abi: tokenFactoryABI,
-        address: "0xYourTokenFactoryAddress",
+        address: FACTORY_ADDRESS,
         functionName: "buy",
-        args: [tokenAddress, parseEther(amount || "0")],
-        value: parseEther(amount || "0"),
+        args: [tokenAddress],
+        value: parseEther(amount || "1"),
       });
       toast({
         title: "Token Purchase Initiated",
