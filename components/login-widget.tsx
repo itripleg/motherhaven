@@ -39,7 +39,7 @@ function LoginWidget({}: Props) {
             <LoginLink
               // postLoginRedirectURL={"/"}
               // postLoginRedirectURL="/dashboard"
-              className="text-white md:hover:underline underline md:no-underline"
+              className="text-primary md:hover:underline underline md:no-underline"
             >
               login
             </LoginLink>{" "}
