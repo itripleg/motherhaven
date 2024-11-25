@@ -7,6 +7,7 @@ import { GlobalFinanceProvider } from "@/contexts/GlobalFinanceContext";
 import StickyHeader from "@/components/sticky-header";
 import MyMenu from "@/components/my-menu";
 import { useState } from "react";
+import WagmiContext from "@/contexts/WagmiContext";
 // import MyMenu from "@/components/my-menu";
 
 const geistSans = localFont({
@@ -46,7 +47,9 @@ export default function RootLayout({
         <ThemeProvider>
           {/* <StickyHeader /> */}
           {/* <MyMenu /> */}
-          <GlobalFinanceProvider>{children}</GlobalFinanceProvider>
+          <WagmiContext>
+            <GlobalFinanceProvider>{children}</GlobalFinanceProvider>
+          </WagmiContext>
         </ThemeProvider>
       </body>
     </html>

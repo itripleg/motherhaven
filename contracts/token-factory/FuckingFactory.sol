@@ -7,9 +7,10 @@ import "https://github.com/Uniswap/v2-periphery/blob/master/contracts/interfaces
 import "https://github.com/Uniswap/v2-core/blob/master/contracts/interfaces/IUniswapV2Pair.sol";
 
 contract TokenFactory {
-
     enum TokenState {
-        NOT_CREATED, ICO, TRADING
+        NOT_CREATED,
+        ICO,
+        TRADING
     }
 
     uint256 public constant DECIMALS = 10 ** 18;
@@ -18,9 +19,19 @@ contract TokenFactory {
     uint256 public constant TARGET_PRICE = 1000 ether; // 1000 AVAX (assuming 1 AVAX = 1 ether)
     uint256 public constant FUNDING_GOAL = 30 ether; // Adjust as necessary
 
-    // Sepolia addresses (replace with actual Avalanche addresses if needed)
-    address public UNISWAP_V2_FACTORY = 0xF62c03E08ada871A0bEb309762E260a7a6a880E6;
-    address public UNISWAP_V2_ROUTER = 0xeE567Fe1712Faf6149d80dA1E6934E354124CfE3;
+    // // mainnet
+    // address public UNISWAP_V2_FACTORY = 0x5C69bEe701ef814a2B6a3EDD4B1652CB9cc5aA6f;
+    // address public UNISWAP_V2_ROTUER = 0x7a250d5630B4cF539739dF2C5dAcb4c659F2488D;
+
+    // // avalanche
+    address public UNISWAP_V2_FACTORY =
+        0x9e5A52f57b3038F1B8EeE45F28b3C1967e22799C;
+    address public UNISWAP_V2_ROTUER =
+        0x4752ba5dbc23f44d87826276bf6fd6b1c372ad24;
+
+    //seoplia
+    // address public UNISWAP_V2_FACTORY = 0xF62c03E08ada871A0bEb309762E260a7a6a880E6;
+    // address public UNISWAP_V2_ROUTER = 0xeE567Fe1712Faf6149d80dA1E6934E354124CfE3;
 
     // Stores all tokens created
     address[] private allTokens;
@@ -52,7 +63,10 @@ contract TokenFactory {
 
     // Users can buy tokens during the ICO
     function buy(address tokenAddress, uint amount) external payable {
-        require(tokens[tokenAddress] == TokenState.ICO, "Token not available for ICO.");
+        require(
+            tokens[tokenAddress] == TokenState.ICO,
+            "Token not available for ICO."
+        );
         Token token = Token(tokenAddress);
         uint availableSupply = MAX_SUPPLY - token.totalSupply();
         require(amount <= availableSupply, "Not enough available supply.");
@@ -72,14 +86,17 @@ contract TokenFactory {
         if (getCurrentPrice(tokenAddress) >= TARGET_PRICE) {
             // Create liquidity pool and provide liquidity
             address pool = _createLiquidityPool(tokenAddress);
-            uint liquidity = _provideLiquidity(tokenAddress, INITIAL_MINT, collateral[tokenAddress]);
+            uint liquidity = _provideLiquidity(
+                tokenAddress,
+                INITIAL_MINT,
+                collateral[tokenAddress]
+            );
             _burnLpTokens(pool, liquidity);
 
             // Update token state to TRADING
             tokens[tokenAddress] = TokenState.TRADING;
         }
     }
-
 
     function calculateRequiredEth(
         address tokenAddress,
@@ -89,16 +106,21 @@ contract TokenFactory {
         uint256 totalTokensSold = token.totalSupply() - INITIAL_MINT; // Tokens sold during ICO (in wei)
 
         uint256 initialPrice = 0.001 ether; // P0 (in wei)
-        uint256 finalPrice = 1000 ether;    // Pf (in wei)
+        uint256 finalPrice = 1000 ether; // Pf (in wei)
         uint256 tokensForSale = MAX_SUPPLY - INITIAL_MINT; // Tokens available for sale (in wei)
 
         // Calculate the fraction of tokens sold and to be sold (scaled by 1e18 for precision)
         uint256 startFraction = (totalTokensSold * 1e18) / tokensForSale;
-        uint256 endFraction = ((totalTokensSold + amount) * 1e18) / tokensForSale;
+        uint256 endFraction = ((totalTokensSold + amount) * 1e18) /
+            tokensForSale;
 
         // Calculate the start and end prices using the bonding curve
-        uint256 startPrice = initialPrice + ((finalPrice - initialPrice) * startFraction) / 1e18;
-        uint256 endPrice = initialPrice + ((finalPrice - initialPrice) * endFraction) / 1e18;
+        uint256 startPrice = initialPrice +
+            ((finalPrice - initialPrice) * startFraction) /
+            1e18;
+        uint256 endPrice = initialPrice +
+            ((finalPrice - initialPrice) * endFraction) /
+            1e18;
 
         // Calculate the total required ETH as the area under the price curve
         uint256 totalPrice = ((startPrice + endPrice) * amount) / (2 * 1e18);
@@ -112,21 +134,23 @@ contract TokenFactory {
         uint256 tokensForSale = MAX_SUPPLY - INITIAL_MINT; // Tokens available for sale (in wei)
 
         uint256 initialPrice = 0.001 ether; // P0 (in wei)
-        uint256 finalPrice = 1000 ether;    // Pf (in wei)
+        uint256 finalPrice = 1000 ether; // Pf (in wei)
 
         // Calculate the fraction of tokens sold (scaled by 1e18 for precision)
         uint256 fractionSold = (totalTokensSold * 1e18) / tokensForSale;
 
         // Calculate the current price using the bonding curve
-        uint256 currentPrice = initialPrice + ((finalPrice - initialPrice) * fractionSold) / 1e18;
+        uint256 currentPrice = initialPrice +
+            ((finalPrice - initialPrice) * fractionSold) /
+            1e18;
 
         return currentPrice;
     }
 
-
-
     // Once the target price is reached, deploy a liquidity pool with the collateral raised
-    function _createLiquidityPool(address tokenAddress) internal returns (address) {
+    function _createLiquidityPool(
+        address tokenAddress
+    ) internal returns (address) {
         IUniswapV2Factory factory = IUniswapV2Factory(UNISWAP_V2_FACTORY);
         IUniswapV2Router02 router = IUniswapV2Router02(UNISWAP_V2_ROUTER);
         address pair = factory.createPair(tokenAddress, router.WETH());
@@ -145,12 +169,12 @@ contract TokenFactory {
 
         // Add liquidity and receive liquidity tokens
         (, , liquidity) = router.addLiquidityETH{value: ethAmount}(
-            tokenAddress,           // Address of the token
-            tokenAmount,            // Amount of tokens to add
-            tokenAmount,            // Min amount of tokens (slippage protection)
-            ethAmount,              // Min amount of ETH (slippage protection)
-            address(this),          // Recipient of liquidity tokens
-            block.timestamp         // Deadline for the transaction
+            tokenAddress, // Address of the token
+            tokenAmount, // Amount of tokens to add
+            tokenAmount, // Min amount of tokens (slippage protection)
+            ethAmount, // Min amount of ETH (slippage protection)
+            address(this), // Recipient of liquidity tokens
+            block.timestamp // Deadline for the transaction
         );
         collateral[tokenAddress] = 0;
         return liquidity;
@@ -164,7 +188,10 @@ contract TokenFactory {
 
     // Users can withdraw their tokens after the ICO is over
     function withdraw(address tokenAddress, address to) external {
-        require(tokens[tokenAddress] == TokenState.TRADING, "Token not ready for withdrawal.");
+        require(
+            tokens[tokenAddress] == TokenState.TRADING,
+            "Token not ready for withdrawal."
+        );
         uint256 balance = balances[tokenAddress][msg.sender];
         require(balance > 0, "No tokens to withdraw.");
 
@@ -173,7 +200,10 @@ contract TokenFactory {
 
         // Ensure the contract has enough tokens before attempting transfer
         uint256 contractBalance = token.balanceOf(address(this));
-        require(contractBalance >= balance, "Contract has insufficient tokens.");
+        require(
+            contractBalance >= balance,
+            "Contract has insufficient tokens."
+        );
 
         token.transfer(to, balance); // Transfer tokens to the specified address
     }
@@ -181,7 +211,9 @@ contract TokenFactory {
     // Getter functions
 
     // Get the token state
-    function getTokenState(address tokenAddress) public view returns (TokenState) {
+    function getTokenState(
+        address tokenAddress
+    ) public view returns (TokenState) {
         return tokens[tokenAddress];
     }
 
@@ -191,12 +223,17 @@ contract TokenFactory {
     }
 
     // Get a user's balance for a token
-    function getBalance(address tokenAddress, address user) public view returns (uint256) {
+    function getBalance(
+        address tokenAddress,
+        address user
+    ) public view returns (uint256) {
         return balances[tokenAddress][user];
     }
 
     // Get the creator of a token
-    function getTokenCreator(address tokenAddress) public view returns (address) {
+    function getTokenCreator(
+        address tokenAddress
+    ) public view returns (address) {
         return tokenCreators[tokenAddress];
     }
 
