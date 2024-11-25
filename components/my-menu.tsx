@@ -35,6 +35,9 @@ export default function MyMenu2() {
           <MenubarItem>
             <a href="/factory">Token Factory</a>
           </MenubarItem>
+          <MenubarItem>
+            <a href="/roadmap">Road to Riches</a>
+          </MenubarItem>
         </MenubarContent>
       </MenubarMenu>
       <ModeToggle />
