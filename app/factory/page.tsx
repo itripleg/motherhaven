@@ -15,6 +15,7 @@ import { CreateTokenForm } from "@/app/factory/CreateTokenForm";
 import { BuyTokenForm } from "./BuyTokenForm";
 import { WithdrawTokenForm } from "./WithdrawTokenForm";
 import { SacrificeForm } from "./SacrificeForm";
+import AllTokensDisplay from "./AllTokensDisplay";
 
 export default function Home() {
   const { address, isConnected } = useAccount();
@@ -56,8 +57,16 @@ export default function Home() {
       <h1 className="text-4xl font-bold mb-8">Token Factory</h1>
       {isConnected ? (
         <>
-          <p className="mb-4">Connected to: {address}</p>
-          <Button onClick={() => disconnect()}>Disconnect</Button>
+          <div className="flex justify-between">
+            <p className="mb-4">
+              Logged in as{" "}
+              {address
+                ? `${address.slice(0, 6)}...${address.slice(-4)}`
+                : "N/A"}
+            </p>
+            <Button onClick={() => disconnect()}>Disconnect</Button>
+          </div>
+          <AllTokensDisplay />
           <Tabs defaultValue="create" className="mt-8">
             <TabsList>
               <TabsTrigger value="create">Create Token</TabsTrigger>

@@ -18,12 +18,60 @@ import { Container } from "@/components/craft";
 // import { Dice, Cards, Chip } from "lucide-react";
 
 const games = [
-  { id: 1, name: "Poker", category: "card", players: 1000, minBet: 0.01 },
-  { id: 2, name: "Blackjack", category: "card", players: 750, minBet: 0.05 },
-  { id: 3, name: "Roulette", category: "table", players: 500, minBet: 0.1 },
-  { id: 4, name: "Slots", category: "machine", players: 2000, minBet: 0.01 },
-  { id: 5, name: "Craps", category: "dice", players: 300, minBet: 0.25 },
-  { id: 6, name: "Baccarat", category: "card", players: 400, minBet: 0.5 },
+  {
+    id: 1,
+    name: "Poker",
+    category: "card",
+    players: 1000,
+    minBet: 0.01,
+    link: "/games/poker",
+    active: false,
+  },
+  {
+    id: 2,
+    name: "Blackjack",
+    category: "card",
+    players: 750,
+    minBet: 0.05,
+    link: "/games/blackjack",
+    active: false,
+  },
+  {
+    id: 3,
+    name: "Roulette",
+    category: "table",
+    players: 500,
+    minBet: 0.1,
+    link: "/games/roulette",
+    active: false,
+  },
+  {
+    id: 4,
+    name: "Slots",
+    category: "machine",
+    players: 2000,
+    minBet: 0.01,
+    link: "/games/slots",
+    active: false,
+  },
+  {
+    id: 5,
+    name: "Magic Dice",
+    category: "dice",
+    players: 300,
+    minBet: 0.25,
+    link: "/casino/games/dice",
+    active: true,
+  },
+  {
+    id: 6,
+    name: "Baccarat",
+    category: "card",
+    players: 400,
+    minBet: 0.5,
+    link: "/games/baccarat",
+    active: false,
+  },
 ];
 
 const GameCard = ({ game }: any) => (
@@ -42,7 +90,15 @@ const GameCard = ({ game }: any) => (
         </div>
       </CardContent>
       <CardFooter>
-        <Button className="w-full">Play Now</Button>
+        <Button
+          className="w-full"
+          disabled={!game.active}
+          onClick={() => {
+            if (game.active) window.location.href = game.link;
+          }}
+        >
+          {game.active ? "Play Now" : "Inactive"}
+        </Button>
       </CardFooter>
     </Card>
   </motion.div>

@@ -19,16 +19,22 @@ export default function MyMenu2() {
     <Menubar className="text-primary rounded-md max-w-[300px] md:max-w-xl justify-center mx-auto mt-4 ">
       <MenubarMenu>
         <MenubarTrigger className="uppercase tracking-wider">
-          Munny
+          Motherhaven
         </MenubarTrigger>
         <MenubarContent>
-          <MenubarItem>
+          {/* <MenubarItem>
             Dashboard<MenubarShortcut>⌘T</MenubarShortcut>
+          </MenubarItem> */}
+
+          <MenubarItem>
+            <a href="/dashboard">Dash</a>
           </MenubarItem>
           <MenubarItem>
             <a href="/casino">Casino</a>
           </MenubarItem>
-          {/* Add more menu items for different views */}
+          <MenubarItem>
+            <a href="/factory">Token Factory</a>
+          </MenubarItem>
         </MenubarContent>
       </MenubarMenu>
       <ModeToggle />

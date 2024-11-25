@@ -9,10 +9,9 @@ import { Label } from "@/components/ui/label";
 import { useToast } from "@/hooks/use-toast";
 import { Canvas } from "@react-three/fiber";
 import { Box, OrbitControls } from "@react-three/drei";
-import tf_metadata from "@/contracts/token-factory/TokenFactory_metadata.json";
+import tokenFactoryABI from "@/contracts/token-factory/TokenFactory_abi.json";
 
-const tokenFactoryABI = tf_metadata.output.abi;
-const FACTORY_ADDRESS = "0x59A612625c2c7cad58159c4F5f136adc213d9537";
+const FACTORY_ADDRESS = "0x7713A39875A5335dc4Fc4f9359908afb55984b1F";
 
 export function SacrificeForm() {
   const [sacrificeAmount, setSacrificeAmount] = useState("");
