@@ -82,13 +82,19 @@ export default function LandingPage() {
             </span>
           </h2>
           <p className="text-xl mb-8">May the odds ever be in your favor.</p>
-          <Button size="lg" onClick={connectWallet}>
-            {isConnected ? "Wallet Connected" : "Connect Wallet"}
-          </Button>
+          {isConnected ? (
+            <Button size="lg" onClick={() => router.push("/casino/lobby")}>
+              Go to Lobby
+            </Button>
+          ) : (
+            <Button size="lg" onClick={connectWallet}>
+              Connect Wallet
+            </Button>
+          )}
         </div>
       </main>
       <footer className="p-4 text-center">
-        <p>&copy; 2024 CryptoComfort Casino. All rights reserved.</p>
+        <p>&copy; 2024 Motherhaven. All rights reserved.</p>
       </footer>
     </div>
   );

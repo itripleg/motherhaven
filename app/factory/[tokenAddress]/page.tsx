@@ -25,12 +25,28 @@ import { BuyTokenForm } from "../BuyTokenForm";
 import { SellTokenForm } from "../SellTokenForm";
 import { TokenPriceChart } from "../TokenPriceChart"; // New import for chart
 
+import { DocumentReference, DocumentData } from "firebase/firestore";
+
+export interface TokenData {
+  id: string;
+  address: string;
+  name: string;
+  symbol: string;
+  blockNumber: number;
+  timestamp: number | Date;
+}
+
+export interface Trade {
+  timestamp: Date;
+  price: number;
+}
+
 export default function TokenPage() {
   const pathname = usePathname();
-  const tokenAddress = pathname?.split("/").pop();
+  const tokenAddress = pathname?.split("/").pop() || "";
 
-  const [tokenData, setTokenData] = useState(null);
-  const [trades, setTrades] = useState([]);
+  const [tokenData, setTokenData] = useState<TokenData | null>(null);
+  const [trades, setTrades] = useState<Trade[]>([]);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
@@ -41,10 +57,22 @@ export default function TokenPage() {
 
     async function fetchTokenData() {
       try {
-        const tokenDocRef = doc(db, "tokens", tokenAddress);
+        // Explicitly type the document reference
+        const tokenDocRef: DocumentReference<DocumentData> = doc(
+          db,
+          "tokens",
+          tokenAddress
+        );
+
         const tokenDoc = await getDoc(tokenDocRef);
         if (tokenDoc.exists()) {
-          setTokenData({ id: tokenDoc.id, ...tokenDoc.data() });
+          const data = tokenDoc.data() as Omit<TokenData, "id">;
+          setTokenData({
+            id: tokenDoc.id,
+            ...data,
+            // Ensure blockNumber is a number
+            blockNumber: Number(data.blockNumber || 0),
+          });
         } else {
           console.error("Token not found");
         }
@@ -54,7 +82,7 @@ export default function TokenPage() {
           where("tokenAddress", "==", tokenAddress)
         );
         const tradesSnapshot = await getDocs(tradesQuery);
-        const tradesData = tradesSnapshot.docs.map((doc) => {
+        const tradesData: Trade[] = tradesSnapshot.docs.map((doc) => {
           const { timestamp, pricePaid } = doc.data();
           return {
             timestamp: new Date(timestamp.seconds * 1000),
