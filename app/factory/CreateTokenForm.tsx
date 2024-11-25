@@ -1,5 +1,6 @@
 "use client";
-import * as React from "react";
+
+import React, { useState, useEffect } from "react";
 import { useWriteContract, useWaitForTransactionReceipt } from "wagmi";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -12,81 +13,112 @@ import tf_metadata from "@/contracts/token-factory/TokenFactory_metadata.json";
 const tokenFactoryABI = tf_metadata.output.abi;
 const FACTORY_ADDRESS = "0x5CefB1c5efc02aba182242D593554AAEf30f2631";
 
+type TokenDetails = {
+  name: string;
+  symbol: string;
+  address?: string;
+  blockNumber?: number;
+  timestamp?: string;
+  transactionHash?: string;
+};
+
 export function CreateTokenForm() {
   const { toast } = useToast();
 
-  const {
-    data: transactionHash,
-    isPending,
-    writeContract,
-  } = useWriteContract();
+  // Manage writeContract interaction
+  const { data: hash, error, isPending, writeContract } = useWriteContract();
 
-  const { isLoading: isConfirming, isSuccess: isConfirmed } =
+  // Manage transaction receipt
+  const { isLoading: isConfirming, data: receipt } =
     useWaitForTransactionReceipt({
-      hash: transactionHash,
+      hash: hash,
     });
+
+  // Local state for token details
+  const [tokenDetails, setTokenDetails] = useState<TokenDetails | null>(null);
 
   async function handleSubmit(e: React.FormEvent<HTMLFormElement>) {
     e.preventDefault();
     const formData = new FormData(e.target as HTMLFormElement);
     const name = formData.get("name") as string;
-    const ticker = formData.get("ticker") as string;
+    const symbol = formData.get("symbol") as string;
+
+    if (!name || !symbol) {
+      toast({
+        title: "Error",
+        description: "Name and symbol are required.",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    // Set initial token details
+    setTokenDetails({ name, symbol: symbol });
 
     writeContract({
       address: FACTORY_ADDRESS,
       abi: tokenFactoryABI,
       functionName: "createToken",
-      args: [name, ticker],
-      async onSuccess(data) {
-        toast({
-          title: "Transaction Submitted",
-          description: `Transaction hash: ${data}`,
-        });
-
-        // Wait for confirmation and extract token address from event
-        const receipt = await data.wait();
-        const tokenCreatedEvent = receipt.events?.find(
-          (event) => event.event === "TokenCreated"
-        );
-
-        if (!tokenCreatedEvent) {
-          toast({
-            title: "Error",
-            description: "Failed to retrieve token address.",
-            variant: "destructive",
-          });
-          return;
-        }
-
-        const tokenAddress = tokenCreatedEvent.args?.[0]; // Extract token address
-        const transaction = data.from; // Creator address from the transaction
-
-        toast({
-          title: "Token Created",
-          description: `Token Address: ${tokenAddress}`,
-        });
-
-        // Save token details to Firestore
-        const tokenDocRef = doc(db, "tokens", tokenAddress);
-        await setDoc(tokenDocRef, {
-          name,
-          ticker,
-          logo: "", // Placeholder for logo
-          creator: transaction, // Save the creator's address
-          transactionHash: transactionHash, // Save the transaction hash
-          createdAt: new Date().toISOString(),
-        });
-      },
-      onError(err) {
-        console.error("Error:", err);
-        toast({
-          title: "Error",
-          description: "Failed to create token.",
-          variant: "destructive",
-        });
-      },
+      args: [name, symbol],
     });
   }
+
+  useEffect(() => {
+    if (receipt && tokenDetails && !tokenDetails.address) {
+      const tokenCreatedEvent = receipt.logs?.find((log: any) => log.address);
+
+      if (!tokenCreatedEvent) {
+        toast({
+          title: "Error",
+          description: "Failed to retrieve token address.",
+          variant: "destructive",
+        });
+        return;
+      }
+
+      const address = tokenCreatedEvent.address;
+      const blockNumber = Number(receipt.blockNumber);
+      const transactionHash = receipt.transactionHash;
+
+      // Fetch timestamp only once
+      const timestamp = new Date().toISOString();
+
+      // Update state with token details
+      setTokenDetails((prev) => ({
+        ...prev!,
+        address,
+        blockNumber,
+        timestamp,
+        transactionHash,
+      }));
+
+      // Save to Firestore
+      const tokenDocRef = doc(db, "tokens", address);
+      setDoc(tokenDocRef, {
+        name: tokenDetails.name,
+        symbol: tokenDetails.symbol,
+        address,
+        blockNumber,
+        timestamp,
+        transactionHash,
+        createdAt: new Date().toISOString(),
+      })
+        .then(() => {
+          toast({
+            title: "Token Created",
+            description: `Token Address: ${address}`,
+          });
+        })
+        .catch((err) => {
+          console.error("Firestore Error:", err);
+          toast({
+            title: "Error",
+            description: "Failed to save token details.",
+            variant: "destructive",
+          });
+        });
+    }
+  }, [receipt, toast]);
 
   return (
     <form onSubmit={handleSubmit} className="space-y-6">
@@ -101,16 +133,28 @@ export function CreateTokenForm() {
           />
         </div>
         <div>
-          <Label htmlFor="ticker">Token Ticker</Label>
-          <Input id="ticker" name="ticker" placeholder="MAT" required />
+          <Label htmlFor="symbol">Token Ticker</Label>
+          <Input id="symbol" name="symbol" placeholder="MAT" required />
         </div>
       </div>
       <Button type="submit" className="w-full" disabled={isPending}>
         {isPending ? "Confirming..." : "Create Token"}
       </Button>
-      {transactionHash && <div>Transaction Hash: {transactionHash}</div>}
+      {hash && <div>Transaction Hash: {hash}</div>}
       {isConfirming && <div>Waiting for confirmation...</div>}
-      {isConfirmed && <div>Transaction confirmed.</div>}
+
+      {/* Display token details */}
+      {tokenDetails?.address && (
+        <div className="mt-4 space-y-2">
+          <div>Token Name: {tokenDetails.name}</div>
+          <div>Token Symbol: {tokenDetails.symbol}</div>
+          <div>Token Address: {tokenDetails.address}</div>
+          <div>Block Number: {tokenDetails.blockNumber}</div>
+          <div>Timestamp: {tokenDetails.timestamp}</div>
+          <div>Transaction Hash: {tokenDetails.transactionHash}</div>
+        </div>
+      )}
+      {error && <div>Error: {error.message}</div>}
     </form>
   );
 }

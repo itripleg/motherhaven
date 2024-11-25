@@ -1,104 +1,134 @@
 "use client";
-import { useRouter } from "next/navigation";
-import { useState, useEffect } from "react";
-import { motion } from "framer-motion";
-import { isAddress } from "viem";
-import { db } from "@/firebase";
-import { collection, getDocs } from "firebase/firestore";
-import { Card } from "@/components/ui/card";
-import { TokenFactoryListener } from "./TokenFactoryListener";
+import { useEffect, useState } from "react";
+import { useAccount, useConnect, useDisconnect } from "wagmi";
+import { Button } from "@/components/ui/button";
+import {
+  Card,
+  CardContent,
+  CardDescription,
+  CardHeader,
+  CardTitle,
+} from "@/components/ui/card";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { useToast } from "@/hooks/use-toast";
+import { CreateTokenForm } from "@/app/factory/CreateTokenForm";
+import { BuyTokenForm } from "./BuyTokenForm";
+import { WithdrawTokenForm } from "./WithdrawTokenForm";
+import { SacrificeForm } from "./SacrificeForm";
+import AllTokensDisplay from "./AllTokensDisplay";
 
-export default function FactoryDefaultPage() {
-  const router = useRouter();
-  const [inputAddress, setInputAddress] = useState("");
-  const [tokens, setTokens] = useState([]);
+export default function Home() {
+  const { address, isConnected } = useAccount();
+  const { connect, connectors } = useConnect();
+  const { disconnect } = useDisconnect();
+  const { toast } = useToast();
+  const isLoading = false;
+  // State to check if it's running on the client
+  const [isClient, setIsClient] = useState(false);
 
   useEffect(() => {
-    async function fetchTokens() {
-      try {
-        const querySnapshot = await getDocs(collection(db, "tokens"));
-        const tokensData = querySnapshot.docs.map((doc) => ({
-          id: doc.id, // Token address
-          ...doc.data(),
-        }));
-        setTokens(tokensData);
-      } catch (error) {
-        console.error("Error fetching tokens: ", error);
-      }
-    }
-    fetchTokens();
+    // Only set `isClient` to true when we're sure we're on the client side
+    setIsClient(true);
   }, []);
 
-  const handleSearch = (e) => {
-    e.preventDefault();
-    if (isAddress(inputAddress)) {
-      router.push(`/factory/${inputAddress}`);
-    } else {
-      alert("Please enter a valid token address");
+  const handleConnect = async (connectorId: number) => {
+    try {
+      const connector = connectors[connectorId];
+      await connect({ connector });
+      toast({
+        title: "Connected",
+        description: "Successfully connected to wallet",
+      });
+    } catch (error) {
+      toast({
+        title: "Connection Failed",
+        description: "Failed to connect to wallet",
+        variant: "destructive",
+      });
     }
   };
 
+  if (!isClient) {
+    // Render nothing or a loading state while determining client-side
+    return null;
+  }
   return (
     <div className="container mx-auto p-4">
-      <h1 className="text-2xl font-bold mb-4">Welcome to the Token Factory</h1>
-      <p>
-        Select a token to view its details or enter a token address in the URL.
-      </p>
-      <div className="mt-8">
-        {/* Search Bar */}
-        <motion.form
-          onSubmit={handleSearch}
-          initial={{ opacity: 0, y: -20 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ duration: 0.5 }}
-          className="flex items-center space-x-4"
-        >
-          <input
-            type="text"
-            value={inputAddress}
-            onChange={(e) => setInputAddress(e.target.value)}
-            placeholder="Enter token address"
-            className="px-4 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
-          />
-          <motion.button
-            whileHover={{ scale: 1.05 }}
-            whileTap={{ scale: 0.95 }}
-            type="submit"
-            className="bg-blue-500 text-white px-6 py-2 rounded-md"
-          >
-            Search
-          </motion.button>
-        </motion.form>
-
-        <div className="mt-8">
-          <h2 className="text-xl font-semibold mb-4">NewTokens</h2>
-          <TokenFactoryListener />
-          <h2 className="text-xl font-semibold mb-4">Trending Tokens</h2>
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-            {tokens.map((token) => (
-              <Card key={token.id} className="p-4">
-                <h3 className="text-lg font-bold">
-                  {token.name} ({token.ticker})
-                </h3>
-                <p>
-                  <strong>Token Address:</strong> {token.id}
-                </p>
-                <p>
-                  <strong>Transaction Hash:</strong> {token.creator}
-                </p>
-                <motion.button
-                  whileHover={{ scale: 1.05 }}
-                  whileTap={{ scale: 0.95 }}
-                  onClick={() => router.push(`/factory/${token.id}`)}
-                  className="mt-4 bg-blue-500 text-white px-4 py-2 rounded-md"
-                >
-                  View Token
-                </motion.button>
-              </Card>
-            ))}
+      <h1 className="text-4xl font-bold mb-8">Token Factory</h1>
+      {isConnected ? (
+        <>
+          <div className="flex justify-between">
+            <p className="mb-4">
+              Logged in as{" "}
+              {address
+                ? `${address.slice(0, 6)}...${address.slice(-4)}`
+                : "N/A"}
+            </p>
+            <Button onClick={() => disconnect()}>Disconnect</Button>
           </div>
-        </div>
-      </div>
+          <AllTokensDisplay />
+          <Tabs defaultValue="create" className="mt-8">
+            <TabsList>
+              <TabsTrigger value="create">Create Token</TabsTrigger>
+              <TabsTrigger value="buy">Buy Token</TabsTrigger>
+              <TabsTrigger value="withdraw">Withdraw Token</TabsTrigger>
+              <TabsTrigger value="sacrifice">Sacrifice</TabsTrigger>
+            </TabsList>
+            <TabsContent value="create">
+              <Card>
+                <CardHeader>
+                  <CardTitle>Create New Token</CardTitle>
+                  <CardDescription>Deploy a new token contract</CardDescription>
+                </CardHeader>
+                <CardContent>
+                  <CreateTokenForm />
+                </CardContent>
+              </Card>
+            </TabsContent>
+            <TabsContent value="buy">
+              <Card>
+                <CardHeader>
+                  <CardTitle>Buy Token</CardTitle>
+                  <CardDescription>
+                    Purchase tokens during ICO phase
+                  </CardDescription>
+                </CardHeader>
+                <CardContent>
+                  <BuyTokenForm />
+                </CardContent>
+              </Card>
+            </TabsContent>
+            <TabsContent value="withdraw">
+              <Card>
+                <CardHeader>
+                  <CardTitle>Withdraw Token</CardTitle>
+                  <CardDescription>
+                    Withdraw your purchased tokens
+                  </CardDescription>
+                </CardHeader>
+                <CardContent>
+                  <WithdrawTokenForm />
+                </CardContent>
+              </Card>
+            </TabsContent>
+            <TabsContent value="sacrifice">
+              <SacrificeForm />
+            </TabsContent>
+          </Tabs>
+        </>
+      ) : (
+        <>
+          {connectors.map((connector, index) => (
+            <Button
+              key={connector.id}
+              onClick={() => handleConnect(index)}
+              disabled={isLoading}
+            >
+              {isLoading ? "Connecting..." : `Connect with ${connector.name}`}
+            </Button>
+          ))}
+        </>
+      )}
     </div>
   );
 }
