@@ -5,16 +5,16 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { useToast } from "@/hooks/use-toast";
-import tk_metadata from "@/contracts/token-factory/Token_metadata.json";
-import tf_metadata from "@/contracts/token-factory/TokenFactory_metadata.json";
+// import tk_metadata from "@/contracts/token-factory/Token_metadata.json";
+// import tf_metadata from "@/contracts/token-factory/TokenFactory_metadata.json";
 import { config } from "@/wagmi-config";
+import tokenABI from "@/contracts/token-factory/Token_abi.json";
+import tokenFactoryABI from "@/contracts/token-factory/TokenFactory_abi.json";
 
 export function WithdrawTokenForm() {
-  const tokenABI = tk_metadata.output.abi;
-  const tokenFactoryABI = tf_metadata.output.abi;
   const isLoading = false;
 
-  const FACTORY_ADDRESS = "0x59A612625c2c7cad58159c4F5f136adc213d9537";
+  const FACTORY_ADDRESS = "0x7713A39875A5335dc4Fc4f9359908afb55984b1F";
   const [tokenAddress, setTokenAddress] = useState("");
   const [withdrawAddress, setWithdrawAddress] = useState("");
   const { toast } = useToast();

@@ -1,55 +1,70 @@
-// /app/factory/[tokenAddress]/page.tsx
 "use client";
-import { useRouter } from "next/navigation";
+
 import { useEffect, useState } from "react";
-import TokenPriceChart from "../TokenPriceChart";
+import { usePathname } from "next/navigation";
+import {
+  doc,
+  getDoc,
+  query,
+  collection,
+  where,
+  getDocs,
+} from "firebase/firestore";
+import { db } from "@/firebase";
+import { AddressComponent } from "@/components/AddressComponent";
+import {
+  Card,
+  CardContent,
+  CardDescription,
+  CardHeader,
+  CardTitle,
+} from "@/components/ui/card";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { Label } from "@/components/ui/label";
 import { BuyTokenForm } from "../BuyTokenForm";
-import { readContract } from "wagmi"; // Assumes you're using wagmi to interact with contracts
-import streamlineABI from "@/contracts/token-factory/StreamlineABI.json";
-import { db } from "@/firebase"; // Import Firestore from Firebase config
-import { doc, setDoc, updateDoc, arrayUnion } from "firebase/firestore";
+import { SellTokenForm } from "../SellTokenForm";
+import { TokenPriceChart } from "../TokenPriceChart"; // New import for chart
 
 export default function TokenPage() {
-  const router = useRouter();
-  // const { tokenAddress } = router.query;
-  const tokenAddress = "0x0000000000000000000000000000000000000000";
+  const pathname = usePathname();
+  const tokenAddress = pathname?.split("/").pop();
 
-  const [tokenSupply, setTokenSupply] = useState(0);
+  const [tokenData, setTokenData] = useState(null);
   const [trades, setTrades] = useState([]);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    if (!tokenAddress) return;
+    if (!tokenAddress) {
+      setLoading(false);
+      return;
+    }
 
-    // Fetch Token Information
     async function fetchTokenData() {
       try {
-        // Assuming we have some contract method to get total supply
-        const tokenSupply = await readContract({
-          address: tokenAddress as string,
-          abi: streamlineABI, // Use your correct ABI
-          functionName: "totalSupply",
+        const tokenDocRef = doc(db, "tokens", tokenAddress);
+        const tokenDoc = await getDoc(tokenDocRef);
+        if (tokenDoc.exists()) {
+          setTokenData({ id: tokenDoc.id, ...tokenDoc.data() });
+        } else {
+          console.error("Token not found");
+        }
+
+        const tradesQuery = query(
+          collection(db, "trades"),
+          where("tokenAddress", "==", tokenAddress)
+        );
+        const tradesSnapshot = await getDocs(tradesQuery);
+        const tradesData = tradesSnapshot.docs.map((doc) => {
+          const { timestamp, pricePaid } = doc.data();
+          return {
+            timestamp: new Date(timestamp.seconds * 1000),
+            price: parseFloat(pricePaid),
+          };
         });
 
-        // Fetching trades could be based on events or an API. For now, we'll mock it
-        const tradesData = [
-          // Example data, replace with real data fetching logic
-          {
-            supply: tokenSupply,
-            price: 0.002,
-            timestamp: new Date().toISOString(),
-          },
-          {
-            supply: tokenSupply * 1.1,
-            price: 0.0025,
-            timestamp: new Date().toISOString(),
-          },
-        ];
-
-        setTokenSupply(Number(tokenSupply));
         setTrades(tradesData);
       } catch (error) {
-        console.error("Failed to fetch token data", error);
+        console.error("Error fetching token data:", error);
       } finally {
         setLoading(false);
       }
@@ -58,20 +73,76 @@ export default function TokenPage() {
     fetchTokenData();
   }, [tokenAddress]);
 
-  if (loading) return <div>Loading token data...</div>;
-  if (!tokenAddress) return <div>Token address not found</div>;
+  if (loading)
+    return (
+      <div className="flex justify-center items-center h-screen">
+        Loading token details...
+      </div>
+    );
+  if (!tokenData)
+    return (
+      <div className="flex justify-center items-center h-screen">
+        Token not found or invalid address.
+      </div>
+    );
 
   return (
-    <div className="container mx-auto p-4">
-      <TokenPriceChart
-        tokenSupply={tokenSupply}
-        trades={trades}
-        maxSupply={1_000_000_000}
-        initialPrice={0.001}
-        priceRate={100}
-        initialMint={200_000_000}
-      />
-      <BuyTokenForm tokenAddress={tokenAddress as string} />
+    <div className="container mx-auto p-4 space-y-6">
+      <Card>
+        <div>
+          <AddressComponent hash={tokenData.address} type="address" />
+        </div>
+        <CardHeader>
+          <CardTitle>
+            {tokenData.name} ({tokenData.symbol})
+          </CardTitle>
+          <CardDescription>Token Details</CardDescription>
+        </CardHeader>
+        <CardContent>
+          <div className="space-y-2">
+            <div>
+              <Label>Total Supply</Label>
+              <p>{tokenData.blockNumber.toLocaleString()}</p>
+            </div>
+            <div>
+              <Label>Created At</Label>
+              <p>{new Date(tokenData.timestamp).toLocaleString()}</p>
+            </div>
+          </div>
+        </CardContent>
+      </Card>
+
+      <Card>
+        <CardHeader>
+          <CardTitle>Token Price Chart</CardTitle>
+        </CardHeader>
+        <CardContent>
+          <div className="h-64">
+            {/* TokenPriceChart component here */}
+            <TokenPriceChart trades={trades} />
+          </div>
+        </CardContent>
+      </Card>
+
+      <Card>
+        <CardHeader>
+          <CardTitle>Trade Tokens</CardTitle>
+        </CardHeader>
+        <CardContent>
+          <Tabs defaultValue="buy">
+            <TabsList className="grid w-full grid-cols-2">
+              <TabsTrigger value="buy">Buy</TabsTrigger>
+              <TabsTrigger value="sell">Sell</TabsTrigger>
+            </TabsList>
+            <TabsContent value="buy">
+              <BuyTokenForm />
+            </TabsContent>
+            <TabsContent value="sell">
+              <SellTokenForm />
+            </TabsContent>
+          </Tabs>
+        </CardContent>
+      </Card>
     </div>
   );
 }

@@ -8,10 +8,9 @@ import { Label } from "@/components/ui/label";
 import { useToast } from "@/hooks/use-toast";
 import { db } from "@/firebase";
 import { doc, setDoc } from "firebase/firestore";
-import tf_metadata from "@/contracts/token-factory/TokenFactory_metadata.json";
+import tokenFactoryABI from "@/contracts/token-factory/TokenFactory_abi.json";
 
-const tokenFactoryABI = tf_metadata.output.abi;
-const FACTORY_ADDRESS = "0x5CefB1c5efc02aba182242D593554AAEf30f2631";
+const FACTORY_ADDRESS = "0x7713A39875A5335dc4Fc4f9359908afb55984b1F";
 
 type TokenDetails = {
   name: string;
