@@ -97,7 +97,7 @@ export default function Roadmap() {
   };
 
   return (
-    <div className="min-h-screen bg-background p-4 md:p-6">
+    <div className="p-4 md:p-6">
       <div className="mb-6 flex items-center justify-between">
         <h1 className="text-2xl font-bold">Roadmap</h1>
         <Select value={filter} onValueChange={setFilter}>

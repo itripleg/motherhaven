@@ -1,5 +1,5 @@
 import React from "react";
-import { CreateTokenForm } from "../CreateTokenForm";
+import { CreateTokenForm } from "../components/CreateTokenForm";
 import { Container } from "@/components/craft";
 
 type Props = {};

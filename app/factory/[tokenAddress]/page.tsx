@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from "react";
 import { usePathname } from "next/navigation";
+import { useAccount, useConnect, useDisconnect } from "wagmi";
 import {
   doc,
   getDoc,
@@ -21,9 +22,13 @@ import {
 } from "@/components/ui/card";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Label } from "@/components/ui/label";
-import { BuyTokenForm } from "../BuyTokenForm";
-import { SellTokenForm } from "../SellTokenForm";
-import { TokenPriceChart } from "../TokenPriceChart"; // New import for chart
+import { BuyTokenForm } from "../components/BuyTokenForm";
+import { SellTokenForm } from "../components/SellTokenForm";
+import { TokenPriceChart } from "../components/TokenPriceChart";
+import { ChatComponent } from "../components/ChatComponent";
+import { Sheet, SheetContent, SheetTrigger } from "@/components/ui/sheet";
+import { Button } from "@/components/ui/button";
+import { MessageCircle } from "lucide-react";
 
 import { DocumentReference, DocumentData } from "firebase/firestore";
 
@@ -44,6 +49,9 @@ export interface Trade {
 export default function TokenPage() {
   const pathname = usePathname();
   const tokenAddress = pathname?.split("/").pop() || "";
+  const { address, isConnected } = useAccount();
+  const { connect, connectors } = useConnect();
+  const { disconnect } = useDisconnect();
 
   const [tokenData, setTokenData] = useState<TokenData | null>(null);
   const [trades, setTrades] = useState<Trade[]>([]);
@@ -57,7 +65,6 @@ export default function TokenPage() {
 
     async function fetchTokenData() {
       try {
-        // Explicitly type the document reference
         const tokenDocRef: DocumentReference<DocumentData> = doc(
           db,
           "tokens",
@@ -70,7 +77,6 @@ export default function TokenPage() {
           setTokenData({
             id: tokenDoc.id,
             ...data,
-            // Ensure blockNumber is a number
             blockNumber: Number(data.blockNumber || 0),
           });
         } else {
@@ -116,61 +122,98 @@ export default function TokenPage() {
 
   return (
     <div className="container mx-auto p-4 space-y-6">
-      <Card>
-        <div>
-          <AddressComponent hash={tokenData.address} type="address" />
+      <div className="flex justify-between items-start">
+        <div className="space-y-6 flex-1">
+          <Card>
+            <div>
+              <AddressComponent hash={tokenData.address} type="address" />
+            </div>
+            <CardHeader>
+              <CardTitle>
+                {tokenData.name} ({tokenData.symbol})
+              </CardTitle>
+              <CardDescription>Token Details</CardDescription>
+            </CardHeader>
+            <CardContent>
+              <div className="space-y-2">
+                <div>
+                  <Label>Total Supply</Label>
+                  <p>{tokenData.blockNumber.toLocaleString()}</p>
+                </div>
+                <div>
+                  <Label>Created At</Label>
+                  <p>{new Date(tokenData.timestamp).toLocaleString()}</p>
+                </div>
+              </div>
+            </CardContent>
+          </Card>
+
+          <Card>
+            <CardHeader>
+              <CardTitle>Token Price Chart</CardTitle>
+            </CardHeader>
+            <CardContent>
+              <div className="h-64">
+                <TokenPriceChart trades={trades} />
+              </div>
+            </CardContent>
+          </Card>
+
+          <Card>
+            <CardHeader>
+              <CardTitle>Trade Tokens</CardTitle>
+            </CardHeader>
+            <CardContent>
+              {isConnected ? (
+                <Tabs defaultValue="buy">
+                  <TabsList className="grid w-full grid-cols-2">
+                    <TabsTrigger value="buy">Buy</TabsTrigger>
+                    <TabsTrigger value="sell">Sell</TabsTrigger>
+                  </TabsList>
+                  <TabsContent value="buy">
+                    <BuyTokenForm />
+                  </TabsContent>
+                  <TabsContent value="sell">
+                    <SellTokenForm />
+                  </TabsContent>
+                </Tabs>
+              ) : (
+                <div className="text-center">
+                  <p className="mb-4">Connect your wallet to trade tokens</p>
+                  {connectors.map((connector) => (
+                    <Button
+                      key={connector.id}
+                      onClick={() => connect({ connector })}
+                      className="mx-2"
+                    >
+                      Connect {connector.name}
+                    </Button>
+                  ))}
+                </div>
+              )}
+            </CardContent>
+          </Card>
         </div>
-        <CardHeader>
-          <CardTitle>
-            {tokenData.name} ({tokenData.symbol})
-          </CardTitle>
-          <CardDescription>Token Details</CardDescription>
-        </CardHeader>
-        <CardContent>
-          <div className="space-y-2">
-            <div>
-              <Label>Total Supply</Label>
-              <p>{tokenData.blockNumber.toLocaleString()}</p>
-            </div>
-            <div>
-              <Label>Created At</Label>
-              <p>{new Date(tokenData.timestamp).toLocaleString()}</p>
-            </div>
-          </div>
-        </CardContent>
-      </Card>
 
-      <Card>
-        <CardHeader>
-          <CardTitle>Token Price Chart</CardTitle>
-        </CardHeader>
-        <CardContent>
-          <div className="h-64">
-            {/* TokenPriceChart component here */}
-            <TokenPriceChart trades={trades} />
-          </div>
-        </CardContent>
-      </Card>
+        <div className="hidden lg:block ml-6">
+          <ChatComponent tokenAddress={tokenAddress} />
+        </div>
 
-      <Card>
-        <CardHeader>
-          <CardTitle>Trade Tokens</CardTitle>
-        </CardHeader>
-        <CardContent>
-          <Tabs defaultValue="buy">
-            <TabsList className="grid w-full grid-cols-2">
-              <TabsTrigger value="buy">Buy</TabsTrigger>
-              <TabsTrigger value="sell">Sell</TabsTrigger>
-            </TabsList>
-            <TabsContent value="buy">
-              <BuyTokenForm />
-            </TabsContent>
-            <TabsContent value="sell">
-              <SellTokenForm />
-            </TabsContent>
-          </Tabs>
-        </CardContent>
-      </Card>
+        <Sheet>
+          <SheetTrigger asChild>
+            <Button
+              variant="outline"
+              size="icon"
+              className="fixed bottom-4 right-4 lg:hidden"
+            >
+              <MessageCircle className="h-4 w-4" />
+            </Button>
+          </SheetTrigger>
+          <SheetContent side="right">
+            <ChatComponent tokenAddress={tokenAddress} />
+          </SheetContent>
+        </Sheet>
+      </div>
     </div>
   );
 }

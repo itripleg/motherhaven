@@ -1,74 +1,96 @@
 "use client";
 
-import React, { useEffect, useState } from "react";
+import React, { useState } from "react";
 import { getTransactionReceipt } from "@wagmi/core";
 import { config } from "@/wagmi-config";
+import {
+  Card,
+  CardContent,
+  CardDescription,
+  CardHeader,
+  CardTitle,
+} from "@/components/ui/card";
+import { Input } from "@/components/ui/input";
+import { Button } from "@/components/ui/button";
+import { useTheme } from "next-themes";
 
-type Props = {};
-
-export default function Page({}: Props) {
+export default function Page() {
+  const [txHash, setTxHash] = useState<any>();
   const [blockNumber, setBlockNumber] = useState<number | null>(null);
   const [tokenAddress, setTokenAddress] = useState<string | null>(null);
   const [initialSupply, setInitialSupply] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const [isLoading, setIsLoading] = useState<boolean>(false);
+  const { theme, setTheme } = useTheme();
 
-  useEffect(() => {
-    async function fetchReceipt() {
-      try {
-        const receipt = await getTransactionReceipt(config, {
-          hash: "0x0d5fdd714ba560a95160e188ee6f4515f3b607e662df16a970e16d6d31f6c457",
-        });
+  async function fetchReceipt() {
+    setIsLoading(true);
+    setError(null);
+    setBlockNumber(null);
+    setTokenAddress(null);
+    setInitialSupply(null);
 
-        console.log("Transaction Receipt:", receipt);
+    try {
+      const receipt = await getTransactionReceipt(config, {
+        hash: txHash,
+      });
 
-        // Extract block number
-        setBlockNumber(
-          receipt?.blockNumber ? Number(receipt.blockNumber) : null
-        );
+      console.log("Transaction Receipt:", receipt);
 
-        // Extract token address from logs[0].address
-        const address = receipt?.logs?.[0]?.address;
-        if (address) {
-          setTokenAddress(address);
-        }
+      // Extract block number
+      setBlockNumber(receipt?.blockNumber ? Number(receipt.blockNumber) : null);
 
-        // Extract initial supply from logs[1].data (hexadecimal to decimal)
-        const supplyHex = receipt?.logs?.[1]?.data;
-        if (supplyHex) {
-          const supplyDecimal = BigInt(supplyHex).toString(); // Convert hex to bigint, then to string
-          setInitialSupply(supplyDecimal);
-        }
-      } catch (err) {
-        setError((err as Error).message);
+      // Extract token address from logs[0].address
+      const address = receipt?.logs?.[0]?.address;
+      if (address) {
+        setTokenAddress(address);
       }
-    }
 
-    fetchReceipt();
-  }, []);
+      // Extract initial supply from logs[1].data (hexadecimal to decimal)
+      const supplyHex = receipt?.logs?.[1]?.data;
+      if (supplyHex) {
+        const supplyDecimal = BigInt(supplyHex).toString(); // Convert hex to bigint, then to string
+        setInitialSupply(supplyDecimal);
+      }
+    } catch (err) {
+      setError((err as Error).message);
+    } finally {
+      setIsLoading(false);
+    }
+  }
 
   return (
-    <div>
-      {blockNumber !== null ? (
-        <div>Block Number: {blockNumber}</div>
-      ) : error ? (
-        <div>Error: {error}</div>
-      ) : (
-        <div>Loading Block Number...</div>
-      )}
-      {tokenAddress !== null ? (
-        <div>Token Address: {tokenAddress}</div>
-      ) : error ? (
-        <div>Error: {error}</div>
-      ) : (
-        <div>Loading Token Address...</div>
-      )}
-      {initialSupply !== null ? (
-        <div>Initial Supply: {initialSupply}</div>
-      ) : error ? (
-        <div>Error: {error}</div>
-      ) : (
-        <div>Loading Initial Supply...</div>
-      )}
+    <div className="container mx-auto p-4">
+      <Card className="w-full max-w-2xl mx-auto">
+        <CardHeader>
+          <CardTitle>Transaction Explorer</CardTitle>
+          <CardDescription>
+            Enter a transaction hash to view details
+          </CardDescription>
+        </CardHeader>
+        <CardContent>
+          <div className="flex space-x-2 mb-4">
+            <Input
+              placeholder="Enter transaction hash"
+              value={txHash}
+              onChange={(e) => setTxHash(e.target.value)}
+            />
+            <Button onClick={fetchReceipt} disabled={isLoading}>
+              {isLoading ? "Loading..." : "Fetch"}
+            </Button>
+          </div>
+          {error && <div className="text-red-500 mb-2">Error: {error}</div>}
+          {blockNumber !== null && (
+            <div className="mb-2">Block Number: {blockNumber}</div>
+          )}
+          {tokenAddress !== null && (
+            <div className="mb-2">Token Address: {tokenAddress}</div>
+          )}
+          {initialSupply !== null && (
+            <div className="mb-2">Initial Supply: {initialSupply}</div>
+          )}
+        </CardContent>
+      </Card>
     </div>
   );
 }

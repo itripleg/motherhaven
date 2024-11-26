@@ -13,7 +13,7 @@ export default function Home() {
   return (
     <>
       {/* <LandingPage /> */}
-      <GeneralLandingPage />
+      {/* <GeneralLandingPage /> */}
       {/* <StickyHeader />
       Home{!user ? <LoginWidget /> : <Dashboard />} */}
     </>

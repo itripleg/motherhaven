@@ -43,10 +43,9 @@ export default function RootLayout({
         suppressHydrationWarning
         className={`${geistSans.variable} ${geistMono.variable} antialiased`}
       >
-        <MyMenu />
         <ThemeProvider>
           {/* <StickyHeader /> */}
-          {/* <MyMenu /> */}
+          <MyMenu />
           <WagmiContext>
             <GlobalFinanceProvider>{children}</GlobalFinanceProvider>
           </WagmiContext>

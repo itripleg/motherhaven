@@ -11,11 +11,11 @@ import {
 } from "@/components/ui/card";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { useToast } from "@/hooks/use-toast";
-import { CreateTokenForm } from "@/app/factory/CreateTokenForm";
-import { BuyTokenForm } from "./BuyTokenForm";
-import { WithdrawTokenForm } from "./WithdrawTokenForm";
-import { SacrificeForm } from "./SacrificeForm";
-import AllTokensDisplay from "./AllTokensDisplay";
+import { CreateTokenForm } from "@/app/factory/components/CreateTokenForm";
+import { BuyTokenForm } from "./components/BuyTokenForm";
+import { WithdrawTokenForm } from "./components/WithdrawTokenForm";
+import { SacrificeForm } from "./components/SacrificeForm";
+import AllTokensDisplay from "./components/AllTokensDisplay";
 
 export default function Home() {
   const { address, isConnected } = useAccount();
@@ -71,8 +71,8 @@ export default function Home() {
             <TabsList>
               <TabsTrigger value="create">Create Token</TabsTrigger>
               <TabsTrigger value="buy">Buy Token</TabsTrigger>
-              <TabsTrigger value="withdraw">Withdraw Token</TabsTrigger>
-              <TabsTrigger value="sacrifice">Sacrifice</TabsTrigger>
+              {/* <TabsTrigger value="withdraw">Withdraw Token</TabsTrigger> */}
+              {/* <TabsTrigger value="sacrifice">Sacrifice</TabsTrigger> */}
             </TabsList>
             <TabsContent value="create">
               <Card>
