@@ -36,7 +36,7 @@ interface Token {
   createdAt: Date;
 }
 
-const TokenCard = ({ token }: { token: Token }) => {
+export const TokenCard = ({ token }: { token: Token }) => {
   const router = useRouter();
 
   return (
@@ -66,7 +66,7 @@ const TokenCard = ({ token }: { token: Token }) => {
         <CardFooter>
           <Button
             className="w-full"
-            onClick={() => router.push(`/factory/${token.address}`)}
+            onClick={() => router.push(`/dex/${token.address}`)}
           >
             View Token
           </Button>
@@ -139,7 +139,7 @@ export default function AllTokensDisplay() {
   };
 
   return (
-    <Container>
+    <Container className="">
       <div className="container mx-auto py-8">
         <h1 className="text-4xl font-bold mb-8 text-center">Newest Tokens</h1>
 
@@ -190,7 +190,7 @@ export default function AllTokensDisplay() {
         </Tabs>
 
         <motion.div
-          className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6"
+          className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 max-h-[600px] overflow-y-auto scrollbar-thin p-2"
           initial={{ opacity: 0 }}
           animate={{ opacity: 1 }}
           transition={{ duration: 0.5 }}

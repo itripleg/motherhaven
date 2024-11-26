@@ -95,7 +95,7 @@ export function BuyTokenForm() {
 
         // Save to Firestore
         const saveTradeToFirestore = async () => {
-          const userId = "currentUserId"; // Replace with the logged-in user's ID
+          const userId = "currentUserId";
           const tradeId = `${transactionData}-${Date.now()}`; // Unique ID for trade
           const tradeData = {
             userId,

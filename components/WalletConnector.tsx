@@ -12,7 +12,7 @@ interface Connector {
 }
 
 interface WalletConnectorProps {
-  connectors?: Connector[];
+  connectors?: readonly Connector[];
   onConnect: (index: number) => void;
   isLoading: boolean;
 }
@@ -41,7 +41,7 @@ export function WalletConnector({
           whileTap={{ scale: 0.95 }}
         >
           <Button
-            className="w-full h-16 text-lg font-semibold relative overflow-hidden"
+            className="w-full h-20 font-semibold relative overflow-hidden text-sm"
             onClick={() => onConnect(index)}
             disabled={isLoading}
             onMouseEnter={() => setHoveredIndex(index)}

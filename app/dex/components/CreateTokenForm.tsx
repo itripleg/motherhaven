@@ -9,6 +9,9 @@ import { useToast } from "@/hooks/use-toast";
 import { db } from "@/firebase";
 import { doc, setDoc } from "firebase/firestore";
 import tokenFactoryABI from "@/contracts/token-factory/TokenFactory_abi.json";
+import { useWatchContractEvent } from "wagmi";
+import { config } from "@/wagmi-config";
+import { EventWatcher } from "./EventWatcher";
 
 const FACTORY_ADDRESS = "0x7713A39875A5335dc4Fc4f9359908afb55984b1F";
 
@@ -22,10 +25,21 @@ type TokenDetails = {
 };
 
 export function CreateTokenForm() {
+  <EventWatcher />;
   const { toast } = useToast();
 
   // Manage writeContract interaction
   const { data: hash, error, isPending, writeContract } = useWriteContract();
+  // useWatchContractEvent({
+  //   address: "0x7713A39875A5335dc4Fc4f9359908afb55984b1F",
+  //   abi: tokenFactoryABI,
+  //   eventName: "TokenCreated",
+  //   config: config,
+  //   onLogs(logs) {
+  //     alert(logs.toString());
+  //     console.log("New logs!", logs);
+  //   },
+  // });
 
   // Manage transaction receipt
   const { isLoading: isConfirming, data: receipt } =
@@ -121,6 +135,7 @@ export function CreateTokenForm() {
 
   return (
     <form onSubmit={handleSubmit} className="space-y-6">
+      {/* <TokenEventWatcher /> */}
       <div className="space-y-4">
         <div>
           <Label htmlFor="name">Token Name</Label>

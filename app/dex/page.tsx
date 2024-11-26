@@ -13,6 +13,7 @@ import {
 import { useToast } from "@/hooks/use-toast";
 import { WalletConnector } from "@/components/WalletConnector";
 import { Factory } from "./Factory";
+// import { TokenCard } from "./components/AllTokensDisplay";
 
 export default function Home() {
   const { address, isConnected } = useAccount();
@@ -49,6 +50,7 @@ export default function Home() {
   return (
     <div className="container mx-auto p-4">
       <h1 className="text-4xl font-bold mb-8">Token Factory</h1>
+      {/* <TokenCard token={undefined} /> */}
       {isConnected ? (
         <>
           <div className="flex justify-between items-center mb-4">
@@ -72,7 +74,7 @@ export default function Home() {
           </CardHeader>
           <CardContent>
             <WalletConnector
-              // connectors={connectors}
+              connectors={connectors}
               onConnect={handleConnect}
               isLoading={false}
             />

@@ -1,5 +1,3 @@
-"use client";
-
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import {
   Card,
@@ -8,18 +6,18 @@ import {
   CardHeader,
   CardTitle,
 } from "@/components/ui/card";
-import { CreateTokenForm } from "@/app/factory/components/CreateTokenForm";
-import { BuyTokenForm } from "@/app/factory/components/BuyTokenForm";
-import { WithdrawTokenForm } from "@/app/factory/components/WithdrawTokenForm";
-import { SacrificeForm } from "@/app/factory/components/SacrificeForm";
-import AllTokensDisplay from "@/app/factory/components/AllTokensDisplay";
+import { CreateTokenForm } from "@/app/dex/components/CreateTokenForm";
+import { BuyTokenForm } from "@/app/dex/components/BuyTokenForm";
+import { WithdrawTokenForm } from "@/app/dex/components/WithdrawTokenForm";
+import { SacrificeForm } from "@/app/dex/components/SacrificeForm";
+// import AllTokensDisplay from "@/app/factory/components/AllTokensDisplay";
+import { Container } from "@/components/craft";
 
-export function Factory() {
+const TakeAction = () => {
   return (
-    <>
-      <AllTokensDisplay />
+    <Container>
       <Tabs defaultValue="create" className="mt-8">
-        <TabsList>
+        <TabsList className="hidden">
           <TabsTrigger value="create">Create Token</TabsTrigger>
           <TabsTrigger value="buy">Buy Token</TabsTrigger>
           <TabsTrigger value="withdraw">Withdraw Token</TabsTrigger>
@@ -64,6 +62,8 @@ export function Factory() {
           <SacrificeForm />
         </TabsContent>
       </Tabs>
-    </>
+    </Container>
   );
-}
+};
+
+export default TakeAction;

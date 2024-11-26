@@ -1,31 +1,34 @@
 "use client";
+
 import {
   Menubar,
   MenubarContent,
   MenubarItem,
   MenubarMenu,
-  //   MenubarSeparator,
   MenubarShortcut,
   MenubarTrigger,
 } from "@/components/ui/menubar";
 import { ModeToggle } from "./mode-toggle";
-
-// type MyMenuProps = {
-//   setCurrentView: (view: "dashboard" | "chart") => void; // Define the type of setCurrentView
-// };
+import { usePathname } from "next/navigation";
 
 export default function MyMenu2() {
+  const pathname = usePathname();
+
+  // Conditionally render the Menubar
+  if (pathname === "/") {
+    return null; // Return nothing if on the home page
+  }
+
   return (
-    <Menubar className="text-primary rounded-md max-w-[300px] md:max-w-xl justify-center mx-auto mt-4 ">
+    <Menubar className="text-primary rounded-md max-w-[300px] md:max-w-xl justify-center mx-auto mt-4">
       <MenubarMenu>
         <MenubarTrigger className="uppercase tracking-wider">
           Motherhaven
         </MenubarTrigger>
         <MenubarContent>
-          {/* <MenubarItem>
-            Dashboard<MenubarShortcut>⌘T</MenubarShortcut>
-          </MenubarItem> */}
-
+          <MenubarItem>
+            <a href="/dex">DEX</a>
+          </MenubarItem>
           <MenubarItem>
             <a href="/dashboard">Dash</a>
           </MenubarItem>
@@ -33,7 +36,7 @@ export default function MyMenu2() {
             <a href="/casino">Casino</a>
           </MenubarItem>
           <MenubarItem>
-            <a href="/factory">Token Factory</a>
+            <a href="/dex/factory">Token Factory</a>
           </MenubarItem>
           <MenubarItem>
             <a href="/roadmap">Road to Riches</a>

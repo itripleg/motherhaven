@@ -26,17 +26,18 @@ function TradingViewWidget() {
       script.async = true;
       script.innerHTML = `
             {
-              "autosize": true,
-              "symbol": "NASDAQ:AAPL",
-              "interval": "D",
-              "timezone": "Etc/UTC",
-              "theme": "light",
-              "style": "1",
-              "locale": "en",
-              "allow_symbol_change": true,
-              "calendar": false,
-              "support_host": "https://www.tradingview.com"
-            }`;
+  "autosize": false,
+  "symbol": "BINANCE:AVAXUSDT",
+  "interval": "D",
+  "timezone": "Etc/UTC",
+  "theme": "light",
+  "style": "1",
+  "locale": "en",
+  "allow_symbol_change": true,
+  "calendar": false,
+  "support_host": "https://www.tradingview.com"
+}
+`;
 
       // Store the script reference so we can remove it later if needed
       container.current.appendChild(script);

@@ -29,7 +29,7 @@ import { ChatComponent } from "../components/ChatComponent";
 import { Sheet, SheetContent, SheetTrigger } from "@/components/ui/sheet";
 import { Button } from "@/components/ui/button";
 import { MessageCircle } from "lucide-react";
-
+import { EventWatcher } from "../components/EventWatcher";
 import { DocumentReference, DocumentData } from "firebase/firestore";
 import Chart from "@/components/chart";
 
@@ -149,16 +149,16 @@ export default function TokenPage() {
             </CardContent>
           </Card>
 
-          <Card>
-            <CardHeader>
-              <CardTitle>Token Price Chart</CardTitle>
+          <Card className="h-[400px] p-2">
+            {/* <CardHeader>
+              <CardTitle>Coming Soon</CardTitle>
             </CardHeader>
             <CardContent>
-              <div className="h-64">
-                <TokenPriceChart trades={trades} />
-                {/* <Chart /> */}
-              </div>
-            </CardContent>
+              <div className="h-64"> */}
+            {/* <TokenPriceChart trades={trades} /> */}
+            <Chart />
+            {/* </div> */}
+            {/* </CardContent> */}
           </Card>
 
           <Card>
