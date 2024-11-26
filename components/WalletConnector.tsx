@@ -12,7 +12,7 @@ interface Connector {
 }
 
 interface WalletConnectorProps {
-  connectors: Connector[];
+  connectors?: Connector[];
   onConnect: (index: number) => void;
   isLoading: boolean;
 }
@@ -31,7 +31,7 @@ export function WalletConnector({
       animate={{ opacity: 1, y: 0 }}
       transition={{ duration: 0.5 }}
     >
-      {connectors.map((connector, index) => (
+      {connectors?.map((connector, index) => (
         <motion.div
           key={connector.id}
           initial={{ opacity: 0, scale: 0.9 }}
