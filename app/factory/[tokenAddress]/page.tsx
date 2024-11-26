@@ -31,6 +31,7 @@ import { Button } from "@/components/ui/button";
 import { MessageCircle } from "lucide-react";
 
 import { DocumentReference, DocumentData } from "firebase/firestore";
+import Chart from "@/components/chart";
 
 export interface TokenData {
   id: string;
@@ -155,13 +156,17 @@ export default function TokenPage() {
             <CardContent>
               <div className="h-64">
                 <TokenPriceChart trades={trades} />
+                {/* <Chart /> */}
               </div>
             </CardContent>
           </Card>
 
           <Card>
+            <AddressComponent hash={tokenData.address} type={"address"} />
             <CardHeader>
-              <CardTitle>Trade Tokens</CardTitle>
+              <CardTitle>
+                Trade {tokenData.symbol} ({tokenData.name})
+              </CardTitle>
             </CardHeader>
             <CardContent>
               {isConnected ? (

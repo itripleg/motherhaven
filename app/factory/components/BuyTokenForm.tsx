@@ -126,51 +126,53 @@ export function BuyTokenForm() {
   }, [receipt, amount, toast, tokenAddress, transactionData]);
 
   return (
-    <form onSubmit={handleSubmit}>
-      <div className="grid w-full items-center gap-4">
-        <AddressComponent hash={tokenAddress} type="address" />
-        <div className="flex flex-col space-y-1.5">
-          <Label htmlFor="amount">Amount (ETH)</Label>
-          <Input
-            id="amount"
-            type="number"
-            value={amount}
-            onChange={(e) => setAmount(e.target.value)}
-            placeholder="0.1"
-            className="text-center pr-2"
-          />
+    <>
+      {/* <AddressComponent hash={tokenAddress} type="address" /> */}
+      <form onSubmit={handleSubmit}>
+        <div className="grid w-full items-center gap-4">
+          <div className="flex flex-col space-y-1.5">
+            <Label htmlFor="amount">Amount (ETH)</Label>
+            <Input
+              id="amount"
+              type="number"
+              value={amount}
+              onChange={(e) => setAmount(e.target.value)}
+              placeholder="0.1"
+              className="text-center pr-2"
+            />
+          </div>
         </div>
-      </div>
-      <Button
-        type="submit"
-        className="mt-4"
-        disabled={isPending || !tokenAddress}
-      >
-        {isPending ? "Processing..." : "Buy Tokens"}
-      </Button>
+        <Button
+          type="submit"
+          className="mt-4"
+          disabled={isPending || !tokenAddress}
+        >
+          {isPending ? "Processing..." : "Buy Tokens"}
+        </Button>
 
-      {isConfirming && <div>Waiting for confirmation...</div>}
-      {receiptDetails.tokensReceived && (
-        <div className="mt-4">
-          <p>Transaction Receipt:</p>
-          <ul>
-            <li>Price Paid: {receiptDetails.pricePaid} AVAX</li>
-            <li>
-              Tokens Received:{" "}
-              {(Number(receiptDetails.tokensReceived) / 1e18).toFixed(2)}
-            </li>
-            <li>
-              Transaction:{" "}
-              <AddressComponent hash={`${transactionData}`} type="tx" />
-            </li>
-          </ul>
-        </div>
-      )}
-      {error && (
-        <div className="mt-4 text-red-600">
-          Error: {error.message || "An error occurred"}
-        </div>
-      )}
-    </form>
+        {isConfirming && <div>Waiting for confirmation...</div>}
+        {receiptDetails.tokensReceived && (
+          <div className="mt-4">
+            <p>Transaction Receipt:</p>
+            <ul>
+              <li>Price Paid: {receiptDetails.pricePaid} AVAX</li>
+              <li>
+                Tokens Received:{" "}
+                {(Number(receiptDetails.tokensReceived) / 1e18).toFixed(2)}
+              </li>
+              <li className="flex justify-center items-center">
+                Transaction:{" "}
+                <AddressComponent hash={`${transactionData}`} type="tx" />
+              </li>
+            </ul>
+          </div>
+        )}
+        {error && (
+          <div className="mt-4 text-red-600">
+            Error: {error.message || "An error occurred"}
+          </div>
+        )}
+      </form>
+    </>
   );
 }

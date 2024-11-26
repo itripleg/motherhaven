@@ -95,11 +95,9 @@ export function ChatComponent({ tokenAddress }: { tokenAddress: string }) {
 
   return (
     <Card className="w-full max-w-md">
-      <CardHeader>
-        <CardTitle>Chat</CardTitle>
-      </CardHeader>
+      <CardHeader>{/* <CardTitle>Chat</CardTitle> */}</CardHeader>
       <CardContent>
-        <ScrollArea className="h-[400px] pr-4 text-black">
+        <ScrollArea className="h-[600px] pr-4 text-black">
           {comments.map((comment) => (
             <div key={comment.id} className="mb-4">
               <div className="flex items-start space-x-2">

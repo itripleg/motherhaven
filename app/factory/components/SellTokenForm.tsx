@@ -130,7 +130,7 @@ export function SellTokenForm() {
   return (
     <form onSubmit={handleSubmit}>
       <div className="grid w-full items-center gap-4">
-        <AddressComponent hash={tokenAddress} type="address" />
+        {/* <AddressComponent hash={tokenAddress} type="address" /> */}
         <div className="flex flex-col space-y-1.5">
           <Label htmlFor="amount">Amount (Tokens)</Label>
           <Input

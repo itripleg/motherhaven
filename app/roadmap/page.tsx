@@ -29,6 +29,7 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { useToast } from "@/hooks/use-toast";
+import { Container, Section } from "@/components/craft";
 
 interface RoadmapItem {
   id: string;
@@ -97,23 +98,24 @@ export default function Roadmap() {
   };
 
   return (
-    <div className="p-4 md:p-6">
-      <div className="mb-6 flex items-center justify-between">
-        <h1 className="text-2xl font-bold">Roadmap</h1>
-        <Select value={filter} onValueChange={setFilter}>
-          <SelectTrigger className="w-[180px]">
-            <SelectValue placeholder="Sort by" />
-          </SelectTrigger>
-          <SelectContent>
-            <SelectItem value="top">Top upvoted</SelectItem>
-            <SelectItem value="new">Newest</SelectItem>
-          </SelectContent>
-        </Select>
-      </div>
-
-      <div className="grid grid-cols-1 gap-6 md:grid-cols-2 lg:grid-cols-4">
-        {(["considering", "planned", "in-progress", "completed"] as const).map(
-          (status) => (
+    <Container>
+      <div className="p-4 md:p-6">
+        <div className="mb-6 flex items-center justify-between">
+          <h1 className="text-2xl font-bold">Roadmap</h1>
+          <Select value={filter} onValueChange={setFilter}>
+            <SelectTrigger className="w-[180px]">
+              <SelectValue placeholder="Sort by" />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="top">Top upvoted</SelectItem>
+              <SelectItem value="new">Newest</SelectItem>
+            </SelectContent>
+          </Select>
+        </div>
+        <div className="grid grid-cols-1 gap-6 md:grid-cols-2 lg:grid-cols-4">
+          {(
+            ["considering", "planned", "in-progress", "completed"] as const
+          ).map((status) => (
             <div key={status} className="space-y-4">
               <div className="flex items-center gap-2">
                 <h2 className="font-semibold capitalize">
@@ -151,9 +153,9 @@ export default function Roadmap() {
                 </Card>
               ))}
             </div>
-          )
-        )}
+          ))}
+        </div>
       </div>
-    </div>
+    </Container>
   );
 }
