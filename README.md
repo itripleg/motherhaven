@@ -90,7 +90,38 @@ The primary objective is to create a central location for radical technological 
 *(Specific license to be determined)*
 
 ## Contributing
-*(Contribution guidelines to be established)*
+
+### Prerequisites for Contribution
+
+#### Wallet Setup
+1. Install [MetaMask](https://metamask.io/) browser extension
+2. Configure Avalanche Fuji Testnet in MetaMask:
+
+**Network Details:**
+- **Network Name:** Avalanche Testnet C-Chain
+- **Network URL:** `https://api.avax-test.network/ext/bc/C/rpc`
+- **Chain ID:** 43113
+- **Currency Symbol:** AVAX
+- **Block Explorer URL:** `https://subnets-test.avax.network/`
+
+#### Obtaining Test AVAX
+- Use Avalanche Fuji Testnet Faucet
+- Contributor network tokens available upon request
+
+### How to Contribute
+
+#### Development Opportunities
+- Optimize bonding curve economics
+- Implement advanced wallet connectors
+- Develop real-time token price tracking
+- Create comprehensive testing suite
+- Enhance UI/UX for token creation and trading
+
+#### Testing
+1. Connect MetaMask to Avalanche Fuji Testnet
+2. Access DEX at [motherhaven.netlify.app/dex](https://motherhaven.netlify.app/dex)
+3. Explore token creation, buying, selling, and transferring
+4. Document and report any discovered issues or potential improvements
 
 ## Contact
 *(Contact information to be added)*
