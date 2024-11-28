@@ -272,7 +272,7 @@ export default function Page() {
           <Sheet>
             <SheetTrigger asChild>
               <Button
-                variant="outline"
+                variant="default"
                 size="icon"
                 className="fixed bottom-4 right-4 lg:hidden"
               >
