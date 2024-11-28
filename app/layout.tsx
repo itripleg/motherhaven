@@ -31,13 +31,14 @@ export const metadata: Metadata = {
     "community tokens",
     "social tokens",
     "Web3",
+    "Memecoin",
   ],
-  authors: [{ name: "MotherHaven Team" }],
+  authors: [{ name: "Joshua Bell" }],
   viewport: "width=device-width, initial-scale=1",
   openGraph: {
     type: "website",
     locale: "en_US",
-    url: "https://motherhaven.vercel.app/",
+    url: "https://motherhaven.netlify.app/",
     siteName: "MotherHaven",
     title: "MotherHaven - Community Token Platform",
     description:
@@ -92,6 +93,12 @@ export default function RootLayout({
 }>) {
   return (
     <html lang="en" suppressHydrationWarning>
+      <head>
+        <link
+          rel="icon"
+          href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='12 0 100 100'><text y='.9em' font-size='90'>🤑</text></svg>"
+        />
+      </head>
       <body
         suppressHydrationWarning
         className={`${geistSans.variable} ${geistMono.variable} antialiased`}
