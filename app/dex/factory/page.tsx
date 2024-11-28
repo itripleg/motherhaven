@@ -87,16 +87,11 @@ function Page() {
 
         if (tokenInfo.image) {
           try {
-            // Create a storage reference
             const storageRef = ref(
               storage,
               `token-images/${address}/${tokenInfo.image.name}`
             );
-
-            // Upload the image
             const uploadTask = await uploadBytes(storageRef, tokenInfo.image);
-
-            // Get the download URL
             imageUrl = await getDownloadURL(uploadTask.ref);
           } catch (error) {
             console.error("Error uploading image:", error);
@@ -108,12 +103,13 @@ function Page() {
           }
         }
 
-        // Save to Firestore with image URL
+        // Save to Firestore with image URL and creator address
         const tokenDocRef = doc(db, "tokens", address);
         await setDoc(tokenDocRef, {
           name: tokenInfo.name,
           symbol: tokenInfo.ticker,
           address,
+          creator: receipt.from, // Add the creator address from the receipt
           blockNumber: Number(receipt.blockNumber),
           timestamp: new Date().toISOString(),
           transactionHash: receipt.transactionHash,
@@ -193,7 +189,7 @@ function Page() {
         backgroundImage: backgroundImage ? `url(${backgroundImage})` : "none",
       }}
     >
-      <div className="min-h-screen  dark:bg-gray-900/80 backdrop-blur-sm">
+      <div className="min-h-screen  dark:bg-gray-900/80 ">
         <Container>
           <form onSubmit={handleSubmit}>
             <Tabs defaultValue="token-info" className="mt-8">
@@ -226,10 +222,10 @@ function Page() {
                     </CardDescription>
                   </CardHeader>
                   <CardContent>
-                    {/* <TokenomicsForm
+                    <TokenomicsForm
                       tokenomics={tokenomics}
-                      onTokenomicsChange={setTokenomics}
-                    /> */}
+                      // onTokenomicsChange={setTokenomics}
+                    />
                   </CardContent>
                 </Card>
               </TabsContent>

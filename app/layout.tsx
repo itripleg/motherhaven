@@ -34,7 +34,6 @@ export const metadata: Metadata = {
     "Memecoin",
   ],
   authors: [{ name: "Joshua Bell" }],
-  viewport: "width=device-width, initial-scale=1",
   openGraph: {
     type: "website",
     locale: "en_US",
@@ -59,15 +58,15 @@ export const metadata: Metadata = {
       "Create and manage community tokens in a decentralized ecosystem",
     images: ["/og-image.png"], // Same as OpenGraph image
   },
-  icons: {
-    icon: [
-      {
-        url: "/favicon.svg", // Move the SVG to a static file
-        type: "image/svg+xml",
-      },
-    ],
-    shortcut: "/favicon.ico",
-  },
+  // icons: {
+  //   icon: [
+  //     {
+  //       url: "/favicon.svg", // Move the SVG to a static file
+  //       type: "image/svg+xml",
+  //     },
+  //   ],
+  //   shortcut: "/favicon.ico",
+  // },
   robots: {
     index: true,
     follow: true,
@@ -79,11 +78,7 @@ export const metadata: Metadata = {
       "max-snippet": -1,
     },
   },
-  themeColor: [
-    { media: "(prefers-color-scheme: light)", color: "#ffffff" },
-    { media: "(prefers-color-scheme: dark)", color: "#000000" },
-  ],
-  manifest: "/manifest.json", // You might want to add a web manifest file
+  // manifest: "/manifest.json", // You might want to add a web manifest file
 };
 
 export default function RootLayout({
@@ -93,6 +88,12 @@ export default function RootLayout({
 }>) {
   return (
     <html lang="en" suppressHydrationWarning>
+      <head>
+        <link
+          rel="icon"
+          href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='12 0 100 100'><text y='.9em' font-size='90'>🤑</text></svg>"
+        />
+      </head>
       <body
         suppressHydrationWarning
         className={`${geistSans.variable} ${geistMono.variable} antialiased`}

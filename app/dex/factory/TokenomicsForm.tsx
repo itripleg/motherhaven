@@ -16,7 +16,7 @@ interface TokenomicsFormProps {
     bondingCurve: string;
     liquidityPool: string;
   };
-  setTokenomics: React.Dispatch<
+  setTokenomics?: React.Dispatch<
     React.SetStateAction<TokenomicsFormProps["tokenomics"]>
   >;
 }
@@ -26,7 +26,7 @@ export function TokenomicsForm({
   setTokenomics,
 }: TokenomicsFormProps) {
   const handleChange = (field: string, value: string) => {
-    setTokenomics((prev) => ({ ...prev, [field]: value }));
+    // setTokenomics((prev) => ({ ...prev, [field]: value }));
   };
 
   return (
