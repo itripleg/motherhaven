@@ -2,8 +2,8 @@ import type { Metadata } from "next";
 import localFont from "next/font/local";
 import "./globals.css";
 import { ThemeProvider } from "@/components/theme-provider";
-import { GlobalFinanceProvider } from "@/contexts/GlobalFinanceContext";
-import StickyHeader from "@/components/sticky-header";
+// import { GlobalFinanceProvider } from "@/contexts/GlobalFinanceContext";
+// import StickyHeader from "@/components/sticky-header";
 import MyMenu from "@/components/my-menu";
 import WagmiContext from "@/contexts/WagmiContext";
 import { Toaster } from "@/components/ui/toaster";
@@ -62,11 +62,11 @@ export const metadata: Metadata = {
   icons: {
     icon: [
       {
-        url: "data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='12 0 100 100'><text y='.9em' font-size='90'>🤑</text></svg>",
+        url: "/favicon.svg", // Move the SVG to a static file
         type: "image/svg+xml",
       },
     ],
-    shortcut: "/favicon.ico", // You might want to add a proper favicon
+    shortcut: "/favicon.ico",
   },
   robots: {
     index: true,
@@ -93,12 +93,6 @@ export default function RootLayout({
 }>) {
   return (
     <html lang="en" suppressHydrationWarning>
-      <head>
-        <link
-          rel="icon"
-          href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='12 0 100 100'><text y='.9em' font-size='90'>🤑</text></svg>"
-        />
-      </head>
       <body
         suppressHydrationWarning
         className={`${geistSans.variable} ${geistMono.variable} antialiased`}
@@ -106,10 +100,8 @@ export default function RootLayout({
         <ThemeProvider>
           <MyMenu />
           <WagmiContext>
-            <GlobalFinanceProvider>
-              {children}
-              <Toaster />
-            </GlobalFinanceProvider>
+            {children}
+            <Toaster />
           </WagmiContext>
         </ThemeProvider>
       </body>

@@ -46,6 +46,7 @@ export interface TokenData {
   transactionHash: string; // Added as required string
   marketCap?: number; // Keeping optional fields that might be added later
   currentPrice?: number;
+  creator?: string;
 }
 
 export interface Trade {
@@ -262,7 +263,10 @@ export default function Page() {
           </div>
 
           <div className="hidden lg:block ml-6">
-            <ChatComponent tokenAddress={tokenAddress} />
+            <ChatComponent
+              tokenAddress={tokenAddress}
+              creatorAddress={tokenData?.creator} // Pass the creator's address
+            />
           </div>
 
           <Sheet>

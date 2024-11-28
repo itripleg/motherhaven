@@ -34,7 +34,13 @@ interface Comment {
   likes: number;
 }
 
-export function ChatComponent({ tokenAddress }: { tokenAddress: string }) {
+export function ChatComponent({
+  tokenAddress,
+  creatorAddress, // Add this prop
+}: {
+  tokenAddress: string;
+  creatorAddress?: string; // Optional in case we can't get it
+}) {
   const [comments, setComments] = useState<Comment[]>([]);
   const [newComment, setNewComment] = useState("");
   const { address, isConnected } = useAccount();
@@ -151,6 +157,13 @@ export function ChatComponent({ tokenAddress }: { tokenAddress: string }) {
                       0,
                       6
                     )}...${comment.userAddress.slice(-4)}`}
+                    {creatorAddress &&
+                      comment.userAddress.toLowerCase() ===
+                        creatorAddress.toLowerCase() && (
+                        <span className="text-xs px-1.5 py-0.5 bg-primary/10 text-primary rounded-full">
+                          dev
+                        </span>
+                      )}
                   </p>
                   <p className="mt-1">{comment.text}</p>
                   <div className="flex items-center mt-1 space-x-2">

@@ -9,8 +9,6 @@ import { useToast } from "@/hooks/use-toast";
 import { db } from "@/firebase";
 import { doc, setDoc } from "firebase/firestore";
 import tokenFactoryABI from "@/contracts/token-factory/TokenFactory_abi.json";
-import { useWatchContractEvent } from "wagmi";
-import { config } from "@/wagmi-config";
 import { EventWatcher } from "./EventWatcher";
 
 const FACTORY_ADDRESS = "0x7713A39875A5335dc4Fc4f9359908afb55984b1F";
@@ -22,6 +20,7 @@ type TokenDetails = {
   blockNumber?: number;
   timestamp?: string;
   transactionHash?: string;
+  creator?: string; // Added creator field
 };
 
 export function CreateTokenForm() {
@@ -30,16 +29,6 @@ export function CreateTokenForm() {
 
   // Manage writeContract interaction
   const { data: hash, error, isPending, writeContract } = useWriteContract();
-  // useWatchContractEvent({
-  //   address: "0x7713A39875A5335dc4Fc4f9359908afb55984b1F",
-  //   abi: tokenFactoryABI,
-  //   eventName: "TokenCreated",
-  //   config: config,
-  //   onLogs(logs) {
-  //     alert(logs.toString());
-  //     console.log("New logs!", logs);
-  //   },
-  // });
 
   // Manage transaction receipt
   const { isLoading: isConfirming, data: receipt } =
@@ -92,20 +81,20 @@ export function CreateTokenForm() {
       const address = tokenCreatedEvent.address;
       const blockNumber = Number(receipt.blockNumber);
       const transactionHash = receipt.transactionHash;
-
-      // Fetch timestamp only once
+      const creator = receipt.from; // Get creator address from receipt
       const timestamp = new Date().toISOString();
 
-      // Update state with token details
+      // Update state with token details including creator
       setTokenDetails((prev) => ({
         ...prev!,
         address,
         blockNumber,
         timestamp,
         transactionHash,
+        creator,
       }));
 
-      // Save to Firestore
+      // Save to Firestore with creator
       const tokenDocRef = doc(db, "tokens", address);
       setDoc(tokenDocRef, {
         name: tokenDetails.name,
@@ -114,6 +103,7 @@ export function CreateTokenForm() {
         blockNumber,
         timestamp,
         transactionHash,
+        creator, // Add creator to Firestore document
         createdAt: new Date().toISOString(),
       })
         .then(() => {
@@ -135,7 +125,6 @@ export function CreateTokenForm() {
 
   return (
     <form onSubmit={handleSubmit} className="space-y-6">
-      {/* <TokenEventWatcher /> */}
       <div className="space-y-4">
         <div>
           <Label htmlFor="name">Token Name</Label>
@@ -166,6 +155,8 @@ export function CreateTokenForm() {
           <div>Block Number: {tokenDetails.blockNumber}</div>
           <div>Timestamp: {tokenDetails.timestamp}</div>
           <div>Transaction Hash: {tokenDetails.transactionHash}</div>
+          <div>Creator: {tokenDetails.creator}</div>{" "}
+          {/* Display creator address */}
         </div>
       )}
       {error && <div>Error: {error.message}</div>}
