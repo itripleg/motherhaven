@@ -1,10 +1,24 @@
 import { useReadContract, useWatchContractEvent } from "wagmi";
-import { formatUnits, parseUnits, Address } from "viem";
-import { useEffect } from "react";
+import { formatUnits, parseUnits, Address, UnknownRpcError } from "viem";
 import tokenFactoryMetadata from "@/contracts/token-factory/artifacts/TokenFactory_metadata.json";
 
 const FACTORY_ADDRESS = "0x7713A39875A5335dc4Fc4f9359908afb55984b1F";
 const FACTORY_ABI = tokenFactoryMetadata.output.abi;
+
+type TokenEventLog = {
+  args: {
+    token: string;
+    buyer?: string;
+    seller?: string;
+    amount?: bigint;
+    tokenAmount?: bigint;
+    price?: bigint;
+    ethAmount?: bigint;
+    eventName: string;
+    args: [];
+  };
+  eventName: string;
+};
 
 const useTokenDetails = (tokenAddress: Address, amountInAvax?: string) => {
   // Get price from factory contract
@@ -39,7 +53,9 @@ const useTokenDetails = (tokenAddress: Address, amountInAvax?: string) => {
     args: amountInAvax
       ? [tokenAddress, parseUnits(amountInAvax, 18)]
       : undefined,
-    enabled: !!amountInAvax,
+    query: {
+      enabled: !!amountInAvax,
+    },
   });
 
   // Watch for buy events for this token
@@ -48,13 +64,12 @@ const useTokenDetails = (tokenAddress: Address, amountInAvax?: string) => {
     abi: FACTORY_ABI,
     eventName: "TokensPurchased",
     onLogs(logs) {
-      logs.forEach((log) => {
-        if (log.args.token?.toLowerCase() === tokenAddress?.toLowerCase()) {
-          console.log("Buy detected for this token, refreshing price...");
-          refetchPrice();
-          refetchCollateral();
-        }
-      });
+      const log = logs[0] as unknown as TokenEventLog;
+      if (log?.args?.token?.toLowerCase() === tokenAddress?.toLowerCase()) {
+        console.log("Buy detected for this token, refreshing price...");
+        refetchPrice();
+        refetchCollateral();
+      }
     },
   });
 
@@ -64,13 +79,12 @@ const useTokenDetails = (tokenAddress: Address, amountInAvax?: string) => {
     abi: FACTORY_ABI,
     eventName: "TokensSold",
     onLogs(logs) {
-      logs.forEach((log) => {
-        if (log.args.token?.toLowerCase() === tokenAddress?.toLowerCase()) {
-          console.log("Sell detected for this token, refreshing price...");
-          refetchPrice();
-          refetchCollateral();
-        }
-      });
+      const log = logs[0] as unknown as TokenEventLog;
+      if (log?.args?.token?.toLowerCase() === tokenAddress?.toLowerCase()) {
+        console.log("Sell detected for this token, refreshing price...");
+        refetchPrice();
+        refetchCollateral();
+      }
     },
   });
 
@@ -90,7 +104,7 @@ const useTokenDetails = (tokenAddress: Address, amountInAvax?: string) => {
     rawPrice: priceData,
     collateral: formattedCollateral,
     rawCollateral: collateralData,
-    tokenState: tokenStateData,
+    tokenState: <number>tokenStateData,
     receiveAmount: formattedReceiveAmount,
     rawReceiveAmount: receiveAmountData,
     isLoading: !priceData || !collateralData || tokenStateData === undefined,
