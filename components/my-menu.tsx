@@ -20,7 +20,10 @@ export default function MyMenu2() {
   }
 
   return (
-    <Menubar className="text-primary rounded-md max-w-[300px] md:max-w-xl justify-center mx-auto mt-4">
+    <Menubar
+      className="text-primary rounded-md max-w-[300px] md:max-w-xl 
+    justify-center mx-auto mt-4 absolute left-1/2 transform -translate-x-1/2  z-10"
+    >
       <MenubarMenu>
         <MenubarTrigger className="uppercase tracking-wider">
           Motherhaven
@@ -32,9 +35,9 @@ export default function MyMenu2() {
           <MenubarItem>
             <a href="/dashboard">Dash</a>
           </MenubarItem>
-          <MenubarItem>
+          {/* <MenubarItem>
             <a href="/casino">Casino</a>
-          </MenubarItem>
+          </MenubarItem> */}
           <MenubarItem>
             <a href="/dex/factory">Token Factory</a>
           </MenubarItem>

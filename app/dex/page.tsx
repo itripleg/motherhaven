@@ -3,17 +3,9 @@
 import { useEffect, useState } from "react";
 import { useAccount, useConnect, useDisconnect } from "wagmi";
 import { Button } from "@/components/ui/button";
-import {
-  Card,
-  CardContent,
-  CardDescription,
-  CardHeader,
-  CardTitle,
-} from "@/components/ui/card";
 import { useToast } from "@/hooks/use-toast";
-import { WalletConnector } from "@/components/WalletConnector";
-import { Factory } from "./Factory";
-// import { TokenCard } from "./components/AllTokensDisplay";
+import AllTokensDisplay from "./components/AllTokensDisplay";
+import { ConnectButton } from "@/components/ConnectButton";
 
 export default function Home() {
   const { address, isConnected } = useAccount();
@@ -26,61 +18,32 @@ export default function Home() {
     setIsClient(true);
   }, []);
 
-  const handleConnect = async (connectorId: number) => {
-    try {
-      const connector = connectors[connectorId];
-      await connect({ connector });
-      toast({
-        title: "Connected",
-        description: "Successfully connected to wallet",
-      });
-    } catch (error) {
-      toast({
-        title: "Connection Failed",
-        description: "Failed to connect to wallet",
-        variant: "destructive",
-      });
-    }
-  };
+  if (!isClient) return null;
 
-  if (!isClient) {
-    return null;
-  }
+  const UserSection = () => (
+    <div className="flex items-center w-full gap-2 justify-between">
+      <span className="text-sm text-muted-foreground">
+        Logged in as{" "}
+        {isConnected
+          ? `${address?.slice(0, 6)}...${address?.slice(-4)}`
+          : "Guest"}
+      </span>
+      {isConnected ? (
+        <Button size="sm" onClick={() => disconnect()}>
+          Disconnect
+        </Button>
+      ) : (
+        <ConnectButton />
+      )}
+    </div>
+  );
 
   return (
-    <div className="container mx-auto p-4">
-      <h1 className="text-4xl font-bold mb-8">Token Factory</h1>
-      {/* <TokenCard token={undefined} /> */}
-      {isConnected ? (
-        <>
-          <div className="flex justify-between items-center mb-4">
-            <p>
-              Logged in as{" "}
-              {address
-                ? `${address.slice(0, 6)}...${address.slice(-4)}`
-                : "N/A"}
-            </p>
-            <Button onClick={() => disconnect()}>Disconnect</Button>
-          </div>
-          <Factory />
-        </>
-      ) : (
-        <Card className="w-full max-w-md mx-auto">
-          <CardHeader>
-            <CardTitle>Connect Your Wallet</CardTitle>
-            <CardDescription>
-              Choose a wallet to connect to this app
-            </CardDescription>
-          </CardHeader>
-          <CardContent>
-            <WalletConnector
-              connectors={connectors}
-              onConnect={handleConnect}
-              isLoading={false}
-            />
-          </CardContent>
-        </Card>
-      )}
+    <div className="container mx-auto pt-20 p-4">
+      <div className="flex justify-between items-center mb-4">
+        <UserSection />
+      </div>
+      <AllTokensDisplay />
     </div>
   );
 }

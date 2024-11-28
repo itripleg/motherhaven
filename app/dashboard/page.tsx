@@ -1,52 +1,23 @@
 "use client";
 
-import { useState, useEffect } from "react";
 import { Container } from "@/components/craft";
-import { Dashboard } from "@/components/dashboard";
-import Chart from "@/components/chart"; // Assume you have a Chart component
-import MyMenu from "@/components/my-menu"; // Your Menubar component
-import LoginWidget from "@/components/login-widget";
-import { useKindeBrowserClient } from "@kinde-oss/kinde-auth-nextjs";
+import { TokensCreated } from "./TokensCreated";
+import { CoinTransactions } from "./CoinTransactions";
+import { HoldingsOverview } from "./HoldingsOverview";
+import { BundledTokensMap } from "./BundledTokensMap";
+import { AuthWrapper } from "@/components/AuthWrapper";
 
-type View = "dashboard" | "chart";
-
-function Page() {
-  const [currentView, setCurrentView] = useState<View>("dashboard"); // Default view is "dashboard"
-  const { user } = useKindeBrowserClient();
-
-  // Load the saved view from localStorage on component mount
-  useEffect(() => {
-    const savedView = localStorage.getItem("currentView");
-    if (savedView && (savedView === "dashboard" || savedView === "chart")) {
-      setCurrentView(savedView as View);
-    }
-  }, []);
-
-  // Save the current view to localStorage whenever it changes
-  useEffect(() => {
-    localStorage.setItem("currentView", currentView);
-  }, [currentView]);
-
-  const renderView = () => {
-    switch (currentView) {
-      case "dashboard":
-        return <Dashboard />;
-      case "chart":
-        return <Chart />;
-      default:
-        return <Dashboard />; // Fallback to dashboard
-    }
-  };
-
-  if (!user) {
-    return <LoginWidget />;
-  }
-
+export default function Dashboard() {
   return (
-    <div>
-      <Container className="mt-8">{renderView()}</Container>
-    </div>
+    <AuthWrapper>
+      <Container className="mt-8">
+        <div className="grid gap-6 md:grid-cols-2 pt-12">
+          <TokensCreated />
+          <CoinTransactions />
+          <HoldingsOverview />
+          <BundledTokensMap />
+        </div>
+      </Container>
+    </AuthWrapper>
   );
 }
-
-export default Page;

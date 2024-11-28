@@ -1,0 +1,40 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1200 630">
+  <!-- Background with gradient -->
+  <defs>
+    <linearGradient id="bgGradient" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" style="stop-color:#1a1a1a;stop-opacity:1" />
+      <stop offset="100%" style="stop-color:#2d2d2d;stop-opacity:1" />
+    </linearGradient>
+    <!-- Glowing effect -->
+    <filter id="glow" x="-50%" y="-50%" width="200%" height="200%">
+      <feGaussianBlur in="SourceGraphic" stdDeviation="10" result="blur" />
+      <feMerge>
+        <feMergeNode in="blur" />
+        <feMergeNode in="SourceGraphic" />
+      </feMerge>
+    </filter>
+  </defs>
+
+  <!-- Main background -->
+  <rect width="1200" height="630" fill="url(#bgGradient)" />
+
+  <!-- Decorative elements -->
+  <circle cx="200" cy="315" r="160" fill="#3d3d3d" opacity="0.1" />
+  <circle cx="1000" cy="315" r="160" fill="#3d3d3d" opacity="0.1" />
+
+  <!-- Main content -->
+  <g filter="url(#glow)">
+    <!-- Logo/Icon -->
+    <text x="600" y="240" fill="#ffffff" font-size="120" text-anchor="middle" font-family="Arial">🤑</text>
+    
+    <!-- Title -->
+    <text x="600" y="380" fill="#ffffff" font-size="64" text-anchor="middle" font-family="Arial" font-weight="bold">MotherHaven</text>
+    
+    <!-- Tagline -->
+    <text x="600" y="440" fill="#ffffff" font-size="32" text-anchor="middle" font-family="Arial" opacity="0.8">The DeFi Community Token Platform</text>
+  </g>
+
+  <!-- Decorative lines -->
+  <path d="M300 500 L900 500" stroke="#ffffff" stroke-width="2" opacity="0.2" />
+  <path d="M400 520 L800 520" stroke="#ffffff" stroke-width="2" opacity="0.1" />
+</svg>
