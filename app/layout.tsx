@@ -7,6 +7,7 @@ import { ThemeProvider } from "@/components/theme-provider";
 import MyMenu from "@/components/my-menu";
 import WagmiContext from "@/contexts/WagmiContext";
 import { Toaster } from "@/components/ui/toaster";
+import { EventWatcher } from "./dex/components/EventWatcher";
 
 const geistSans = localFont({
   src: "./fonts/GeistVF.woff",
@@ -101,6 +102,7 @@ export default function RootLayout({
         <ThemeProvider>
           <MyMenu />
           <WagmiContext>
+            <EventWatcher />
             {children}
             <Toaster />
           </WagmiContext>

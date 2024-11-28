@@ -12,6 +12,7 @@ type TokenData = {
   timestamp?: string;
   transactionHash?: string;
 };
+
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import {
   Card,
@@ -28,10 +29,12 @@ import { useWriteContract, useWaitForTransactionReceipt } from "wagmi";
 import { parseEther } from "viem";
 import { useToast } from "@/hooks/use-toast";
 import { AddressComponent } from "@/components/AddressComponent";
-import tokenFactoryABI from "@/contracts/token-factory/TokenFactory_abi.json";
+import tokenFactoryMetadata from "@/contracts/token-factory/artifacts/TokenFactory_metadata.json";
 import { ref, uploadBytes, getDownloadURL } from "firebase/storage";
+import dynamic from "next/dynamic";
 
 const FACTORY_ADDRESS = "0x7713A39875A5335dc4Fc4f9359908afb55984b1F";
+const ABI = tokenFactoryMetadata.output.abi;
 
 function Page() {
   const [tokenInfo, setTokenInfo] = useState({
@@ -155,7 +158,7 @@ function Page() {
 
       // Contract currently only accepts name and ticker
       writeContract({
-        abi: tokenFactoryABI,
+        abi: ABI,
         address: FACTORY_ADDRESS,
         functionName: "createToken",
         args: [
