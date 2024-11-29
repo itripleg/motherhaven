@@ -11,16 +11,15 @@ import {
   orderBy,
   arrayUnion,
   arrayRemove,
+  addDoc,
 } from "firebase/firestore";
 import { db } from "@/firebase";
-import { useKindeBrowserClient } from "@kinde-oss/kinde-auth-nextjs";
-/// If using the wagmi library for Ethereum wallet integration, uncomment the following line to import the `useAccount` hook, and comment out the `useKindeAuth` import.
-// If using wagmi, uncomment the following line and comment out the Kinde import
-// import { useAccount } from 'wagmi'
-
+import { useAccount } from "wagmi";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Input } from "@/components/ui/input";
+import { Textarea } from "@/components/ui/textarea";
 import {
   Select,
   SelectContent,
@@ -29,7 +28,7 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { useToast } from "@/hooks/use-toast";
-import { Container, Section } from "@/components/craft";
+import { Container } from "@/components/craft";
 
 interface RoadmapItem {
   id: string;
@@ -39,15 +38,19 @@ interface RoadmapItem {
   comments: number;
 }
 
+const ADMIN_ADDRESSES = ["0xd85327505Ab915AB0C1aa5bC6768bF4002732258"];
+
 export default function Roadmap() {
   const [items, setItems] = React.useState<RoadmapItem[]>([]);
   const [filter, setFilter] = React.useState<string>("top");
+  const [title, setTitle] = React.useState("");
+  const [notes, setNotes] = React.useState("");
+  const [status, setStatus] =
+    React.useState<RoadmapItem["status"]>("considering");
   const { toast } = useToast();
+  const { address, isConnecting, isDisconnected } = useAccount();
 
-  // Use Kinde authentication
-  const { user, isLoading } = useKindeBrowserClient();
-  // If using wagmi, comment out the line above and uncomment the following line
-  // const { address, isConnecting, isDisconnected } = useAccount()
+  const isAdmin = address && ADMIN_ADDRESSES.includes(address);
 
   React.useEffect(() => {
     const q = query(collection(db, "roadmap"), orderBy("upvotes", "desc"));
@@ -62,13 +65,12 @@ export default function Roadmap() {
   }, []);
 
   const handleUpvote = async (itemId: string) => {
-    if (isLoading) return; // If using wagmi, change this to: if (isConnecting) return
+    if (isConnecting) return;
 
-    if (!user) {
-      // If using wagmi, change this to: if (isDisconnected || !address) {
+    if (isDisconnected || !address) {
       toast({
         title: "Authentication required",
-        description: "Please sign in to upvote items.",
+        description: "Please connect your wallet to upvote items.",
         variant: "destructive",
       });
       return;
@@ -77,11 +79,47 @@ export default function Roadmap() {
     const itemRef = doc(db, "roadmap", itemId);
     const item = items.find((i) => i.id === itemId);
     if (item) {
-      const userId = user.id; // If using wagmi, change this to: const userId = address
-      const hasUpvoted = item.upvotes.includes(userId);
+      const hasUpvoted = item.upvotes.includes(address);
 
       await updateDoc(itemRef, {
-        upvotes: hasUpvoted ? arrayRemove(userId) : arrayUnion(userId),
+        upvotes: hasUpvoted ? arrayRemove(address) : arrayUnion(address),
+      });
+    }
+  };
+
+  const handleAddItem = async () => {
+    if (!title.trim()) {
+      toast({
+        title: "Title required",
+        description: "Please enter a title for the roadmap item.",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    try {
+      await addDoc(collection(db, "roadmap"), {
+        title: title.trim(),
+        status,
+        notes,
+        upvotes: [],
+        comments: 0,
+        createdAt: new Date().toISOString(),
+      });
+
+      setTitle("");
+      setNotes("");
+      setStatus("considering");
+
+      toast({
+        title: "Item added",
+        description: "The roadmap item has been added successfully.",
+      });
+    } catch (error) {
+      toast({
+        title: "Error",
+        description: "Failed to add roadmap item. Please try again.",
+        variant: "destructive",
       });
     }
   };
@@ -101,7 +139,7 @@ export default function Roadmap() {
     <Container>
       <div className="p-4 md:p-6">
         <div className="mb-6 flex items-center justify-between">
-          <h1 className="text-2xl font-bold">Roadmap</h1>
+          <h1 className="text-2xl font-bold">Road 2 Riches</h1>
           <Select value={filter} onValueChange={setFilter}>
             <SelectTrigger className="w-[180px]">
               <SelectValue placeholder="Sort by" />
@@ -112,6 +150,47 @@ export default function Roadmap() {
             </SelectContent>
           </Select>
         </div>
+
+        {isAdmin && (
+          <Card className="mb-6">
+            <CardHeader>
+              <CardTitle>Add Roadmap Item</CardTitle>
+            </CardHeader>
+            <CardContent className="space-y-4">
+              <Input
+                placeholder="Item title"
+                value={title}
+                onChange={(e) => setTitle(e.target.value)}
+              />
+              <Textarea
+                placeholder="Admin notes"
+                value={notes}
+                onChange={(e) => setNotes(e.target.value)}
+                className="h-24"
+              />
+              <Select
+                value={status}
+                onValueChange={(value) =>
+                  setStatus(value as RoadmapItem["status"])
+                }
+              >
+                <SelectTrigger>
+                  <SelectValue placeholder="Status" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="considering">Considering</SelectItem>
+                  <SelectItem value="planned">Planned</SelectItem>
+                  <SelectItem value="in-progress">In Progress</SelectItem>
+                  <SelectItem value="completed">Completed</SelectItem>
+                </SelectContent>
+              </Select>
+              <Button onClick={handleAddItem} className="w-full">
+                Add Item
+              </Button>
+            </CardContent>
+          </Card>
+        )}
+
         <div className="grid grid-cols-1 gap-6 md:grid-cols-2 lg:grid-cols-4">
           {(
             ["considering", "planned", "in-progress", "completed"] as const

@@ -20,8 +20,10 @@ import { ChatComponent } from "../components/ChatComponent";
 import { Sheet, SheetContent, SheetTrigger } from "@/components/ui/sheet";
 import { Button } from "@/components/ui/button";
 import { MessageCircle } from "lucide-react";
-import Chart from "@/app/dex/components/chart";
+// import Chart from "@/app/dex/components/chart";
 import useTokenDetails from "@/hooks/useTokenDetails";
+import { TokenPriceChart } from "../components/charts/TokenPriceChart";
+import RechartsChart from "../components/charts/RechartsChart";
 
 export interface TokenData {
   id: string;
@@ -68,6 +70,7 @@ export default function Page() {
       try {
         const tokenDocRef = doc(db, "tokens", tokenAddress);
         const tokenDoc = await getDoc(tokenDocRef);
+        console.log(tokenDoc);
 
         if (tokenDoc.exists()) {
           const data = tokenDoc.data();
@@ -189,9 +192,19 @@ export default function Page() {
                 <div className="absolute inset-0 bg-gradient-to-br from-gray-900 to-gray-800" />
               )}
             </Card>
-
             <Card className="h-[400px] p-2">
-              <Chart />
+              <TokenPriceChart
+                tokenAddress={tokenData.address}
+                currentPrice={price}
+                tokenSymbol={tokenData.symbol}
+              />
+            </Card>
+            <Card className="h-[400px] p-2">
+              <RechartsChart
+                tokenAddress={tokenData.address}
+                currentPrice={price}
+                tokenSymbol={tokenData.symbol}
+              />
             </Card>
 
             <Card>
@@ -241,7 +254,7 @@ export default function Page() {
             </Card>
           </div>
 
-          <div className="hidden lg:block ml-6">
+          <div className="hidden md:block ml-6 mt-12 ">
             <ChatComponent
               tokenAddress={tokenAddress}
               creatorAddress={tokenData.creator}
@@ -253,7 +266,7 @@ export default function Page() {
               <Button
                 variant="default"
                 size="icon"
-                className="fixed bottom-4 right-4 lg:hidden"
+                className="fixed bottom-4 right-4 md:hidden"
               >
                 <MessageCircle className="h-4 w-4" />
               </Button>

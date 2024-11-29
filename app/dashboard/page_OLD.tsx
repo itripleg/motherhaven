@@ -3,7 +3,7 @@
 import { useState, useEffect } from "react";
 import { Container } from "@/components/craft";
 import { Dashboard } from "@/components/dashboard";
-import Chart from "@/app/dex/components/chart"; // Assume you have a Chart component
+import Chart from "@/app/dex/components/charts/chart"; // Assume you have a Chart component
 import MyMenu from "@/components/my-menu"; // Your Menubar component
 import LoginWidget from "@/components/login-widget";
 import { useKindeBrowserClient } from "@kinde-oss/kinde-auth-nextjs";

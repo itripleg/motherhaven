@@ -8,6 +8,7 @@ import MyMenu from "@/components/my-menu";
 import WagmiContext from "@/contexts/WagmiContext";
 import { Toaster } from "@/components/ui/toaster";
 import { EventWatcher } from "./dex/components/EventWatcher";
+import { GlobalFinanceProvider } from "@/contexts/GlobalFinanceContext";
 
 const geistSans = localFont({
   src: "./fonts/GeistVF.woff",
@@ -99,12 +100,14 @@ export default function RootLayout({
         suppressHydrationWarning
         className={`${geistSans.variable} ${geistMono.variable} antialiased`}
       >
-        <ThemeProvider>
+        <ThemeProvider defaultTheme="dark">
           <MyMenu />
           <WagmiContext>
-            <EventWatcher />
-            {children}
-            <Toaster />
+            <GlobalFinanceProvider>
+              {/* <EventWatcher /> */}
+              {children}
+              <Toaster />
+            </GlobalFinanceProvider>
           </WagmiContext>
         </ThemeProvider>
       </body>

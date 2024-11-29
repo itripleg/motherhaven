@@ -22,7 +22,7 @@ export default function MyMenu2() {
   return (
     <Menubar
       className="text-primary rounded-md max-w-[300px] md:max-w-xl 
-    justify-center mx-auto mt-4 absolute left-1/2 transform -translate-x-1/2  z-10"
+    justify-center mx-auto mt-4 absolute left-1/2 transform -translate-x-1/2  z-40"
     >
       <MenubarMenu>
         <MenubarTrigger className="uppercase tracking-wider">

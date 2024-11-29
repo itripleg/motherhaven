@@ -1,3 +1,12 @@
+/**
+ * The `LandingPage` component is the main entry point for the landing page of the Motherhaven application. It displays the hero section, call-to-action buttons, and feature grid sections.
+ *
+ * The component uses the `framer-motion` library to add animations to the various sections, creating a smooth and engaging user experience.
+ *
+ * The landing page is designed to provide an overview of the Motherhaven platform, highlighting its key features and functionalities, such as the analytics dashboard, decentralized exchange, and casino.
+ *
+ * @returns {JSX.Element} The rendered `LandingPage` component.
+ */
 "use client";
 
 import React from "react";

@@ -8,10 +8,11 @@ import { Label } from "@/components/ui/label";
 import { useToast } from "@/hooks/use-toast";
 import { db } from "@/firebase";
 import { doc, setDoc } from "firebase/firestore";
-import tokenFactoryABI from "@/contracts/token-factory/TokenFactory_abi.json";
 import { EventWatcher } from "./EventWatcher";
 
+import tokenFactoryMetadata from "@/contracts/token-factory/artifacts/TokenFactory_metadata.json";
 const FACTORY_ADDRESS = "0x7713A39875A5335dc4Fc4f9359908afb55984b1F";
+const FACTORY_ABI = tokenFactoryMetadata.output.abi;
 
 type TokenDetails = {
   name: string;
@@ -59,7 +60,7 @@ export function CreateTokenForm() {
 
     writeContract({
       address: FACTORY_ADDRESS,
-      abi: tokenFactoryABI,
+      abi: FACTORY_ABI,
       functionName: "createToken",
       args: [name, symbol],
     });

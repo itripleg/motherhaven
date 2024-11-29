@@ -21,7 +21,7 @@ export default function Home() {
   if (!isClient) return null;
 
   const UserSection = () => (
-    <div className="flex items-center w-full gap-2 justify-between">
+    <div className="flex items-center w-full gap-2 justify-between z-40">
       <span className="text-sm text-muted-foreground">
         Logged in as{" "}
         {isConnected
@@ -41,6 +41,7 @@ export default function Home() {
   return (
     <div className="container mx-auto pt-20 p-4">
       <div className="flex justify-between items-center mb-4">
+        {/* Logged in user information and connect/disconnect button */}
         <UserSection />
       </div>
       <AllTokensDisplay />

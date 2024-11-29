@@ -2,9 +2,11 @@
 import React from "react";
 import { useWatchContractEvent } from "wagmi";
 import { Log } from "viem";
-import abi from "./TokenFactory_abi.json";
+
+import tokenFactoryMetadata from "@/contracts/token-factory/artifacts/TokenFactory_metadata.json";
 
 const FACTORY_ADDRESS = "0x7713A39875A5335dc4Fc4f9359908afb55984b1F";
+const FACTORY_ABI = tokenFactoryMetadata.output.abi;
 
 // Base log type that includes the args property
 type LogWithArgs = Log & {
@@ -42,7 +44,7 @@ export function EventWatcher() {
   // Watch for new token creation events
   useWatchContractEvent({
     address: FACTORY_ADDRESS,
-    abi,
+    abi: FACTORY_ABI,
     eventName: "TokenCreated",
     onLogs(logs) {
       console.log("Token Created!", logs);
@@ -59,7 +61,7 @@ export function EventWatcher() {
   // Watch for token purchase events
   useWatchContractEvent({
     address: FACTORY_ADDRESS,
-    abi,
+    abi: FACTORY_ABI,
     eventName: "TokensPurchased",
     onLogs(logs) {
       console.log("Tokens Purchased!", logs);
@@ -76,7 +78,7 @@ export function EventWatcher() {
   // Watch for token sale events
   useWatchContractEvent({
     address: FACTORY_ADDRESS,
-    abi,
+    abi: FACTORY_ABI,
     eventName: "TokensSold",
     onLogs(logs) {
       console.log("Tokens Sold!", logs);
@@ -93,7 +95,7 @@ export function EventWatcher() {
   // Watch for trading halt events
   useWatchContractEvent({
     address: FACTORY_ADDRESS,
-    abi,
+    abi: FACTORY_ABI,
     eventName: "TradingHalted",
     onLogs(logs) {
       console.log("Trading Halted!", logs);

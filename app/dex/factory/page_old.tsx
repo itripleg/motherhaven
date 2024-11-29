@@ -8,7 +8,7 @@ import {
 } from "@/components/ui/card";
 import { CreateTokenForm } from "@/app/dex/components/CreateTokenForm";
 import { BuyTokenForm } from "@/app/dex/components/BuyTokenForm";
-import { WithdrawTokenForm } from "@/app/dex/components/WithdrawTokenForm";
+// import { WithdrawTokenForm } from "@/app/dex/components/WithdrawTokenForm";
 import { SacrificeForm } from "@/app/dex/components/SacrificeForm";
 // import AllTokensDisplay from "@/app/factory/components/AllTokensDisplay";
 import { Container } from "@/components/craft";
@@ -53,9 +53,9 @@ const TakeAction = () => {
               <CardTitle>Withdraw Token</CardTitle>
               <CardDescription>Withdraw your purchased tokens</CardDescription>
             </CardHeader>
-            <CardContent>
+            {/* <CardContent>
               <WithdrawTokenForm />
-            </CardContent>
+            </CardContent> */}
           </Card>
         </TabsContent>
         <TabsContent value="sacrifice">

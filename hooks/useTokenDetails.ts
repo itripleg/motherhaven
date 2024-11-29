@@ -22,7 +22,11 @@ type TokenEventLog = {
 
 const useTokenDetails = (tokenAddress: Address, amountInAvax?: string) => {
   // Get price from factory contract
-  const { data: priceData, refetch: refetchPrice } = useReadContract({
+  const {
+    data: priceData,
+    refetch: refetchPrice,
+    isError: isPriceError,
+  } = useReadContract({
     abi: FACTORY_ABI,
     address: FACTORY_ADDRESS,
     functionName: "getCurrentPrice",
@@ -30,7 +34,11 @@ const useTokenDetails = (tokenAddress: Address, amountInAvax?: string) => {
   });
 
   // Get token's collateral from factory
-  const { data: collateralData, refetch: refetchCollateral } = useReadContract({
+  const {
+    data: collateralData,
+    refetch: refetchCollateral,
+    isError: isCollateralError,
+  } = useReadContract({
     abi: FACTORY_ABI,
     address: FACTORY_ADDRESS,
     functionName: "getCollateral",
@@ -38,7 +46,7 @@ const useTokenDetails = (tokenAddress: Address, amountInAvax?: string) => {
   });
 
   // Get token's state from factory
-  const { data: tokenStateData } = useReadContract({
+  const { data: tokenStateData, isError: isStateError } = useReadContract({
     abi: FACTORY_ABI,
     address: FACTORY_ADDRESS,
     functionName: "getTokenState",
@@ -58,7 +66,7 @@ const useTokenDetails = (tokenAddress: Address, amountInAvax?: string) => {
     },
   });
 
-  // Watch for buy events for this token
+  // Watch events...
   useWatchContractEvent({
     address: FACTORY_ADDRESS,
     abi: FACTORY_ABI,
@@ -66,14 +74,12 @@ const useTokenDetails = (tokenAddress: Address, amountInAvax?: string) => {
     onLogs(logs) {
       const log = logs[0] as unknown as TokenEventLog;
       if (log?.args?.token?.toLowerCase() === tokenAddress?.toLowerCase()) {
-        console.log("Buy detected for this token, refreshing price...");
         refetchPrice();
         refetchCollateral();
       }
     },
   });
 
-  // Watch for sell events for this token
   useWatchContractEvent({
     address: FACTORY_ADDRESS,
     abi: FACTORY_ABI,
@@ -81,7 +87,6 @@ const useTokenDetails = (tokenAddress: Address, amountInAvax?: string) => {
     onLogs(logs) {
       const log = logs[0] as unknown as TokenEventLog;
       if (log?.args?.token?.toLowerCase() === tokenAddress?.toLowerCase()) {
-        console.log("Sell detected for this token, refreshing price...");
         refetchPrice();
         refetchCollateral();
       }
@@ -91,23 +96,30 @@ const useTokenDetails = (tokenAddress: Address, amountInAvax?: string) => {
   // Format the values if they exist
   const formattedPrice = priceData
     ? formatUnits(BigInt(priceData.toString()), 18)
-    : undefined;
+    : "0";
   const formattedCollateral = collateralData
     ? formatUnits(BigInt(collateralData.toString()), 18)
-    : undefined;
+    : "0";
   const formattedReceiveAmount = receiveAmountData
     ? formatUnits(BigInt(receiveAmountData.toString()), 18)
-    : undefined;
+    : "0";
+
+  // Consider loading complete if we either have data or encountered an error
+  const isLoading = !(
+    (priceData !== undefined || isPriceError) &&
+    (collateralData !== undefined || isCollateralError) &&
+    (tokenStateData !== undefined || isStateError)
+  );
 
   return {
     price: formattedPrice,
     rawPrice: priceData,
     collateral: formattedCollateral,
     rawCollateral: collateralData,
-    tokenState: <number>tokenStateData,
+    tokenState: Number(tokenStateData ?? 0),
     receiveAmount: formattedReceiveAmount,
     rawReceiveAmount: receiveAmountData,
-    isLoading: !priceData || !collateralData || tokenStateData === undefined,
+    isLoading,
   };
 };
 
