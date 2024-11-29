@@ -21,7 +21,7 @@ import { Input } from "@/components/ui/input";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { ThumbsUp } from "lucide-react";
+import { ThumbsUp, Send } from "lucide-react";
 
 interface Comment {
   id: string;
@@ -36,10 +36,10 @@ interface Comment {
 
 export function ChatComponent({
   tokenAddress,
-  creatorAddress, // Add this prop
+  creatorAddress,
 }: {
   tokenAddress: string;
-  creatorAddress?: string; // Optional in case we can't get it
+  creatorAddress?: string;
 }) {
   const [comments, setComments] = useState<Comment[]>([]);
   const [newComment, setNewComment] = useState("");
@@ -88,6 +88,7 @@ export function ChatComponent({
 
     return () => unsubscribe();
   }, [tokenAddress]);
+
   const handleSubmitComment = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!isConnected || !address || !newComment.trim() || isSubmitting) return;
@@ -134,52 +135,62 @@ export function ChatComponent({
   };
 
   return (
-    <Card className="w-full max-w-md">
-      <CardHeader>
-        <CardTitle>Chat</CardTitle>
+    <Card className="w-full max-w-md bg-background border-primary-foreground shadow-lg">
+      <CardHeader className="border-b border-border dark:border-gray-700">
+        <CardTitle className="text-2xl font-bold text-foreground dark:text-white">
+          Chat
+        </CardTitle>
       </CardHeader>
-      <CardContent>
-        <ScrollArea className="h-[600px] pr-4">
+      <CardContent className="p-0">
+        <ScrollArea className="h-[600px] px-4">
           {comments.map((comment) => (
-            <div key={comment.id} className="mb-4">
-              <div className="flex items-start space-x-2">
-                <Avatar>
+            <div
+              key={comment.id}
+              className="py-4 border-b border-border dark:border-gray-700 last:border-0"
+            >
+              <div className="flex items-start space-x-3">
+                <Avatar className="w-10 h-10">
                   <AvatarImage
                     src={`https://avatar.vercel.sh/${comment.userAddress}`}
                   />
-                  <AvatarFallback>
+                  <AvatarFallback className="bg-primary text-primary-foreground">
                     {comment.userAddress.slice(0, 2)}
                   </AvatarFallback>
                 </Avatar>
-                <div className="flex-1">
-                  <p className="font-semibold text-sm">
-                    {`${comment.userAddress.slice(
-                      0,
-                      6
-                    )}...${comment.userAddress.slice(-4)}`}
+                <div className="flex-1 space-y-1">
+                  <div className="flex items-center">
+                    <p className="font-semibold text-sm text-foreground dark:text-gray-200">
+                      {`${comment.userAddress.slice(
+                        0,
+                        6
+                      )}...${comment.userAddress.slice(-4)}`}
+                    </p>
                     {creatorAddress &&
                       comment.userAddress.toLowerCase() ===
                         creatorAddress.toLowerCase() && (
-                        <span className="text-xs px-1.5 py-0.5 bg-primary/10 text-primary rounded-full">
+                        <span className="ml-2 text-xs px-1.5 py-0.5 bg-primary/10 text-primary rounded-full">
                           dev
                         </span>
                       )}
+                    <span className="ml-auto text-xs text-muted-foreground dark:text-gray-400">
+                      {comment.timestamp?.toDate().toLocaleString() ||
+                        "Just now"}
+                    </span>
+                  </div>
+                  <p className="text-sm text-foreground dark:text-gray-300">
+                    {comment.text}
                   </p>
-                  <p className="mt-1">{comment.text}</p>
-                  <div className="flex items-center mt-1 space-x-2">
+                  <div className="flex items-center mt-1">
                     <Button
                       variant="ghost"
                       size="sm"
                       onClick={() => handleLike(comment.id)}
                       disabled={!isConnected}
+                      className="text-muted-foreground hover:text-foreground dark:text-gray-400 dark:hover:text-white"
                     >
                       <ThumbsUp className="w-4 h-4 mr-1" />
                       {comment.likes || 0}
                     </Button>
-                    <span className="text-xs text-muted-foreground">
-                      {comment.timestamp?.toDate().toLocaleString() ||
-                        "Just now"}
-                    </span>
                   </div>
                 </div>
               </div>
@@ -187,24 +198,36 @@ export function ChatComponent({
           ))}
         </ScrollArea>
         {isConnected ? (
-          <form onSubmit={handleSubmitComment} className="mt-4">
+          <form
+            onSubmit={handleSubmitComment}
+            className="p-4 border-t border-border dark:border-gray-700"
+          >
             <div className="flex space-x-2">
               <Input
                 value={newComment}
                 onChange={(e) => setNewComment(e.target.value)}
                 placeholder="Type your comment..."
                 disabled={isSubmitting}
+                className="flex-1 bg-background dark:bg-gray-700 text-foreground dark:text-white"
               />
               <Button
                 type="submit"
                 disabled={isSubmitting || !newComment.trim()}
+                className="bg-primary hover:bg-primary/90 text-primary-foreground"
               >
-                {isSubmitting ? "Sending..." : "Send"}
+                {isSubmitting ? (
+                  "Sending..."
+                ) : (
+                  <>
+                    <Send className="w-4 h-4 mr-2" />
+                    Send
+                  </>
+                )}
               </Button>
             </div>
           </form>
         ) : (
-          <p className="mt-4 text-center text-muted-foreground">
+          <p className="p-4 text-center text-muted-foreground dark:text-gray-400 border-t border-border dark:border-gray-700">
             Please connect your wallet to comment.
           </p>
         )}

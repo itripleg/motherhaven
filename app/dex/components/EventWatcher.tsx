@@ -1,112 +1,93 @@
 "use client";
-import React from "react";
+
+import React, { useCallback } from "react";
 import { useWatchContractEvent } from "wagmi";
 import { Log } from "viem";
-
 import tokenFactoryMetadata from "@/contracts/token-factory/artifacts/TokenFactory_metadata.json";
+import exp from "constants";
 
-const FACTORY_ADDRESS = "0x7713A39875A5335dc4Fc4f9359908afb55984b1F";
-const FACTORY_ABI = tokenFactoryMetadata.output.abi;
+export const FACTORY_ADDRESS = "0x7713A39875A5335dc4Fc4f9359908afb55984b1F";
+export const FACTORY_ABI = tokenFactoryMetadata.output.abi;
 
-// Base log type that includes the args property
+// Event types
 type LogWithArgs = Log & {
   args: Record<string, any>;
+  eventName: string | string[];
 };
 
-// Event-specific types
-type TokenCreatedEvent = {
-  tokenAddress: `0x${string}`;
-  name: string;
-  ticker: string;
-  creator: `0x${string}`;
+type TokenEvent = {
+  eventName: string;
+  tokenAddress: string;
+  data: any;
 };
 
-type TokensPurchasedEvent = {
-  token: `0x${string}`;
-  buyer: `0x${string}`;
-  amount: bigint;
-  price: bigint;
-};
+// Create a custom event bus
+export const tokenEventEmitter = {
+  listeners: new Map<string, Set<(event: TokenEvent) => void>>(),
 
-type TokensSoldEvent = {
-  token: `0x${string}`;
-  seller: `0x${string}`;
-  tokenAmount: bigint;
-  ethAmount: bigint;
-};
+  addEventListener(
+    tokenAddress: string,
+    callback: (event: TokenEvent) => void
+  ) {
+    if (!this.listeners.has(tokenAddress)) {
+      this.listeners.set(tokenAddress, new Set());
+    }
+    this.listeners.get(tokenAddress)?.add(callback);
+  },
 
-type TradingHaltedEvent = {
-  token: `0x${string}`;
-  collateral: bigint;
+  removeEventListener(
+    tokenAddress: string,
+    callback: (event: TokenEvent) => void
+  ) {
+    this.listeners.get(tokenAddress)?.delete(callback);
+    if (this.listeners.get(tokenAddress)?.size === 0) {
+      this.listeners.delete(tokenAddress);
+    }
+  },
+
+  emit(event: TokenEvent) {
+    this.listeners
+      .get(event.tokenAddress)
+      ?.forEach((callback) => callback(event));
+  },
 };
 
 export function EventWatcher() {
-  // Watch for new token creation events
-  useWatchContractEvent({
-    address: FACTORY_ADDRESS,
-    abi: FACTORY_ABI,
-    eventName: "TokenCreated",
-    onLogs(logs) {
-      console.log("Token Created!", logs);
-      logs.forEach((log) => {
-        const { tokenAddress, name, ticker, creator } = (log as LogWithArgs)
-          .args as TokenCreatedEvent;
-        console.log(
-          `New Token: ${name} (${ticker}) at ${tokenAddress} by ${creator}`
-        );
-      });
-    },
-  });
+  const handleEvents = useCallback((logs: any) => {
+    logs.forEach((log: LogWithArgs) => {
+      const { eventName, args } = log;
+      console.log(`Event ${eventName}:`, args);
 
-  // Watch for token purchase events
-  useWatchContractEvent({
-    address: FACTORY_ADDRESS,
-    abi: FACTORY_ABI,
-    eventName: "TokensPurchased",
-    onLogs(logs) {
-      console.log("Tokens Purchased!", logs);
-      logs.forEach((log) => {
-        const { token, buyer, amount, price } = (log as LogWithArgs)
-          .args as TokensPurchasedEvent;
-        console.log(
-          `Purchase: ${amount} tokens at ${price} AVAX by ${buyer} for token ${token}`
-        );
-      });
-    },
-  });
+      // Get token address based on event type
+      let tokenAddress = "";
+      if ("token" in args) {
+        tokenAddress = args.token.toLowerCase();
+      } else if ("tokenAddress" in args) {
+        tokenAddress = args.tokenAddress.toLowerCase();
+      }
 
-  // Watch for token sale events
-  useWatchContractEvent({
-    address: FACTORY_ADDRESS,
-    abi: FACTORY_ABI,
-    eventName: "TokensSold",
-    onLogs(logs) {
-      console.log("Tokens Sold!", logs);
-      logs.forEach((log) => {
-        const { token, seller, tokenAmount, ethAmount } = (log as LogWithArgs)
-          .args as TokensSoldEvent;
-        console.log(
-          `Sale: ${tokenAmount} tokens for ${ethAmount} AVAX by ${seller} for token ${token}`
-        );
-      });
-    },
-  });
+      if (tokenAddress) {
+        tokenEventEmitter.emit({
+          eventName: eventName as string,
+          tokenAddress,
+          data: args,
+        });
+      }
+    });
+  }, []);
 
-  // Watch for trading halt events
   useWatchContractEvent({
     address: FACTORY_ADDRESS,
     abi: FACTORY_ABI,
-    eventName: "TradingHalted",
-    onLogs(logs) {
-      console.log("Trading Halted!", logs);
-      logs.forEach((log) => {
-        const { token, collateral } = (log as LogWithArgs)
-          .args as TradingHaltedEvent;
-        console.log(
-          `Trading Halted for token ${token} with total collateral: ${collateral} AVAX`
-        );
-      });
-    },
+    // @ts-expect-error works
+    eventName: [
+      "TokenCreated",
+      "TokensPurchased",
+      "TokensSold",
+      "TradingHalted",
+    ],
+    onLogs: handleEvents,
+    pollingInterval: 5000,
   });
 
   return null;

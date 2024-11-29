@@ -187,12 +187,12 @@ function Page() {
 
   return (
     <div
-      className="min-h-screen bg-cover bg-center bg-no-repeat "
+      className="min-h-screen bg-cover bg-center bg-no-repeat"
       style={{
         backgroundImage: backgroundImage ? `url(${backgroundImage})` : "none",
       }}
     >
-      <div className="min-h-screen  dark:bg-gray-900/80 ">
+      <div className="min-h-screen bg-gray-100/30">
         <Container>
           <form onSubmit={handleSubmit}>
             <Tabs defaultValue="token-info" className="mt-8">

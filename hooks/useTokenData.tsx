@@ -1,31 +1,12 @@
-"use client";
-
 import { useState, useEffect } from "react";
-import { usePathname } from "next/navigation";
-import { useAccount } from "wagmi";
 import { doc, getDoc } from "firebase/firestore";
 import { db } from "@/firebase";
-import useTokenDetails from "@/hooks/useTokenDetails";
-import TokenPage from "../components/TokenPage";
-import { TokenData } from "@/types";
+import { TokenData } from "../types";
 
-export default function Page() {
-  const pathname = usePathname();
-  const { address, isConnected } = useAccount();
-  const tokenAddress = pathname?.split("/").pop() || "";
-  const [mounted, setMounted] = useState(false);
+export function useTokenData(tokenAddress: string) {
   const [tokenData, setTokenData] = useState<TokenData | null>(null);
   const [loading, setLoading] = useState(true);
-
-  const {
-    price,
-    tokenState,
-    isLoading: detailsLoading,
-  } = useTokenDetails(tokenData?.address as `0x${string}`);
-
-  useEffect(() => {
-    setMounted(true);
-  }, []);
+  const [error, setError] = useState<Error | null>(null);
 
   useEffect(() => {
     if (!tokenAddress) {
@@ -37,7 +18,6 @@ export default function Page() {
       try {
         const tokenDocRef = doc(db, "tokens", tokenAddress);
         const tokenDoc = await getDoc(tokenDocRef);
-        console.log("Firestore response:", tokenDoc);
 
         if (tokenDoc.exists()) {
           const data = tokenDoc.data();
@@ -53,9 +33,13 @@ export default function Page() {
             creationBlock: data.creationBlock,
             transactionHash: data.transactionHash,
           });
+        } else {
+          throw new Error("Token not found");
         }
       } catch (error) {
-        console.error("Error fetching token data:", error);
+        setError(
+          error instanceof Error ? error : new Error("Unknown error occurred")
+        );
       } finally {
         setLoading(false);
       }
@@ -64,18 +48,5 @@ export default function Page() {
     fetchTokenData();
   }, [tokenAddress]);
 
-  if (!mounted) return null;
-
-  return (
-    // <Container>
-    <TokenPage
-      tokenData={tokenData}
-      price={Number(price)}
-      tokenState={tokenState}
-      isConnected={isConnected}
-      loading={loading || detailsLoading}
-      address={address}
-    />
-    // </Container>
-  );
+  return { tokenData, loading, error };
 }

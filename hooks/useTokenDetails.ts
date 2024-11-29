@@ -1,11 +1,29 @@
-//useTokenDetails.ts
+import { useReadContract } from "wagmi";
+import { formatUnits, parseUnits, Address } from "viem";
+import { useEffect } from "react";
+import {
+  FACTORY_ADDRESS,
+  FACTORY_ABI,
+  tokenEventEmitter,
+} from "../app/dex/components/EventWatcher";
 
-import { useReadContract, useWatchContractEvent } from "wagmi";
-import { formatUnits, parseUnits, Address, UnknownRpcError } from "viem";
-import tokenFactoryMetadata from "@/contracts/token-factory/artifacts/TokenFactory_metadata.json";
+// Configuration for data staleness and garbage collection
+const CONFIG = {
+  // How often data should be refetched
+  PRICE_STALE_TIME: 30_000, // 30 seconds
+  COLLATERAL_STALE_TIME: 30_000, // 30 seconds
+  STATE_STALE_TIME: 60_000, // 1 minute
+  CALC_STALE_TIME: 15_000, // 15 seconds
 
-const FACTORY_ADDRESS = "0x7713A39875A5335dc4Fc4f9359908afb55984b1F";
-const FACTORY_ABI = tokenFactoryMetadata.output.abi;
+  // How long to keep data in cache
+  PRICE_GC_TIME: 60_000, // 1 minute
+  COLLATERAL_GC_TIME: 60_000, // 1 minute
+  STATE_GC_TIME: 120_000, // 2 minutes
+  CALC_GC_TIME: 30_000, // 30 seconds
+
+  // Event refetch delay
+  EVENT_REFETCH_DELAY: 2000, // 2 seconds
+} as const;
 
 type TokenEventLog = {
   args: {
@@ -33,6 +51,11 @@ const useTokenDetails = (tokenAddress: Address, amountInAvax?: string) => {
     address: FACTORY_ADDRESS,
     functionName: "getCurrentPrice",
     args: [tokenAddress],
+    query: {
+      enabled: Boolean(tokenAddress),
+      staleTime: CONFIG.PRICE_STALE_TIME,
+      gcTime: CONFIG.PRICE_GC_TIME,
+    },
   });
 
   // Get token's collateral from factory
@@ -45,6 +68,11 @@ const useTokenDetails = (tokenAddress: Address, amountInAvax?: string) => {
     address: FACTORY_ADDRESS,
     functionName: "getCollateral",
     args: [tokenAddress],
+    query: {
+      enabled: Boolean(tokenAddress),
+      staleTime: CONFIG.COLLATERAL_STALE_TIME,
+      gcTime: CONFIG.COLLATERAL_GC_TIME,
+    },
   });
 
   // Get token's state from factory
@@ -53,6 +81,11 @@ const useTokenDetails = (tokenAddress: Address, amountInAvax?: string) => {
     address: FACTORY_ADDRESS,
     functionName: "getTokenState",
     args: [tokenAddress],
+    query: {
+      enabled: Boolean(tokenAddress),
+      staleTime: CONFIG.STATE_STALE_TIME,
+      gcTime: CONFIG.STATE_GC_TIME,
+    },
   });
 
   // Calculate tokens to receive for a given AVAX amount
@@ -64,36 +97,37 @@ const useTokenDetails = (tokenAddress: Address, amountInAvax?: string) => {
       ? [tokenAddress, parseUnits(amountInAvax, 18)]
       : undefined,
     query: {
-      enabled: !!amountInAvax,
+      enabled: Boolean(tokenAddress && amountInAvax),
+      staleTime: CONFIG.CALC_STALE_TIME,
+      gcTime: CONFIG.CALC_GC_TIME,
     },
   });
 
-  // Watch events...
-  useWatchContractEvent({
-    address: FACTORY_ADDRESS,
-    abi: FACTORY_ABI,
-    eventName: "TokensPurchased",
-    onLogs(logs) {
-      const log = logs[0] as unknown as TokenEventLog;
-      if (log?.args?.token?.toLowerCase() === tokenAddress?.toLowerCase()) {
-        refetchPrice();
-        refetchCollateral();
-      }
-    },
-  });
+  // Subscribe to events using the event emitter
+  useEffect(() => {
+    if (!tokenAddress) return;
 
-  useWatchContractEvent({
-    address: FACTORY_ADDRESS,
-    abi: FACTORY_ABI,
-    eventName: "TokensSold",
-    onLogs(logs) {
-      const log = logs[0] as unknown as TokenEventLog;
-      if (log?.args?.token?.toLowerCase() === tokenAddress?.toLowerCase()) {
-        refetchPrice();
-        refetchCollateral();
+    const handleTokenEvent = (event: any) => {
+      if (["TokensPurchased", "TokensSold"].includes(event.eventName)) {
+        setTimeout(() => {
+          refetchPrice();
+          refetchCollateral();
+        }, CONFIG.EVENT_REFETCH_DELAY);
       }
-    },
-  });
+    };
+
+    tokenEventEmitter.addEventListener(
+      tokenAddress.toLowerCase(),
+      handleTokenEvent
+    );
+
+    return () => {
+      tokenEventEmitter.removeEventListener(
+        tokenAddress.toLowerCase(),
+        handleTokenEvent
+      );
+    };
+  }, [tokenAddress, refetchPrice, refetchCollateral]);
 
   // Format the values if they exist
   const formattedPrice = priceData

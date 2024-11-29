@@ -95,6 +95,7 @@ export default function AllTokensDisplay() {
             className="z-60"
             onClick={() => {
               moveCamPosition({ cameraRef, x: 0, y: 0, z: -7, scale: 1 });
+              console.log((controlRef.current.autoRotateSpeed = 1));
             }}
           >
             Default

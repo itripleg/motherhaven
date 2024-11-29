@@ -25,7 +25,7 @@ type TokenDetails = {
 };
 
 export function CreateTokenForm() {
-  <EventWatcher />;
+  // <EventWatcher />;
   const { toast } = useToast();
 
   // Manage writeContract interaction
@@ -65,6 +65,11 @@ export function CreateTokenForm() {
       args: [name, symbol],
     });
   }
+
+  useEffect(() => {
+    console.log("[CreateTokenForm] Mounted");
+    return () => console.log("[CreateTokenForm] Unmounted");
+  }, []);
 
   useEffect(() => {
     if (receipt && tokenDetails && !tokenDetails.address) {

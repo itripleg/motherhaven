@@ -11,15 +11,17 @@ import { motion } from "framer-motion";
 import { Badge } from "@/components/ui/badge";
 import { useRouter } from "next/navigation";
 import { Button } from "@/components/ui/button";
-import useTokenDetails from "@/hooks/useTokenDetails";
+// import useTokenDetails from "@/hooks/useTokenDetails";
 
-export const TokenCard = ({ token }: { token: Token }) => {
+export const TokenCard = ({
+  token,
+  price,
+}: {
+  token: Token;
+  price: string;
+}) => {
   const router = useRouter();
-  const { price, isLoading } = useTokenDetails(token.address as `0x${string}`);
-
-  const displayPrice = isLoading
-    ? "Loading..."
-    : `$${Number(price).toFixed(4)}`;
+  const displayPrice = `$${Number(price).toFixed(4)}`;
 
   return (
     <motion.div whileHover={{ scale: 1.05 }} whileTap={{ scale: 0.95 }}>
