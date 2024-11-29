@@ -1,3 +1,5 @@
+//useTokenDetails.ts
+
 import { useReadContract, useWatchContractEvent } from "wagmi";
 import { formatUnits, parseUnits, Address, UnknownRpcError } from "viem";
 import tokenFactoryMetadata from "@/contracts/token-factory/artifacts/TokenFactory_metadata.json";
