@@ -1,17 +1,16 @@
 import { Canvas } from "@react-three/fiber";
-import { OrbitControls, Stars } from "@react-three/drei";
+import { OrbitControls, PerspectiveCamera, Stars } from "@react-three/drei";
 import { motion } from "framer-motion";
 import { useTheme } from "next-themes";
 import { useEffect, useRef } from "react";
 import Moon from "@/components-3d/Moon";
 import gsap from "gsap";
 
-export const SpaceBackground = () => {
+export const SpaceScene = ({ cameraRef, controlRef, lightRef }: any) => {
   const { theme } = useTheme();
-  const lightRef = useRef();
 
   useEffect(() => {
-    if (lightRef.current) {
+    if (lightRef?.current) {
       gsap.to(lightRef.current, {
         intensity: theme === "dark" ? 0.3 : 1,
         duration: 2.5,
@@ -27,15 +26,17 @@ export const SpaceBackground = () => {
       transition={{ duration: 6, delay: 0 }}
     >
       <Canvas>
-        {/* @ts-expect-error always get this ref error */}
         <ambientLight intensity={1} ref={lightRef} />
         <directionalLight position={[0, 10, 0]} />
         <OrbitControls
-          enableZoom={true}
+          ref={controlRef}
+          enableZoom={false}
           enablePan={true}
+          enableRotate={false}
           autoRotate={false}
           autoRotateSpeed={0.1}
         />
+        <PerspectiveCamera position={[0, 0, -7]} ref={cameraRef} makeDefault />
         <Moon scale={2} position={[0, 1.1, 0]} />
         <Stars />
       </Canvas>
