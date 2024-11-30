@@ -10,6 +10,7 @@ import {
 } from "@/components/ui/menubar";
 import { ModeToggle } from "./mode-toggle";
 import { usePathname } from "next/navigation";
+import Link from "next/link";
 
 export default function MyMenu2() {
   const pathname = usePathname();
@@ -30,19 +31,19 @@ export default function MyMenu2() {
         </MenubarTrigger>
         <MenubarContent>
           <MenubarItem>
-            <a href="/dex">DEX</a>
+            <Link href="/dex">DEX</Link>
           </MenubarItem>
           <MenubarItem>
-            <a href="/dashboard">Dash</a>
+            <Link href="/dashboard">Dash</Link>
           </MenubarItem>
           {/* <MenubarItem>
-            <a href="/casino">Casino</a>
+            <Link href="/casino">Casino</Link>
           </MenubarItem> */}
           <MenubarItem>
-            <a href="/dex/factory">Token Factory</a>
+            <Link href="/dex/factory">Token Factory</Link>
           </MenubarItem>
           <MenubarItem>
-            <a href="/roadmap">Road to Riches</a>
+            <Link href="/roadmap">Road to Riches</Link>
           </MenubarItem>
         </MenubarContent>
       </MenubarMenu>

@@ -51,7 +51,7 @@ export const positions = {
   z: { x: -3.1, y: -0.71 },
 };
 
-export function Flecha({ animationControls }: any, props: any) {
+export function Flecha({ animationControls }, props) {
   const { nodes, materials } = useGLTF("/models/Flecha.glb");
 
   function spin() {

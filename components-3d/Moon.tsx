@@ -10,6 +10,7 @@ export default function Model(props: any) {
   };
   return (
     <group {...props} dispose={null}>
+      {/* @ts-expect-error three@alpha error */}
       <motion.mesh
         ref={meshRef}
         animate={{ rotateY: 360 }} // Spin the mesh 360 degrees around the Y-axis

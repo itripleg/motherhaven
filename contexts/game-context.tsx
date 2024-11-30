@@ -2,16 +2,15 @@
 import GameOver from "@/game-components/GameOver";
 import { OrbitControls } from "@react-three/drei";
 import { AnimationControls, useAnimation } from "framer-motion";
+import * as THREE from "three";
 import {
   RefObject,
   createContext,
-  use,
   useContext,
   useEffect,
   useRef,
   useState,
 } from "react";
-// Import OrbitControls from @react-three/drei
 import { PerspectiveCamera } from "three";
 
 type Target = "hero" | "enemy";
@@ -28,22 +27,22 @@ type Context = {
   stopGame: () => void;
   checkGameStatus: () => void;
   gameRestart: boolean;
-  cameraRef: RefObject<PerspectiveCamera>;
-  controlRef: any;
+  cameraRef: RefObject<PerspectiveCamera | null>;
+  controlRef: RefObject<typeof OrbitControls | null>;
   animationControls: AnimationControls;
-  bossEyeRef: RefObject<any>; // Update this type if you have a specific type for bossEyeRef
+  bossEyeRef: RefObject<THREE.Object3D | null>;
   battle: boolean;
   wallpaper: string;
-  setWallpaper: Function;
-  cameraZPosition: any;
-  setCameraZPosition: Function;
+  setWallpaper: (wallpaper: string) => void;
+  cameraZPosition: number;
+  setCameraZPosition: (position: number) => void;
   jaxMessage: string;
-  setJaxMessage: Function;
+  setJaxMessage: (message: string) => void;
   ouijaMessage: string;
-  setOuijaMessage: Function;
-  setBossHealth: Function;
+  setOuijaMessage: (message: string) => void;
+  setBossHealth: (health: number) => void;
   view: string;
-  setView: Function;
+  setView: (view: string) => void;
 };
 
 export const GameContext = createContext<Context | null>(null);
@@ -51,9 +50,9 @@ export const GameContext = createContext<Context | null>(null);
 type Props = { children: React.ReactNode };
 
 export default function GameContextProvider({ children }: Props) {
-  const cameraRef = useRef<PerspectiveCamera>(null);
-  const controlRef = useRef<typeof OrbitControls>(null);
-  const bossEyeRef = useRef<any>(null); // Update this type if you have a specific type for bossEyeRef
+  const cameraRef = useRef<PerspectiveCamera | null>(null);
+  const controlRef = useRef<typeof OrbitControls | null>(null);
+  const bossEyeRef = useRef<THREE.Object3D | null>(null);
   const [gameTimer, setGameTimer] = useState(0);
   const [heroHealth, setHeroHealth] = useState(100);
   const [bossHealth, setBossHealth] = useState(100);
@@ -64,10 +63,8 @@ export default function GameContextProvider({ children }: Props) {
   const [ouijaMessage, setOuijaMessage] = useState("");
   const [wallpaper, setWallpaper] = useState("");
   const [view, setView] = useState("default");
-  // const [wallpaper, setWallpaper] = useState("/ai-concept-art/bar1.webp");
-  const animationControls = useAnimation();
-
   const [cameraZPosition, setCameraZPosition] = useState(10);
+  const animationControls = useAnimation();
 
   const startGame = () => {
     setGameStatus("running");
@@ -98,7 +95,7 @@ export default function GameContextProvider({ children }: Props) {
     }
   };
 
-  const applyDamage = (target: string, amount: number) => {
+  const applyDamage = (target: Target, amount: number) => {
     if (target === "hero") {
       setHeroHealth((prev) => Math.max(prev - amount, 0));
     } else if (target === "enemy") {
@@ -106,40 +103,18 @@ export default function GameContextProvider({ children }: Props) {
     }
   };
 
-  // const handleGameTimer = () => {
-  //   let interval: NodeJS.Timeout;
-  //   if (gameStatus === "running") {
-  //     interval = setInterval(() => {
-  //       setGameTimer((prevTimer) => prevTimer + 1);
-  //     }, 1000);
-  //   }
-  //   return () => clearInterval(interval);
-  // };
-
-  // useEffect(() => {
-  //   if (gameRestart) {
-  //     setGameRestart(false);
-  //   }
-  //   checkGameStatus();
-  //   return handleGameTimer();
-  // }, [gameStatus, gameRestart]);
-
   useEffect(() => {
     if (gameRestart) {
       setGameRestart(false);
     }
 
-    // Clear interval if game is not running
     let interval: NodeJS.Timeout;
     if (gameStatus === "running") {
       interval = setInterval(() => {
         setGameTimer((prevTimer) => prevTimer + 1);
       }, 1000);
-    } else {
-      // clearInterval(interval);
     }
 
-    // Check game status on every render
     if (heroHealth <= 0) {
       setGameStatus("lost");
       console.log("You lost.");

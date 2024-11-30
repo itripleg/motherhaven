@@ -175,7 +175,7 @@ export default function DiceGame() {
 
             {rollResult !== null && (
               <motion.div
-                className="text-6xl font-bold text-center"
+                // className="text-6xl font-bold text-center"
                 initial={{ scale: 0 }}
                 animate={{ scale: 1 }}
                 transition={{ type: "spring", stiffness: 260, damping: 20 }}

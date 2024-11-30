@@ -1,8 +1,9 @@
+// @ts-ignore
 import { useGLTF } from "@react-three/drei";
 import { motion } from "framer-motion-3d";
 import React, { useRef } from "react";
 
-export function OuijaBoard(props: any) {
+export function OuijaBoard(props) {
   const { nodes, materials } = useGLTF("/models/ouija_board.glb");
   return (
     <motion.group {...props} dispose={null}>

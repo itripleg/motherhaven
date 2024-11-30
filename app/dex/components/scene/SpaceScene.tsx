@@ -1,6 +1,6 @@
 import { Canvas } from "@react-three/fiber";
 import { OrbitControls, PerspectiveCamera, Stars } from "@react-three/drei";
-import { motion } from "framer-motion";
+import { motion, useAnimation, AnimationControls } from "framer-motion";
 import { useTheme } from "next-themes";
 import { useEffect, useRef } from "react";
 import Moon from "@/components-3d/Moon";
@@ -10,6 +10,8 @@ import { Flecha } from "@/components-3d/Ouija/Flecha";
 
 export const SpaceScene = ({ cameraRef, controlRef, lightRef }: any) => {
   const { theme } = useTheme();
+
+  const animationControls: AnimationControls = useAnimation();
 
   useEffect(() => {
     if (lightRef?.current) {
@@ -42,7 +44,7 @@ export const SpaceScene = ({ cameraRef, controlRef, lightRef }: any) => {
         <Moon scale={2} position={[0, 1.1, 0]} />
         <Stars />
         <OuijaBoard position={[666, 666, 666]} />
-        <Flecha />
+        <Flecha animationControls={animationControls} />
       </Canvas>
     </motion.div>
   );

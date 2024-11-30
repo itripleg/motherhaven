@@ -1,3 +1,5 @@
+// @ts-nocheck
+"use client";
 import { useState, useEffect, useRef } from "react";
 import Eye from "@/components-3d/Eye";
 import { Canvas } from "@react-three/fiber";
