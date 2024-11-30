@@ -1,5 +1,5 @@
 import gsap from "gsap";
-import { Tsukimi_Rounded } from "next/font/google";
+// import predefinedPositions from "@/game-components/Controls";
 
 export const defaultCam = (controlRef: any, cameraRef: any) => {
   // console.log(controlRef.current.target)
@@ -58,3 +58,34 @@ export const moveTarget = (
 //     duration: 2.5,
 //   })
 // }
+
+// export const handleCameraChange = (
+//   key: string,
+//   cameraRef: any,
+//   controlRef: any
+// ) => {
+//   // const [baseCameraPosition, setBaseCameraPosition] = useState([0, 0, 10]);
+//   const { offset, target, duration, zoomLevel } = predefinedPositions[key];
+//   // const newPosition = baseCameraPosition.map((pos, i) => pos + offset[i]);
+//   setCamera(cameraRef, controlRef, offset, target, duration);
+//   // Check if zoomLevel is defined and call the zoom function
+//   if (zoomLevel !== undefined) {
+//     zoomCamera(cameraRef, zoomLevel, duration);
+//   }
+// };
+
+export const zoomCamera = (cameraRef: any, level: number, duration = 2) => {
+  if (cameraRef.current) {
+    // Animate zoom property
+    gsap.to(cameraRef.current, {
+      zoom: level,
+      duration: duration,
+      onUpdate: () => {
+        // Update the projection matrix on each frame
+        cameraRef.current.updateProjectionMatrix();
+      },
+    });
+  } else {
+    console.log("can't get camera reference");
+  }
+};

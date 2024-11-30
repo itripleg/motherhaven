@@ -35,7 +35,7 @@ export const CameraSearch = ({ cameraRef }: CameraSearchProps) => {
 
       if (checkSecretPosition([x, y, z])) {
         setShowSecret(true);
-        setTimeout(() => setShowSecret(false), 6000); // Hide after 6 seconds
+        setTimeout(() => setShowSecret(false), 6000);
       }
     }
   };
@@ -58,13 +58,16 @@ export const CameraSearch = ({ cameraRef }: CameraSearchProps) => {
   };
 
   return (
-    <div className="relative">
+    <div className="flex flex-col items-center">
       <motion.form
+        animate={{ y: !showSecret ? -175 : 0 }}
+        transition={{
+          type: "spring",
+          stiffness: 500,
+          damping: 30,
+        }}
         onSubmit={handleCameraPosition}
-        initial={{ opacity: 0, y: -20 }}
-        animate={{ opacity: 1, y: 0 }}
-        transition={{ duration: 0.5 }}
-        className="flex items-center space-x-4 mb-8"
+        className="flex items-center space-x-4 mb-8 w-full"
       >
         <Input
           value={position}
@@ -82,27 +85,35 @@ export const CameraSearch = ({ cameraRef }: CameraSearchProps) => {
       </motion.form>
 
       <AnimatePresence>
-        {showSecret && (
+        {!showSecret && (
           <motion.div
-            initial={{ opacity: 0, scale: 0, rotate: -180 }}
+            initial={{ opacity: 0, height: 0 }}
             animate={{
               opacity: 1,
-              scale: 1,
-              rotate: 0,
+              height: "36vh",
+              // height: "auto",
               transition: {
-                type: "spring",
-                stiffness: 260,
-                damping: 20,
+                height: {
+                  type: "spring",
+                  stiffness: 500,
+                  damping: 30,
+                },
+                opacity: { duration: 0.2 },
               },
             }}
             exit={{
               opacity: 0,
-              scale: 0,
-              rotate: 180,
-              transition: { duration: 0.5 },
+              height: 0,
+              transition: {
+                height: {
+                  type: "spring",
+                  stiffness: 500,
+                  damping: 30,
+                },
+                opacity: { duration: 0.2 },
+              },
             }}
-            className="absolute top-1/2 left-1/2 transform -translate-x-1/2 -translate-y-1/2 
-                       flex flex-col items-center justify-center space-y-4 z-50"
+            className="overflow-hidden w-full flex flex-col items-center"
           >
             <motion.div
               animate={{
@@ -126,7 +137,7 @@ export const CameraSearch = ({ cameraRef }: CameraSearchProps) => {
                 repeat: Infinity,
                 ease: "linear",
               }}
-              className="text-2xl font-bold text-red-500"
+              className="text-2xl font-bold text-red-500 h-20"
             >
               You found the secret!
             </motion.h2>

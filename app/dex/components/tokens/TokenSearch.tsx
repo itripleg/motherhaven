@@ -40,7 +40,7 @@ export const TokenSearch = ({
         value={searchQuery}
         onChange={(e) => setSearchQuery(e.target.value)}
         placeholder="Name, symbol, or address"
-        className="flex-grow z-40 bg-white/15 hidden dark:text-white dark:ring-white/40 ring-1"
+        className="flex-grow z-40 bg-white/15 dark:text-white dark:ring-white/40 ring-1"
       />
       <Button type="submit" className="z-40">
         Search
