@@ -1,5 +1,5 @@
 "use client";
-import { useEffect, useState } from "react";
+import React, { useMemo } from "react";
 import {
   LineChart,
   Line,
@@ -9,94 +9,95 @@ import {
   Tooltip,
   ResponsiveContainer,
 } from "recharts";
-import { collection, query, where, orderBy, getDocs } from "firebase/firestore";
-import { db } from "@/firebase";
+import { format } from "date-fns";
 
 interface RechartsChartProps {
-  tokenAddress: string;
+  trades: Array<{
+    pricePerToken: string;
+    timestamp: string;
+    type: "buy" | "sell";
+    ethAmount: string;
+    tokenAmount: string;
+  }>;
+  loading: boolean;
   currentPrice?: string;
   tokenSymbol?: string;
 }
 
-interface Trade {
-  pricePaid: string;
-  timestamp: Date;
-  type: "buy" | "sell";
-}
-
-export function RechartsChart({
-  tokenAddress,
+const RechartsChart = ({
+  trades,
+  loading,
   currentPrice,
   tokenSymbol,
-}: RechartsChartProps) {
-  const [trades, setTrades] = useState<Trade[]>([]);
+}: RechartsChartProps) => {
+  // Memoize chart data calculation
+  const chartData = useMemo(() => {
+    const data = [
+      // Add all historical trades
+      ...trades.map((trade) => ({
+        time: new Date(trade.timestamp).getTime(),
+        price: parseFloat(trade.pricePerToken),
+        volume: parseFloat(trade.ethAmount) / 1e18, // Convert from wei to ETH
+        type: trade.type,
+      })),
+      // Add current price as the latest point if different from last trade
+      ...(currentPrice &&
+      trades.length > 0 &&
+      parseFloat(currentPrice) !== parseFloat(trades[0].pricePerToken)
+        ? [
+            {
+              time: Date.now(),
+              price: parseFloat(currentPrice),
+              volume: 0,
+              type: "current",
+            },
+          ]
+        : []),
+    ].sort((a, b) => a.time - b.time);
 
-  useEffect(() => {
-    const fetchTrades = async () => {
-      try {
-        const tradesRef = collection(db, "trades");
-        const q = query(
-          tradesRef,
-          where("tokenAddress", "==", tokenAddress),
-          orderBy("timestamp", "desc")
-        );
-
-        const querySnapshot = await getDocs(q);
-        const tradeData = querySnapshot.docs.map((doc) => ({
-          pricePaid: doc.data().pricePaid,
-          timestamp: doc.data().timestamp.toDate(),
-          type: doc.data().type,
-        })) as Trade[];
-
-        setTrades(tradeData);
-      } catch (error) {
-        console.error("Error fetching trades:", error);
-      }
-    };
-
-    if (tokenAddress) {
-      fetchTrades();
-    }
-  }, [tokenAddress]);
-
-  // Prepare chart data
-  const chartData = [
-    // Add all historical trades
-    ...trades.map((trade) => ({
-      time: trade.timestamp.getTime(),
-      price: parseFloat(trade.pricePaid),
-      type: trade.type,
-    })),
-    // Add current price as the latest point
-    ...(currentPrice
-      ? [
-          {
-            time: Date.now(),
-            price: parseFloat(currentPrice),
-            type: "current",
-          },
-        ]
-      : []),
-  ].sort((a, b) => a.time - b.time);
+    return data;
+  }, [trades, currentPrice]);
 
   const CustomTooltip = ({ active, payload, label }: any) => {
     if (active && payload && payload.length) {
+      const data = payload[0].payload;
       return (
         <div className="bg-background/80 backdrop-blur-sm border rounded-lg p-2 shadow-lg">
           <p className="text-sm font-medium">
-            {new Date(label).toLocaleString()}
+            {format(new Date(label), "MMM dd yyyy HH:mm")}
           </p>
           <p className="text-sm text-primary">
-            Price: {payload[0].value.toFixed(6)} AVAX
+            Price: {data.price.toFixed(12)} ETH
           </p>
+          {data.type !== "current" && (
+            <p className="text-sm text-primary">
+              Volume: {data.volume.toFixed(4)} ETH
+            </p>
+          )}
           <p className="text-xs text-muted-foreground capitalize">
-            Type: {payload[0].payload.type}
+            Type: {data.type}
           </p>
         </div>
       );
     }
     return null;
   };
+
+  if (loading) {
+    return (
+      <div className="flex items-center justify-center h-full text-sm text-muted-foreground">
+        Loading trades...
+      </div>
+    );
+  }
+
+  if (trades.length === 0) {
+    return (
+      <div className="flex items-center justify-center h-full text-sm text-muted-foreground">
+        No trades found for this token
+      </div>
+    );
+  }
 
   // Calculate price range for better scaling
   const prices = chartData.map((d) => d.price);
@@ -111,7 +112,7 @@ export function RechartsChart({
   return (
     <div className="w-full h-full">
       <div className="absolute top-4 left-4 text-sm text-muted-foreground">
-        {tokenSymbol ? `${tokenSymbol}/AVAX` : "Price Chart"}
+        {tokenSymbol ? `${tokenSymbol}/ETH` : "Price Chart"}
       </div>
       <ResponsiveContainer width="100%" height="100%">
         <LineChart
@@ -123,15 +124,22 @@ export function RechartsChart({
             dataKey="time"
             stroke="#6b7280"
             tick={{ fill: "#6b7280" }}
-            tickFormatter={(value) => new Date(value).toLocaleTimeString()}
+            tickFormatter={(value) => {
+              const date = new Date(value);
+              return `${date.getHours()}:${String(date.getMinutes()).padStart(
+                2,
+                "0"
+              )}`;
+            }}
             type="number"
             domain={["dataMin", "dataMax"]}
           />
+
           <YAxis
             stroke="#6b7280"
             tick={{ fill: "#6b7280" }}
             domain={yDomain}
-            tickFormatter={(value) => value.toFixed(6)}
+            tickFormatter={(value) => value.toFixed(12)}
             tickCount={5}
           />
           <Tooltip content={<CustomTooltip />} />
@@ -140,12 +148,29 @@ export function RechartsChart({
             dataKey="price"
             stroke="#10b981"
             strokeWidth={2}
-            dot={{ fill: "#10b981", r: 4 }}
+            dot={(props) => {
+              const { payload } = props;
+              // Customize dots based on trade type
+              const colors = {
+                buy: "#10b981",
+                sell: "#ef4444",
+                current: "#3b82f6",
+              };
+              return (
+                <circle
+                  {...props}
+                  fill={
+                    colors[payload.type as keyof typeof colors] || "#10b981"
+                  }
+                  r={4}
+                />
+              );
+            }}
           />
         </LineChart>
       </ResponsiveContainer>
     </div>
   );
-}
+};
 
 export default RechartsChart;

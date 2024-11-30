@@ -35,15 +35,17 @@ export function TokenHeader({
   };
 
   return (
-    <Card className="relative overflow-hidden">
+    <Card className="relative overflow-hidden min-h-[300px]">
       <div
-        className="absolute inset-0 z-0"
+        className="absolute inset-0 z-0 bg-no-repeat"
         style={{
           backgroundImage: tokenData.imageUrl
             ? `url(${tokenData.imageUrl})`
             : "none",
-          backgroundSize: "cover",
+          backgroundSize: "100% 100%", // Changed from cover
           backgroundPosition: "center",
+          height: "100%",
+          width: "100%",
         }}
       >
         <div className="absolute inset-0 bg-gradient-to-b from-black/60 via-black/50 to-black/70" />

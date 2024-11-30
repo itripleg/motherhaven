@@ -3,7 +3,7 @@ import { motion } from "framer-motion-3d";
 import React, { useRef } from "react";
 
 export function OuijaBoard(props: any) {
-  const { nodes, materials } = useGLTF("/ouija_board.glb");
+  const { nodes, materials } = useGLTF("/models/ouija_board.glb");
   return (
     <motion.group {...props} dispose={null}>
       <motion.mesh

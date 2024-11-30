@@ -71,7 +71,7 @@ export function LandingPage() {
           <Link href="/dex">
             <Button
               size="lg"
-              variant="outline"
+              // variant="outline"
               className="text-[black] border-[var(--color-primary)] hover:bg-[var(--color-primary)] hover:text-[var(--color-on-primary)]"
             >
               Enter DEX <Coins className="ml-2 h-4 w-4" />

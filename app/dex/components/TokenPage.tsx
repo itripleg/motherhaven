@@ -76,42 +76,59 @@ export default function TokenPage({
       <div className="flex justify-between items-center mb-4">
         <UserSection />
       </div>
-      <div className="space-y-6">
-        <div className="flex justify-between items-start">
-          <div className="space-y-6 flex-1">
-            <TokenHeader
-              tokenData={tokenData}
-              price={price}
-              tokenState={tokenState}
-            />
-            <TokenPriceCharts tokenData={tokenData} price={price} />
 
-            <TokenTradeCard tokenData={tokenData} isConnected={isConnected} />
+      <div className="grid grid-cols-1 lg:grid-cols-4 gap-6">
+        {/* Main Content Area (3 columns on desktop) */}
+        <div className="lg:col-span-3 space-y-6">
+          {/* Charts Section */}
+          <div className="grid grid-cols-1 xl:grid-cols-2 gap-6 ">
+            <div className="xl:col-span-2">
+              <TokenHeader
+                tokenData={tokenData}
+                price={price}
+                tokenState={tokenState}
+              />
+            </div>
+            <div className="xl:col-span-2">
+              <TokenPriceCharts tokenData={tokenData} price={price} />
+            </div>
           </div>
 
-          <div className="hidden md:flex md:flex-col ml-6 mt-12 ">
+          {/* Trade Card Section */}
+          <div className="w-full">
+            <TokenTradeCard tokenData={tokenData} isConnected={isConnected} />
+          </div>
+        </div>
+
+        {/* Right Sidebar (1 column on desktop) */}
+        <div className="hidden lg:flex lg:flex-col gap-6">
+          <div className="sticky top-24 space-y-6">
             <ChatComponent
               tokenAddress={tokenData.address}
               creatorAddress={tokenData.creator}
             />
             <BondingCurve />
           </div>
-
-          <Sheet>
-            <SheetTrigger asChild>
-              <Button
-                variant="default"
-                size="icon"
-                className="fixed bottom-4 right-4 md:hidden"
-              >
-                <MessageCircle className="h-4 w-4" />
-              </Button>
-            </SheetTrigger>
-            <SheetContent side="right">
-              <ChatComponent tokenAddress={tokenData.address} />
-            </SheetContent>
-          </Sheet>
         </div>
+
+        {/* Mobile Chat Button */}
+        <Sheet>
+          <SheetTrigger asChild>
+            <Button
+              variant="default"
+              size="icon"
+              className="fixed bottom-4 right-4 lg:hidden z-40"
+            >
+              <MessageCircle className="h-4 w-4" />
+            </Button>
+          </SheetTrigger>
+          <SheetContent side="right" className="w-[90%] sm:w-[440px]">
+            {/* <div className="h-full space-y-6"> */}
+            <ChatComponent tokenAddress={tokenData.address} />
+            <BondingCurve />
+            {/* </div> */}
+          </SheetContent>
+        </Sheet>
       </div>
     </div>
   );

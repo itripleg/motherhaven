@@ -10,10 +10,8 @@ import { useToast } from "@/hooks/use-toast";
 import { usePathname } from "next/navigation";
 import { AddressComponent } from "@/components/AddressComponent";
 import tokenFactoryABI from "@/contracts/token-factory/TokenFactory_abi.json";
-import { db } from "@/firebase"; // Import Firestore instance
-import { doc, setDoc } from "firebase/firestore";
 
-export function BuyTokenForm() {
+export function BuyTokenForm({ onAmountChange, maxAmount }: any) {
   const FACTORY_ADDRESS = "0x7713A39875A5335dc4Fc4f9359908afb55984b1F";
 
   const pathname = usePathname();
@@ -33,6 +31,7 @@ export function BuyTokenForm() {
     isPending,
     writeContract,
   } = useWriteContract();
+
   const { isLoading: isConfirming, data: receipt } =
     useWaitForTransactionReceipt({
       hash: transactionData,
@@ -71,10 +70,11 @@ export function BuyTokenForm() {
     }
   };
 
-  useEffect(() => {
-    if (receipt) {
-      const pricePaid = amount;
+  const [hasHandledReceipt, setHasHandledReceipt] = useState(false);
 
+  useEffect(() => {
+    if (receipt && !hasHandledReceipt) {
+      const pricePaid = amount;
       const tokensReceivedLog = receipt.logs?.find(
         (log: any) =>
           log.topics[0] ===
@@ -90,55 +90,41 @@ export function BuyTokenForm() {
 
         toast({
           title: "Purchase Confirmed",
-          description: `You purchased ${tokensReceived} tokens for ${pricePaid} AVAX.`,
+          description: `You purchased ${(Number(tokensReceived) / 1e18).toFixed(
+            2
+          )} tokens for ${pricePaid} AVAX.`,
         });
 
-        // Save to Firestore
-        const saveTradeToFirestore = async () => {
-          const userId = "currentUserId";
-          const tradeId = `${transactionData}-${Date.now()}`; // Unique ID for trade
-          const tradeData = {
-            userId,
-            tokenAddress,
-            pricePaid,
-            tokensReceived,
-            timestamp: new Date(),
-            transactionHash: transactionData,
-          };
-
-          try {
-            await setDoc(doc(db, "trades", tradeId), tradeData);
-            console.log("Trade saved to Firestore:", tradeData);
-          } catch (err) {
-            console.error("Error saving trade to Firestore:", err);
-          }
-        };
-
-        saveTradeToFirestore();
-      } else {
-        toast({
-          title: "Error",
-          description: "Unable to retrieve tokens received.",
-          variant: "destructive",
-        });
+        setHasHandledReceipt(true);
       }
     }
-  }, [receipt, amount, toast, tokenAddress, transactionData]);
-
+  }, [receipt, hasHandledReceipt, amount, toast]);
   return (
     <>
-      {/* <AddressComponent hash={tokenAddress} type="address" /> */}
       <form onSubmit={handleSubmit}>
         <div className="grid w-full items-center gap-4">
           <div className="flex flex-col space-y-1.5">
-            <Label htmlFor="amount">Amount (ETH)</Label>
+            <Label htmlFor="amount">Amount (AVAX)</Label>
+            <span
+              className="absolute right-3 top-1/2 -translate-y-1/2 text-sm text-muted-foreground cursor-pointer hover:text-primary"
+              onClick={() => {
+                const input = document.querySelector(
+                  'input[type="number"]'
+                ) as HTMLInputElement;
+                input.value = maxAmount;
+                onAmountChange(maxAmount);
+              }}
+            >
+              Max
+            </span>
             <Input
               id="amount"
+              onScroll={(e) => e.stopPropagation()}
               type="number"
               value={amount}
               onChange={(e) => setAmount(e.target.value)}
-              placeholder="0.1"
-              className="text-center pr-2"
+              onWheel={(e) => e.currentTarget.blur()}
+              className="text-center pr-2 dark:bg-black/80"
             />
           </div>
         </div>

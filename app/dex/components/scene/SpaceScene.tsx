@@ -5,6 +5,8 @@ import { useTheme } from "next-themes";
 import { useEffect, useRef } from "react";
 import Moon from "@/components-3d/Moon";
 import gsap from "gsap";
+import { OuijaBoard } from "@/components-3d/Ouija/OuijaBoard";
+import { Flecha } from "@/components-3d/Ouija/Flecha";
 
 export const SpaceScene = ({ cameraRef, controlRef, lightRef }: any) => {
   const { theme } = useTheme();
@@ -39,6 +41,8 @@ export const SpaceScene = ({ cameraRef, controlRef, lightRef }: any) => {
         <PerspectiveCamera position={[0, 0, -7]} ref={cameraRef} makeDefault />
         <Moon scale={2} position={[0, 1.1, 0]} />
         <Stars />
+        <OuijaBoard position={[666, 666, 666]} />
+        <Flecha />
       </Canvas>
     </motion.div>
   );
