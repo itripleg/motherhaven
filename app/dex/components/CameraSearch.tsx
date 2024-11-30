@@ -4,15 +4,22 @@ import { motion, AnimatePresence } from "framer-motion";
 import { useState } from "react";
 import { moveCamPosition } from "@/hooks/CamTools";
 import { Skull } from "lucide-react";
+import OuijAi from "@/components-3d/Ouija/OuijAi";
 
+// CameraSearch.tsx
 interface CameraSearchProps {
   cameraRef: React.RefObject<any>;
+  onSecretFound: () => void;
+  showSecret: boolean;
 }
 
-export const CameraSearch = ({ cameraRef }: CameraSearchProps) => {
+export const CameraSearch = ({
+  cameraRef,
+  onSecretFound,
+  showSecret,
+}: CameraSearchProps) => {
   const [position, setPosition] = useState("");
   const [lastPosition, setLastPosition] = useState([0, 0, -7]);
-  const [showSecret, setShowSecret] = useState(false);
 
   const checkSecretPosition = (pos: number[]) => {
     return (
@@ -34,8 +41,7 @@ export const CameraSearch = ({ cameraRef }: CameraSearchProps) => {
       moveCamPosition({ cameraRef, x, y, z, scale: 3 });
 
       if (checkSecretPosition([x, y, z])) {
-        setShowSecret(true);
-        setTimeout(() => setShowSecret(false), 6000);
+        onSecretFound();
       }
     }
   };
@@ -51,8 +57,7 @@ export const CameraSearch = ({ cameraRef }: CameraSearchProps) => {
       setPosition(currentPos.join(","));
 
       if (checkSecretPosition(currentPos)) {
-        setShowSecret(true);
-        setTimeout(() => setShowSecret(false), 6000);
+        onSecretFound();
       }
     }
   };
@@ -60,7 +65,7 @@ export const CameraSearch = ({ cameraRef }: CameraSearchProps) => {
   return (
     <div className="flex flex-col items-center">
       <motion.form
-        animate={{ y: !showSecret ? -175 : 0 }}
+        animate={{ y: showSecret ? 500 : 0 }}
         transition={{
           type: "spring",
           stiffness: 500,
@@ -85,13 +90,12 @@ export const CameraSearch = ({ cameraRef }: CameraSearchProps) => {
       </motion.form>
 
       <AnimatePresence>
-        {!showSecret && (
+        {showSecret && (
           <motion.div
             initial={{ opacity: 0, height: 0 }}
             animate={{
               opacity: 1,
               height: "36vh",
-              // height: "auto",
               transition: {
                 height: {
                   type: "spring",
@@ -116,17 +120,18 @@ export const CameraSearch = ({ cameraRef }: CameraSearchProps) => {
             className="overflow-hidden w-full flex flex-col items-center"
           >
             <motion.div
-              animate={{
-                rotate: [0, 360],
-                scale: [1, 1.2, 1],
-              }}
-              transition={{
-                duration: 2,
-                repeat: Infinity,
-                ease: "linear",
-              }}
+            // animate={{
+            //   rotate: [0, 360],
+            //   scale: [1, 1.2, 1],
+            // }}
+            // transition={{
+            //   duration: 2,
+            //   repeat: Infinity,
+            //   ease: "linear",
+            // }}
             >
               <Skull className="w-16 h-16 text-red-500" />
+              <OuijAi />
             </motion.div>
             <motion.h2
               animate={{

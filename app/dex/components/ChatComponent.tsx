@@ -135,14 +135,14 @@ export function ChatComponent({
   };
 
   return (
-    <Card className="w-full max-w-md bg-background border-primary-foreground shadow-lg">
+    <Card className="w-full max-w-md bg-background border-primary shadow-lg flex flex-col justify-between">
       <CardHeader className="border-b border-border dark:border-gray-700">
         <CardTitle className="text-2xl font-bold text-foreground dark:text-white">
           Chat
         </CardTitle>
       </CardHeader>
       <CardContent className="p-0">
-        <ScrollArea className="h-[600px] px-4">
+        <ScrollArea className="md:h-[600px] px-4">
           {comments.map((comment) => (
             <div
               key={comment.id}

@@ -29,8 +29,15 @@ export default function AllTokensDisplay() {
   const [searchQuery, setSearchQuery] = useState("");
   const [activeCategory, setActiveCategory] = useState("all");
   const [showCameraSearch, setShowCameraSearch] = useState(false);
-
   const [greeting, setGreeting] = useState("");
+  const [showSecret, setShowSecret] = useState(false);
+
+  const handleSecretFound = () => {
+    setShowSecret(true);
+    setTimeout(() => setShowSecret(false), 160000);
+    // Hide the greeting and other components
+    setShowCameraSearch(true);
+  };
 
   useEffect(() => {
     setGreeting(getAddressGreeting(account?.address));
@@ -109,15 +116,24 @@ export default function AllTokensDisplay() {
     <Container className="">
       <SpaceScene cameraRef={cameraRef} controlRef={controlRef} />
       <div className="container mx-auto py-8 relative">
-        <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4">
+        <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4 ">
           <div className="z-30">
-            <h1 className="text-4xl font-bold mb-8 text-center">{greeting}</h1>
+            {!showSecret && (
+              <h1 className="text-4xl font-bold mb-8 text-center">
+                {greeting}
+              </h1>
+            )}
           </div>
         </div>
         {/* @ts-expect-error camera ref */}
         <CameraAngles cameraRef={cameraRef} controlRef={controlRef} />
+
         {showCameraSearch ? (
-          <CameraSearch cameraRef={cameraRef} />
+          <CameraSearch
+            cameraRef={cameraRef}
+            onSecretFound={handleSecretFound}
+            showSecret={showSecret}
+          />
         ) : (
           <TokenSearch
             searchQuery={searchQuery}
@@ -125,8 +141,12 @@ export default function AllTokensDisplay() {
             setActiveCategory={setActiveCategory}
           />
         )}
-        <TokenTabs onCategoryChange={filterTokensByCategory} />
-        <TokenGrid tokens={filteredTokens} />
+        {!showSecret && (
+          <>
+            <TokenTabs onCategoryChange={filterTokensByCategory} />
+            <TokenGrid tokens={filteredTokens} />
+          </>
+        )}
       </div>
     </Container>
   );

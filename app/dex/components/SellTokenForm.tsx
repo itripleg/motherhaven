@@ -138,9 +138,22 @@ export function SellTokenForm() {
             type="number"
             value={amount}
             onChange={(e) => setAmount(e.target.value)}
-            placeholder="100"
-            className="text-center pr-2"
+            onWheel={(e) => e.currentTarget.blur()}
+            // placeholder="100"
+            className="text-center pr-2 dark:bg-black/80"
           />
+          {/* <span
+            className="absolute right-3 top-1/2 -translate-y-1/2 text-sm text-muted-foreground cursor-pointer hover:text-primary"
+            onClick={() => {
+              const input = document.querySelector(
+                'input[type="number"]'
+              ) as HTMLInputElement;
+              input.value = maxAmount;
+              onAmountChange(maxAmount);
+            }}
+          >
+            Max
+          </span> */}
         </div>
       </div>
       <Button

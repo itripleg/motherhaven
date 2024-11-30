@@ -13,7 +13,7 @@ import tokenFactoryABI from "@/contracts/token-factory/TokenFactory_abi.json";
 import { db } from "@/firebase"; // Import Firestore instance
 import { doc, setDoc } from "firebase/firestore";
 
-export function BuyTokenForm() {
+export function BuyTokenForm({ onAmountChange, maxAmount }: any) {
   const FACTORY_ADDRESS = "0x7713A39875A5335dc4Fc4f9359908afb55984b1F";
 
   const pathname = usePathname();
@@ -131,14 +131,28 @@ export function BuyTokenForm() {
       <form onSubmit={handleSubmit}>
         <div className="grid w-full items-center gap-4">
           <div className="flex flex-col space-y-1.5">
-            <Label htmlFor="amount">Amount (ETH)</Label>
+            <Label htmlFor="amount">Amount (AVAX)</Label>
+            <span
+              className="absolute right-3 top-1/2 -translate-y-1/2 text-sm text-muted-foreground cursor-pointer hover:text-primary"
+              onClick={() => {
+                const input = document.querySelector(
+                  'input[type="number"]'
+                ) as HTMLInputElement;
+                input.value = maxAmount;
+                onAmountChange(maxAmount);
+              }}
+            >
+              Max
+            </span>
             <Input
               id="amount"
+              onScroll={(e) => e.stopPropagation()}
               type="number"
               value={amount}
               onChange={(e) => setAmount(e.target.value)}
-              placeholder="0.1"
-              className="text-center pr-2"
+              onWheel={(e) => e.currentTarget.blur()}
+              // placeholder="0.1"
+              className="text-center pr-2 dark:bg-black/80"
             />
           </div>
         </div>

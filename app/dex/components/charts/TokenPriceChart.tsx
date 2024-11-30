@@ -1,5 +1,3 @@
-"use client";
-
 import { useEffect, useRef, useState } from "react";
 import { createChart, ColorType, LineStyle } from "lightweight-charts";
 import { collection, query, where, orderBy, getDocs } from "firebase/firestore";
@@ -67,7 +65,6 @@ export const TokenPriceChart = ({
           type: doc.data().type,
         })) as Trade[];
 
-        console.log("Fetched trades:", tradeData);
         setTrades(tradeData);
       } catch (error) {
         console.error("Error fetching trades:", error);
@@ -79,44 +76,57 @@ export const TokenPriceChart = ({
     }
   }, [tokenAddress]);
 
+  const MIN_PRICE = 0.001; // Minimum price from bonding curve
+
   const aggregateTrades = (
     trades: Trade[],
     interval: number
   ): Candlestick[] => {
-    if (trades.length === 0) return [];
+    if (trades.length === 0) {
+      // Return minimum price data point if no trades
+      const currentTime = Math.floor(Date.now() / 1000);
+      return [
+        {
+          time: currentTime,
+          open: MIN_PRICE,
+          high: MIN_PRICE,
+          low: MIN_PRICE,
+          close: MIN_PRICE,
+        },
+      ];
+    }
 
-    const buckets: { [key: number]: { prices: number[]; lastPrice: number } } =
-      {};
+    const buckets: { [key: number]: number[] } = {};
 
-    // Process trades in chronological order
+    // Process trades and group them by time interval
     trades.forEach((trade) => {
       const timestamp = Math.floor(trade.timestamp.getTime() / 1000);
       const bucketTime = Math.floor(timestamp / interval) * interval;
-      const price = Math.abs(parseFloat(trade.pricePaid)); // Ensure positive price
+      // Ensure price is never below minimum
+      const price = Math.max(parseFloat(trade.pricePaid), MIN_PRICE);
 
       if (!buckets[bucketTime]) {
-        buckets[bucketTime] = {
-          prices: [],
-          lastPrice: price,
-        };
+        buckets[bucketTime] = [];
       }
-
-      buckets[bucketTime].prices.push(price);
-      buckets[bucketTime].lastPrice = price;
+      buckets[bucketTime].push(price);
     });
 
     // Convert buckets to candlesticks
     const candlesticks: Candlestick[] = Object.entries(buckets).map(
-      ([time, data]) => ({
-        time: parseInt(time),
-        open: data.prices[0],
-        high: Math.max(...data.prices),
-        low: Math.min(...data.prices),
-        close: data.lastPrice,
-      })
+      ([time, prices]) => {
+        // Sort prices for accurate OHLC
+        const sortedPrices = [...prices].sort((a, b) => a - b);
+        return {
+          time: parseInt(time),
+          open: Math.max(prices[0], MIN_PRICE), // First price in the interval
+          high: Math.max(sortedPrices[sortedPrices.length - 1], MIN_PRICE), // Highest price
+          low: Math.max(sortedPrices[0], MIN_PRICE), // Lowest price
+          close: Math.max(prices[prices.length - 1], MIN_PRICE), // Last price in the interval
+        };
+      }
     );
 
-    // Add current price if available
+    // Add current price point if available
     if (currentPrice) {
       const currentTime = Math.floor(Date.now() / 1000 / interval) * interval;
       const currentPriceNum = parseFloat(currentPrice);
@@ -125,11 +135,13 @@ export const TokenPriceChart = ({
         candlesticks.length > 0 &&
         candlesticks[candlesticks.length - 1].time === currentTime
       ) {
-        const last = candlesticks[candlesticks.length - 1];
-        last.close = currentPriceNum;
-        last.high = Math.max(last.high, currentPriceNum);
-        last.low = Math.min(last.low, currentPriceNum);
+        // Update last candlestick if it's in the same time interval
+        const lastCandlestick = candlesticks[candlesticks.length - 1];
+        lastCandlestick.close = currentPriceNum;
+        lastCandlestick.high = Math.max(lastCandlestick.high, currentPriceNum);
+        lastCandlestick.low = Math.min(lastCandlestick.low, currentPriceNum);
       } else {
+        // Add new candlestick for current price
         candlesticks.push({
           time: currentTime,
           open: currentPriceNum,
@@ -159,6 +171,10 @@ export const TokenPriceChart = ({
       rightPriceScale: {
         borderColor: "#2f3540",
         autoScale: true,
+        scaleMargins: {
+          top: 0.1,
+          bottom: 0.1,
+        },
       },
       timeScale: {
         borderColor: "#2f3540",
@@ -202,7 +218,6 @@ export const TokenPriceChart = ({
     if (!seriesRef.current || trades.length === 0) return;
 
     const candlesticks = aggregateTrades(trades, TIME_INTERVALS[timeFrame]);
-    console.log("Candlesticks:", candlesticks);
     seriesRef.current.setData(candlesticks);
 
     if (chartRef.current) {
@@ -218,9 +233,8 @@ export const TokenPriceChart = ({
         </div>
         <ToggleGroup
           type="single"
-          value={"1"}
-          // value={timeFrame}
-          // onValueChange={(value) => value && setTimeFrame(value as TimeFrame)}
+          value={timeFrame}
+          onValueChange={(value) => value && setTimeFrame(value as TimeFrame)}
         >
           <ToggleGroupItem value="5m" aria-label="5 Minutes">
             5m

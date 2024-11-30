@@ -52,7 +52,7 @@ export const positions = {
 };
 
 export function Flecha({ animationControls }: any, props: any) {
-  const { nodes, materials } = useGLTF("/Flecha.glb");
+  const { nodes, materials } = useGLTF("/models/Flecha.glb");
 
   function spin() {
     animationControls.start("spin");
