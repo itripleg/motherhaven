@@ -44,7 +44,8 @@
     "@react-three/fiber": "^8.17.8",
     "@tailwindcss/typography": "^0.5.15",
     "@tanstack/react-query": "^5.56.2",
-    "@wagmi/connectors": "^5.1.14",
+    "@wagmi/connectors": "^5.5.2",
+    "@wagmi/core": "^2.15.0",
     "class-variance-authority": "^0.7.0",
     "clsx": "^2.1.1",
     "cmdk": "1.0.0",
@@ -75,8 +76,8 @@
     "tailwindcss-animate": "^1.0.7",
     "three": "^0.168.0",
     "vaul": "^0.9.4",
-    "viem": "2.x",
-    "wagmi": "^2.12.14",
+    "viem": "^2.21.53",
+    "wagmi": "2.13.0",
     "zod": "^3.23.8"
   },
   "devDependencies": {
