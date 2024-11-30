@@ -10,8 +10,6 @@ import { useToast } from "@/hooks/use-toast";
 import { usePathname } from "next/navigation";
 import { AddressComponent } from "@/components/AddressComponent";
 import tokenFactoryABI from "@/contracts/token-factory/TokenFactory_abi.json";
-import { db } from "@/firebase";
-import { doc, setDoc } from "firebase/firestore";
 
 export function SellTokenForm() {
   const FACTORY_ADDRESS = "0x7713A39875A5335dc4Fc4f9359908afb55984b1F";
@@ -21,7 +19,7 @@ export function SellTokenForm() {
 
   const [amount, setAmount] = useState("");
   const [receiptDetails, setReceiptDetails] = useState<{
-    pricePaid?: string;
+    avaxReceived?: string;
     tokensSold?: string;
   }>({});
 
@@ -33,6 +31,7 @@ export function SellTokenForm() {
     isPending,
     writeContract,
   } = useWriteContract();
+
   const { isLoading: isConfirming, data: receipt } =
     useWaitForTransactionReceipt({
       hash: transactionData,
@@ -70,67 +69,38 @@ export function SellTokenForm() {
     }
   };
 
+  const [hasHandledReceipt, setHasHandledReceipt] = useState(false);
   useEffect(() => {
-    if (receipt) {
+    if (receipt && !hasHandledReceipt) {
       const tokensSold = amount;
-
-      const avaxReceivedLog = receipt.logs?.find(
+      const sellEvent = receipt.logs?.find(
         (log) =>
           log.topics[0] ===
-          "0xddf252ad1be2c89b69c2b068fc378daa952ba7f163c4a11628f55a4df523b3ef"
+          "0x697c42d55a5e1fed3f464ec6f38b32546a0bd368dc8068b065c67566d73f3290"
       );
 
-      if (avaxReceivedLog) {
-        const avaxReceived = BigInt(avaxReceivedLog.data).toString();
+      if (sellEvent) {
+        const avaxReceived = BigInt(sellEvent.data).toString();
+        const formattedAvax = (Number(avaxReceived) / 1e18).toFixed(4);
+
         setReceiptDetails({
-          pricePaid: (Number(avaxReceived) / 1e18).toFixed(4),
+          avaxReceived: formattedAvax,
           tokensSold,
         });
 
         toast({
           title: "Sale Confirmed",
-          description: `You sold ${tokensSold} tokens for ${(
-            Number(avaxReceived) / 1e18
-          ).toFixed(4)} AVAX.`,
+          description: `You sold ${tokensSold} tokens for ${formattedAvax} AVAX.`,
         });
 
-        // Save to Firestore
-        const saveTradeToFirestore = async () => {
-          const userId = "currentUserId"; // Replace with the logged-in user's ID
-          const tradeId = `${transactionData}-${Date.now()}`; // Unique ID for trade
-          const tradeData = {
-            userId,
-            tokenAddress,
-            pricePaid: (Number(avaxReceived) / 1e18).toFixed(4),
-            tokensSold,
-            timestamp: new Date(),
-            transactionHash: transactionData,
-            type: "sell",
-          };
-
-          try {
-            await setDoc(doc(db, "trades", tradeId), tradeData);
-            console.log("Trade saved to Firestore:", tradeData);
-          } catch (err) {
-            console.error("Error saving trade to Firestore:", err);
-          }
-        };
-
-        saveTradeToFirestore();
-      } else {
-        toast({
-          title: "Error",
-          description: "Unable to retrieve AVAX received.",
-          variant: "destructive",
-        });
+        setHasHandledReceipt(true);
       }
     }
-  }, [receipt, amount, toast, tokenAddress, transactionData]);
+  }, [receipt, hasHandledReceipt, amount, toast]);
 
   return (
     <form onSubmit={handleSubmit}>
       <div className="grid w-full items-center gap-4">
-        {/* <AddressComponent hash={tokenAddress} type="address" /> */}
         <div className="flex flex-col space-y-1.5">
           <Label htmlFor="amount">Amount (Tokens)</Label>
           <Input
@@ -139,21 +109,8 @@ export function SellTokenForm() {
             value={amount}
             onChange={(e) => setAmount(e.target.value)}
             onWheel={(e) => e.currentTarget.blur()}
-            // placeholder="100"
             className="text-center pr-2 dark:bg-black/80"
           />
-          {/* <span
-            className="absolute right-3 top-1/2 -translate-y-1/2 text-sm text-muted-foreground cursor-pointer hover:text-primary"
-            onClick={() => {
-              const input = document.querySelector(
-                'input[type="number"]'
-              ) as HTMLInputElement;
-              input.value = maxAmount;
-              onAmountChange(maxAmount);
-            }}
-          >
-            Max
-          </span> */}
         </div>
       </div>
       <Button
@@ -170,8 +127,8 @@ export function SellTokenForm() {
           <p>Transaction Receipt:</p>
           <ul>
             <li>Tokens Sold: {receiptDetails.tokensSold}</li>
-            <li>AVAX Received: {receiptDetails.pricePaid} AVAX</li>
-            <li>
+            <li>AVAX Received: {receiptDetails.avaxReceived} AVAX</li>
+            <li className="flex justify-center items-center">
               Transaction:{" "}
               <AddressComponent hash={`${transactionData}`} type="tx" />
             </li>

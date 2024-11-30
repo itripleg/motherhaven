@@ -8,6 +8,7 @@ import { BuyTokenForm } from "./BuyTokenForm";
 import { SellTokenForm } from "./SellTokenForm";
 import { TokenData } from "@/types";
 import { useConnect, useBalance, useAccount } from "wagmi";
+import { tokenEventEmitter } from "./EventWatcher";
 
 interface TokenTradeCardProps {
   tokenData: TokenData;
@@ -25,55 +26,157 @@ export function TokenTradeCard({
 }: TokenTradeCardProps) {
   const { connect, connectors } = useConnect();
   const { address } = useAccount();
+
+  // State
   const [tradeEstimation, setTradeEstimation] = useState<TradeEstimation>({
     priceImpact: 0,
-    slippage: 10, //
+    slippage: 10,
+  });
+  const [currentAmount, setCurrentAmount] = useState("0");
+  const [shouldRefresh, setShouldRefresh] = useState(0);
+
+  // AVAX Balance
+  const { data: avaxBalance, refetch: refetchAvaxBalance } = useBalance({
+    address: address,
   });
 
-  const { data: avaxBalance } = useBalance({
+  // Token Balance
+  const { data: tokenBalance, refetch: refetchTokenBalance } = useBalance({
     address: address,
-    watch: true,
+    token: tokenData?.address as `0x${string}`,
+    // enabled: !!tokenData?.address && !!address,
   });
 
-  const { data: tokenBalance } = useBalance({
-    address: address,
-    token: tokenData.address as `0x${string}`,
-    watch: true,
-  });
+  // Set up event listener for this specific token
+  useEffect(() => {
+    if (!tokenData?.address) return;
+
+    const handleTokenEvent = (event: any) => {
+      if (
+        event.eventName === "TokensPurchased" ||
+        event.eventName === "TokensSold"
+      ) {
+        // Trigger a refresh of balances
+        setShouldRefresh((prev) => prev + 1);
+      }
+    };
+
+    tokenEventEmitter.addEventListener(
+      tokenData.address.toLowerCase(),
+      handleTokenEvent
+    );
+
+    return () => {
+      tokenEventEmitter.removeEventListener(
+        tokenData.address.toLowerCase(),
+        handleTokenEvent
+      );
+    };
+  }, [tokenData?.address]);
+
+  // Refresh balances when events occur
+  useEffect(() => {
+    if (shouldRefresh > 0) {
+      refetchAvaxBalance();
+      refetchTokenBalance();
+    }
+  }, [shouldRefresh, refetchAvaxBalance, refetchTokenBalance]);
 
   const slippageValues = [1, 5, 10, 20];
+
+  // const handleAmountChange = (amount: string, isBuy: boolean) => {
+  //   setCurrentAmount(amount);
+  //   const impact = calculatePriceImpact(amount, isBuy);
+  //   setTradeEstimation(prev => ({
+  //     ...prev,
+  //     priceImpact: impact,
+  //   }));
+  // };
+
+  // Effect to update price impact when token data changes
+  useEffect(() => {
+    if (currentAmount && currentAmount !== "0") {
+      const impact = calculatePriceImpact(currentAmount);
+      setTradeEstimation((prev) => ({
+        ...prev,
+        priceImpact: impact,
+      }));
+    }
+  }, [tokenData, currentAmount]);
 
   const handleSlippageChange = (value: number[]) => {
     const index = Math.round((value[0] / 100) * (slippageValues.length - 1));
     setTradeEstimation((prev) => ({
       ...prev,
-      slippage: slippageValues[index],
+      slippage: slippageValues[index] || prev.slippage,
     }));
   };
 
-  const calculatePriceImpact = (amount: string, isBuy: boolean) => {
-    if (!amount) return 0;
-    const tradeSize = parseFloat(amount);
-    const liquidity = tokenData.liquidity || 1000000;
-    const impact = (tradeSize / liquidity) * 100;
-    return Math.min(impact, 100);
+  const calculatePriceImpact = (amount: string, isBuy: boolean = true) => {
+    if (!amount || !tokenData) return 0;
+    try {
+      const tradeSize = parseFloat(amount);
+      if (isNaN(tradeSize)) return 0;
+
+      const liquidity = tokenData.liquidity || 1000000;
+      const impact = (tradeSize / liquidity) * 100;
+      return Math.min(impact, 100);
+    } catch (error) {
+      console.error("Error calculating price impact:", error);
+      return 0;
+    }
   };
 
-  const formatNumber = (num: number, decimals: number = 2) => {
-    return new Intl.NumberFormat("en-US", {
-      minimumFractionDigits: decimals,
-      maximumFractionDigits: decimals,
-    }).format(num);
+  const handleAmountChange = (amount: string, isBuy: boolean) => {
+    setCurrentAmount(amount);
+    const impact = calculatePriceImpact(amount, isBuy);
+    setTradeEstimation((prev) => ({
+      ...prev,
+      priceImpact: impact,
+    }));
   };
+
+  const formatNumber = (num: number | string, decimals: number = 2): string => {
+    try {
+      const value = typeof num === "string" ? parseFloat(num) : num;
+      if (isNaN(value)) return "0.00";
+
+      return new Intl.NumberFormat("en-US", {
+        minimumFractionDigits: decimals,
+        maximumFractionDigits: decimals,
+      }).format(value);
+    } catch (error) {
+      console.error("Error formatting number:", error);
+      return "0.00";
+    }
+  };
+
+  const formatBalance = (
+    balance: any,
+    price: number = 0
+  ): { amount: string; value: string } => {
+    if (!balance) return { amount: "0.00", value: "0.00" };
+    try {
+      const amount = formatNumber(balance.formatted || "0");
+      const value = formatNumber(parseFloat(balance.formatted || "0") * price);
+      return { amount, value };
+    } catch (error) {
+      console.error("Error formatting balance:", error);
+      return { amount: "0.00", value: "0.00" };
+    }
+  };
+
+  const avaxFormatted = formatBalance(avaxBalance, tokenData?.price || 0);
+  const tokenFormatted = formatBalance(tokenBalance, tokenData?.price || 0);
 
   return (
     <Card className="w-full p-6">
       <CardHeader className="text-center pb-2 text-lg p-4">
         <CardTitle>
-          Trade {tokenData.symbol} ({tokenData.name})
+          Trade {tokenData?.symbol} ({tokenData?.name})
         </CardTitle>
       </CardHeader>
-      <AddressComponent hash={tokenData.address} type="address" />
+      <AddressComponent hash={tokenData?.address || ""} type="address" />
 
       <CardContent className="mt-4">
         {isConnected ? (
@@ -84,36 +187,18 @@ export function TokenTradeCard({
               <div className="space-y-4">
                 <div className="p-3 bg-secondary rounded-lg text-center">
                   <p className="text-lg font-bold">
-                    {avaxBalance
-                      ? formatNumber(parseFloat(avaxBalance.formatted))
-                      : "0"}{" "}
-                    AVAX
+                    {avaxFormatted.amount} AVAX
                   </p>
                   <p className="text-sm text-muted-foreground">
-                    ≈ $
-                    {avaxBalance
-                      ? formatNumber(
-                          parseFloat(avaxBalance.formatted) *
-                            (tokenData.price || 0)
-                        )
-                      : "0"}
+                    ≈ ${avaxFormatted.value}
                   </p>
                 </div>
                 <div className="p-3 bg-secondary rounded-lg text-center">
                   <p className="text-lg font-bold">
-                    {tokenBalance
-                      ? formatNumber(parseFloat(tokenBalance.formatted))
-                      : "0"}{" "}
-                    {tokenData.symbol}
+                    {tokenFormatted.amount} {tokenData?.symbol}
                   </p>
                   <p className="text-sm text-muted-foreground">
-                    ≈ $
-                    {tokenBalance
-                      ? formatNumber(
-                          parseFloat(tokenBalance.formatted) *
-                            (tokenData.price || 0)
-                        )
-                      : "0"}
+                    ≈ ${tokenFormatted.value}
                   </p>
                 </div>
               </div>
@@ -146,7 +231,7 @@ export function TokenTradeCard({
                   </div>
                   <div className="pt-2">
                     <Slider
-                      defaultValue={[0]}
+                      defaultValue={[50]}
                       max={100}
                       step={1}
                       onValueChange={handleSlippageChange}
@@ -172,25 +257,17 @@ export function TokenTradeCard({
                 <TabsContent value="buy">
                   <BuyTokenForm
                     maxAmount={avaxBalance?.formatted || "0"}
-                    onAmountChange={(amount) => {
-                      const impact = calculatePriceImpact(amount, true);
-                      setTradeEstimation((prev) => ({
-                        ...prev,
-                        priceImpact: impact,
-                      }));
-                    }}
+                    onAmountChange={(amount: any) =>
+                      handleAmountChange(amount, true)
+                    }
                   />
                 </TabsContent>
                 <TabsContent value="sell">
                   <SellTokenForm
-                    maxAmount={tokenBalance?.formatted || "0"}
-                    onAmountChange={(amount) => {
-                      const impact = calculatePriceImpact(amount, false);
-                      setTradeEstimation((prev) => ({
-                        ...prev,
-                        priceImpact: impact,
-                      }));
-                    }}
+                  // maxAmount={tokenBalance?.formatted || "0"}
+                  // onAmountChange={(amount: any) =>
+                  // handleAmountChange(amount, false)
+                  // }
                   />
                 </TabsContent>
               </Tabs>

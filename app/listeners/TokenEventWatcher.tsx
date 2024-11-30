@@ -4,8 +4,6 @@ import { useEffect } from "react";
 import { watchContractEvent } from "@wagmi/core";
 import { config } from "@/wagmi-config";
 import abi from "./TokenFactory_abi.json";
-import { addDoc, collection } from "firebase/firestore";
-import { db } from "@/firebase"; // Your Firebase config
 
 export function TokenEventWatcher() {
   useEffect(() => {
@@ -18,13 +16,6 @@ export function TokenEventWatcher() {
 
         for (const log of logs) {
           try {
-            // await addDoc(collection(db, "tokens"), {
-            //   tokenAddress: log.args.tokenAddress,
-            //   name: log.args.name,
-            //   ticker: log.args.ticker,
-            //   creator: log.args.creator,
-            //   timestamp: new Date(),
-            // });
           } catch (error) {
             console.error("Error adding document: ", error);
           }

@@ -35,6 +35,8 @@ export interface TokenData {
   currentPrice?: number;
   creator?: string;
   transactionHash: string;
+  price?: number;
+  liquidity?: number;
 }
 
 import tokenFactoryMetadata from "@/contracts/token-factory/artifacts/TokenFactory_metadata.json";

@@ -1,259 +1,212 @@
-import { useEffect, useRef, useState } from "react";
-import { createChart, ColorType, LineStyle } from "lightweight-charts";
-import { collection, query, where, orderBy, getDocs } from "firebase/firestore";
-import { db } from "@/firebase";
-import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group";
-
-interface Trade {
-  pricePaid: string;
-  timestamp: Date;
-  tokenAddress: string;
-  type: "buy" | "sell";
-}
-
-interface Candlestick {
-  open: number;
-  high: number;
-  low: number;
-  close: number;
-  time: number;
-}
+"use client";
+import React, { useMemo } from "react";
+import {
+  ComposedChart,
+  Bar,
+  XAxis,
+  YAxis,
+  CartesianGrid,
+  Tooltip,
+  ResponsiveContainer,
+  Line,
+} from "recharts";
+import { format } from "date-fns";
 
 interface TokenPriceChartProps {
-  tokenAddress: string;
+  trades: Array<{
+    pricePerToken: string;
+    timestamp: string;
+    type: "buy" | "sell";
+    ethAmount: string;
+    tokenAmount: string;
+  }>;
+  loading: boolean;
   currentPrice?: string;
   tokenSymbol?: string;
 }
 
-type TimeFrame = "5m" | "15m" | "1h" | "4h" | "1d";
+interface CandleData {
+  timestamp: number;
+  open: number;
+  high: number;
+  low: number;
+  close: number;
+  volume: number;
+}
 
-const TIME_INTERVALS: Record<TimeFrame, number> = {
-  "5m": 300,
-  "15m": 900,
-  "1h": 3600,
-  "4h": 14400,
-  "1d": 86400,
-};
-
-export const TokenPriceChart = ({
-  tokenAddress,
+const TokenPriceChart = ({
+  trades,
+  loading,
   currentPrice,
   tokenSymbol,
 }: TokenPriceChartProps) => {
-  const chartContainerRef = useRef<HTMLDivElement>(null);
-  const chartRef = useRef<any>(null);
-  const seriesRef = useRef<any>(null);
-  const [trades, setTrades] = useState<Trade[]>([]);
-  const [timeFrame, setTimeFrame] = useState<TimeFrame>("1h");
+  // Function to group trades into candles
+  const groupTradesIntoCandles = (
+    trades: TokenPriceChartProps["trades"],
+    intervalMinutes: number = 15
+  ) => {
+    const candleMap = new Map<number, CandleData>();
 
-  // Fetch historical trades
-  useEffect(() => {
-    const fetchTrades = async () => {
-      try {
-        const tradesRef = collection(db, "trades");
-        const q = query(
-          tradesRef,
-          where("tokenAddress", "==", tokenAddress),
-          orderBy("timestamp", "asc")
-        );
-
-        const querySnapshot = await getDocs(q);
-        const tradeData = querySnapshot.docs.map((doc) => ({
-          pricePaid: doc.data().pricePaid,
-          timestamp: doc.data().timestamp.toDate(),
-          tokenAddress: doc.data().tokenAddress,
-          type: doc.data().type,
-        })) as Trade[];
-
-        setTrades(tradeData);
-      } catch (error) {
-        console.error("Error fetching trades:", error);
-      }
-    };
-
-    if (tokenAddress) {
-      fetchTrades();
-    }
-  }, [tokenAddress]);
-
-  const MIN_PRICE = 0.001; // Minimum price from bonding curve
-
-  const aggregateTrades = (
-    trades: Trade[],
-    interval: number
-  ): Candlestick[] => {
-    if (trades.length === 0) {
-      // Return minimum price data point if no trades
-      const currentTime = Math.floor(Date.now() / 1000);
-      return [
-        {
-          time: currentTime,
-          open: MIN_PRICE,
-          high: MIN_PRICE,
-          low: MIN_PRICE,
-          close: MIN_PRICE,
-        },
-      ];
-    }
-
-    const buckets: { [key: number]: number[] } = {};
-
-    // Process trades and group them by time interval
     trades.forEach((trade) => {
-      const timestamp = Math.floor(trade.timestamp.getTime() / 1000);
-      const bucketTime = Math.floor(timestamp / interval) * interval;
-      // Ensure price is never below minimum
-      const price = Math.max(parseFloat(trade.pricePaid), MIN_PRICE);
+      const timestamp = new Date(trade.timestamp).getTime();
+      const interval = intervalMinutes * 60 * 1000;
+      const candleTimestamp = Math.floor(timestamp / interval) * interval;
+      const price = parseFloat(trade.pricePerToken);
+      const volume = parseFloat(trade.ethAmount) / 1e18; // Convert from wei to ETH
 
-      if (!buckets[bucketTime]) {
-        buckets[bucketTime] = [];
+      if (!candleMap.has(candleTimestamp)) {
+        candleMap.set(candleTimestamp, {
+          timestamp: candleTimestamp,
+          open: price,
+          high: price,
+          low: price,
+          close: price,
+          volume: volume,
+        });
+      } else {
+        const candle = candleMap.get(candleTimestamp)!;
+        candle.high = Math.max(candle.high, price);
+        candle.low = Math.min(candle.low, price);
+        candle.close = price;
+        candle.volume += volume;
       }
-      buckets[bucketTime].push(price);
     });
 
-    // Convert buckets to candlesticks
-    const candlesticks: Candlestick[] = Object.entries(buckets).map(
-      ([time, prices]) => {
-        // Sort prices for accurate OHLC
-        const sortedPrices = [...prices].sort((a, b) => a - b);
-        return {
-          time: parseInt(time),
-          open: Math.max(prices[0], MIN_PRICE), // First price in the interval
-          high: Math.max(sortedPrices[sortedPrices.length - 1], MIN_PRICE), // Highest price
-          low: Math.max(sortedPrices[0], MIN_PRICE), // Lowest price
-          close: Math.max(prices[prices.length - 1], MIN_PRICE), // Last price in the interval
-        };
-      }
+    return Array.from(candleMap.values()).sort(
+      (a, b) => a.timestamp - b.timestamp
     );
-
-    // Add current price point if available
-    if (currentPrice) {
-      const currentTime = Math.floor(Date.now() / 1000 / interval) * interval;
-      const currentPriceNum = parseFloat(currentPrice);
-
-      if (
-        candlesticks.length > 0 &&
-        candlesticks[candlesticks.length - 1].time === currentTime
-      ) {
-        // Update last candlestick if it's in the same time interval
-        const lastCandlestick = candlesticks[candlesticks.length - 1];
-        lastCandlestick.close = currentPriceNum;
-        lastCandlestick.high = Math.max(lastCandlestick.high, currentPriceNum);
-        lastCandlestick.low = Math.min(lastCandlestick.low, currentPriceNum);
-      } else {
-        // Add new candlestick for current price
-        candlesticks.push({
-          time: currentTime,
-          open: currentPriceNum,
-          high: currentPriceNum,
-          low: currentPriceNum,
-          close: currentPriceNum,
-        });
-      }
-    }
-
-    return candlesticks.sort((a, b) => a.time - b.time);
   };
 
-  // Create chart
-  useEffect(() => {
-    if (!chartContainerRef.current) return;
+  // Memoize candle data calculation
+  const candleData = useMemo(() => groupTradesIntoCandles(trades), [trades]);
 
-    const chart = createChart(chartContainerRef.current, {
-      layout: {
-        background: { type: ColorType.Solid, color: "transparent" },
-        textColor: "#d1d5db",
-      },
-      grid: {
-        vertLines: { color: "#2f3540", style: LineStyle.Dotted },
-        horzLines: { color: "#2f3540", style: LineStyle.Dotted },
-      },
-      rightPriceScale: {
-        borderColor: "#2f3540",
-        autoScale: true,
-        scaleMargins: {
-          top: 0.1,
-          bottom: 0.1,
-        },
-      },
-      timeScale: {
-        borderColor: "#2f3540",
-        timeVisible: true,
-        secondsVisible: false,
-      },
-      width: chartContainerRef.current.clientWidth,
-      height: chartContainerRef.current.clientHeight,
-    });
-
-    const candlestickSeries = chart.addCandlestickSeries({
-      upColor: "#10b981",
-      downColor: "#ef4444",
-      borderVisible: false,
-      wickUpColor: "#10b981",
-      wickDownColor: "#ef4444",
-    });
-
-    chartRef.current = chart;
-    seriesRef.current = candlestickSeries;
-
-    const handleResize = () => {
-      if (chartContainerRef.current) {
-        chart.resize(
-          chartContainerRef.current.clientWidth,
-          chartContainerRef.current.clientHeight
-        );
-      }
-    };
-
-    window.addEventListener("resize", handleResize);
-
-    return () => {
-      window.removeEventListener("resize", handleResize);
-      chart.remove();
-    };
-  }, []);
-
-  // Update chart data
-  useEffect(() => {
-    if (!seriesRef.current || trades.length === 0) return;
-
-    const candlesticks = aggregateTrades(trades, TIME_INTERVALS[timeFrame]);
-    seriesRef.current.setData(candlesticks);
-
-    if (chartRef.current) {
-      chartRef.current.timeScale().fitContent();
+  const CustomTooltip = ({ active, payload, label }: any) => {
+    if (active && payload && payload.length) {
+      return (
+        <div className="bg-background/80 backdrop-blur-sm border rounded-lg p-2 shadow-lg">
+          <p className="text-sm font-medium">
+            {format(new Date(label), "MMM dd yyyy HH:mm")}
+          </p>
+          <p className="text-sm text-primary">
+            Open: {payload[0]?.value.toFixed(12)} ETH
+          </p>
+          <p className="text-sm text-primary">
+            High: {payload[1]?.value.toFixed(12)} ETH
+          </p>
+          <p className="text-sm text-primary">
+            Low: {payload[2]?.value.toFixed(12)} ETH
+          </p>
+          <p className="text-sm text-primary">
+            Close: {payload[3]?.value.toFixed(12)} ETH
+          </p>
+          <p className="text-sm text-primary">
+            Volume: {payload[4]?.value.toFixed(4)} ETH
+          </p>
+        </div>
+      );
     }
-  }, [trades, currentPrice, timeFrame]);
+    return null;
+  };
+
+  if (loading) {
+    return (
+      <div className="flex items-center justify-center h-full text-sm text-muted-foreground">
+        Loading trades...
+      </div>
+    );
+  }
+
+  if (trades.length === 0) {
+    return (
+      <div className="flex items-center justify-center h-full text-sm text-muted-foreground">
+        No trades found for this token
+      </div>
+    );
+  }
+
+  // Calculate price range for better scaling
+  const allPrices = candleData.flatMap((d) => [d.open, d.high, d.low, d.close]);
+  const minPrice = Math.min(...allPrices);
+  const maxPrice = Math.max(...allPrices);
+  const priceDiff = maxPrice - minPrice;
+  const yDomain = [
+    Math.max(0, minPrice - priceDiff * 0.1),
+    maxPrice + priceDiff * 0.1,
+  ];
 
   return (
-    <div className="w-full h-full relative">
-      <div className="absolute top-4 left-4 z-10 flex flex-col gap-2">
-        <div className="text-sm text-gray-400">
-          {tokenSymbol ? `${tokenSymbol}/AVAX` : "Price Chart"}
-        </div>
-        <ToggleGroup
-          type="single"
-          value={timeFrame}
-          onValueChange={(value) => value && setTimeFrame(value as TimeFrame)}
-        >
-          <ToggleGroupItem value="5m" aria-label="5 Minutes">
-            5m
-          </ToggleGroupItem>
-          <ToggleGroupItem value="15m" aria-label="15 Minutes">
-            15m
-          </ToggleGroupItem>
-          <ToggleGroupItem value="1h" aria-label="1 Hour">
-            1h
-          </ToggleGroupItem>
-          <ToggleGroupItem value="4h" aria-label="4 Hours">
-            4h
-          </ToggleGroupItem>
-          <ToggleGroupItem value="1d" aria-label="1 Day">
-            1d
-          </ToggleGroupItem>
-        </ToggleGroup>
+    <div className="w-full h-full">
+      <div className="absolute top-4 left-4 text-sm text-muted-foreground">
+        {tokenSymbol ? `${tokenSymbol}/ETH` : "Price Chart"}
       </div>
-      <div ref={chartContainerRef} className="w-full h-full" />
+      <ResponsiveContainer width="100%" height="100%">
+        <ComposedChart
+          data={candleData}
+          margin={{ top: 40, right: 30, left: 0, bottom: 0 }}
+        >
+          <CartesianGrid strokeDasharray="3 3" stroke="#2f3540" />
+          <XAxis
+            dataKey="timestamp"
+            scale="time"
+            type="number"
+            domain={["dataMin", "dataMax"]}
+            tickFormatter={(value) => format(new Date(value), "HH:mm")}
+            stroke="#6b7280"
+          />
+          <YAxis
+            yAxisId="price"
+            domain={yDomain}
+            tickFormatter={(value) => value.toFixed(12)}
+            stroke="#6b7280"
+          />
+          <YAxis
+            yAxisId="volume"
+            orientation="right"
+            tickFormatter={(value) => `${value.toFixed(4)} ETH`}
+            stroke="#6b7280"
+          />
+          <Tooltip content={<CustomTooltip />} />
+
+          {/* Volume bars */}
+          <Bar
+            dataKey="volume"
+            yAxisId="volume"
+            fill="#3b82f6"
+            opacity={0.3}
+            barSize={20}
+          />
+
+          {/* Candlestick components */}
+          <Line
+            type="step"
+            dataKey="high"
+            stroke="#22c55e"
+            dot={false}
+            yAxisId="price"
+          />
+          <Line
+            type="step"
+            dataKey="low"
+            stroke="#ef4444"
+            dot={false}
+            yAxisId="price"
+          />
+          <Line
+            type="step"
+            dataKey="open"
+            stroke="#10b981"
+            dot={false}
+            yAxisId="price"
+          />
+          <Line
+            type="step"
+            dataKey="close"
+            stroke="#3b82f6"
+            dot={false}
+            yAxisId="price"
+          />
+        </ComposedChart>
+      </ResponsiveContainer>
     </div>
   );
 };
