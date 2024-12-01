@@ -1,0 +1,31 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 200 200">
+  <!-- Background Circle -->
+  <circle cx="100" cy="100" r="90" fill="#2563eb" />
+  <circle cx="100" cy="100" r="85" fill="#1d4ed8" />
+  
+  <!-- Inner Glow Effect -->
+  <circle cx="100" cy="100" r="75" fill="#3b82f6" opacity="0.6" />
+  
+  <!-- FGT Text -->
+  <text x="100" y="115" 
+        font-family="Arial, sans-serif" 
+        font-size="48" 
+        font-weight="bold" 
+        fill="white" 
+        text-anchor="middle">
+    FGT
+  </text>
+  
+  <!-- Decorative Ring -->
+  <circle cx="100" cy="100" r="82" 
+          fill="none" 
+          stroke="white" 
+          stroke-width="2" 
+          stroke-dasharray="4,4"
+          opacity="0.6" />
+          
+  <!-- Highlight Effect -->
+  <circle cx="70" cy="70" r="15" 
+          fill="white" 
+          opacity="0.2" />
+</svg>

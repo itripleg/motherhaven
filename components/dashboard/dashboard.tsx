@@ -1,11 +1,11 @@
 "use client";
 import { useState, useEffect } from "react";
-import { CalendarComponent } from "./CalendarComponent";
-import Projection from "./projection";
-import { RecurringRevenueComponent } from "./RecurringRevenue";
-import { BalanceOverview } from "./BalanceOverview";
-import { Events } from "./Events";
-import { useGlobalFinance } from "@/contexts/GlobalFinanceContext";
+// import { CalendarComponent } from "./CalendarComponent";
+// import Projection from "./projection";
+// import { RecurringRevenueComponent } from "./RecurringRevenue";
+// import { BalanceOverview } from "./BalanceOverview";
+// import { Events } from "./Events";
+// import { useGlobalFinance } from "@/contexts/GlobalFinanceContext";
 import {
   NavigationMenu,
   NavigationMenuContent,
@@ -13,7 +13,7 @@ import {
   NavigationMenuLink,
   NavigationMenuList,
   NavigationMenuTrigger,
-} from "./ui/navigation-menu";
+} from "../ui/navigation-menu";
 
 const Nav = () => {
   const [mounted, setMounted] = useState(false);

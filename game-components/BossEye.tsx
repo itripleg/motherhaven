@@ -10,6 +10,7 @@ import { useGameContext } from "../contexts/game-context";
 import { motion } from "framer-motion-3d";
 import { moveTarget } from "@/hooks/CamTools";
 import ShakeWord from "./ShakeWord";
+import { Rotate3D } from "lucide-react";
 
 type Props = {};
 
@@ -110,8 +111,8 @@ function BossEye({}: Props) {
   return (
     <motion.mesh
       initial={{ rotateY: Math.PI }}
-      animate={{ rotateY: 0 }}
-      transition={{ delay: 3 }}
+      animate={{ rotateY: 1, rotateX: 0.2, rotateZ: -0.2 }}
+      transition={{ delay: 0 }}
     >
       <Html className="w-[100px]" position={[0, 150, 0]}>
         <ProgressBar style="bg-green-800" progress={bossHealth} />
@@ -119,7 +120,7 @@ function BossEye({}: Props) {
       <Html className="w-[100px]" position={[-40, 100, 0]}>
         <ShakeWord word={bossMessage} />
       </Html>
-      <Eye position={[0, 15, 0]} scale={0.08} />
+      <Eye position={[-20, -175, -100]} scale={0.2} />
     </motion.mesh>
   );
 }

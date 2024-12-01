@@ -80,4 +80,4 @@ export function Flecha({ animationControls }, props) {
   );
 }
 
-useGLTF.preload("/Flecha.glb");
+useGLTF.preload("/models/Flecha.glb");

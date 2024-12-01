@@ -30,39 +30,9 @@ export default function TokenPage({
 }: TokenPageProps) {
   const { disconnect } = useDisconnect();
 
-  const UserSection = () => (
-    <div className="flex items-center w-full gap-2 justify-between z-40">
-      <span className="text-sm text-muted-foreground">
-        Logged in as{" "}
-        {isConnected
-          ? `${address?.slice(0, 6)}...${address?.slice(-4)}`
-          : "Guest"}
-      </span>
-      {isConnected ? (
-        <Button size="sm" onClick={() => disconnect()}>
-          Disconnect
-        </Button>
-      ) : (
-        <ConnectButton />
-      )}
-    </div>
-  );
-
-  if (loading) {
-    return (
-      <div className="container mx-auto pt-20 p-4">
-        <UserSection />
-        <div className="flex justify-center items-center h-[80vh]">
-          <div className="animate-pulse">Loading token details...</div>
-        </div>
-      </div>
-    );
-  }
-
   if (!tokenData) {
     return (
       <div className="container mx-auto pt-20 p-4">
-        <UserSection />
         <div className="flex justify-center items-center h-[80vh]">
           Token or Pair Not Found. We can&apos;t seem to find the token
           you&apos;re looking for.
@@ -73,21 +43,18 @@ export default function TokenPage({
 
   return (
     <div className="container mx-auto pt-20 p-4">
-      <div className="flex justify-between items-center mb-4">
-        <UserSection />
-      </div>
-
       <div className="grid grid-cols-1 lg:grid-cols-4 gap-6">
         {/* Main Content Area (3 columns on desktop) */}
         <div className="lg:col-span-3 space-y-6">
           {/* Charts Section */}
           <div className="grid grid-cols-1 xl:grid-cols-2 gap-6 ">
             <div className="xl:col-span-2">
-              <TokenHeader
+              Token Header
+              {/* <TokenHeader
                 tokenData={tokenData}
                 price={price}
                 tokenState={tokenState}
-              />
+              /> */}
             </div>
             <div className="xl:col-span-2">
               <TokenPriceCharts tokenData={tokenData} price={price} />

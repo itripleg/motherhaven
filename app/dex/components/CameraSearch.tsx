@@ -4,7 +4,7 @@ import { motion, AnimatePresence } from "framer-motion";
 import { useState } from "react";
 import { moveCamPosition } from "@/hooks/CamTools";
 import { Skull } from "lucide-react";
-import OuijAi from "@/components-3d/Ouija/OuijAi";
+import OuijAi from "@/components-3d/Ouija/OuijaAndFletcha";
 
 // CameraSearch.tsx
 interface CameraSearchProps {

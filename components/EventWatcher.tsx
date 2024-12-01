@@ -3,11 +3,9 @@
 import React, { useCallback } from "react";
 import { useWatchContractEvent } from "wagmi";
 import { Log } from "viem";
-import tokenFactoryMetadata from "@/contracts/token-factory/artifacts/TokenFactory_metadata.json";
-import exp from "constants";
+import { FACTORY_ADDRESS, FACTORY_ABI } from "@/types";
 
-export const FACTORY_ADDRESS = "0x7713A39875A5335dc4Fc4f9359908afb55984b1F";
-export const FACTORY_ABI = tokenFactoryMetadata.output.abi;
+// export const FACTORY_ADDRESS = "0x7713A39875A5335dc4Fc4f9359908afb55984b1F";
 
 // Event types
 type LogWithArgs = Log & {

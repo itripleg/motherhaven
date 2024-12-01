@@ -1,18 +1,7 @@
 "use client";
 
 import { useState, useEffect } from "react";
-import { db, storage } from "@/firebase";
-import { doc, setDoc } from "firebase/firestore";
-
-type TokenData = {
-  name: string;
-  symbol: string;
-  address?: string;
-  blockNumber?: number;
-  timestamp?: string;
-  transactionHash?: string;
-};
-
+import { storage } from "@/firebase";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import {
   Card,
@@ -29,12 +18,10 @@ import { useWriteContract, useWaitForTransactionReceipt } from "wagmi";
 import { parseEther } from "viem";
 import { useToast } from "@/hooks/use-toast";
 import { AddressComponent } from "@/components/AddressComponent";
-import tokenFactoryMetadata from "@/contracts/token-factory/artifacts/TokenFactory_metadata.json";
 import { ref, uploadBytes, getDownloadURL } from "firebase/storage";
-import dynamic from "next/dynamic";
+import { FACTORY_ADDRESS } from "@/types";
 
-const FACTORY_ADDRESS = "0x7713A39875A5335dc4Fc4f9359908afb55984b1F";
-const ABI = tokenFactoryMetadata.output.abi;
+import ABI from "@/contracts/token-factory/BigBoss_abi.json";
 
 function Page() {
   const [tokenInfo, setTokenInfo] = useState({
@@ -45,15 +32,15 @@ function Page() {
   });
 
   const [tokenomics, setTokenomics] = useState({
-    fundingGoal: "500",
-    maxSupply: "1000000000",
-    initialSupply: "200000000",
+    fundingGoal: 5,
+    maxSupply: 1000000000,
+    initialSupply: 200000000,
     bondingCurve: "linear",
     liquidityPool: "uniswap",
   });
 
   const [backgroundImage, setBackgroundImage] = useState<string | null>(null);
-
+  const [uploadingImage, setUploadingImage] = useState(false);
   const { toast } = useToast();
 
   const {
@@ -68,76 +55,7 @@ function Page() {
       hash: transactionData,
     });
 
-  useEffect(() => {
-    if (receipt && tokenInfo.name) {
-      // Find the TokenCreated event from the logs
-      const tokenCreatedEvent = receipt.logs?.find((log: any) => log.address);
-
-      if (!tokenCreatedEvent) {
-        toast({
-          title: "Error",
-          description: "Failed to retrieve token address.",
-          variant: "destructive",
-        });
-        return;
-      }
-
-      const address = tokenCreatedEvent.address;
-
-      // Handle image upload to Firebase Storage and get URL
-      const handleImageUpload = async () => {
-        let imageUrl = "";
-
-        if (tokenInfo.image) {
-          try {
-            const storageRef = ref(
-              storage,
-              `token-images/${address}/${tokenInfo.image.name}`
-            );
-            const uploadTask = await uploadBytes(storageRef, tokenInfo.image);
-            imageUrl = await getDownloadURL(uploadTask.ref);
-          } catch (error) {
-            console.error("Error uploading image:", error);
-            toast({
-              title: "Warning",
-              description: "Failed to upload image, but token was created.",
-              variant: "destructive",
-            });
-          }
-        }
-
-        // Save to Firestore with image URL and creator address
-        const tokenDocRef = doc(db, "tokens", address);
-        await setDoc(tokenDocRef, {
-          name: tokenInfo.name,
-          symbol: tokenInfo.ticker,
-          address,
-          creator: receipt.from, // Add the creator address from the receipt
-          blockNumber: Number(receipt.blockNumber),
-          timestamp: new Date().toISOString(),
-          transactionHash: receipt.transactionHash,
-          createdAt: new Date().toISOString(),
-          description: tokenInfo.description,
-          imageUrl: imageUrl,
-        });
-
-        toast({
-          title: "Token Created",
-          description: `Token Address: ${address}`,
-        });
-      };
-
-      handleImageUpload().catch((err) => {
-        console.error("Error saving token details:", err);
-        toast({
-          title: "Error",
-          description: "Failed to save token details.",
-          variant: "destructive",
-        });
-      });
-    }
-  }, [receipt, toast, tokenInfo]);
-
+  // Handle image preview
   useEffect(() => {
     if (tokenInfo.image) {
       const reader = new FileReader();
@@ -150,27 +68,40 @@ function Page() {
     }
   }, [tokenInfo.image]);
 
+  // Simple upload function that returns URL
+  const uploadImage = async (file: File): Promise<string> => {
+    const storageRef = ref(storage, `temp-uploads/${Date.now()}-${file.name}`);
+    const uploadTask = await uploadBytes(storageRef, file);
+    return await getDownloadURL(uploadTask.ref);
+  };
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     try {
-      // TODO: Handle image upload to IPFS or other storage solution
-      const imageUrl = tokenInfo.image ? "placeholder_url" : "";
+      setUploadingImage(true);
+      let imageUrl = "";
 
-      // Contract currently only accepts name and ticker
+      if (tokenInfo.image) {
+        try {
+          imageUrl = await uploadImage(tokenInfo.image);
+        } catch (error) {
+          console.error("Error uploading image:", error);
+          toast({
+            title: "Error",
+            description: "Failed to upload image. Please try again.",
+            variant: "destructive",
+          });
+          return;
+        }
+      }
+
       writeContract({
         abi: ABI,
         address: FACTORY_ADDRESS,
         functionName: "createToken",
-        args: [
-          tokenInfo.name,
-          tokenInfo.ticker,
-          // parseEther(tokenomics.maxSupply),
-          // parseEther(tokenomics.initialSupply),
-          // tokenomics.bondingCurve === "linear" ? 0 : 1,
-          // imageUrl,
-          // tokenInfo.description,
-        ],
+        args: [tokenInfo.name, tokenInfo.ticker, imageUrl],
       });
+
       toast({
         title: "Transaction Submitted",
         description: "Waiting for confirmation...",
@@ -182,86 +113,102 @@ function Page() {
         description: "Failed to create token. Please try again.",
         variant: "destructive",
       });
+    } finally {
+      setUploadingImage(false);
     }
   };
 
   return (
-    <div
-      className="min-h-screen bg-cover bg-center bg-no-repeat"
-      style={{
-        backgroundImage: backgroundImage ? `url(${backgroundImage})` : "none",
-      }}
-    >
-      <div className="min-h-screen bg-gray-100/30">
-        <Container>
-          <form onSubmit={handleSubmit}>
-            <Tabs defaultValue="token-info" className="mt-8">
-              <TabsList className="grid w-full grid-cols-2">
-                <TabsTrigger value="token-info">Token Info</TabsTrigger>
-                <TabsTrigger value="tokenomics">Tokenomics</TabsTrigger>
-              </TabsList>
-              <TabsContent value="token-info">
-                <Card>
-                  <CardHeader>
-                    <CardTitle>Token Information</CardTitle>
-                    <CardDescription>
-                      Provide details about your new token
-                    </CardDescription>
-                  </CardHeader>
-                  <CardContent>
-                    <TokenInfoForm
-                      tokenInfo={tokenInfo}
-                      onTokenInfoChange={setTokenInfo}
-                    />
-                  </CardContent>
-                </Card>
-              </TabsContent>
-              <TabsContent value="tokenomics">
-                <Card>
-                  <CardHeader>
-                    <CardTitle>Tokenomics</CardTitle>
-                    <CardDescription>
-                      Set up the economic parameters for your token
-                    </CardDescription>
-                  </CardHeader>
-                  <CardContent>
-                    <TokenomicsForm
-                      tokenomics={tokenomics}
-                      // onTokenomicsChange={setTokenomics}
-                    />
-                  </CardContent>
-                </Card>
-              </TabsContent>
-            </Tabs>
-            <Button type="submit" className="w-full mt-4" disabled={isPending}>
-              {isPending ? "Creating Token..." : "Create Token"}
-            </Button>
-          </form>
+    <Container className="">
+      <div
+        className="min-h-screen bg-cover bg-center bg-no-repeat md:px-28 "
+        style={{
+          backgroundImage: backgroundImage ? `url(${backgroundImage})` : "none",
+        }}
+      >
+        <div className="min-h-screen">
+          <Container>
+            <form onSubmit={handleSubmit}>
+              <Tabs defaultValue="token-info" className="mt-8 opacity-95">
+                <TabsList className="grid w-full grid-cols-2">
+                  <TabsTrigger value="token-info">Token Info</TabsTrigger>
+                  <TabsTrigger value="tokenomics">Tokenomics</TabsTrigger>
+                </TabsList>
+                <TabsContent value="token-info">
+                  <Card>
+                    <CardHeader>
+                      <CardTitle>Token Information</CardTitle>
+                      <CardDescription>
+                        Provide details about your new token
+                      </CardDescription>
+                    </CardHeader>
+                    <CardContent>
+                      <TokenInfoForm
+                        tokenInfo={tokenInfo}
+                        onTokenInfoChange={setTokenInfo}
+                      />
+                    </CardContent>
+                  </Card>
+                </TabsContent>
+                <TabsContent value="tokenomics">
+                  <Card>
+                    <CardHeader>
+                      <CardTitle>Tokenomics</CardTitle>
+                      <CardDescription>
+                        Set your token&apos;s funding goal
+                      </CardDescription>
+                    </CardHeader>
+                    <CardContent>
+                      <TokenomicsForm
+                        tokenomics={tokenomics}
+                        // onTokenomicsChange={setTokenomics}
+                      />
+                    </CardContent>
+                  </Card>
+                </TabsContent>
+              </Tabs>
+              <div className="flex justify-center ">
+                <Button
+                  type="submit"
+                  className="w-full mt-4 max-w-[300px] h-16 opacity-90 border-4 border-black/20"
+                  disabled={isPending || uploadingImage || isConfirming}
+                >
+                  {uploadingImage
+                    ? "Uploading Image..."
+                    : isPending
+                    ? "Creating Token..."
+                    : isConfirming
+                    ? "Confirming Transaction..."
+                    : "Create Token"}
+                </Button>
+              </div>
+            </form>
+            {error && (
+              <div className="mt-4 text-red-600 text-center">
+                Error: {error.message || "An error occurred"}
+              </div>
+            )}
 
-          {isConfirming && (
-            <div className="text-center mt-4">Waiting for confirmation...</div>
-          )}
-          {receipt && (
-            <div className="mt-4">
-              <p>Transaction Receipt:</p>
-              <ul>
-                <li>Token Name: {tokenInfo.name}</li>
-                <li>Ticker: {tokenInfo.ticker}</li>
-                <li className="flex items-center">
-                  Transaction:{" "}
-                  <AddressComponent hash={`${transactionData}`} type="tx" />
-                </li>
-              </ul>
-            </div>
-          )}
-          {error && (
-            <div className="mt-4 text-red-600 text-center">
-              Error: {error.message || "An error occurred"}
-            </div>
-          )}
-        </Container>
+            {receipt && (
+              <div className="mt-4 p-4 bg-green-50 rounded-lg">
+                <h3 className="font-bold text-green-800">
+                  Token Created Successfully!
+                </h3>
+                <div className="mt-2 text-sm text-green-700">
+                  <p>Name: {tokenInfo.name}</p>
+                  <p>Symbol: {tokenInfo.ticker}</p>
+                  <p>Funding Goal: {tokenomics.fundingGoal} ETH</p>
+                  <div className="flex items-center mt-1">
+                    <span>Transaction: </span>
+                    <AddressComponent hash={`${transactionData}`} type="tx" />
+                  </div>
+                </div>
+              </div>
+            )}
+          </Container>
+        </div>
       </div>
-    </div>
+    </Container>
   );
 }
 

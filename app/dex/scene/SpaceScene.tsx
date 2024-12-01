@@ -5,8 +5,12 @@ import { useTheme } from "next-themes";
 import { useEffect, useRef } from "react";
 import Moon from "@/components-3d/Moon";
 import gsap from "gsap";
-import { OuijaBoard } from "@/components-3d/Ouija/OuijaBoard";
+import OuijaAndFlecha from "@/components-3d/Ouija/OuijaAndFletcha";
 import { Flecha } from "@/components-3d/Ouija/Flecha";
+import { OuijaBoard } from "@/components-3d/Ouija/OuijaBoard";
+import BossEye from "@/game-components/BossEye";
+import GameContextProvider from "@/contexts/game-context";
+import Jax from "@/Characters/Jax";
 
 export const SpaceScene = ({ cameraRef, controlRef, lightRef }: any) => {
   const { theme } = useTheme();
@@ -37,15 +41,23 @@ export const SpaceScene = ({ cameraRef, controlRef, lightRef }: any) => {
           enableZoom={false}
           enablePan={true}
           enableRotate={false}
-          autoRotate={false}
-          autoRotateSpeed={0.1}
+          // autoRotate
+          autoRotateSpeed={0.01}
         />
         <PerspectiveCamera position={[0, 0, -7]} ref={cameraRef} makeDefault />
-        <Moon scale={2} position={[0, 1.1, 0]} />
-        <Stars />
-        <OuijaBoard position={[666, 666, 666]} />
-        <Flecha animationControls={animationControls} />
+        {/* <Moon scale={2} position={[0, 1.1, 0]} /> */}
+        <Stars radius={100} />
+        {/* <Planet /> */}
+        {/* <OuijaAndFlecha position={[666, 666, 666]} /> */}
+        {/* <OuijaBoard position={[0, 0, 0]} scale={20} /> */}
+        {/* <Flecha animationControls={animationControls} /> */}
+        {/* <OuijaBoard /> */}
+        {/* <GameContextProvider> */}
+        {/* <BossEye /> */}
+        {/* <OuijaBoard position={[555, 555, 555]} scale={2} /> */}
+        {/* </GameContextProvider> */}
       </Canvas>
+      {/* <OuijaAndFlecha position={[0, 0, 0]} /> */}
     </motion.div>
   );
 };

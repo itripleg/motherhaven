@@ -5,8 +5,10 @@ import { ThemeProvider } from "@/components/theme-provider";
 import MyMenu from "@/components/my-menu";
 import WagmiContext from "@/contexts/WagmiContext";
 import { Toaster } from "@/components/ui/toaster";
-import { EventWatcher } from "./dex/components/EventWatcher";
+import { EventWatcher } from "../components/EventWatcher";
 import { GlobalFinanceProvider } from "@/contexts/GlobalFinanceContext";
+import { UserSection } from "@/components/UserSection";
+import { Header } from "./Header";
 
 const geistSans = localFont({
   src: "./fonts/GeistVF.woff",
@@ -50,6 +52,7 @@ export default function RootLayout({
           <WagmiContext>
             <GlobalFinanceProvider>
               <EventWatcher />
+              <Header />
               {children}
               <Toaster />
             </GlobalFinanceProvider>

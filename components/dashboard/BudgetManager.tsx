@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useEffect } from "react";
-import Projection from "@/components/projection"; // Import the Projection component
+import Projection from "@/components/dashboard/projection"; // Import the Projection component
 import { doc, getDoc, setDoc } from "firebase/firestore";
 import { db } from "@/firebase";
 

@@ -1,3 +1,4 @@
+// TokenomicsForm.tsx
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import {
@@ -10,23 +11,23 @@ import {
 
 interface TokenomicsFormProps {
   tokenomics: {
-    fundingGoal: string;
-    maxSupply: string;
-    initialSupply: string;
-    bondingCurve: string;
-    liquidityPool: string;
+    fundingGoal: number;
+    maxSupply?: number;
+    initialSupply?: number;
+    bondingCurve?: string;
+    liquidityPool?: string;
   };
-  setTokenomics?: React.Dispatch<
-    React.SetStateAction<TokenomicsFormProps["tokenomics"]>
-  >;
+  onTokenomicsChange?: (tokenomics: TokenomicsFormProps["tokenomics"]) => void;
 }
 
 export function TokenomicsForm({
   tokenomics,
-  setTokenomics,
+  onTokenomicsChange,
 }: TokenomicsFormProps) {
   const handleChange = (field: string, value: string) => {
-    // setTokenomics((prev) => ({ ...prev, [field]: value }));
+    if (onTokenomicsChange) {
+      onTokenomicsChange({ ...tokenomics, [field]: value });
+    }
   };
 
   return (
@@ -37,11 +38,15 @@ export function TokenomicsForm({
       </div>
       <div className="grid w-full items-center gap-1.5">
         <Label htmlFor="maxSupply">Max Supply</Label>
-        <Input id="maxSupply" value={tokenomics.maxSupply} disabled />
+        <Input id="maxSupply" value={tokenomics.maxSupply || ""} disabled />
       </div>
       <div className="grid w-full items-center gap-1.5">
         <Label htmlFor="initialSupply">Initial Supply</Label>
-        <Input id="initialSupply" value={tokenomics.initialSupply} disabled />
+        <Input
+          id="initialSupply"
+          value={tokenomics.initialSupply || ""}
+          disabled
+        />
       </div>
       <div className="grid w-full items-center gap-1.5">
         <Label htmlFor="bondingCurve">Bonding Curve Type</Label>
@@ -64,6 +69,7 @@ export function TokenomicsForm({
         <Select
           value={tokenomics.liquidityPool}
           onValueChange={(value) => handleChange("liquidityPool", value)}
+          disabled
         >
           <SelectTrigger id="liquidityPool">
             <SelectValue placeholder="Select liquidity pool" />

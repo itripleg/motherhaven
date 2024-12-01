@@ -7,13 +7,14 @@ import {
   CardTitle,
 } from "@/components/ui/card";
 import { Label } from "@/components/ui/label";
+import { Badge } from "@/components/ui/badge";
 import { AddressComponent } from "@/components/AddressComponent";
-import { TokenData } from "@/types";
+import { TokenData, TokenState } from "@/types";
 
 interface TokenHeaderProps {
   tokenData: TokenData;
   price: number;
-  tokenState: number;
+  tokenState: TokenState;
 }
 
 export function TokenHeader({
@@ -21,28 +22,48 @@ export function TokenHeader({
   price,
   tokenState,
 }: TokenHeaderProps) {
-  const getTokenStateText = (state: number) => {
+  const getTokenStateDisplay = (state: TokenState) => {
     switch (state) {
-      case 0:
-        return "Not Created";
-      case 1:
-        return "Platform Trading";
-      case 2:
-        return "Goal Reached";
+      case TokenState.NOT_CREATED:
+        return {
+          text: "Not Created",
+          color: "bg-red-500/80",
+        };
+      case TokenState.TRADING:
+        return {
+          text: "Trading",
+          color: "bg-green-500/80",
+        };
+      case TokenState.GOAL_REACHED:
+        return {
+          text: "Goal Reached",
+          color: "bg-blue-500/80",
+        };
+      case TokenState.HALTED:
+        return {
+          text: "Halted",
+          color: "bg-yellow-500/80",
+        };
       default:
-        return "Unknown";
+        return {
+          text: "Unknown",
+          color: "bg-gray-500/80",
+        };
     }
   };
 
+  const stateDisplay = getTokenStateDisplay(tokenState);
+
   return (
     <Card className="relative overflow-hidden min-h-[300px]">
+      {/* Background Image Layer */}
       <div
         className="absolute inset-0 z-0 bg-no-repeat"
         style={{
           backgroundImage: tokenData.imageUrl
             ? `url(${tokenData.imageUrl})`
             : "none",
-          backgroundSize: "100% 100%", // Changed from cover
+          backgroundSize: "100% 100%",
           backgroundPosition: "center",
           height: "100%",
           width: "100%",
@@ -51,19 +72,22 @@ export function TokenHeader({
         <div className="absolute inset-0 bg-gradient-to-b from-black/60 via-black/50 to-black/70" />
       </div>
 
+      {/* Content Layer */}
       <div className="relative z-10">
-        <div className="p-4">
+        <div className="p-4 flex justify-between items-center">
           <AddressComponent hash={tokenData.address} type="address" />
+          <Badge
+            className={`${stateDisplay.color} text-white px-3 py-1`}
+            variant="outline"
+          >
+            {stateDisplay.text}
+          </Badge>
         </div>
         <CardHeader>
-          <CardTitle className="text-white text-3xl font-bold">
-            {tokenData.name} ({tokenData.symbol})
+          <CardTitle className="text-white text-3xl font-bold flex items-center gap-4">
+            {tokenData.name}
+            <span className="text-2xl text-gray-300">({tokenData.symbol})</span>
           </CardTitle>
-          <CardDescription className="text-gray-200 text-lg">
-            <p className="text-white text-lg font-semibold">
-              {getTokenStateText(tokenState)}
-            </p>
-          </CardDescription>
         </CardHeader>
         <CardContent>
           <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
@@ -71,10 +95,30 @@ export function TokenHeader({
               <div className="backdrop-blur-sm bg-white/10 p-4 rounded-lg">
                 <Label className="text-gray-200">Current Price</Label>
                 <p className="text-white text-lg font-semibold">
-                  {price} <span className="text-xs">AVAX</span>
+                  {price} <span className="text-gray-300">ETH</span>
                 </p>
               </div>
+              {tokenData.fundingGoal && (
+                <div className="backdrop-blur-sm bg-white/10 p-4 rounded-lg">
+                  <Label className="text-gray-200">Funding Goal</Label>
+                  <p className="text-white text-lg font-semibold">
+                    {tokenData.fundingGoal}{" "}
+                    <span className="text-gray-300">ETH</span>
+                  </p>
+                </div>
+              )}
             </div>
+            {tokenData.statistics && (
+              <div className="space-y-4">
+                <div className="backdrop-blur-sm bg-white/10 p-4 rounded-lg">
+                  <Label className="text-gray-200">Trading Volume</Label>
+                  <p className="text-white text-lg font-semibold">
+                    {tokenData.statistics.volumeETH}{" "}
+                    <span className="text-gray-300">ETH</span>
+                  </p>
+                </div>
+              </div>
+            )}
           </div>
           {tokenData.description && (
             <div className="mt-6 backdrop-blur-sm bg-white/10 p-4 rounded-lg">
@@ -85,6 +129,7 @@ export function TokenHeader({
         </CardContent>
       </div>
 
+      {/* Fallback Background */}
       {!tokenData.imageUrl && (
         <div className="absolute inset-0 bg-gradient-to-br from-gray-900 to-gray-800" />
       )}

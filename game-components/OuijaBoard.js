@@ -7,7 +7,7 @@ import { useGLTF } from "@react-three/drei";
 import { motion } from "framer-motion-3d";
 
 export function OuijaBoard(props) {
-  const { nodes, materials } = useGLTF("/ouija_board.glb");
+  const { nodes, materials } = useGLTF("/models/ouija_board.glb");
   return (
     <motion.group {...props} dispose={null}>
       <motion.mesh
@@ -19,4 +19,4 @@ export function OuijaBoard(props) {
   );
 }
 
-useGLTF.preload("/ouija_board.glb");
+useGLTF.preload("/models/ouija_board.glb");
