@@ -2,7 +2,7 @@
 
 import { useState, useEffect } from "react";
 import { Container } from "@/components/craft";
-import { Dashboard } from "@/components/dashboard";
+import { Dashboard } from "@/components/dashboard/dashboard";
 import Chart from "@/app/dex/components/charts/chart"; // Assume you have a Chart component
 import MyMenu from "@/components/my-menu"; // Your Menubar component
 import LoginWidget from "@/components/login-widget";

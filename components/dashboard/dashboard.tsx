@@ -1,6 +1,6 @@
 "use client";
 import { useState, useEffect } from "react";
-import { CalendarComponent } from "./CalendarComponent";
+// import { CalendarComponent } from "./CalendarComponent";
 import Projection from "./projection";
 import { RecurringRevenueComponent } from "./RecurringRevenue";
 import { BalanceOverview } from "./BalanceOverview";
@@ -13,7 +13,7 @@ import {
   NavigationMenuLink,
   NavigationMenuList,
   NavigationMenuTrigger,
-} from "./ui/navigation-menu";
+} from "../ui/navigation-menu";
 
 const Nav = () => {
   const [mounted, setMounted] = useState(false);

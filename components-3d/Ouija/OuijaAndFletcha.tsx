@@ -1,3 +1,4 @@
+"use client";
 // import { OuijaBoard } from "../components/OuijaBoard";
 import { Environment, PresentationControls } from "@react-three/drei";
 import { Canvas, useThree } from "@react-three/fiber";
@@ -9,7 +10,7 @@ import { OuijaBoard } from "./OuijaBoard";
 
 type Props = {};
 
-function OuijAi({}: Props) {
+function OuijaAndFlecha({}: Props) {
   const [questionInput, setQuestionInput] = useState("");
   const [result, setResult] = useState();
   const animationControls = useAnimation();
@@ -84,4 +85,4 @@ function OuijAi({}: Props) {
   );
 }
 
-export default OuijAi;
+export default OuijaAndFlecha;

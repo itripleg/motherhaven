@@ -21,6 +21,7 @@ import { defaultCam, moveCamPosition } from "@/hooks/CamTools";
 import { getAddressGreeting } from "@/hooks/addressGreetings";
 import { useAccount } from "wagmi";
 import { CameraSearch } from "./CameraSearch";
+import OuijaSearch from "./OuijaSearch";
 
 export default function AllTokensDisplay() {
   const account = useAccount();
@@ -31,6 +32,20 @@ export default function AllTokensDisplay() {
   const [showCameraSearch, setShowCameraSearch] = useState(false);
   const [greeting, setGreeting] = useState("");
   const [showSecret, setShowSecret] = useState(false);
+  const [searchMode, setSearchMode] = useState("token"); // "token", "camera", or "ouija"
+
+  const handleOuijaInput = (key: string) => {
+    if (key === "submit") {
+      // Handle submission
+      return;
+    }
+    if (key === "clear") {
+      // Handle clear
+      return;
+    }
+    // Handle individual key presses for Flecha movement
+    console.log("Ouija key pressed:", key);
+  };
 
   const handleSecretFound = () => {
     setShowSecret(true);
@@ -88,16 +103,33 @@ export default function AllTokensDisplay() {
   };
   const cameraRef = useRef<any>(null);
   const controlRef = useRef<any>(null);
+
   const CameraAngles = () => {
+    const handleSearchModeChange = () => {
+      if (searchMode === "token") {
+        setSearchMode("camera");
+      } else if (searchMode === "camera") {
+        setSearchMode("ouija");
+      } else {
+        setSearchMode("token");
+        // Reset camera to default when switching back to token search
+        moveCamPosition({ cameraRef, x: 0, y: 0, z: -7, scale: 1 });
+        if (controlRef.current) {
+          controlRef.current.autoRotateSpeed = 1;
+        }
+      }
+    };
+
     return (
       <div className="z-30 flex gap-2 py-2">
-        <Button
-          className="z-60"
-          onClick={() => setShowCameraSearch(!showCameraSearch)}
-        >
-          {showCameraSearch ? "Token Search" : "👀"}
+        <Button className="z-60" onClick={handleSearchModeChange}>
+          {searchMode === "token"
+            ? "👀"
+            : searchMode === "camera"
+            ? "🔮"
+            : "🔎"}
         </Button>
-        {showCameraSearch && (
+        {searchMode === "camera" && (
           <Button
             className="z-60"
             onClick={() => {
@@ -125,15 +157,16 @@ export default function AllTokensDisplay() {
             )}
           </div>
         </div>
-        {/* @ts-expect-error camera ref */}
-        <CameraAngles cameraRef={cameraRef} controlRef={controlRef} />
+        <CameraAngles />
 
-        {showCameraSearch ? (
+        {searchMode === "camera" ? (
           <CameraSearch
             cameraRef={cameraRef}
             onSecretFound={handleSecretFound}
             showSecret={showSecret}
           />
+        ) : searchMode === "ouija" ? (
+          <OuijaSearch onOuijaInput={handleOuijaInput} />
         ) : (
           <TokenSearch
             searchQuery={searchQuery}
@@ -141,6 +174,7 @@ export default function AllTokensDisplay() {
             setActiveCategory={setActiveCategory}
           />
         )}
+
         {!showSecret && (
           <>
             <TokenTabs onCategoryChange={filterTokensByCategory} />

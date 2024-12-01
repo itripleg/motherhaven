@@ -16,4 +16,4 @@ export function OuijaBoard(props) {
   );
 }
 
-useGLTF.preload("/ouija_board.glb");
+useGLTF.preload("/models/ouija_board.glb");

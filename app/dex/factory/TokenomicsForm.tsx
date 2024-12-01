@@ -16,9 +16,9 @@ interface TokenomicsFormProps {
     bondingCurve: string;
     liquidityPool: string;
   };
-  setTokenomics?: React.Dispatch<
-    React.SetStateAction<TokenomicsFormProps["tokenomics"]>
-  >;
+  setTokenomics?:
+    | React.Dispatch<React.SetStateAction<TokenomicsFormProps["tokenomics"]>>
+    | undefined;
 }
 
 export function TokenomicsForm({
