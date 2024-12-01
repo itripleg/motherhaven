@@ -19,9 +19,9 @@ import { parseEther } from "viem";
 import { useToast } from "@/hooks/use-toast";
 import { AddressComponent } from "@/components/AddressComponent";
 import { ref, uploadBytes, getDownloadURL } from "firebase/storage";
+import { FACTORY_ADDRESS } from "@/types";
 
 import ABI from "@/contracts/token-factory/BigBoss_abi.json";
-const FACTORY_ADDRESS = "0x4696af372b151E2fF611561B565C3A15b53850C4";
 
 function Page() {
   const [tokenInfo, setTokenInfo] = useState({
@@ -32,7 +32,11 @@ function Page() {
   });
 
   const [tokenomics, setTokenomics] = useState({
-    fundingGoal: "5",
+    fundingGoal: 5,
+    maxSupply: 1000000000,
+    initialSupply: 200000000,
+    bondingCurve: "linear",
+    liquidityPool: "uniswap",
   });
 
   const [backgroundImage, setBackgroundImage] = useState<string | null>(null);
@@ -95,12 +99,7 @@ function Page() {
         abi: ABI,
         address: FACTORY_ADDRESS,
         functionName: "createToken",
-        args: [
-          tokenInfo.name,
-          tokenInfo.ticker,
-          imageUrl,
-          parseEther(tokenomics.fundingGoal),
-        ],
+        args: [tokenInfo.name, tokenInfo.ticker, imageUrl],
       });
 
       toast({
@@ -162,7 +161,7 @@ function Page() {
                     <CardContent>
                       <TokenomicsForm
                         tokenomics={tokenomics}
-                        onTokenomicsChange={setTokenomics}
+                        // onTokenomicsChange={setTokenomics}
                       />
                     </CardContent>
                   </Card>

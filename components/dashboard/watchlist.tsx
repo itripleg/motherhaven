@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from "react";
 import { motion, AnimatePresence } from "framer-motion";
-import { CryptoAddress } from "../types";
-import { fetchAddresses, addAddress } from "../utils/firebase";
+import { CryptoAddress } from "@/types";
+import { fetchAddresses, addAddress } from "@/utils/firebase";
 
 const Watchlist: React.FC = () => {
   const [addresses, setAddresses] = useState<CryptoAddress[]>([]);

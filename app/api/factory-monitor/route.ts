@@ -11,44 +11,25 @@ import {
   runTransaction,
 } from "firebase/firestore";
 import { db } from "@/firebase";
-import { decodeEventLog, formatEther, parseAbiItem, Hex } from "viem";
+import { decodeEventLog, formatEther, parseAbiItem } from "viem";
+import {
+  TokenCreatedEvent,
+  TokensPurchasedEvent,
+  TokensSoldEvent,
+  TokenState,
+  TradingHaltedEvent,
+} from "@/types";
 
 // import { FACTORY_ADDRESS } from "@/types";
-const FACTORY_ADDRESS = "0x4696af372b151E2fF611561B565C3A15b53850C4";
-
-type TokenCreatedEvent = {
-  tokenAddress: Hex;
-  name: string;
-  ticker: string;
-  creator: Hex;
-};
-
-type TokensPurchasedEvent = {
-  token: Hex;
-  buyer: Hex;
-  amount: bigint;
-  price: bigint;
-};
-
-type TokensSoldEvent = {
-  token: Hex;
-  seller: Hex;
-  tokenAmount: bigint;
-  ethAmount: bigint;
-};
-
-type TradingHaltedEvent = {
-  token: Hex;
-  collateral: bigint;
-};
+const FACTORY_ADDRESS = "0x56aec6B1D4Ea8Ee0B35B526e216aDd6e8268b1eA";
 
 const EVENTS = {
   TokenCreated: {
     abi: parseAbiItem(
-      "event TokenCreated(address indexed tokenAddress, string name, string ticker, string imageUrl, address creator, uint256 fundingGoal)"
+      "event TokenCreated(address indexed tokenAddress, string name, string symbol, string imageUrl, address creator, uint256 fundingGoal)"
     ),
     signature:
-      "0x04fd48c2f6f5e55655ccb9c8e74b3536d134d868106456d0fa24ee25acd5013a", // This will be the new signature
+      "0x72d6a46765aafdd4100a7143409417ecff26241bbeddd3f3ac10adcbd636b83b",
   },
 
   TokensPurchased: {
@@ -93,10 +74,12 @@ async function handleTokenCreated(
   console.log("\n=== TOKEN CREATION DETAILS ===");
   console.log("Token Address:", tokenAddress);
   console.log("Name:", args.name);
-  console.log("Symbol:", args.ticker);
+  console.log("Symbol:", args.symbol);
   console.log("Creator:", creatorAddress);
-  console.log("Block Number:", blockNumber);
+  console.log("Image URL:", args.imageUrl);
   console.log("Timestamp:", timestamp);
+  console.log("Block Number:", blockNumber);
+  console.log("Funding Goal:", formatEther(args.fundingGoal), "ETH");
   console.log("Transaction Hash:", transactionHash);
 
   try {
@@ -104,10 +87,12 @@ async function handleTokenCreated(
     await setDoc(doc(db, COLLECTIONS.TOKENS, tokenAddress), {
       address: tokenAddress,
       name: args.name,
-      symbol: args.ticker,
+      symbol: args.symbol,
+      imageUrl: args.imageUrl,
       creator: creatorAddress,
+      fundingGoal: formatEther(args.fundingGoal),
       createdAt: timestamp,
-      currentState: "TRADING",
+      currentState: TokenState.TRADING,
       collateral: "0",
       statistics: {
         totalSupply: "0",
@@ -122,9 +107,6 @@ async function handleTokenCreated(
     console.log("✅ Token document created in", COLLECTIONS.TOKENS);
 
     // Update user document
-    console.log(
-      "calling setDoc inside handleTokenCreated from /api/factory-monitor"
-    );
     await setDoc(
       doc(db, COLLECTIONS.USERS, creatorAddress),
       {
@@ -134,7 +116,9 @@ async function handleTokenCreated(
           {
             address: tokenAddress,
             name: args.name,
-            symbol: args.ticker,
+            symbol: args.symbol,
+            imageUrl: args.imageUrl,
+            fundingGoal: formatEther(args.fundingGoal),
             timestamp,
           },
         ],
@@ -153,6 +137,7 @@ async function handleTokenCreated(
   }
 }
 
+// Updated handleTokenTrade function with error handling
 async function handleTokenTrade(
   eventType: "buy" | "sell",
   token: string,
@@ -163,10 +148,30 @@ async function handleTokenTrade(
   blockNumber: number,
   transactionHash: string
 ) {
-  const formattedTokenAmount = formatEther(tokenAmount);
-  const formattedEthAmount = formatEther(ethAmount);
-  const pricePerToken =
-    Number(formattedEthAmount) / Number(formattedTokenAmount);
+  let formattedTokenAmount: string;
+  let formattedEthAmount: string;
+  let pricePerToken: number;
+
+  try {
+    formattedTokenAmount = formatEther(tokenAmount);
+    formattedEthAmount = formatEther(ethAmount);
+
+    // Add validation before division
+    const tokenAmountNum = Number(formattedTokenAmount);
+    if (tokenAmountNum === 0) {
+      throw new Error("Token amount cannot be zero");
+    }
+
+    pricePerToken = Number(formattedEthAmount) / tokenAmountNum;
+
+    // Validate the calculated price
+    if (!Number.isFinite(pricePerToken)) {
+      throw new Error("Invalid price calculation");
+    }
+  } catch (error: any) {
+    console.error("❌ Error processing amounts:", error);
+    throw new Error(`Failed to process trade amounts: ${error.message}`);
+  }
 
   console.log("\n=== TRADE DETAILS ===");
   console.log("Type:", eventType);
@@ -243,7 +248,7 @@ async function handleTradingHalted(
 
   try {
     await updateDoc(doc(db, COLLECTIONS.TOKENS, token.toLowerCase()), {
-      currentState: "GOAL_REACHED",
+      currentState: TokenState.GOAL_REACHED,
       finalCollateral: formattedCollateral,
       haltedAt: timestamp,
       haltBlock: blockNumber,

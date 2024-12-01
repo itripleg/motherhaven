@@ -1,11 +1,11 @@
 "use client";
 import { useState, useEffect } from "react";
 // import { CalendarComponent } from "./CalendarComponent";
-import Projection from "./projection";
-import { RecurringRevenueComponent } from "./RecurringRevenue";
-import { BalanceOverview } from "./BalanceOverview";
-import { Events } from "./Events";
-import { useGlobalFinance } from "@/contexts/GlobalFinanceContext";
+// import Projection from "./projection";
+// import { RecurringRevenueComponent } from "./RecurringRevenue";
+// import { BalanceOverview } from "./BalanceOverview";
+// import { Events } from "./Events";
+// import { useGlobalFinance } from "@/contexts/GlobalFinanceContext";
 import {
   NavigationMenu,
   NavigationMenuContent,

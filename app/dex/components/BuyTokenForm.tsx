@@ -9,7 +9,7 @@ import { Label } from "@/components/ui/label";
 import { useToast } from "@/hooks/use-toast";
 import { usePathname } from "next/navigation";
 import { AddressComponent } from "@/components/AddressComponent";
-import tokenFactoryABI from "@/contracts/token-factory/TokenFactory_abi.json";
+import { FACTORY_ABI } from "@/types";
 
 export function BuyTokenForm({ onAmountChange, maxAmount }: any) {
   const FACTORY_ADDRESS = "0x7713A39875A5335dc4Fc4f9359908afb55984b1F";
@@ -50,7 +50,7 @@ export function BuyTokenForm({ onAmountChange, maxAmount }: any) {
 
     try {
       writeContract({
-        abi: tokenFactoryABI,
+        abi: FACTORY_ABI,
         address: FACTORY_ADDRESS,
         functionName: "buy",
         args: [tokenAddress],

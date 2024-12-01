@@ -1,3 +1,21 @@
+# proper hook organization
+/hooks
+  /token
+    - useTokenList.ts      # renamed from useTokens - for listing tokens
+    - useTokenStats.ts     # for detailed token statistics
+    - useTokenTrading.ts   # renamed from useTokenDetails - for trading interface
+    - index.ts            # export all hooks
+
+# /hooks/token/index.ts
+export { useTokenList } from './useTokenList';
+export { useTokenStats } from './useTokenStats';
+export { useTokenTrading } from './useTokenTrading';
+
+# Usage in components:
+import { useTokenList } from '@/hooks/token';     # For token grid/lists
+import { useTokenStats } from '@/hooks/token';    # For token stats page
+import { useTokenTrading } from '@/hooks/token';  # For trading interface
+
 # proper debug info
 
 ==================================

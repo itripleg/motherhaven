@@ -1,20 +1,22 @@
 "use client";
+
 import { useState, useEffect } from "react";
 import { useParams } from "next/navigation";
-import { usePublicClient } from "wagmi";
 import { doc, getDoc } from "firebase/firestore";
 import { db } from "@/firebase";
-import { TokenData } from "@/types";
-import { getFormattedTokenData } from "@/utils/tokenUtils";
+import { TokenStats } from "@/components/TokenStats";
 import { useTokenStats } from "@/hooks/token/useTokenStats";
-import TokenPage from "../components/TokenPage";
+import { TokenData } from "@/types";
+import { usePublicClient } from "wagmi";
+import { getFormattedTokenData } from "@/utils/tokenUtils";
 
-export default function Page() {
+export default function TokenStatsPage() {
   const { tokenAddress } = useParams();
   const publicClient = usePublicClient();
   const [loading, setLoading] = useState(true);
   const [tokenData, setTokenData] = useState<TokenData | null>(null);
 
+  // Get real-time stats from our existing hook
   const {
     currentPrice,
     volumeETH,
@@ -26,6 +28,7 @@ export default function Page() {
     error: statsError,
   } = useTokenStats({ tokenAddress: tokenAddress as string });
 
+  // Fetch initial token data
   useEffect(() => {
     async function fetchTokenData() {
       if (!tokenAddress || !publicClient) return;
@@ -41,7 +44,7 @@ export default function Page() {
             data,
             {
               currentPrice,
-              volumeAVAX: volumeETH,
+              //   volumeETH,
               tradeCount,
               uniqueHolders,
               tokenState,
@@ -72,16 +75,7 @@ export default function Page() {
 
   if (!publicClient) return <div>Initializing...</div>;
   if (loading || statsLoading) {
-    return (
-      <TokenPage
-        loading
-        tokenData={null}
-        price={0}
-        tokenState={1}
-        isConnected={false}
-        address={String(tokenAddress)}
-      />
-    );
+    return <TokenStats loading data={null as any} />;
   }
 
   if (!tokenData) {
@@ -103,13 +97,13 @@ export default function Page() {
   }
 
   return (
-    <TokenPage
-      tokenData={tokenData}
-      price={Number(currentPrice || 0)}
-      tokenState={Number(tokenState)}
-      isConnected={false}
-      loading={false}
-      address={String(tokenAddress)}
-    />
+    <div className="container mx-auto p-4">
+      <div className="flex justify-between items-center mb-6">
+        <h1 className="text-2xl font-bold">
+          {tokenData.name} ({tokenData.symbol}) Stats
+        </h1>
+      </div>
+      <TokenStats data={tokenData} />
+    </div>
   );
 }

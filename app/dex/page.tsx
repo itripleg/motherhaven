@@ -1,50 +1,76 @@
+// app/dex/page.tsx
 "use client";
 
-import { useEffect, useState } from "react";
-import { useAccount, useConnect, useDisconnect } from "wagmi";
-import { Button } from "@/components/ui/button";
-import { useToast } from "@/hooks/use-toast";
-import AllTokensDisplay from "./components/AllTokensDisplay";
-import { ConnectButton } from "@/components/ConnectButton";
+import { useState, useEffect, useRef } from "react";
+import { Container } from "@/components/craft";
+import { useAccount } from "wagmi";
+import { getAddressGreeting } from "@/hooks/addressGreetings";
+import { SpaceScene } from "./scene/SpaceScene";
+import { SearchContainer } from "./components/SearchContainer";
+import { TokenContainer } from "./components/TokenContainer";
+import { Greeting } from "./components/Greeting";
+// import { useTokenData } from "@/hooks/useTokenData";
+import { Token } from "@/types";
+import { useTokenList } from "@/hooks/token/useTokenList";
 
-export default function Home() {
-  const { address, isConnected } = useAccount();
-  const { connect, connectors } = useConnect();
-  const { disconnect } = useDisconnect();
-  const { toast } = useToast();
-  const [isClient, setIsClient] = useState(false);
+export default function DexPage() {
+  const account = useAccount();
+  const cameraRef = useRef<any>(null);
+  const controlRef = useRef<any>(null);
+  const [showSecret, setShowSecret] = useState(false);
+  const [greeting, setGreeting] = useState("");
+  const [searchMode, setSearchMode] = useState("token");
+
+  const {
+    tokens,
+    filteredTokens,
+    // setFilteredTokens,
+    searchQuery,
+    setSearchQuery,
+    activeCategory,
+    setCategory,
+    // filterTokensByCategory,
+    isLoading,
+    error,
+  } = useTokenList();
+
+  const handleSecretFound = () => {
+    setShowSecret(true);
+    setTimeout(() => setShowSecret(false), 160000);
+  };
 
   useEffect(() => {
-    setIsClient(true);
-  }, []);
-
-  if (!isClient) return null;
-
-  const UserSection = () => (
-    <div className="flex items-center w-full gap-2 justify-between z-40">
-      <span className="text-sm text-muted-foreground">
-        Logged in as{" "}
-        {isConnected
-          ? `${address?.slice(0, 6)}...${address?.slice(-4)}`
-          : "Guest"}
-      </span>
-      {isConnected ? (
-        <Button size="sm" onClick={() => disconnect()}>
-          Disconnect
-        </Button>
-      ) : (
-        <ConnectButton />
-      )}
-    </div>
-  );
+    setGreeting(getAddressGreeting(account?.address));
+  }, [account?.address]);
 
   return (
-    <div className="container mx-auto pt-20 p-4">
-      <div className="flex justify-between items-center mb-4">
-        {/* Logged in user information and connect/disconnect button */}
-        <UserSection />
+    <Container className="">
+      <SpaceScene cameraRef={cameraRef} controlRef={controlRef} />
+      <div className="container mx-auto py-8 relative">
+        <Greeting greeting={greeting} showSecret={showSecret} />
+
+        <SearchContainer
+          searchMode={searchMode}
+          setSearchMode={setSearchMode}
+          cameraRef={cameraRef}
+          controlRef={controlRef}
+          searchQuery={searchQuery}
+          setSearchQuery={setSearchQuery}
+          setActiveCategory={setCategory}
+          onSecretFound={handleSecretFound}
+          showSecret={showSecret}
+        />
+
+        {!showSecret && (
+          <div>Token Container</div>
+          // <TokenContainer
+          //   tokens={filteredTokens}
+          //   onCategoryChange={filterTokensByCategory}
+          //   isLoading={isLoading}
+          //   error={error}
+          // />
+        )}
       </div>
-      <AllTokensDisplay />
-    </div>
+    </Container>
   );
 }

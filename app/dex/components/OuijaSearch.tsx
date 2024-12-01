@@ -2,7 +2,7 @@ import React, { useState } from "react";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 
-const OuijaSearch = ({ onOuijaInput }: any) => {
+export const OuijaSearch = ({ onOuijaInput }: any) => {
   const [inputValue, setInputValue] = useState("");
   const [lastKey, setLastKey] = useState("");
 
@@ -64,5 +64,3 @@ const OuijaSearch = ({ onOuijaInput }: any) => {
     </form>
   );
 };
-
-export default OuijaSearch;

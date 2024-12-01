@@ -1,12 +1,8 @@
 import { useReadContract } from "wagmi";
 import { formatUnits, parseUnits, Address } from "viem";
 import { useEffect } from "react";
-import {
-  FACTORY_ADDRESS,
-  FACTORY_ABI,
-  tokenEventEmitter,
-} from "../app/dex/components/EventWatcher";
-
+import { tokenEventEmitter } from "../../components/EventWatcher";
+import { FACTORY_ADDRESS, FACTORY_ABI } from "@/types";
 // Configuration for data staleness and garbage collection
 const CONFIG = {
   // How often data should be refetched

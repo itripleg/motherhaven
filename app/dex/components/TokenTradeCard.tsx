@@ -8,7 +8,7 @@ import { BuyTokenForm } from "./BuyTokenForm";
 import { SellTokenForm } from "./SellTokenForm";
 import { TokenData } from "@/types";
 import { useConnect, useBalance, useAccount } from "wagmi";
-import { tokenEventEmitter } from "./EventWatcher";
+import { tokenEventEmitter } from "../../../components/EventWatcher";
 
 interface TokenTradeCardProps {
   tokenData: TokenData;

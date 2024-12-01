@@ -63,18 +63,13 @@
       },
       {
         "internalType": "string",
-        "name": "ticker",
+        "name": "symbol",
         "type": "string"
       },
       {
         "internalType": "string",
         "name": "imageUrl",
         "type": "string"
-      },
-      {
-        "internalType": "uint256",
-        "name": "customFundingGoal",
-        "type": "uint256"
       }
     ],
     "name": "createToken",
@@ -389,7 +384,7 @@
       {
         "indexed": false,
         "internalType": "string",
-        "name": "ticker",
+        "name": "symbol",
         "type": "string"
       },
       {
@@ -894,7 +889,7 @@
       },
       {
         "internalType": "string",
-        "name": "ticker",
+        "name": "symbol",
         "type": "string"
       },
       {
@@ -1108,7 +1103,7 @@
       },
       {
         "internalType": "string",
-        "name": "ticker",
+        "name": "symbol",
         "type": "string"
       },
       {

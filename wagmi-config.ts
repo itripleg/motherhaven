@@ -12,6 +12,7 @@ const avalancheFujiTransport = {
   //     "https://avax-mainnet.g.alchemy.com/v2/7NBTdVMFlqXaf5D-r-0kb73aehWeZ1Aj"
   //   ),
   // };
+  // TODO: use .env
   // Alchemy Fuji
   43113: http(
     "https://avax-fuji.g.alchemy.com/v2/7NBTdVMFlqXaf5D-r-0kb73aehWeZ1Aj"
