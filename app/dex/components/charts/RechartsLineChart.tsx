@@ -1,18 +1,18 @@
 "use client";
-import React, { useMemo } from "react";
+import React, { useMemo, useEffect, useState } from "react";
 import {
-  ComposedChart,
-  Bar,
+  LineChart,
+  Line,
   XAxis,
   YAxis,
   CartesianGrid,
   Tooltip,
   ResponsiveContainer,
-  Line,
 } from "recharts";
 import { format } from "date-fns";
+import { tokenEventEmitter } from "@/components/EventWatcher";
 
-interface TokenPriceChartProps {
+interface RechartsChartProps {
   trades: Array<{
     pricePerToken: string;
     timestamp: string;
@@ -23,84 +23,136 @@ interface TokenPriceChartProps {
   loading: boolean;
   currentPrice?: string;
   tokenSymbol?: string;
+  tokenAddress?: string;
 }
 
-interface CandleData {
-  timestamp: number;
-  open: number;
-  high: number;
-  low: number;
-  close: number;
-  volume: number;
-}
-
-const TokenPriceChart = ({
-  trades,
+const RechartsChart = ({
+  trades: initialTrades,
   loading,
   currentPrice,
   tokenSymbol,
-}: TokenPriceChartProps) => {
-  // Function to group trades into candles
-  const groupTradesIntoCandles = (
-    trades: TokenPriceChartProps["trades"],
-    intervalMinutes: number = 15
-  ) => {
-    const candleMap = new Map<number, CandleData>();
+  tokenAddress,
+}: RechartsChartProps) => {
+  // State to hold live trades
+  const [liveTrades, setLiveTrades] = useState<typeof initialTrades>([]);
 
-    trades.forEach((trade) => {
-      const timestamp = new Date(trade.timestamp).getTime();
-      const interval = intervalMinutes * 60 * 1000;
-      const candleTimestamp = Math.floor(timestamp / interval) * interval;
-      const price = parseFloat(trade.pricePerToken);
-      const volume = parseFloat(trade.ethAmount) / 1e18; // Convert from wei to ETH
+  // Combine initial and live trades
+  const allTrades = useMemo(
+    () => [...initialTrades, ...liveTrades],
+    [initialTrades, liveTrades]
+  );
 
-      if (!candleMap.has(candleTimestamp)) {
-        candleMap.set(candleTimestamp, {
-          timestamp: candleTimestamp,
-          open: price,
-          high: price,
-          low: price,
-          close: price,
-          volume: volume,
-        });
-      } else {
-        const candle = candleMap.get(candleTimestamp)!;
-        candle.high = Math.max(candle.high, price);
-        candle.low = Math.min(candle.low, price);
-        candle.close = price;
-        candle.volume += volume;
+  useEffect(() => {
+    if (!tokenAddress) return;
+
+    const handleTokenEvent = (event: {
+      eventName: string;
+      data: {
+        pricePerToken: bigint | number;
+        ethAmount: bigint | number;
+        tokenAmount: bigint | number;
+      };
+    }) => {
+      if (
+        event.eventName === "TokensPurchased" ||
+        event.eventName === "TokensSold"
+      ) {
+        const newTrade = {
+          pricePerToken: event.data.pricePerToken.toString(),
+          timestamp: new Date().toISOString(),
+          type:
+            event.eventName === "TokensPurchased"
+              ? ("buy" as const)
+              : ("sell" as const),
+          ethAmount: event.data.ethAmount.toString(),
+          tokenAmount: event.data.tokenAmount.toString(),
+        };
+
+        setLiveTrades((prev) => [...prev, newTrade]);
       }
-    });
+    };
 
-    return Array.from(candleMap.values()).sort(
-      (a, b) => a.timestamp - b.timestamp
+    const normalizedAddress = tokenAddress.toLowerCase();
+
+    // Subscribe to events for this token
+    tokenEventEmitter.addEventListener(normalizedAddress, handleTokenEvent);
+
+    return () => {
+      // Cleanup subscription
+      tokenEventEmitter.removeEventListener(
+        normalizedAddress,
+        handleTokenEvent
+      );
+    };
+  }, [tokenAddress]);
+
+  // Memoize chart data calculation
+  const chartData = useMemo(() => {
+    const data = [
+      // Add all trades (both initial and live)
+      ...allTrades.map((trade) => ({
+        time: new Date(trade.timestamp).getTime(),
+        price: parseFloat(trade.pricePerToken),
+        volume: parseFloat(trade.ethAmount) / 1e18,
+        type: trade.type,
+      })),
+      // Add current price if different from last trade
+      ...(currentPrice &&
+      allTrades.length > 0 &&
+      parseFloat(currentPrice) !== parseFloat(allTrades[0].pricePerToken)
+        ? [
+            {
+              time: Date.now(),
+              price: parseFloat(currentPrice),
+              volume: 0,
+              type: "current",
+            },
+          ]
+        : []),
+    ].sort((a, b) => a.time - b.time);
+
+    return data;
+  }, [allTrades, currentPrice]);
+
+  const CustomDot = (props: any) => {
+    const { cx, cy, payload, index } = props;
+
+    const colors = {
+      buy: "#10b981",
+      sell: "#ef4444",
+      current: "#3b82f6",
+    };
+
+    return (
+      <circle
+        key={`dot-${index}`}
+        cx={cx}
+        cy={cy}
+        r={4}
+        fill={colors[payload.type as keyof typeof colors] || "#10b981"}
+      />
     );
   };
 
-  // Memoize candle data calculation
-  const candleData = useMemo(() => groupTradesIntoCandles(trades), [trades]);
-
+  // Rest of your component remains the same...
   const CustomTooltip = ({ active, payload, label }: any) => {
     if (active && payload && payload.length) {
+      const data = payload[0].payload;
       return (
         <div className="bg-background/80 backdrop-blur-sm border rounded-lg p-2 shadow-lg">
           <p className="text-sm font-medium">
             {format(new Date(label), "MMM dd yyyy HH:mm")}
           </p>
           <p className="text-sm text-primary">
-            Open: {payload[0]?.value.toFixed(12)} ETH
+            Price: {data.price.toFixed(12)} ETH
           </p>
-          <p className="text-sm text-primary">
-            High: {payload[1]?.value.toFixed(12)} ETH
-          </p>
-          <p className="text-sm text-primary">
-            Low: {payload[2]?.value.toFixed(12)} ETH
-          </p>
-          <p className="text-sm text-primary">
-            Close: {payload[3]?.value.toFixed(12)} ETH
-          </p>
-          <p className="text-sm text-primary">
-            Volume: {payload[4]?.value.toFixed(4)} ETH
+          {data.type !== "current" && (
+            <p className="text-sm text-primary">
+              Volume: {data.volume.toFixed(4)} ETH
+            </p>
+          )}
+          <p className="text-xs text-muted-foreground capitalize">
+            Type: {data.type}
           </p>
         </div>
       );
@@ -116,7 +168,7 @@ const TokenPriceChart = ({
     );
   }
 
-  if (trades.length === 0) {
+  if (allTrades.length === 0) {
     return (
       <div className="flex items-center justify-center h-full text-sm text-muted-foreground">
         No trades found for this token
@@ -125,9 +177,9 @@ const TokenPriceChart = ({
   }
 
   // Calculate price range for better scaling
-  const allPrices = candleData.flatMap((d) => [d.open, d.high, d.low, d.close]);
-  const minPrice = Math.min(...allPrices);
-  const maxPrice = Math.max(...allPrices);
+  const prices = chartData.map((d) => d.price);
+  const minPrice = Math.min(...prices);
+  const maxPrice = Math.max(...prices);
   const priceDiff = maxPrice - minPrice;
   const yDomain = [
     Math.max(0, minPrice - priceDiff * 0.1),
@@ -140,75 +192,44 @@ const TokenPriceChart = ({
         {tokenSymbol ? `${tokenSymbol}/ETH` : "Price Chart"}
       </div>
       <ResponsiveContainer width="100%" height="100%">
-        <ComposedChart
-          data={candleData}
+        <LineChart
+          data={chartData}
           margin={{ top: 40, right: 30, left: 0, bottom: 0 }}
         >
           <CartesianGrid strokeDasharray="3 3" stroke="#2f3540" />
           <XAxis
-            dataKey="timestamp"
-            scale="time"
+            dataKey="time"
+            stroke="#6b7280"
+            tick={{ fill: "#6b7280" }}
+            tickFormatter={(value) => {
+              const date = new Date(value);
+              return `${date.getHours()}:${String(date.getMinutes()).padStart(
+                2,
+                "0"
+              )}`;
+            }}
             type="number"
             domain={["dataMin", "dataMax"]}
-            tickFormatter={(value) => format(new Date(value), "HH:mm")}
-            stroke="#6b7280"
           />
           <YAxis
-            yAxisId="price"
+            stroke="#6b7280"
+            tick={{ fill: "#6b7280" }}
             domain={yDomain}
             tickFormatter={(value) => value.toFixed(12)}
-            stroke="#6b7280"
-          />
-          <YAxis
-            yAxisId="volume"
-            orientation="right"
-            tickFormatter={(value) => `${value.toFixed(4)} ETH`}
-            stroke="#6b7280"
+            tickCount={5}
           />
           <Tooltip content={<CustomTooltip />} />
-
-          {/* Volume bars */}
-          <Bar
-            dataKey="volume"
-            yAxisId="volume"
-            fill="#3b82f6"
-            opacity={0.3}
-            barSize={20}
-          />
-
-          {/* Candlestick components */}
           <Line
-            type="step"
-            dataKey="high"
-            stroke="#22c55e"
-            dot={false}
-            yAxisId="price"
-          />
-          <Line
-            type="step"
-            dataKey="low"
-            stroke="#ef4444"
-            dot={false}
-            yAxisId="price"
-          />
-          <Line
-            type="step"
-            dataKey="open"
+            type="monotone"
+            dataKey="price"
             stroke="#10b981"
-            dot={false}
-            yAxisId="price"
+            strokeWidth={2}
+            dot={CustomDot}
           />
-          <Line
-            type="step"
-            dataKey="close"
-            stroke="#3b82f6"
-            dot={false}
-            yAxisId="price"
-          />
-        </ComposedChart>
+        </LineChart>
       </ResponsiveContainer>
     </div>
   );
 };
 
-export default TokenPriceChart;
+export default RechartsChart;

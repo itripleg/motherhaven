@@ -97,30 +97,33 @@ export function BuyTokenForm({ onAmountChange, maxAmount }: any) {
       }
     }
   }, [receipt, hasHandledReceipt, amount, toast]);
+
   return (
     <>
       <form onSubmit={handleSubmit}>
         <div className="grid w-full items-center gap-4">
           <div className="flex flex-col space-y-1.5">
-            <Label htmlFor="amount">Amount (AVAX)</Label>
-            <span
-              className="absolute right-3 top-1/2 -translate-y-1/2 text-sm text-muted-foreground cursor-pointer hover:text-primary"
-              onClick={() => {
-                const input = document.querySelector(
-                  'input[type="number"]'
-                ) as HTMLInputElement;
-                input.value = maxAmount;
-                onAmountChange(maxAmount);
-              }}
-            >
-              Max
-            </span>
+            <div className="flex justify-between items-center">
+              <Label htmlFor="amount">Amount (AVAX)</Label>
+              <span
+                className="text-sm text-muted-foreground cursor-pointer hover:text-primary"
+                onClick={() => {
+                  setAmount(maxAmount);
+                  onAmountChange(maxAmount);
+                }}
+              >
+                Max
+              </span>
+            </div>
             <Input
               id="amount"
               onScroll={(e) => e.stopPropagation()}
               type="number"
               value={amount}
-              onChange={(e) => setAmount(e.target.value)}
+              onChange={(e) => {
+                setAmount(e.target.value);
+                onAmountChange(e.target.value);
+              }}
               onWheel={(e) => e.currentTarget.blur()}
               className="text-center pr-2 dark:bg-black/80"
             />
@@ -128,23 +131,25 @@ export function BuyTokenForm({ onAmountChange, maxAmount }: any) {
         </div>
         <Button
           type="submit"
-          className="mt-4"
+          className="mt-4 w-full"
           disabled={isPending || !tokenAddress}
         >
           {isPending ? "Processing..." : "Buy Tokens"}
         </Button>
 
-        {isConfirming && <div>Waiting for confirmation...</div>}
+        {isConfirming && (
+          <div className="mt-2 text-center">Waiting for confirmation...</div>
+        )}
         {receiptDetails.tokensReceived && (
           <div className="mt-4">
-            <p>Transaction Receipt:</p>
-            <ul>
+            <p className="font-semibold">Transaction Receipt:</p>
+            <ul className="mt-2 space-y-1">
               <li>Price Paid: {receiptDetails.pricePaid} AVAX</li>
               <li>
                 Tokens Received:{" "}
                 {(Number(receiptDetails.tokensReceived) / 1e18).toFixed(2)}
               </li>
-              <li className="flex justify-center items-center">
+              <li className="flex items-center">
                 Transaction:{" "}
                 <AddressComponent hash={`${transactionData}`} type="tx" />
               </li>

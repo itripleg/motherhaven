@@ -1,3 +1,4 @@
+// /utils/tokenUtils.tsx
 import { getContract } from "viem";
 import { formatEther, type PublicClient } from "viem";
 import { TokenData, TokenState } from "@/types";
