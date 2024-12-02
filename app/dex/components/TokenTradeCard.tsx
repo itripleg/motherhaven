@@ -8,7 +8,7 @@ import { BuyTokenForm } from "./BuyTokenForm";
 import { SellTokenForm } from "./SellTokenForm";
 import { TokenData } from "@/types";
 import { useConnect, useBalance, useAccount } from "wagmi";
-import { tokenEventEmitter } from "../../../components/EventWatcher";
+import { tokenEventEmitter } from "@/components/EventWatcher";
 
 interface TokenTradeCardProps {
   tokenData: TokenData;
@@ -22,10 +22,13 @@ interface TradeEstimation {
 
 export function TokenTradeCard({
   tokenData,
-  isConnected,
+  isConnected: isConnectedProp, // rename to avoid confusion
 }: TokenTradeCardProps) {
   const { connect, connectors } = useConnect();
-  const { address } = useAccount();
+  const { address, isConnected } = useAccount(); // Add isConnected from useAccount
+
+  // Use either prop or wagmi's isConnected
+  const effectivelyConnected = isConnected || isConnectedProp;
 
   // State
   const [tradeEstimation, setTradeEstimation] = useState<TradeEstimation>({

@@ -13,7 +13,7 @@ interface SearchContainerProps {
   cameraRef: React.RefObject<any>;
   controlRef: React.RefObject<any>;
   searchQuery: string;
-  setSearchQuery: (query: string) => void;
+  setSearchQuery: (query: TokenPriceCategory) => void;
   setActiveCategory: (category: TokenPriceCategory) => void;
   onSecretFound: () => void;
   showSecret: boolean;
@@ -90,12 +90,12 @@ export const SearchContainer = ({
       ) : searchMode === "ouija" ? (
         <OuijaSearch onOuijaInput={handleOuijaInput} />
       ) : (
-        <div>Token Search</div>
-        // <TokenSearch
-        //   searchQuery={searchQuery}
-        //   setSearchQuery={setSearchQuery}
-        //   setActiveCategory={setActiveCategory}
-        // />
+        // <div>Token Search</div>
+        <TokenSearch
+          searchQuery={searchQuery}
+          setSearchQuery={setSearchQuery}
+          setActiveCategory={setActiveCategory}
+        />
       )}
     </div>
   );

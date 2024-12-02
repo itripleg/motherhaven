@@ -1,3 +1,4 @@
+// /utils/tokenUtils.tsx
 import { getContract } from "viem";
 import { formatEther, type PublicClient } from "viem";
 import { TokenData, TokenState } from "@/types";
@@ -38,7 +39,7 @@ interface RealTimeStats {
   volumeAVAX?: string;
   tradeCount?: number;
   uniqueHolders?: number;
-  tokenState?: TokenState;
+  tokenState: TokenState;
   collateral?: string;
 }
 

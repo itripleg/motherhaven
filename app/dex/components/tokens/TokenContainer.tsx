@@ -1,6 +1,6 @@
 import { useState } from "react";
-import { TokenTabs } from "./tokens/TokenTabs";
-import { TokenGrid } from "./tokens/TokenGrid";
+import { TokenTabs } from "./TokenTabs";
+import { TokenGrid } from "./TokenGrid";
 import { useTokenList } from "@/hooks/token/useTokenList";
 import { Token } from "@/types";
 

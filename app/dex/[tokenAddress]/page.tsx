@@ -4,7 +4,7 @@ import { useParams } from "next/navigation";
 import { usePublicClient } from "wagmi";
 import { doc, getDoc } from "firebase/firestore";
 import { db } from "@/firebase";
-import { TokenData } from "@/types";
+import { TokenData, TokenState } from "@/types";
 import { getFormattedTokenData } from "@/utils/tokenUtils";
 import { useTokenStats } from "@/hooks/token/useTokenStats";
 import TokenPage from "../components/TokenPage";
@@ -36,6 +36,7 @@ export default function Page() {
 
         if (tokenDoc.exists()) {
           const data = tokenDoc.data();
+          console.log("This is the tokenDoc.data : ", data); //this has the correct currentState!
           const formattedData = await getFormattedTokenData(
             tokenAddress as string,
             data,
@@ -50,6 +51,10 @@ export default function Page() {
             publicClient
           );
           setTokenData(formattedData);
+          console.log(
+            "This is the formatted data being called from the [tokenAddress]/page.tsx getFormattedTokenData function : ",
+            formattedData
+          ); // this is returning the wrong currentState for the token - it's not matching what's in the firestore!
         }
       } catch (error) {
         console.error("Error fetching token data:", error);
@@ -77,7 +82,7 @@ export default function Page() {
         loading
         tokenData={null}
         price={0}
-        tokenState={1}
+        tokenState={tokenState}
         isConnected={false}
         address={String(tokenAddress)}
       />
@@ -106,7 +111,7 @@ export default function Page() {
     <TokenPage
       tokenData={tokenData}
       price={Number(currentPrice || 0)}
-      tokenState={Number(tokenState)}
+      tokenState={tokenState}
       isConnected={false}
       loading={false}
       address={String(tokenAddress)}

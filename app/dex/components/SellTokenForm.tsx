@@ -9,11 +9,15 @@ import { Label } from "@/components/ui/label";
 import { useToast } from "@/hooks/use-toast";
 import { usePathname } from "next/navigation";
 import { AddressComponent } from "@/components/AddressComponent";
-import { FACTORY_ABI } from "@/types";
+import { FACTORY_ABI, FACTORY_ADDRESS } from "@/types";
 
-export function SellTokenForm() {
-  const FACTORY_ADDRESS = "0x7713A39875A5335dc4Fc4f9359908afb55984b1F";
-
+export function SellTokenForm({
+  onAmountChange,
+  maxAmount,
+}: {
+  onAmountChange?: (amount: string) => void;
+  maxAmount?: string;
+}) {
   const pathname = usePathname();
   const tokenAddress = pathname.split("/").pop() || "";
 
@@ -69,6 +73,11 @@ export function SellTokenForm() {
     }
   };
 
+  const handleAmountChange = (value: string) => {
+    setAmount(value);
+    onAmountChange?.(value);
+  };
+
   const [hasHandledReceipt, setHasHandledReceipt] = useState(false);
   useEffect(() => {
     if (receipt && !hasHandledReceipt) {
@@ -102,12 +111,25 @@ export function SellTokenForm() {
     <form onSubmit={handleSubmit}>
       <div className="grid w-full items-center gap-4">
         <div className="flex flex-col space-y-1.5">
-          <Label htmlFor="amount">Amount (Tokens)</Label>
+          <div className="flex justify-between items-center">
+            <Label htmlFor="amount">Amount (Tokens)</Label>
+            <span
+              className="text-sm text-muted-foreground cursor-pointer hover:text-primary"
+              onClick={() => {
+                if (maxAmount) {
+                  setAmount(maxAmount);
+                  onAmountChange?.(maxAmount);
+                }
+              }}
+            >
+              Max
+            </span>
+          </div>
           <Input
             id="amount"
             type="number"
             value={amount}
-            onChange={(e) => setAmount(e.target.value)}
+            onChange={(e) => handleAmountChange(e.target.value)}
             onWheel={(e) => e.currentTarget.blur()}
             className="text-center pr-2 dark:bg-black/80"
           />
@@ -115,20 +137,22 @@ export function SellTokenForm() {
       </div>
       <Button
         type="submit"
-        className="mt-4"
+        className="mt-4 w-full"
         disabled={isPending || !tokenAddress}
       >
         {isPending ? "Processing..." : "Sell Tokens"}
       </Button>
 
-      {isConfirming && <div>Waiting for confirmation...</div>}
+      {isConfirming && (
+        <div className="mt-2 text-center">Waiting for confirmation...</div>
+      )}
       {receiptDetails.tokensSold && (
         <div className="mt-4">
-          <p>Transaction Receipt:</p>
-          <ul>
+          <p className="font-semibold">Transaction Receipt:</p>
+          <ul className="mt-2 space-y-1">
             <li>Tokens Sold: {receiptDetails.tokensSold}</li>
             <li>AVAX Received: {receiptDetails.avaxReceived} AVAX</li>
-            <li className="flex justify-center items-center">
+            <li className="flex items-center">
               Transaction:{" "}
               <AddressComponent hash={`${transactionData}`} type="tx" />
             </li>

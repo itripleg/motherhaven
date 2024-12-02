@@ -1,5 +1,5 @@
 "use client";
-import React, { useMemo } from "react";
+import React, { useMemo, useEffect, useState } from "react";
 import {
   LineChart,
   Line,
@@ -10,6 +10,7 @@ import {
   ResponsiveContainer,
 } from "recharts";
 import { format } from "date-fns";
+import { tokenEventEmitter } from "@/components/EventWatcher";
 
 interface RechartsChartProps {
   trades: Array<{
@@ -22,28 +23,83 @@ interface RechartsChartProps {
   loading: boolean;
   currentPrice?: string;
   tokenSymbol?: string;
+  tokenAddress?: string;
 }
 
 const RechartsChart = ({
-  trades,
+  trades: initialTrades,
   loading,
   currentPrice,
   tokenSymbol,
+  tokenAddress,
 }: RechartsChartProps) => {
+  // State to hold live trades
+  const [liveTrades, setLiveTrades] = useState<typeof initialTrades>([]);
+
+  // Combine initial and live trades
+  const allTrades = useMemo(
+    () => [...initialTrades, ...liveTrades],
+    [initialTrades, liveTrades]
+  );
+
+  useEffect(() => {
+    if (!tokenAddress) return;
+
+    const handleTokenEvent = (event: {
+      eventName: string;
+      data: {
+        pricePerToken: bigint | number;
+        ethAmount: bigint | number;
+        tokenAmount: bigint | number;
+      };
+    }) => {
+      if (
+        event.eventName === "TokensPurchased" ||
+        event.eventName === "TokensSold"
+      ) {
+        const newTrade = {
+          pricePerToken: event.data.pricePerToken.toString(),
+          timestamp: new Date().toISOString(),
+          type:
+            event.eventName === "TokensPurchased"
+              ? ("buy" as const)
+              : ("sell" as const),
+          ethAmount: event.data.ethAmount.toString(),
+          tokenAmount: event.data.tokenAmount.toString(),
+        };
+
+        setLiveTrades((prev) => [...prev, newTrade]);
+      }
+    };
+
+    const normalizedAddress = tokenAddress.toLowerCase();
+
+    // Subscribe to events for this token
+    tokenEventEmitter.addEventListener(normalizedAddress, handleTokenEvent);
+
+    return () => {
+      // Cleanup subscription
+      tokenEventEmitter.removeEventListener(
+        normalizedAddress,
+        handleTokenEvent
+      );
+    };
+  }, [tokenAddress]);
+
   // Memoize chart data calculation
   const chartData = useMemo(() => {
     const data = [
-      // Add all historical trades
-      ...trades.map((trade) => ({
+      // Add all trades (both initial and live)
+      ...allTrades.map((trade) => ({
         time: new Date(trade.timestamp).getTime(),
         price: parseFloat(trade.pricePerToken),
-        volume: parseFloat(trade.ethAmount) / 1e18, // Convert from wei to ETH
+        volume: parseFloat(trade.ethAmount) / 1e18,
         type: trade.type,
       })),
-      // Add current price as the latest point if different from last trade
+      // Add current price if different from last trade
       ...(currentPrice &&
-      trades.length > 0 &&
-      parseFloat(currentPrice) !== parseFloat(trades[0].pricePerToken)
+      allTrades.length > 0 &&
+      parseFloat(currentPrice) !== parseFloat(allTrades[0].pricePerToken)
         ? [
             {
               time: Date.now(),
@@ -56,8 +112,29 @@ const RechartsChart = ({
     ].sort((a, b) => a.time - b.time);
 
     return data;
-  }, [trades, currentPrice]);
+  }, [allTrades, currentPrice]);
 
+  const CustomDot = (props: any) => {
+    const { cx, cy, payload, index } = props;
+
+    const colors = {
+      buy: "#10b981",
+      sell: "#ef4444",
+      current: "#3b82f6",
+    };
+
+    return (
+      <circle
+        key={`dot-${index}`}
+        cx={cx}
+        cy={cy}
+        r={4}
+        fill={colors[payload.type as keyof typeof colors] || "#10b981"}
+      />
+    );
+  };
+
+  // Rest of your component remains the same...
   const CustomTooltip = ({ active, payload, label }: any) => {
     if (active && payload && payload.length) {
       const data = payload[0].payload;
@@ -91,7 +168,7 @@ const RechartsChart = ({
     );
   }
 
-  if (trades.length === 0) {
+  if (allTrades.length === 0) {
     return (
       <div className="flex items-center justify-center h-full text-sm text-muted-foreground">
         No trades found for this token
@@ -134,7 +211,6 @@ const RechartsChart = ({
             type="number"
             domain={["dataMin", "dataMax"]}
           />
-
           <YAxis
             stroke="#6b7280"
             tick={{ fill: "#6b7280" }}
@@ -148,24 +224,7 @@ const RechartsChart = ({
             dataKey="price"
             stroke="#10b981"
             strokeWidth={2}
-            dot={(props) => {
-              const { payload } = props;
-              // Customize dots based on trade type
-              const colors = {
-                buy: "#10b981",
-                sell: "#ef4444",
-                current: "#3b82f6",
-              };
-              return (
-                <circle
-                  {...props}
-                  fill={
-                    colors[payload.type as keyof typeof colors] || "#10b981"
-                  }
-                  r={4}
-                />
-              );
-            }}
+            dot={CustomDot}
           />
         </LineChart>
       </ResponsiveContainer>
