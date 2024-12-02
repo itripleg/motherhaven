@@ -7,7 +7,7 @@ import { useAccount } from "wagmi";
 import { getAddressGreeting } from "@/hooks/addressGreetings";
 import { SpaceScene } from "./scene/SpaceScene";
 import { SearchContainer } from "./components/SearchContainer";
-import { TokenContainer } from "./components/TokenContainer";
+import { TokenContainer } from "./components/tokens/TokenContainer";
 import { Greeting } from "./components/Greeting";
 // import { useTokenData } from "@/hooks/useTokenData";
 import { Token } from "@/types";
@@ -62,13 +62,13 @@ export default function DexPage() {
         />
 
         {!showSecret && (
-          <div>Token Container</div>
-          // <TokenContainer
-          //   tokens={filteredTokens}
-          //   onCategoryChange={filterTokensByCategory}
-          //   isLoading={isLoading}
-          //   error={error}
-          // />
+          // <div>Token Container</div>
+          <TokenContainer
+            tokens={filteredTokens}
+            // onCategoryChange={filterTokensByCategory}
+            isLoading={isLoading}
+            error={error}
+          />
         )}
       </div>
     </Container>

@@ -32,17 +32,12 @@ export function TokenHeader({
       case TokenState.TRADING:
         return {
           text: "Trading",
-          color: "bg-green-500/80",
-        };
-      case TokenState.GOAL_REACHED:
-        return {
-          text: "Goal Reached",
-          color: "bg-blue-500/80",
+          color: "bg-green-600/70",
         };
       case TokenState.HALTED:
         return {
-          text: "Halted",
-          color: "bg-yellow-500/80",
+          text: "Goal Reached", // Using "Goal Reached" as the display text since that's currently the only way to halt
+          color: "bg-blue-500/80",
         };
       default:
         return {
@@ -53,7 +48,7 @@ export function TokenHeader({
   };
 
   const stateDisplay = getTokenStateDisplay(tokenState);
-
+  console.log("Token data, is there state?", tokenData);
   return (
     <Card className="relative overflow-hidden min-h-[300px]">
       {/* Background Image Layer */}
@@ -114,7 +109,7 @@ export function TokenHeader({
                   <Label className="text-gray-200">Trading Volume</Label>
                   <p className="text-white text-lg font-semibold">
                     {tokenData.statistics.volumeETH}{" "}
-                    <span className="text-gray-300">ETH</span>
+                    <span className="text-gray-300">AVAX</span>
                   </p>
                 </div>
               </div>

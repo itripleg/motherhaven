@@ -6,7 +6,7 @@
     - useTokenTrading.ts   # renamed from useTokenDetails - for trading interface
     - index.ts            # export all hooks
 
-# /hooks/token/index.ts
+# /hooks/token/index.ts 
 export { useTokenList } from './useTokenList';
 export { useTokenStats } from './useTokenStats';
 export { useTokenTrading } from './useTokenTrading';

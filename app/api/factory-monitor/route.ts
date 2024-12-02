@@ -248,7 +248,7 @@ async function handleTradingHalted(
 
   try {
     await updateDoc(doc(db, COLLECTIONS.TOKENS, token.toLowerCase()), {
-      currentState: TokenState.GOAL_REACHED,
+      currentState: TokenState.HALTED,
       finalCollateral: formattedCollateral,
       haltedAt: timestamp,
       haltBlock: blockNumber,

@@ -1,7 +1,6 @@
 // /types/enums.ts
 export enum TokenState {
-  NOT_CREATED = "NOT_CREATED",
-  TRADING = "TRADING",
-  GOAL_REACHED = "GOAL_REACHED",
-  HALTED = "HALTED",
+  NOT_CREATED = 0,
+  TRADING = 1,
+  HALTED = 2, // Single state for when goal is reached/trading halted
 }

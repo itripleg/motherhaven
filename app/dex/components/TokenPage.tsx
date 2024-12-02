@@ -6,7 +6,7 @@ import { ChatComponent } from "./ChatComponent";
 import { Sheet, SheetContent, SheetTrigger } from "@/components/ui/sheet";
 import { Button } from "@/components/ui/button";
 import { MessageCircle } from "lucide-react";
-import { TokenData } from "@/types";
+import { TokenData, TokenState } from "@/types";
 import { ConnectButton } from "@/components/ConnectButton";
 import { useDisconnect } from "wagmi";
 import BondingCurve from "@/components/bonding-curve";
@@ -14,7 +14,7 @@ import BondingCurve from "@/components/bonding-curve";
 interface TokenPageProps {
   tokenData: TokenData | null;
   price: number;
-  tokenState: number;
+  tokenState: TokenState;
   isConnected: boolean;
   loading: boolean;
   address?: string;
@@ -49,12 +49,12 @@ export default function TokenPage({
           {/* Charts Section */}
           <div className="grid grid-cols-1 xl:grid-cols-2 gap-6 ">
             <div className="xl:col-span-2">
-              Token Header
-              {/* <TokenHeader
+              {/* Token Header */}
+              <TokenHeader
                 tokenData={tokenData}
                 price={price}
                 tokenState={tokenState}
-              /> */}
+              />
             </div>
             <div className="xl:col-span-2">
               <TokenPriceCharts tokenData={tokenData} price={price} />

@@ -1,7 +1,7 @@
 "use client";
 import React, { useEffect, useState } from "react";
 import { Card } from "@/components/ui/card";
-import TokenPriceChart from "./charts/TokenPriceChart";
+import TokenPriceChart from "./charts/RechartsLineChart";
 import RechartsChart from "./charts/RechartsChart";
 import { TokenData } from "@/types";
 import { collection, query, where, orderBy, getDocs } from "firebase/firestore";

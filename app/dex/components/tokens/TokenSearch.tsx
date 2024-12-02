@@ -4,11 +4,12 @@ import { Button } from "@/components/ui/button";
 import { motion } from "framer-motion";
 import { useRouter } from "next/navigation";
 import { isAddress } from "viem";
+import { TokenPriceCategory } from "@/hooks/token/useTokenList";
 
 interface TokenSearchProps {
   searchQuery: string;
-  setSearchQuery: (query: string) => void;
-  setActiveCategory: (category: string) => void;
+  setSearchQuery: (query: TokenPriceCategory) => void;
+  setActiveCategory: (category: TokenPriceCategory) => void;
 }
 
 export const TokenSearch = ({
@@ -23,7 +24,7 @@ export const TokenSearch = ({
     if (isAddress(searchQuery)) {
       router.push(`/factory/${searchQuery}`);
     } else {
-      setActiveCategory("all");
+      setActiveCategory("all" as TokenPriceCategory);
     }
   };
 
@@ -38,7 +39,7 @@ export const TokenSearch = ({
       <Input
         type="text"
         value={searchQuery}
-        onChange={(e) => setSearchQuery(e.target.value)}
+        onChange={(e) => setSearchQuery(e.target.value as TokenPriceCategory)}
         placeholder="Name, symbol, or address"
         className="flex-grow z-40 bg-white/15 dark:text-white dark:ring-white/40 ring-1"
       />

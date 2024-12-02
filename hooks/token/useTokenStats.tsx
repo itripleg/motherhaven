@@ -1,4 +1,4 @@
-//useTokenStats.tsx
+// /hooks/token/useTokenStats.tsx
 import { useState, useEffect } from "react";
 import { useReadContracts } from "wagmi";
 import { formatEther } from "viem";
@@ -20,9 +20,23 @@ interface UseTokenStatsProps {
 interface TokenStats extends TokenStatistics {
   loading: boolean;
   error: string | null;
-  tokenState?: TokenState;
-  collateral?: string;
+  tokenState: TokenState;
+  collateral: string;
 }
+
+const mapContractStateToAppState = (contractState: number): TokenState => {
+  switch (contractState) {
+    case 0:
+      return TokenState.NOT_CREATED;
+    case 1:
+      return TokenState.TRADING;
+    case 2: // GOAL_REACHED
+    case 3: // HALTED
+      return TokenState.HALTED;
+    default:
+      return TokenState.NOT_CREATED;
+  }
+};
 
 export function useTokenStats({
   tokenAddress,
@@ -81,9 +95,12 @@ export function useTokenStats({
       ? (collateralData?.result as bigint)
       : 0n;
 
-    const tokenState = isSuccess(tokenStateData)
-      ? (tokenStateData?.result as TokenState)
-      : TokenState.NOT_CREATED;
+    // Map the contract state to our simplified app state
+    const rawContractState = isSuccess(tokenStateData)
+      ? Number(tokenStateData?.result as bigint)
+      : 0;
+
+    const tokenState = mapContractStateToAppState(rawContractState);
 
     setStats((prev) => ({
       ...prev,
@@ -95,7 +112,7 @@ export function useTokenStats({
     }));
   }, [contractData, isError]);
 
-  // Listen to Firestore updates
+  // Listen to Firestore updates for statistical data
   useEffect(() => {
     if (!tokenAddress) return;
 
@@ -152,7 +169,7 @@ export function useTokenStats({
         case "TradingHalted":
           setStats((prev) => ({
             ...prev,
-            tokenState: TokenState.GOAL_REACHED,
+            tokenState: TokenState.HALTED, // Changed from GOAL_REACHED to HALTED
           }));
           break;
       }
