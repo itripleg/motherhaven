@@ -189,8 +189,10 @@ export function useToken({
         );
 
         setBuySellPressure({
-          buyAmount: formatEther(pressure.buyAmount),
-          sellAmount: formatEther(pressure.sellAmount),
+          buyAmount: "1000",
+          sellAmount: "2000",
+          // buyAmount: formatEther(pressure.buyAmount),
+          // sellAmount: formatEther(pressure.sellAmount),
         });
       },
       (err) => {

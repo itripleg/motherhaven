@@ -1,3 +1,5 @@
+//@types/database.ts
+
 import { Timestamp } from "firebase/firestore";
 import { TokenState } from "./enums";
 
@@ -10,7 +12,6 @@ export interface Token {
   currentPrice: number;
   createdAt: Date;
   imageUrl?: string;
-  collateral: number;
 }
 
 export interface TokenStatistics {
