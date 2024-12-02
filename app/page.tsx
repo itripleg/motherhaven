@@ -1,21 +1,20 @@
 "use client";
-import { LandingPage } from "@/components/components-landing-page";
-import { Dashboard } from "@/components/dashboard";
-import { GeneralLandingPage } from "@/components/landing-page";
-import LoginWidget from "@/components/login-widget";
-import StickyHeader from "@/components/sticky-header";
-// import AllWhoopsies from "@/components/AllWhoopsies";
-import { useKindeBrowserClient } from "@kinde-oss/kinde-auth-nextjs";
-import Image from "next/image";
+import { LandingPage } from "@/components/landing-page";
+import { useAccount } from "wagmi";
+import { useRouter } from "next/navigation";
+import { useEffect } from "react";
 
 export default function Home() {
-  const { user } = useKindeBrowserClient();
-  return (
-    <>
-      {/* <LandingPage /> */}
-      <GeneralLandingPage />
-      {/* <StickyHeader />
-      Home{!user ? <LoginWidget /> : <Dashboard />} */}
-    </>
-  );
+  const { isConnected } = useAccount();
+  const router = useRouter();
+
+  // Redirect connected users to DEX
+  useEffect(() => {
+    if (isConnected) {
+      router.push("/dex");
+    }
+  }, [isConnected, router]);
+
+  // Show landing page for non-connected users
+  return <LandingPage />;
 }

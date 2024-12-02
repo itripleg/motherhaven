@@ -29,15 +29,12 @@ export function AddressComponent({ hash, type }: TransactionHashProps) {
     setTimeout(() => setCopied(false), 2000);
   };
 
-  const truncateHash = (hash: string) => {
-    return (
-      <>
-        <span className="hidden sm:inline">{hash.slice(0, 6)}</span>
-        <span className="hidden md:inline">{hash.slice(6, -8)}</span>
-        <span>{hash.slice(-8, -4)}</span>
-        <span>{hash.slice(-4)}</span>
-      </>
-    );
+  const truncateHash = (hash: string, isTx: boolean = true) => {
+    if (!hash) return "";
+    if (isTx) {
+      return `${hash.slice(0, 6)}...${hash.slice(-4)}`;
+    }
+    return hash;
   };
 
   return (
@@ -52,8 +49,8 @@ export function AddressComponent({ hash, type }: TransactionHashProps) {
           href={explorerUrl}
           target="_blank"
           rel="noopener noreferrer"
-          className="text-primary hover:text-primary/80 transition-colors duration-200"
-          whileHover={{ scale: 1.05 }}
+          className="text-primary hover:text-white/80 transition-colors duration-200"
+          whileHover={{ scale: 1 }}
           whileTap={{ scale: 0.95 }}
         >
           {truncateHash(hash)}
@@ -65,7 +62,7 @@ export function AddressComponent({ hash, type }: TransactionHashProps) {
                 variant="ghost"
                 size="icon"
                 onClick={copyToClipboard}
-                className="h-8 w-8 text-primary hover:text-primary/80 hover:bg-primary/20"
+                className="h-8 w-8 text-primary hover:text-white/80 hover:bg-primary/20"
               >
                 <Copy className="h-4 w-4" />
               </Button>
@@ -81,7 +78,7 @@ export function AddressComponent({ hash, type }: TransactionHashProps) {
               <Button
                 variant="ghost"
                 size="icon"
-                className="h-8 w-8 text-primary hover:text-primary/80 hover:bg-primary/20"
+                className="h-8 w-8 text-primary hover:text-white/80 hover:bg-primary/20"
                 asChild
               >
                 <a href={explorerUrl} target="_blank" rel="noopener noreferrer">

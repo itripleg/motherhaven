@@ -1,11 +1,6 @@
-export interface CryptoAddress {
-  id?: string; // Optional, as it will be assigned by Firestore
-  name: string;
-  address: string;
-  blockchain: string;
-}
-
-export interface FirebaseError {
-  code: string;
-  message: string;
-}
+// /types/index.ts
+export * from "./contracts";
+export * from "./enums";
+export * from "./events";
+export * from "./database";
+export * from "./utils";

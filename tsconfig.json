@@ -1,5 +1,6 @@
 {
   "compilerOptions": {
+    "target": "ES2020",
     "lib": ["dom", "dom.iterable", "esnext"],
     "allowJs": true,
     "skipLibCheck": true,
@@ -27,7 +28,9 @@
     "**/*.tsx",
     ".next/types/**/*.ts",
     "app/casino/games/dice/page.tsx",
-    "app/casino/games/layout.tsx"
+    "app/casino/games/layout.tsx",
+    "app/dashboard/page.old.tsx",
+    "app/api/factory-monitor/route.ts"
   ],
   "exclude": ["node_modules"]
 }

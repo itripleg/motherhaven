@@ -1,6 +1,5 @@
 "use client";
-
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { motion } from "framer-motion";
 import {
   Card,
@@ -14,8 +13,6 @@ import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Container } from "@/components/craft";
-// import { DiceIcon, CardsIcon, ChipIcon } from "lucide-react";
-// import { Dice, Cards, Chip } from "lucide-react";
 
 const games = [
   {
@@ -106,11 +103,18 @@ const GameCard = ({ game }: any) => (
 
 export default function LobbyPage() {
   const [activeCategory, setActiveCategory] = useState("all");
+  const [hydrated, setHydrated] = useState(false);
+
+  useEffect(() => {
+    setHydrated(true); // Prevent hydration mismatch
+  }, []);
 
   const filteredGames =
     activeCategory === "all"
       ? games
       : games.filter((game) => game.category === activeCategory);
+
+  if (!hydrated) return null; // Avoid rendering until hydration matches
 
   return (
     <Container>
@@ -123,18 +127,15 @@ export default function LobbyPage() {
               All
             </TabsTrigger>
             <TabsTrigger value="card" onClick={() => setActiveCategory("card")}>
-              {/* <CardsIcon className="mr-2 h-4 w-4" /> */}
               Card
             </TabsTrigger>
             <TabsTrigger value="dice" onClick={() => setActiveCategory("dice")}>
-              {/* <DiceIcon className="mr-2 h-4 w-4" /> */}
               Dice
             </TabsTrigger>
             <TabsTrigger
               value="table"
               onClick={() => setActiveCategory("table")}
             >
-              {/* <ChipIcon className="mr-2 h-4 w-4" /> */}
               Table
             </TabsTrigger>
             <TabsTrigger

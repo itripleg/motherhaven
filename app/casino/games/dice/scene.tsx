@@ -1,3 +1,4 @@
+"use client";
 import { Box } from "@react-three/drei";
 import { useRef } from "react";
 import * as THREE from "three";
@@ -16,7 +17,7 @@ export default function Scene() {
   });
   return (
     <>
-      <ambientLight intensity={0.1} />
+      {/* <ambientLight intensity={0.1} />
       <directionalLight position={[10, 10, 10]} />
       <pointLight position={[10, 10, 10]} />
       <Box ref={cube1Ref} position={[-1.5, 0, 0]}>
@@ -24,7 +25,7 @@ export default function Scene() {
       </Box>
       <Box ref={cube2Ref} position={[1.5, 0, 0]}>
         <meshStandardMaterial color="lightblue" />
-      </Box>
+      </Box> */}
     </>
   );
 }
