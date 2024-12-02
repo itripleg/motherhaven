@@ -8,6 +8,7 @@ import { TokenData, TokenState } from "@/types";
 import { getFormattedTokenData } from "@/utils/tokenUtils";
 import { useTokenStats } from "@/hooks/token/useTokenStats";
 import TokenPage from "../components/TokenPage";
+import { tokenEventEmitter } from "@/components/EventWatcher";
 
 export default function Page() {
   const { tokenAddress } = useParams();
@@ -26,43 +27,40 @@ export default function Page() {
     error: statsError,
   } = useTokenStats({ tokenAddress: tokenAddress as string });
 
-  useEffect(() => {
-    async function fetchTokenData() {
-      if (!tokenAddress || !publicClient) return;
+  // Fetch token data function
+  const fetchTokenData = async () => {
+    if (!tokenAddress || !publicClient) return;
 
-      try {
-        const tokenDocRef = doc(db, "tokens", tokenAddress as string);
-        const tokenDoc = await getDoc(tokenDocRef);
+    try {
+      const tokenDocRef = doc(db, "tokens", tokenAddress as string);
+      const tokenDoc = await getDoc(tokenDocRef);
 
-        if (tokenDoc.exists()) {
-          const data = tokenDoc.data();
-          console.log("This is the tokenDoc.data : ", data); //this has the correct currentState!
-          const formattedData = await getFormattedTokenData(
-            tokenAddress as string,
-            data,
-            {
-              currentPrice,
-              volumeAVAX: volumeETH,
-              tradeCount,
-              uniqueHolders,
-              tokenState,
-              collateral,
-            },
-            publicClient
-          );
-          setTokenData(formattedData);
-          console.log(
-            "This is the formatted data being called from the [tokenAddress]/page.tsx getFormattedTokenData function : ",
-            formattedData
-          ); // this is returning the wrong currentState for the token - it's not matching what's in the firestore!
-        }
-      } catch (error) {
-        console.error("Error fetching token data:", error);
-      } finally {
-        setLoading(false);
+      if (tokenDoc.exists()) {
+        const data = tokenDoc.data();
+        const formattedData = await getFormattedTokenData(
+          tokenAddress as string,
+          data,
+          {
+            currentPrice,
+            volumeAVAX: volumeETH,
+            tradeCount,
+            uniqueHolders,
+            tokenState,
+            collateral,
+          },
+          publicClient
+        );
+        setTokenData(formattedData);
       }
+    } catch (error) {
+      console.error("Error fetching token data:", error);
+    } finally {
+      setLoading(false);
     }
+  };
 
+  // Initial data fetch
+  useEffect(() => {
     fetchTokenData();
   }, [
     tokenAddress,
@@ -74,6 +72,27 @@ export default function Page() {
     tokenState,
     collateral,
   ]);
+
+  // Simple event listener
+  useEffect(() => {
+    if (!tokenAddress) return;
+
+    const handleTokenEvent = () => {
+      fetchTokenData();
+    };
+
+    tokenEventEmitter.addEventListener(
+      String(tokenAddress).toLowerCase(),
+      handleTokenEvent
+    );
+
+    return () => {
+      tokenEventEmitter.removeEventListener(
+        String(tokenAddress).toLowerCase(),
+        handleTokenEvent
+      );
+    };
+  }, [tokenAddress]);
 
   if (!publicClient) return <div>Initializing...</div>;
   if (loading || statsLoading) {

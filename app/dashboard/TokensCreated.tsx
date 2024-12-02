@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useState, useEffect } from "react";
 import {
   Card,
   CardContent,
@@ -9,75 +9,136 @@ import {
   CardTitle,
 } from "@/components/ui/card";
 import { Progress } from "@/components/ui/progress";
-import { collection, query, orderBy, getDocs } from "firebase/firestore";
+import { useTokenList } from "@/hooks/token/useTokenList";
+import { Token } from "@/types/database";
+import { doc, getDoc } from "firebase/firestore";
 import { db } from "@/firebase";
 
-interface TokenData {
+interface TokenProgressData {
+  address: string;
   name: string;
-  totalSupply: string;
-  token: string; // token address
-  ethAmount: string;
-  tokenAmount: string;
+  symbol: string;
+  collateral: number;
+  fundingGoal: number;
+  progress: number;
+  imageUrl?: string;
 }
 
+const TokenProgressItem = ({ token }: { token: TokenProgressData }) => {
+  const progress =
+    token.fundingGoal > 0 ? (token.collateral / token.fundingGoal) * 100 : 0;
+
+  return (
+    <div className="mb-4">
+      <div className="flex items-center justify-between mb-1">
+        <div className="flex items-center gap-2">
+          {token.imageUrl && (
+            <img
+              src={token.imageUrl}
+              alt={token.name}
+              className="w-6 h-6 rounded-full"
+            />
+          )}
+          <span className="text-sm font-medium">
+            {token.name} ({token.symbol})
+          </span>
+        </div>
+        <span className="text-sm font-medium">
+          {Math.min(progress, 100).toFixed(1)}%
+        </span>
+      </div>
+      <Progress value={Math.min(progress, 100)} className="w-full" />
+      <div className="flex justify-between text-xs text-muted-foreground mt-1">
+        <span>Raised: {token.collateral.toFixed(4)} ETH</span>
+        <span>Goal: {token.fundingGoal.toFixed(4)} ETH</span>
+      </div>
+    </div>
+  );
+};
+
 export function TokensCreated() {
-  const [tokens, setTokens] = useState<{
-    [key: string]: {
-      name: string;
-      totalRaised: number;
-      totalSupply: number;
-      address: string;
-    };
-  }>({});
-  const [loading, setLoading] = useState(true);
+  const { tokens, isLoading, error } = useTokenList({
+    orderByField: "createdAt",
+    orderDirection: "desc",
+    limitCount: 5,
+  });
+
+  const [processedTokens, setProcessedTokens] = useState<TokenProgressData[]>(
+    []
+  );
+  const [loadingDetails, setLoadingDetails] = useState(false);
 
   useEffect(() => {
-    const fetchTokenData = async () => {
+    async function fetchTokenDetails() {
+      if (!tokens.length) return;
+
+      setLoadingDetails(true);
       try {
-        setLoading(true);
-        const tokenMap = new Map();
+        const tokenDetails = await Promise.all(
+          tokens.map(async (token) => {
+            // Fetch additional details from Firestore
+            const tokenDoc = await getDoc(doc(db, "tokens", token.address));
+            const tokenData = tokenDoc.data();
 
-        // Fetch trades to calculate total raised
-        const tradesRef = collection(db, "trades");
-        const tradesQuery = query(tradesRef, orderBy("timestamp", "desc"));
-        const tradesSnapshot = await getDocs(tradesQuery);
+            return {
+              address: token.address,
+              name: token.name,
+              symbol: token.symbol,
+              collateral: parseFloat(tokenData?.collateral || "0"),
+              fundingGoal: parseFloat(tokenData?.fundingGoal || "0"),
+              progress: tokenData?.fundingGoal
+                ? (parseFloat(tokenData.collateral || "0") /
+                    parseFloat(tokenData.fundingGoal)) *
+                  100
+                : 0,
+              imageUrl: token.imageUrl,
+            };
+          })
+        );
 
-        tradesSnapshot.forEach((doc) => {
-          const trade = doc.data();
-          const tokenAddress = trade.token.toLowerCase();
-
-          if (!tokenMap.has(tokenAddress)) {
-            tokenMap.set(tokenAddress, {
-              totalRaised: 0,
-              trades: 0,
-              name: "Token " + tokenAddress.slice(0, 6), // Default name, you can fetch real names if available
-              address: tokenAddress,
-              totalSupply: parseFloat(trade.tokenAmount) / 1e18, // Convert from wei
-            });
-          }
-
-          const tokenData = tokenMap.get(tokenAddress);
-          tokenData.totalRaised += parseFloat(trade.ethAmount) / 1e18; // Convert from wei to ETH
-          tokenData.trades += 1;
-        });
-
-        setTokens(Object.fromEntries(tokenMap));
-      } catch (error) {
-        console.error("Error fetching token data:", error);
+        setProcessedTokens(tokenDetails);
+      } catch (err) {
+        console.error("Error fetching token details:", err);
       } finally {
-        setLoading(false);
+        setLoadingDetails(false);
       }
-    };
+    }
 
-    fetchTokenData();
-  }, []);
+    if (tokens && tokens.length > 0) {
+      fetchTokenDetails();
+    }
+  }, [tokens]);
 
-  if (loading) {
+  if (isLoading || loadingDetails) {
     return (
       <Card>
         <CardHeader>
           <CardTitle>Tokens Created</CardTitle>
           <CardDescription>Loading token data...</CardDescription>
+        </CardHeader>
+        <CardContent>
+          <div className="space-y-4">
+            {[...Array(3)].map((_, i) => (
+              <div key={i} className="animate-pulse space-y-2">
+                <div className="flex items-center gap-2">
+                  <div className="w-6 h-6 bg-gray-200 rounded-full"></div>
+                  <div className="h-4 bg-gray-200 rounded w-32"></div>
+                </div>
+                <div className="h-2 bg-gray-200 rounded w-full"></div>
+              </div>
+            ))}
+          </div>
+        </CardContent>
+      </Card>
+    );
+  }
+
+  if (error) {
+    return (
+      <Card>
+        <CardHeader>
+          <CardTitle>Tokens Created</CardTitle>
+          <CardDescription className="text-red-500">{error}</CardDescription>
         </CardHeader>
       </Card>
     );
@@ -90,30 +151,18 @@ export function TokensCreated() {
         <CardDescription>Progress towards funding goals</CardDescription>
       </CardHeader>
       <CardContent>
-        {Object.values(tokens).map((token) => {
-          // Calculate progress as percentage of total supply sold
-          const progressPercentage = Math.min(
-            (token.totalRaised / token.totalSupply) * 100,
-            100
-          );
-
-          return (
-            <div key={token.address} className="mb-4">
-              <div className="flex justify-between mb-1">
-                <span className="text-sm font-medium">{token.name}</span>
-                <span className="text-sm font-medium">
-                  {progressPercentage.toFixed(1)}%
-                </span>
-              </div>
-              <Progress value={progressPercentage} className="w-full" />
-              <div className="flex justify-between text-xs text-muted-foreground mt-1">
-                <span>Raised: {token.totalRaised.toFixed(4)} ETH</span>
-                <span>Goal: {token.totalSupply.toFixed(0)} Tokens</span>
-              </div>
-            </div>
-          );
-        })}
+        {processedTokens.length === 0 ? (
+          <div className="text-center text-muted-foreground py-4">
+            No tokens created yet
+          </div>
+        ) : (
+          processedTokens.map((token) => (
+            <TokenProgressItem key={token.address} token={token} />
+          ))
+        )}
       </CardContent>
     </Card>
   );
 }
+
+export default TokensCreated;

@@ -10,6 +10,7 @@ export interface Token {
   currentPrice: number;
   createdAt: Date;
   imageUrl?: string;
+  collateral: number;
 }
 
 export interface TokenStatistics {

@@ -1,3 +1,5 @@
+//app/dex/[tokenAddress]/stats
+
 "use client";
 
 import { useState, useEffect } from "react";

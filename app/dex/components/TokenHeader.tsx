@@ -90,7 +90,7 @@ export function TokenHeader({
               <div className="backdrop-blur-sm bg-white/10 p-4 rounded-lg">
                 <Label className="text-gray-200">Current Price</Label>
                 <p className="text-white text-lg font-semibold">
-                  {price} <span className="text-gray-300">ETH</span>
+                  {price} <span className="text-gray-300">AVAX</span>
                 </p>
               </div>
               {tokenData.fundingGoal && (
@@ -98,7 +98,7 @@ export function TokenHeader({
                   <Label className="text-gray-200">Funding Goal</Label>
                   <p className="text-white text-lg font-semibold">
                     {tokenData.fundingGoal}{" "}
-                    <span className="text-gray-300">ETH</span>
+                    <span className="text-gray-300">AVAX</span>
                   </p>
                 </div>
               )}
@@ -108,7 +108,7 @@ export function TokenHeader({
                 <div className="backdrop-blur-sm bg-white/10 p-4 rounded-lg">
                   <Label className="text-gray-200">Trading Volume</Label>
                   <p className="text-white text-lg font-semibold">
-                    {tokenData.statistics.volumeETH}{" "}
+                    {tokenData.statistics.volumeETH}
                     <span className="text-gray-300">AVAX</span>
                   </p>
                 </div>

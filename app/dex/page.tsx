@@ -22,14 +22,11 @@ export default function DexPage() {
   const [searchMode, setSearchMode] = useState("token");
 
   const {
-    tokens,
     filteredTokens,
-    // setFilteredTokens,
     searchQuery,
     setSearchQuery,
     activeCategory,
     setCategory,
-    // filterTokensByCategory,
     isLoading,
     error,
   } = useTokenList();
@@ -62,10 +59,8 @@ export default function DexPage() {
         />
 
         {!showSecret && (
-          // <div>Token Container</div>
           <TokenContainer
             tokens={filteredTokens}
-            // onCategoryChange={filterTokensByCategory}
             isLoading={isLoading}
             error={error}
           />

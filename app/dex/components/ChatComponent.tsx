@@ -142,7 +142,7 @@ export function ChatComponent({
         </CardTitle>
       </CardHeader>
       <CardContent className="p-0">
-        <ScrollArea className="md:h-[600px] px-4">
+        <ScrollArea className="md:h-[500px] px-4">
           {comments.map((comment) => (
             <div
               key={comment.id}

@@ -9,6 +9,7 @@ import { EventWatcher } from "../components/EventWatcher";
 import { GlobalFinanceProvider } from "@/contexts/GlobalFinanceContext";
 import { UserSection } from "@/components/UserSection";
 import { Header } from "./Header";
+import { FactoryGuard } from "@/components/FactoryGuard";
 
 const geistSans = localFont({
   src: "./fonts/GeistVF.woff",
@@ -48,15 +49,17 @@ export default function RootLayout({
           enableSystem
           disableTransitionOnChange
         >
-          <MyMenu />
-          <WagmiContext>
-            <GlobalFinanceProvider>
-              <EventWatcher />
-              <Header />
-              {children}
-              <Toaster />
-            </GlobalFinanceProvider>
-          </WagmiContext>
+          <FactoryGuard>
+            <MyMenu />
+            <WagmiContext>
+              <GlobalFinanceProvider>
+                <EventWatcher />
+                <Header />
+                {children}
+                <Toaster />
+              </GlobalFinanceProvider>
+            </WagmiContext>
+          </FactoryGuard>
         </ThemeProvider>
       </body>
     </html>

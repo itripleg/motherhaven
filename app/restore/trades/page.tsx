@@ -51,6 +51,17 @@ interface TokenTrades {
   inFirestore: boolean;
 }
 
+const calculatePricePerToken = (
+  ethAmount: bigint,
+  tokenAmount: bigint
+): string => {
+  if (tokenAmount === 0n) return "0";
+  // Convert to float for division, being careful with decimal precision
+  const ethFloat = Number(ethAmount) / 1e18; // Convert from wei to ETH
+  const tokenFloat = Number(tokenAmount) / 1e18; // Assuming 18 decimals for token
+  return (ethFloat / tokenFloat).toString();
+};
+
 export default function RestoreTrades() {
   const [tokenTrades, setTokenTrades] = useState<TokenTrades[]>([]);
   const [loading, setLoading] = useState(true);
@@ -96,7 +107,7 @@ export default function RestoreTrades() {
           blockNumber: Number(blockNumber),
           ethAmount: args.price.toString(),
           tokenAmount: args.amount.toString(),
-          pricePerToken: formatEther(args.price),
+          pricePerToken: calculatePricePerToken(args.price, args.amount),
           timestamp: new Date(Number(block.timestamp) * 1000).toISOString(),
           token: tokenAddress,
           trader: args.buyer.toLowerCase(),
@@ -144,7 +155,10 @@ export default function RestoreTrades() {
           blockNumber: Number(blockNumber),
           ethAmount: args.ethAmount.toString(),
           tokenAmount: args.tokenAmount.toString(),
-          pricePerToken: formatEther(args.ethAmount),
+          pricePerToken: calculatePricePerToken(
+            args.ethAmount,
+            args.tokenAmount
+          ),
           timestamp: new Date(Number(block.timestamp) * 1000).toISOString(),
           token: tokenAddress,
           trader: args.seller.toLowerCase(),

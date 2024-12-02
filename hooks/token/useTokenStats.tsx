@@ -53,8 +53,12 @@ export function useTokenStats({
     collateral: "0",
   });
 
-  // Contract reads
-  const { data: contractData, isError } = useReadContracts({
+  // Contract reads with refetch capability
+  const {
+    data: contractData,
+    isError,
+    refetch,
+  } = useReadContracts({
     contracts: tokenAddress
       ? [
           {
@@ -138,40 +142,39 @@ export function useTokenStats({
     return () => unsubscribe();
   }, [tokenAddress]);
 
-  // Listen to token events from the global emitter
+  // Listen to token events and refetch contract data on trades
   useEffect(() => {
     if (!tokenAddress) return;
 
-    const handleTokenEvent = (event: { eventName: string; data: any }) => {
-      switch (event.eventName) {
-        case "TokensPurchased":
-          setStats((prev) => ({
-            ...prev,
-            tradeCount: prev.tradeCount + 1,
-            volumeETH: formatEther(
-              BigInt(parseFloat(prev.volumeETH) * 10 ** 18) +
-                BigInt(event.data.price)
-            ),
-          }));
-          break;
+    const handleTokenEvent = async (event: {
+      eventName: string;
+      data: any;
+    }) => {
+      if (
+        event.eventName === "TokensPurchased" ||
+        event.eventName === "TokensSold"
+      ) {
+        console.log("Trade event detected, refetching contract data...");
+        try {
+          await refetch();
+        } catch (error) {
+          console.error("Error refetching contract data:", error);
+        }
 
-        case "TokensSold":
-          setStats((prev) => ({
-            ...prev,
-            tradeCount: prev.tradeCount + 1,
-            volumeETH: formatEther(
-              BigInt(parseFloat(prev.volumeETH) * 10 ** 18) +
-                BigInt(event.data.ethAmount)
-            ),
-          }));
-          break;
-
-        case "TradingHalted":
-          setStats((prev) => ({
-            ...prev,
-            tokenState: TokenState.HALTED, // Changed from GOAL_REACHED to HALTED
-          }));
-          break;
+        // Update trade-specific stats
+        setStats((prev) => ({
+          ...prev,
+          tradeCount: prev.tradeCount + 1,
+          volumeETH: formatEther(
+            BigInt(parseFloat(prev.volumeETH) * 10 ** 18) +
+              BigInt(event.data.price || event.data.ethAmount)
+          ),
+        }));
+      } else if (event.eventName === "TradingHalted") {
+        setStats((prev) => ({
+          ...prev,
+          tokenState: TokenState.HALTED,
+        }));
       }
     };
 
@@ -186,7 +189,7 @@ export function useTokenStats({
         handleTokenEvent
       );
     };
-  }, [tokenAddress]);
+  }, [tokenAddress, refetch]);
 
   return stats;
 }

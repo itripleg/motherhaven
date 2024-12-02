@@ -1,16 +1,20 @@
 import { useState } from "react";
 import { TokenTabs } from "./TokenTabs";
 import { TokenGrid } from "./TokenGrid";
-import { useTokenList } from "@/hooks/token/useTokenList";
 import { Token } from "@/types";
 
-type TokenContainerProps = {
+interface TokenContainerProps {
   tokens: Token[];
-};
+  isLoading: boolean;
+  error: string | null;
+}
 
-export const TokenContainer: React.FC = () => {
+export const TokenContainer: React.FC<TokenContainerProps> = ({
+  tokens,
+  isLoading,
+  error,
+}) => {
   const [category, setCategory] = useState("all");
-  const { tokens, isLoading, error } = useTokenList();
 
   if (isLoading) {
     return (

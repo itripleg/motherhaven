@@ -10,6 +10,7 @@ import { TokenData, TokenState } from "@/types";
 import { ConnectButton } from "@/components/ConnectButton";
 import { useDisconnect } from "wagmi";
 import BondingCurve from "@/components/bonding-curve";
+import RecentTrades from "./RecentTrades";
 
 interface TokenPageProps {
   tokenData: TokenData | null;
@@ -74,7 +75,8 @@ export default function TokenPage({
               tokenAddress={tokenData.address}
               creatorAddress={tokenData.creator}
             />
-            <BondingCurve />
+            {/* <BondingCurve /> */}
+            <RecentTrades tokenAddress={String(address)} />
           </div>
         </div>
 
@@ -92,7 +94,7 @@ export default function TokenPage({
           <SheetContent side="right" className="w-[90%] sm:w-[440px]">
             {/* <div className="h-full space-y-6"> */}
             <ChatComponent tokenAddress={tokenData.address} />
-            <BondingCurve />
+            {/* <BondingCurve /> */}
             {/* </div> */}
           </SheetContent>
         </Sheet>

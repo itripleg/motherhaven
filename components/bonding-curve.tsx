@@ -55,11 +55,11 @@ export default function BondingCurve() {
   };
 
   return (
-    <Card className="w-full hidden md:block max-w-md mx-auto mt-6">
+    <Card className="w-full hidden md:block max-w-md mx-auto ">
       <CardContent className="flex flex-col space-y-4">
         <div className="flex flex-col space-y-2">
           <div className="flex items-center justify-between">
-            <h3 className="text-sm font-medium flex items-center gap-2">
+            <h3 className="text-sm font-medium flex items-center gap-2 pt-2">
               Curve type
               <InfoIcon className="h-4 w-4 text-muted-foreground" />
             </h3>

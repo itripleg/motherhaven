@@ -58,7 +58,7 @@ export const SearchContainer = ({
 
   return (
     <div>
-      <div className="z-30 flex gap-2 py-2">
+      <div className="z-30 flex gap-2 py-2 hidden">
         <Button className="z-60" onClick={handleSearchModeChange}>
           {searchMode === "token"
             ? "👀"

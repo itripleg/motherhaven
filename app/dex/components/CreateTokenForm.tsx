@@ -8,11 +8,11 @@ import { Label } from "@/components/ui/label";
 import { useToast } from "@/hooks/use-toast";
 import { db } from "@/firebase";
 import { doc, setDoc } from "firebase/firestore";
-import { EventWatcher } from "../../../components/EventWatcher";
-
-import tokenFactoryMetadata from "@/contracts/token-factory/artifacts/TokenFactory_metadata.json";
-const FACTORY_ADDRESS = "0x7713A39875A5335dc4Fc4f9359908afb55984b1F";
-const FACTORY_ABI = tokenFactoryMetadata.output.abi;
+import { EventWatcher } from "@/components/EventWatcher";
+import { FACTORY_ABI, FACTORY_ADDRESS } from "@/types";
+// import tokenFactoryMetadata from "@/contracts/token-factory/artifacts/TokenFactory_metadata.json";
+// const FACTORY_ADDRESS = "0x7713A39875A5335dc4Fc4f9359908afb55984b1F";
+// const FACTORY_ABI = tokenFactoryMetadata.output.abi;
 
 type TokenDetails = {
   name: string;
