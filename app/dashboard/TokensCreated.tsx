@@ -10,7 +10,7 @@ import {
 } from "@/components/ui/card";
 import { Progress } from "@/components/ui/progress";
 import { useTokenList } from "@/hooks/token/useTokenList";
-import { Token } from "@/types/database";
+// import { Token } from "@/types/database";
 import { doc, getDoc } from "firebase/firestore";
 import { db } from "@/firebase";
 

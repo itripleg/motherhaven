@@ -21,7 +21,7 @@ interface TokenPageProps {
   address: string;
 }
 
-export default function TokenPage({
+export function TokenPage({
   tokenData,
   isConnected,
   loading,
