@@ -1,267 +1,281 @@
-// useToken.ts - Main unified hook
-import { useState, useEffect, useMemo } from "react";
-import { useReadContracts } from "wagmi";
-import { formatEther, parseEther } from "viem";
-import {
-  collection,
-  doc,
-  onSnapshot,
-  query,
-  where,
-  orderBy,
-  limit,
-} from "firebase/firestore";
-import { db } from "@/firebase";
-import { Token, TokenStatistics, TokenState, TokenTrade } from "@/types";
-import { tokenEventEmitter } from "@/components/EventWatcher";
-import { FACTORY_ADDRESS, FACTORY_ABI } from "@/types";
+export {};
+// // useToken.ts
+// import { useState, useEffect, useMemo } from "react";
+// import { useReadContracts } from "wagmi";
+// import { formatEther, parseEther } from "viem";
+// import {
+//   collection,
+//   doc,
+//   onSnapshot,
+//   query,
+//   where,
+//   orderBy,
+//   limit,
+// } from "firebase/firestore";
+// import { db } from "@/firebase";
+// import {
+//   TokenData,
+//   TokenContractState,
+//   TokenMetrics,
+//   TokenState,
+//   TokenTrade
+// } from "@/types";
+// import { tokenEventEmitter } from "@/components/EventWatcher";
+// import { FACTORY_ADDRESS, FACTORY_ABI } from "@/types";
 
-const TRADE_LIMIT = 50;
-const UPDATE_INTERVAL = 30000; // 30 seconds
+// const TRADE_LIMIT = 50;
 
-interface UseTokenOptions {
-  address?: string;
-  includeStats?: boolean;
-  includeTrades?: boolean;
-  tradeLimit?: number;
-}
+// interface UseTokenOptions {
+//   address?: string;
+//   includeMetrics?: boolean;
+//   includeTrades?: boolean;
+//   tradeLimit?: number;
+// }
 
-interface TokenHookReturn {
-  // Basic token data
-  token: Token | null;
+// interface UseTokenReturn {
+//   // Combined token data
+//   tokenData: TokenData | null;
 
-  // Extended statistics
-  stats: TokenStatistics | null;
+//   // Recent trades (optional)
+//   recentTrades: TokenTrade[];
 
-  // Recent trades
-  trades: TokenTrade[];
+//   // Loading states
+//   loading: {
+//     contract: boolean;
+//     firestore: boolean;
+//     trades: boolean;
+//   };
 
-  // Trading pressure
-  buySellPressure: {
-    buyAmount: string;
-    sellAmount: string;
-  };
+//   // Errors
+//   error: {
+//     contract?: string;
+//     firestore?: string;
+//     trades?: string;
+//   };
 
-  // Status
-  loading: boolean;
-  error: string | null;
+//   // Manual refresh function
+//   refresh: () => Promise<void>;
+// }
 
-  // Contract state
-  tokenState: TokenState;
-  collateral: string;
-}
+// export function useToken({
+//   address,
+//   includeMetrics = true,
+//   includeTrades = false,
+//   tradeLimit = TRADE_LIMIT,
+// }: UseTokenOptions): UseTokenReturn {
+//   // State
+//   const [tokenData, setTokenData] = useState<TokenData | null>(null);
+//   const [recentTrades, setRecentTrades] = useState<TokenTrade[]>([]);
+//   const [loading, setLoading] = useState({
+//     contract: true,
+//     firestore: true,
+//     trades: includeTrades,
+//   });
+//   const [error, setError] = useState<Record<string, string>>({});
 
-export function useToken({
-  address,
-  includeStats = true,
-  includeTrades = false,
-  tradeLimit = TRADE_LIMIT,
-}: UseTokenOptions): TokenHookReturn {
-  const [token, setToken] = useState<Token | null>(null);
-  const [stats, setStats] = useState<TokenStatistics | null>(null);
-  const [trades, setTrades] = useState<TokenTrade[]>([]);
-  const [buySellPressure, setBuySellPressure] = useState({
-    buyAmount: "0",
-    sellAmount: "0",
-  });
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
+//   // Contract state via wagmi
+//   const { data: contractData, refetch } = useReadContracts({
+//     contracts: address ? [
+//       {
+//         address: FACTORY_ADDRESS,
+//         abi: FACTORY_ABI,
+//         functionName: "getCurrentPrice",
+//         args: [address as `0x${string}`],
+//       },
+//       {
+//         address: FACTORY_ADDRESS,
+//         abi: FACTORY_ABI,
+//         functionName: "collateral",
+//         args: [address as `0x${string}`],
+//       },
+//       {
+//         address: FACTORY_ADDRESS,
+//         abi: FACTORY_ABI,
+//         functionName: "getTokenState",
+//         args: [address as `0x${string}`],
+//       },
+//     ] : [],
+//   });
 
-  // Contract reads
-  const { data: contractData, refetch } = useReadContracts({
-    contracts: address
-      ? [
-          {
-            address: FACTORY_ADDRESS as `0x${string}`,
-            abi: FACTORY_ABI,
-            functionName: "getCurrentPrice",
-            args: [address as `0x${string}`],
-          },
-          {
-            address: FACTORY_ADDRESS as `0x${string}`,
-            abi: FACTORY_ABI,
-            functionName: "collateral",
-            args: [address as `0x${string}`],
-          },
-          {
-            address: FACTORY_ADDRESS as `0x${string}`,
-            abi: FACTORY_ABI,
-            functionName: "getTokenState",
-            args: [address as `0x${string}`],
-          },
-        ]
-      : [],
-  });
+//   // Parse contract data
+//   const contractState = useMemo((): TokenContractState | null => {
+//     if (!contractData) return null;
 
-  // Basic token data subscription
-  useEffect(() => {
-    if (!address) return;
+//     const [priceData, collateralData, stateData] = contractData;
 
-    const unsubscribe = onSnapshot(
-      doc(db, "tokens", address),
-      (snapshot) => {
-        if (snapshot.exists()) {
-          const data = snapshot.data();
-          setToken({
-            id: snapshot.id,
-            name: data.name,
-            symbol: data.symbol,
-            address: data.address,
-            currentPrice: Number(data.statistics?.currentPrice || 0),
-            createdAt: new Date(data.createdAt),
-            imageUrl: data.imageUrl,
-          });
+//     return {
+//       currentPrice: formatEther(priceData?.result || 0n),
+//       collateral: formatEther(collateralData?.result || 0n),
+//       state: Number(stateData?.result || 0) as TokenState,
+//       totalSupply: "0", // TODO: Add ERC20 totalSupply call
+//     };
+//   }, [contractData]);
 
-          if (includeStats) {
-            setStats({
-              totalSupply: data.statistics?.totalSupply || "0",
-              currentPrice: data.statistics?.currentPrice || "0",
-              volumeETH: data.statistics?.volumeETH || "0",
-              tradeCount: data.statistics?.tradeCount || 0,
-              uniqueHolders: data.statistics?.uniqueHolders || 0,
-              priceChange24h: data.statistics?.priceChange24h,
-              highPrice24h: data.statistics?.highPrice24h,
-              lowPrice24h: data.statistics?.lowPrice24h,
-              lastTradeTimestamp: data.statistics?.lastTradeTimestamp,
-            });
-          }
-        }
-        setLoading(false);
-      },
-      (err) => {
-        console.error("Error fetching token:", err);
-        setError("Failed to load token data");
-        setLoading(false);
-      }
-    );
+//   // Firestore subscription for token data
+//   useEffect(() => {
+//     if (!address) return;
 
-    return () => unsubscribe();
-  }, [address, includeStats]);
+//     const unsubscribe = onSnapshot(
+//       doc(db, "tokens", address),
+//       (snapshot) => {
+//         if (!snapshot.exists()) {
+//           setError(prev => ({ ...prev, firestore: "Token not found" }));
+//           setLoading(prev => ({ ...prev, firestore: false }));
+//           return;
+//         }
 
-  // Trades subscription
-  useEffect(() => {
-    if (!address || !includeTrades) return;
+//         const data = snapshot.data();
+//         const baseTokenData: Partial<TokenData> = {
+//           id: snapshot.id,
+//           address: data.address,
+//           name: data.name,
+//           symbol: data.symbol,
+//           creator: data.creator,
+//           description: data.description,
+//           imageUrl: data.imageUrl,
+//           initialPrice: data.initialPrice,
+//           maxSupply: data.maxSupply,
+//           priceRate: data.priceRate,
+//           tradeCooldown: data.tradeCooldown,
+//           maxWalletPercentage: data.maxWalletPercentage,
+//           createdAt: data.createdAt,
+//           creationBlock: data.creationBlock,
+//           transactionHash: data.transactionHash,
+//         };
 
-    const tradesRef = collection(db, "trades");
-    const q = query(
-      tradesRef,
-      where("token", "==", address),
-      orderBy("timestamp", "desc"),
-      limit(tradeLimit)
-    );
+//         if (includeMetrics) {
+//           const metrics: TokenMetrics = {
+//             volumeETH24h: data.metrics?.volumeETH24h || "0",
+//             tradeCount24h: data.metrics?.tradeCount24h || 0,
+//             priceChange24h: data.metrics?.priceChange24h || 0,
+//             highPrice24h: data.metrics?.highPrice24h || "0",
+//             lowPrice24h: data.metrics?.lowPrice24h || "0",
+//             totalVolumeETH: data.metrics?.totalVolumeETH || "0",
+//             totalTradeCount: data.metrics?.totalTradeCount || 0,
+//             uniqueHolders: data.metrics?.uniqueHolders || 0,
+//             marketCap: data.metrics?.marketCap || "0",
+//             buyPressure24h: data.metrics?.buyPressure24h || 0,
+//             lastTradeTimestamp: data.metrics?.lastTradeTimestamp || "",
+//             timeToGoal: data.metrics?.timeToGoal,
+//           };
+//           baseTokenData.metrics = metrics;
+//         }
 
-    const unsubscribe = onSnapshot(
-      q,
-      (snapshot) => {
-        const tradeData = snapshot.docs.map((doc) => {
-          const data = doc.data();
-          return {
-            timestamp: data.timestamp,
-            type: data.type,
-            price: data.pricePerToken,
-            amount: data.tokenAmount,
-            ethAmount: data.ethAmount,
-            trader: data.trader,
-          };
-        });
+//         if (contractState) {
+//           baseTokenData.contractState = contractState;
+//         }
 
-        setTrades(tradeData);
+//         setTokenData(baseTokenData as TokenData);
+//         setLoading(prev => ({ ...prev, firestore: false }));
+//       },
+//       (err) => {
+//         console.error("Error fetching token:", err);
+//         setError(prev => ({ ...prev, firestore: "Failed to load token data" }));
+//         setLoading(prev => ({ ...prev, firestore: false }));
+//       }
+//     );
 
-        // Calculate buy/sell pressure
-        const pressure = tradeData.reduce(
-          (acc, trade) => ({
-            buyAmount:
-              trade.type === "buy"
-                ? (
-                    BigInt(parseEther(acc.buyAmount)) +
-                    BigInt(parseEther(trade.ethAmount))
-                  ).toString()
-                : acc.buyAmount,
-            sellAmount:
-              trade.type === "sell"
-                ? (
-                    BigInt(parseEther(acc.sellAmount)) +
-                    BigInt(parseEther(trade.ethAmount))
-                  ).toString()
-                : acc.sellAmount,
-          }),
-          { buyAmount: "0", sellAmount: "0" }
-        );
+//     return () => unsubscribe();
+//   }, [address, includeMetrics, contractState]);
 
-        setBuySellPressure({
-          buyAmount: "1000",
-          sellAmount: "2000",
-          // buyAmount: formatEther(pressure.buyAmount),
-          // sellAmount: formatEther(pressure.sellAmount),
-        });
-      },
-      (err) => {
-        console.error("Error fetching trades:", err);
-        setError("Failed to load trade data");
-      }
-    );
+//   // Trades subscription
+//   useEffect(() => {
+//     if (!address || !includeTrades) return;
 
-    return () => unsubscribe();
-  }, [address, includeTrades, tradeLimit]);
+//     const tradesQuery = query(
+//       collection(db, "trades"),
+//       where("token", "==", address),
+//       orderBy("timestamp", "desc"),
+//       limit(tradeLimit)
+//     );
 
-  // Event listener for updates
-  useEffect(() => {
-    if (!address) return;
+//     const unsubscribe = onSnapshot(
+//       tradesQuery,
+//       (snapshot) => {
+//         const trades = snapshot.docs.map(doc => {
+//           const data = doc.data();
+//           return {
+//             timestamp: data.timestamp,
+//             type: data.type,
+//             price: data.pricePerToken,
+//             amount: data.tokenAmount,
+//             ethAmount: data.ethAmount,
+//             trader: data.trader,
+//           };
+//         });
 
-    const handleTokenEvent = async (event: {
-      eventName: string;
-      data: any;
-    }) => {
-      if (["TokensPurchased", "TokensSold"].includes(event.eventName)) {
-        await refetch();
-      }
-    };
+//         setRecentTrades(trades);
+//         setLoading(prev => ({ ...prev, trades: false }));
+//       },
+//       (err) => {
+//         console.error("Error fetching trades:", err);
+//         setError(prev => ({ ...prev, trades: "Failed to load trade data" }));
+//         setLoading(prev => ({ ...prev, trades: false }));
+//       }
+//     );
 
-    tokenEventEmitter.addEventListener(address.toLowerCase(), handleTokenEvent);
+//     return () => unsubscribe();
+//   }, [address, includeTrades, tradeLimit]);
 
-    return () => {
-      tokenEventEmitter.removeEventListener(
-        address.toLowerCase(),
-        handleTokenEvent
-      );
-    };
-  }, [address, refetch]);
+//   // Event listener for updates
+//   useEffect(() => {
+//     if (!address) return;
 
-  // Parse contract data
-  const { tokenState, collateral } = useMemo(() => {
-    if (!contractData) {
-      return { tokenState: TokenState.NOT_CREATED, collateral: "0" };
-    }
+//     const handleTokenEvent = async (event: { eventName: string; data: any }) => {
+//       if (["TokensPurchased", "TokensSold"].includes(event.eventName)) {
+//         await refetch();
+//       }
+//     };
 
-    const [priceData, collateralData, stateData] = contractData;
+//     const eventKey = address.toLowerCase();
+//     tokenEventEmitter.addEventListener(eventKey, handleTokenEvent);
 
-    return {
-      tokenState: Number(stateData?.result || 0),
-      collateral: formatEther((collateralData?.result as bigint) || 0n),
-    };
-  }, [contractData]);
+//     return () => {
+//       tokenEventEmitter.removeEventListener(eventKey, handleTokenEvent);
+//     };
+//   }, [address, refetch]);
 
-  return {
-    token,
-    stats,
-    trades,
-    buySellPressure,
-    loading,
-    error,
-    tokenState,
-    collateral,
-  };
-}
+//   // Refresh function
+//   const refresh = async () => {
+//     await refetch();
+//   };
 
-// Optional: Export specialized hooks for specific use cases
-export function useTokenStats(address?: string) {
-  return useToken({ address, includeStats: true, includeTrades: false });
-}
+//   return {
+//     tokenData,
+//     recentTrades,
+//     loading,
+//     error,
+//     refresh,
+//   };
+// }
 
-export function useTokenTrades(address?: string) {
-  return useToken({ address, includeStats: false, includeTrades: true });
-}
+// // Specialized hooks
+// export function useTokenMetrics(address?: string) {
+//   const { tokenData, loading, error } = useToken({
+//     address,
+//     includeMetrics: true,
+//     includeTrades: false
+//   });
+//   return {
+//     metrics: tokenData?.metrics || null,
+//     loading: loading.firestore || loading.contract,
+//     error: error.firestore || error.contract,
+//   };
+// }
 
-export function useTokenPriceOnly(address?: string) {
-  return useToken({ address, includeStats: false, includeTrades: false });
-}
+// export function useTokenTrades(address?: string, limit?: number) {
+//   return useToken({
+//     address,
+//     includeMetrics: false,
+//     includeTrades: true,
+//     tradeLimit: limit
+//   });
+// }
+
+// export function useTokenBase(address?: string) {
+//   return useToken({
+//     address,
+//     includeMetrics: false,
+//     includeTrades: false
+//   });
+// }

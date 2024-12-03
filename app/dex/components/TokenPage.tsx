@@ -8,14 +8,13 @@ import { Sheet, SheetContent, SheetTrigger } from "@/components/ui/sheet";
 import { Button } from "@/components/ui/button";
 import { MessageCircle } from "lucide-react";
 import { TokenData } from "@/types";
-import { ConnectButton } from "@/components/ConnectButton";
 import { useDisconnect } from "wagmi";
 import BondingCurve from "@/components/bonding-curve";
 import RecentTrades from "./RecentTrades";
-import { useToken } from "@/contexts/TokenContext";
+import { useTokenContext } from "@/contexts/TokenContext";
 
 interface TokenPageProps {
-  tokenData: TokenData | null;
+  tokenData: TokenData | null; // Made nullable
   isConnected: boolean;
   loading: boolean;
   address: string;
@@ -28,14 +27,13 @@ export function TokenPage({
   address,
 }: TokenPageProps) {
   const { disconnect } = useDisconnect();
-  const { currentPrice, tokenState } = useToken();
+  const { contractState, metrics } = useTokenContext();
 
-  if (!tokenData) {
+  if (loading || !tokenData) {
     return (
       <div className="container mx-auto pt-20 p-4">
         <div className="flex justify-center items-center h-[80vh]">
-          Token or Pair Not Found. We can&apos;t seem to find the token
-          you&apos;re looking for.
+          {loading ? "Loading token information..." : "Token not found"}
         </div>
       </div>
     );
@@ -44,40 +42,39 @@ export function TokenPage({
   return (
     <div className="container mx-auto pt-20 p-4">
       <div className="grid grid-cols-1 lg:grid-cols-4 gap-6">
-        {/* Main Content Area (3 columns on desktop) */}
+        {/* Main Content Area */}
         <div className="lg:col-span-3 space-y-6">
-          {/* Charts Section */}
-          <div className="grid grid-cols-1 xl:grid-cols-2 gap-6 ">
+          {/* Token Info and Charts Section */}
+          <div className="grid grid-cols-1 xl:grid-cols-2 gap-6">
             <div className="xl:col-span-2">
-              {/* Token Header */}
               <TokenHeader tokenData={tokenData} />
             </div>
             <div className="xl:col-span-2">
               <TokenPriceCharts
                 tokenData={tokenData}
-                price={Number(currentPrice)}
+                price={Number(contractState.currentPrice)}
               />
             </div>
           </div>
 
-          {/* Trade Card Section */}
+          {/* Trading Section */}
           <div className="w-full">
             <TokenTradeCard tokenData={tokenData} isConnected={isConnected} />
           </div>
         </div>
 
-        {/* Right Sidebar (1 column on desktop) */}
+        {/* Right Sidebar */}
         <div className="hidden lg:flex lg:flex-col gap-6">
           <div className="sticky top-24 space-y-6">
             <ChatComponent
               tokenAddress={tokenData.address}
               creatorAddress={tokenData.creator}
             />
-            <RecentTrades tokenAddress={String(address)} />
+            <RecentTrades tokenAddress={address} />
           </div>
         </div>
 
-        {/* Mobile Chat Button */}
+        {/* Mobile Chat Sheet */}
         <Sheet>
           <SheetTrigger asChild>
             <Button
@@ -89,7 +86,10 @@ export function TokenPage({
             </Button>
           </SheetTrigger>
           <SheetContent side="right" className="w-[90%] sm:w-[440px]">
-            <ChatComponent tokenAddress={tokenData.address} />
+            <ChatComponent
+              tokenAddress={tokenData.address}
+              creatorAddress={tokenData.creator}
+            />
           </SheetContent>
         </Sheet>
       </div>

@@ -10,22 +10,36 @@ import { doc, onSnapshot, updateDoc, increment } from "firebase/firestore";
 import { db } from "@/firebase";
 import { formatEther, parseEther } from "viem";
 import { tokenEventEmitter } from "@/components/EventWatcher";
-import { TokenState, TokenStatistics } from "@/types";
+import { TokenState, TokenContractState, TokenMetrics } from "@/types";
 
-interface TokenContextType extends TokenStatistics {
-  tokenState: TokenState;
+interface TokenContextState {
+  contractState: TokenContractState;
+  metrics: TokenMetrics;
   updateVolume: (ethAmount: string) => Promise<void>;
 }
 
-const defaultStats: TokenStatistics = {
+const defaultContractState: TokenContractState = {
   currentPrice: "0",
+  totalSupply: "0",
   collateral: "0",
-  volumeETH: "0",
-  tradeCount: 0,
-  uniqueTraders: 0,
+  state: TokenState.NOT_CREATED,
 };
 
-const TokenContext = createContext<TokenContextType | null>(null);
+const defaultMetrics: TokenMetrics = {
+  volumeETH24h: "0",
+  tradeCount24h: 0,
+  priceChange24h: 0,
+  highPrice24h: "0",
+  lowPrice24h: "0",
+  totalVolumeETH: "0",
+  totalTradeCount: 0,
+  uniqueHolders: 0,
+  marketCap: "0",
+  buyPressure24h: 0,
+  lastTradeTimestamp: "",
+};
+
+const TokenContext = createContext<TokenContextState | null>(null);
 
 export function TokenProvider({
   children,
@@ -34,10 +48,9 @@ export function TokenProvider({
   children: React.ReactNode;
   tokenAddress: string;
 }) {
-  const [stats, setStats] = useState<TokenStatistics>(defaultStats);
-  const [tokenState, setTokenState] = useState<TokenState>(
-    TokenState.NOT_CREATED
-  );
+  const [contractState, setContractState] =
+    useState<TokenContractState>(defaultContractState);
+  const [metrics, setMetrics] = useState<TokenMetrics>(defaultMetrics);
 
   // Update Firestore and local state
   const updateVolume = useCallback(
@@ -46,21 +59,27 @@ export function TokenProvider({
 
       const tokenRef = doc(db, "tokens", tokenAddress);
       try {
+        const ethAmountNumber = Number(formatEther(BigInt(ethAmount)));
+
         // Update Firestore
         await updateDoc(tokenRef, {
-          "statistics.volumeETH": increment(
-            Number(formatEther(BigInt(ethAmount)))
-          ),
-          "statistics.tradeCount": increment(1),
+          "metrics.totalVolumeETH": increment(ethAmountNumber),
+          "metrics.volumeETH24h": increment(ethAmountNumber),
+          "metrics.totalTradeCount": increment(1),
+          "metrics.tradeCount24h": increment(1),
         });
 
         // Update local state
-        setStats((prev) => ({
+        setMetrics((prev) => ({
           ...prev,
-          volumeETH: formatEther(
-            BigInt(parseEther(prev.volumeETH)) + BigInt(ethAmount)
+          totalVolumeETH: formatEther(
+            BigInt(parseEther(prev.totalVolumeETH)) + BigInt(ethAmount)
           ),
-          tradeCount: prev.tradeCount + 1,
+          volumeETH24h: formatEther(
+            BigInt(parseEther(prev.volumeETH24h)) + BigInt(ethAmount)
+          ),
+          totalTradeCount: prev.totalTradeCount + 1,
+          tradeCount24h: prev.tradeCount24h + 1,
         }));
       } catch (error) {
         console.error("Error updating volume:", error);
@@ -77,17 +96,30 @@ export function TokenProvider({
     const unsubscribe = onSnapshot(tokenRef, (doc) => {
       if (doc.exists()) {
         const data = doc.data();
-        setStats({
-          currentPrice: data.statistics?.currentPrice || "0",
-          collateral: data.statistics?.collateral || "0",
-          volumeETH: data.statistics?.volumeETH || "0",
-          tradeCount: data.statistics?.tradeCount || 0,
-          uniqueTraders: data.statistics?.uniqueTraders || 0,
-          lastTradeTimestamp: data.statistics?.lastTradeTimestamp,
-          priceHistory: data.statistics?.priceHistory,
-          metrics24h: data.statistics?.metrics24h,
+
+        // Update contract state
+        setContractState({
+          currentPrice: data.contractState?.currentPrice || "0",
+          totalSupply: data.contractState?.totalSupply || "0",
+          collateral: data.contractState?.collateral || "0",
+          state: data.contractState?.state || TokenState.NOT_CREATED,
         });
-        setTokenState(data.currentState || TokenState.NOT_CREATED);
+
+        // Update metrics
+        setMetrics({
+          volumeETH24h: data.metrics?.volumeETH24h || "0",
+          tradeCount24h: data.metrics?.tradeCount24h || 0,
+          priceChange24h: data.metrics?.priceChange24h || 0,
+          highPrice24h: data.metrics?.highPrice24h || "0",
+          lowPrice24h: data.metrics?.lowPrice24h || "0",
+          totalVolumeETH: data.metrics?.totalVolumeETH || "0",
+          totalTradeCount: data.metrics?.totalTradeCount || 0,
+          uniqueHolders: data.metrics?.uniqueHolders || 0,
+          marketCap: data.metrics?.marketCap || "0",
+          buyPressure24h: data.metrics?.buyPressure24h || 0,
+          lastTradeTimestamp: data.metrics?.lastTradeTimestamp || "",
+          timeToGoal: data.metrics?.timeToGoal,
+        });
       }
     });
 
@@ -107,21 +139,17 @@ export function TokenProvider({
       }
     };
 
-    tokenEventEmitter.addEventListener(
-      tokenAddress.toLowerCase(),
-      handleTokenEvent
-    );
+    const eventKey = tokenAddress.toLowerCase();
+    tokenEventEmitter.addEventListener(eventKey, handleTokenEvent);
+
     return () => {
-      tokenEventEmitter.removeEventListener(
-        tokenAddress.toLowerCase(),
-        handleTokenEvent
-      );
+      tokenEventEmitter.removeEventListener(eventKey, handleTokenEvent);
     };
   }, [tokenAddress, updateVolume]);
 
-  const value: TokenContextType = {
-    ...stats,
-    tokenState,
+  const value: TokenContextState = {
+    contractState,
+    metrics,
     updateVolume,
   };
 
@@ -130,10 +158,22 @@ export function TokenProvider({
   );
 }
 
-export function useToken() {
+// Rename to useTokenContext to avoid confusion with the hook
+export function useTokenContext() {
   const context = useContext(TokenContext);
   if (!context) {
-    throw new Error("useToken must be used within a TokenProvider");
+    throw new Error("useTokenContext must be used within a TokenProvider");
   }
   return context;
+}
+
+// Optional: Export specialized hooks for specific parts of the context
+export function useTokenMetricsContext() {
+  const context = useTokenContext();
+  return context.metrics;
+}
+
+export function useTokenContractContext() {
+  const context = useTokenContext();
+  return context.contractState;
 }

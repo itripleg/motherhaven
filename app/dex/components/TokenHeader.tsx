@@ -1,27 +1,28 @@
 // components/TokenHeader.tsx
-import React from "react";
-import {
-  Card,
-  CardContent,
-  CardDescription,
-  CardHeader,
-  CardTitle,
-} from "@/components/ui/card";
+import React, { useEffect } from "react";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Label } from "@/components/ui/label";
 import { Badge } from "@/components/ui/badge";
 import { AddressComponent } from "@/components/AddressComponent";
 import { TokenData, TokenState } from "@/types";
-import { useToken } from "@/contexts/TokenContext";
+import { useTokenContext } from "@/contexts/TokenContext";
 
 interface TokenHeaderProps {
   tokenData: TokenData;
 }
 
 export function TokenHeader({ tokenData }: TokenHeaderProps) {
-  // Get stats from context instead of props
-  const { currentPrice, volumeETH, tokenState } = useToken();
+  const { contractState, metrics } = useTokenContext();
+
+  // Debug logging
+  useEffect(() => {
+    console.log("TokenHeader - tokenData:", tokenData);
+    console.log("TokenHeader - contractState:", contractState);
+    console.log("TokenHeader - metrics:", metrics);
+  }, [tokenData, contractState, metrics]);
 
   const getTokenStateDisplay = (state: TokenState) => {
+    console.log("Getting state display for:", state);
     switch (state) {
       case TokenState.NOT_CREATED:
         return {
@@ -33,20 +34,26 @@ export function TokenHeader({ tokenData }: TokenHeaderProps) {
           text: "Trading",
           color: "bg-green-600/70",
         };
-      case TokenState.HALTED:
+      case TokenState.GOAL_REACHED:
         return {
           text: "Goal Reached",
           color: "bg-blue-500/80",
         };
+      case TokenState.HALTED:
+        return {
+          text: "Halted",
+          color: "bg-blue-500/80",
+        };
       default:
         return {
-          text: "Unknown",
+          text: `Unknown State: ${state}`,
           color: "bg-gray-500/80",
         };
     }
   };
 
-  const stateDisplay = getTokenStateDisplay(tokenState);
+  // Use contract state instead of token state
+  const stateDisplay = getTokenStateDisplay(contractState.state);
 
   return (
     <Card className="relative overflow-hidden min-h-[300px]">
@@ -89,7 +96,8 @@ export function TokenHeader({ tokenData }: TokenHeaderProps) {
               <div className="backdrop-blur-sm bg-white/10 p-4 rounded-lg">
                 <Label className="text-gray-200">Current Price</Label>
                 <p className="text-white text-lg font-semibold">
-                  {currentPrice} <span className="text-gray-300">AVAX</span>
+                  {contractState.currentPrice}{" "}
+                  <span className="text-gray-300">AVAX</span>
                 </p>
               </div>
               {tokenData.fundingGoal && (
@@ -104,10 +112,17 @@ export function TokenHeader({ tokenData }: TokenHeaderProps) {
             </div>
             <div className="space-y-4">
               <div className="backdrop-blur-sm bg-white/10 p-4 rounded-lg">
-                <Label className="text-gray-200">Trading Volume</Label>
+                <Label className="text-gray-200">24h Volume</Label>
                 <p className="text-white text-lg font-semibold">
-                  {volumeETH}
-                  <span className="text-gray-300">AVAX</span>
+                  {metrics.volumeETH24h}
+                  <span className="text-gray-300"> AVAX</span>
+                </p>
+              </div>
+              <div className="backdrop-blur-sm bg-white/10 p-4 rounded-lg">
+                <Label className="text-gray-200">Total Volume</Label>
+                <p className="text-white text-lg font-semibold">
+                  {metrics.totalVolumeETH}
+                  <span className="text-gray-300"> AVAX</span>
                 </p>
               </div>
             </div>

@@ -10,7 +10,7 @@ import { SearchContainer } from "./components/SearchContainer";
 import { TokenContainer } from "./components/tokens/TokenContainer";
 import { Greeting } from "./components/Greeting";
 // import { useTokenData } from "@/hooks/useTokenData";
-import { Token } from "@/types";
+// import { Token } from "@/types";
 import { useTokenList } from "@/hooks/token/useTokenList";
 
 export default function DexPage() {
