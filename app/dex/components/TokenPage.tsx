@@ -1,3 +1,4 @@
+// components/TokenPage.tsx
 import React from "react";
 import { TokenHeader } from "./TokenHeader";
 import { TokenPriceCharts } from "./TokenPriceCharts";
@@ -6,30 +7,28 @@ import { ChatComponent } from "./ChatComponent";
 import { Sheet, SheetContent, SheetTrigger } from "@/components/ui/sheet";
 import { Button } from "@/components/ui/button";
 import { MessageCircle } from "lucide-react";
-import { TokenData, TokenState } from "@/types";
+import { TokenData } from "@/types";
 import { ConnectButton } from "@/components/ConnectButton";
 import { useDisconnect } from "wagmi";
 import BondingCurve from "@/components/bonding-curve";
 import RecentTrades from "./RecentTrades";
+import { useToken } from "@/contexts/TokenContext";
 
 interface TokenPageProps {
   tokenData: TokenData | null;
-  price: number;
-  tokenState: TokenState;
   isConnected: boolean;
   loading: boolean;
-  address?: string;
+  address: string;
 }
 
 export default function TokenPage({
   tokenData,
-  price,
-  tokenState,
   isConnected,
   loading,
   address,
 }: TokenPageProps) {
   const { disconnect } = useDisconnect();
+  const { currentPrice, tokenState } = useToken();
 
   if (!tokenData) {
     return (
@@ -51,14 +50,13 @@ export default function TokenPage({
           <div className="grid grid-cols-1 xl:grid-cols-2 gap-6 ">
             <div className="xl:col-span-2">
               {/* Token Header */}
-              <TokenHeader
-                tokenData={tokenData}
-                price={price}
-                tokenState={tokenState}
-              />
+              <TokenHeader tokenData={tokenData} />
             </div>
             <div className="xl:col-span-2">
-              <TokenPriceCharts tokenData={tokenData} price={price} />
+              <TokenPriceCharts
+                tokenData={tokenData}
+                price={Number(currentPrice)}
+              />
             </div>
           </div>
 
@@ -75,7 +73,6 @@ export default function TokenPage({
               tokenAddress={tokenData.address}
               creatorAddress={tokenData.creator}
             />
-            {/* <BondingCurve /> */}
             <RecentTrades tokenAddress={String(address)} />
           </div>
         </div>
@@ -92,10 +89,7 @@ export default function TokenPage({
             </Button>
           </SheetTrigger>
           <SheetContent side="right" className="w-[90%] sm:w-[440px]">
-            {/* <div className="h-full space-y-6"> */}
             <ChatComponent tokenAddress={tokenData.address} />
-            {/* <BondingCurve /> */}
-            {/* </div> */}
           </SheetContent>
         </Sheet>
       </div>

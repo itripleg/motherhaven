@@ -1,4 +1,3 @@
-import tokenFactoryMetadata from "@/contracts/token-factory/artifacts/TokenFactory_metadata.json";
 import tokenMetadata from "@/contracts/token-factory/artifacts/Token_metadata.json";
 import factoryABI from "@/contracts/token-factory/BigBoss_abi.json";
 import { Abi } from "viem";

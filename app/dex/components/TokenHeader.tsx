@@ -1,3 +1,4 @@
+// components/TokenHeader.tsx
 import React from "react";
 import {
   Card,
@@ -10,18 +11,16 @@ import { Label } from "@/components/ui/label";
 import { Badge } from "@/components/ui/badge";
 import { AddressComponent } from "@/components/AddressComponent";
 import { TokenData, TokenState } from "@/types";
+import { useToken } from "@/contexts/TokenContext";
 
 interface TokenHeaderProps {
   tokenData: TokenData;
-  price: number;
-  tokenState: TokenState;
 }
 
-export function TokenHeader({
-  tokenData,
-  price,
-  tokenState,
-}: TokenHeaderProps) {
+export function TokenHeader({ tokenData }: TokenHeaderProps) {
+  // Get stats from context instead of props
+  const { currentPrice, volumeETH, tokenState } = useToken();
+
   const getTokenStateDisplay = (state: TokenState) => {
     switch (state) {
       case TokenState.NOT_CREATED:
@@ -36,7 +35,7 @@ export function TokenHeader({
         };
       case TokenState.HALTED:
         return {
-          text: "Goal Reached", // Using "Goal Reached" as the display text since that's currently the only way to halt
+          text: "Goal Reached",
           color: "bg-blue-500/80",
         };
       default:
@@ -48,7 +47,7 @@ export function TokenHeader({
   };
 
   const stateDisplay = getTokenStateDisplay(tokenState);
-  console.log("Token data, is there state?", tokenData);
+
   return (
     <Card className="relative overflow-hidden min-h-[300px]">
       {/* Background Image Layer */}
@@ -90,7 +89,7 @@ export function TokenHeader({
               <div className="backdrop-blur-sm bg-white/10 p-4 rounded-lg">
                 <Label className="text-gray-200">Current Price</Label>
                 <p className="text-white text-lg font-semibold">
-                  {price} <span className="text-gray-300">AVAX</span>
+                  {currentPrice} <span className="text-gray-300">AVAX</span>
                 </p>
               </div>
               {tokenData.fundingGoal && (
@@ -103,17 +102,15 @@ export function TokenHeader({
                 </div>
               )}
             </div>
-            {tokenData.statistics && (
-              <div className="space-y-4">
-                <div className="backdrop-blur-sm bg-white/10 p-4 rounded-lg">
-                  <Label className="text-gray-200">Trading Volume</Label>
-                  <p className="text-white text-lg font-semibold">
-                    {tokenData.statistics.volumeETH}
-                    <span className="text-gray-300">AVAX</span>
-                  </p>
-                </div>
+            <div className="space-y-4">
+              <div className="backdrop-blur-sm bg-white/10 p-4 rounded-lg">
+                <Label className="text-gray-200">Trading Volume</Label>
+                <p className="text-white text-lg font-semibold">
+                  {volumeETH}
+                  <span className="text-gray-300">AVAX</span>
+                </p>
               </div>
-            )}
+            </div>
           </div>
           {tokenData.description && (
             <div className="mt-6 backdrop-blur-sm bg-white/10 p-4 rounded-lg">

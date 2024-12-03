@@ -109,7 +109,7 @@ export function HoldingsOverview() {
         <CardHeader>
           <CardTitle>Holdings Overview</CardTitle>
           <CardDescription>
-            You don&pos;t have any token holdings yet
+            You don&apos;t have any token holdings yet
           </CardDescription>
         </CardHeader>
       </Card>
@@ -157,3 +157,5 @@ export function HoldingsOverview() {
     </Card>
   );
 }
+
+export default HoldingsOverview;

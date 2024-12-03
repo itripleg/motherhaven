@@ -9,6 +9,7 @@ import { getFormattedTokenData } from "@/utils/tokenUtils";
 import { useTokenStats } from "@/hooks/token/useTokenStats";
 import TokenPage from "../components/TokenPage";
 import { tokenEventEmitter } from "@/components/EventWatcher";
+import { TokenProvider } from "@/contexts/TokenContext";
 
 export default function Page() {
   const { tokenAddress } = useParams();
@@ -97,14 +98,14 @@ export default function Page() {
   if (!publicClient) return <div>Initializing...</div>;
   if (loading || statsLoading) {
     return (
-      <TokenPage
-        loading
-        tokenData={null}
-        price={0}
-        tokenState={tokenState}
-        isConnected={false}
-        address={String(tokenAddress)}
-      />
+      <TokenProvider tokenAddress={tokenAddress as string}>
+        <TokenPage
+          loading
+          tokenData={null}
+          isConnected={false}
+          address={String(tokenAddress)}
+        />
+      </TokenProvider>
     );
   }
 
@@ -127,13 +128,13 @@ export default function Page() {
   }
 
   return (
-    <TokenPage
-      tokenData={tokenData}
-      price={Number(currentPrice || 0)}
-      tokenState={tokenState}
-      isConnected={false}
-      loading={false}
-      address={String(tokenAddress)}
-    />
+    <TokenProvider tokenAddress={tokenAddress as string}>
+      <TokenPage
+        tokenData={tokenData}
+        isConnected={false}
+        loading={false}
+        address={String(tokenAddress)}
+      />
+    </TokenProvider>
   );
 }

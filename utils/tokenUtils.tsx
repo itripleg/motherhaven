@@ -52,7 +52,6 @@ function serializeBigInt(obj: any): any {
   );
 }
 
-// Modified to accept publicClient as parameter
 export async function getTokenMetadata(
   tokenAddress: string,
   publicClient: PublicClient
@@ -63,9 +62,10 @@ export async function getTokenMetadata(
       client: publicClient,
     });
 
-    const result = await contract.read.getTokenMetadata([
+    // Add type assertion for the result
+    const result = (await contract.read.getTokenMetadata([
       tokenAddress as `0x${string}`,
-    ]);
+    ])) as [string, string, string, bigint, bigint];
 
     const [name, symbol, imageUrl, fundingGoal, createdAt] = result;
 
@@ -81,7 +81,6 @@ export async function getTokenMetadata(
     throw error;
   }
 }
-
 export function formatTokenData(
   firestoreData: any,
   id: string,
