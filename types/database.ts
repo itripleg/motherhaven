@@ -2,20 +2,22 @@
 
 import { Timestamp } from "firebase/firestore";
 import { TokenState } from "./enums";
+import { Address } from "viem";
 
 // Basic token interface for grid display
 export interface Token {
-  id: string;
+  id: string; //string representation of token address
   name: string;
   symbol: string;
-  address: string;
-  currentPrice: number;
-  createdAt: Date;
+  address: Address;
+  currentPrice: number; //this may need to be a bigint? or a string?
+  createdAt: Date; //should be compatible with firestore timestamp
   imageUrl?: string;
 }
 
+// This whole interface needs to be rethought - do we even need it? things are things we want to calculate or derive
 export interface TokenStatistics {
-  totalSupply: string; // From contract totalSupply()
+  totalSupply: string; // This does not exist in the factory contract it's an ERC20 function
   currentPrice: string; // From getCurrentPrice()
   volumeETH: string; // Calculated from TokensPurchased and TokensSold events
   tradeCount: number; // Count of trades from events
