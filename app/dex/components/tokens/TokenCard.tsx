@@ -21,7 +21,7 @@ export const TokenCard = ({
   price: string;
 }) => {
   const router = useRouter();
-  const displayPrice = `$${Number(price).toFixed(4)}`;
+  const displayPrice = `$${Number(price).toFixed(9)}`;
 
   return (
     <motion.div whileHover={{ scale: 1.05 }} whileTap={{ scale: 0.95 }}>

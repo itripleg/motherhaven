@@ -48,7 +48,7 @@ export function TokenHeader({
   };
 
   const stateDisplay = getTokenStateDisplay(tokenState);
-  console.log("Token data, is there state?", tokenData);
+  // console.log("Token data, is there state?", tokenData);
   return (
     <Card className="relative overflow-hidden min-h-[300px]">
       {/* Background Image Layer */}

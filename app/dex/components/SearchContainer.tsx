@@ -10,8 +10,8 @@ import { TokenPriceCategory } from "@/hooks/token/useTokenList";
 interface SearchContainerProps {
   searchMode: string;
   setSearchMode: (mode: string) => void;
-  cameraRef: React.RefObject<any>;
-  controlRef: React.RefObject<any>;
+  cameraRef?: React.RefObject<any>;
+  controlRef?: React.RefObject<any>;
   searchQuery: string;
   setSearchQuery: (query: TokenPriceCategory) => void;
   setActiveCategory: (category: TokenPriceCategory) => void;
@@ -71,7 +71,7 @@ export const SearchContainer = ({
             className="z-60"
             onClick={() => {
               moveCamPosition({ cameraRef, x: 0, y: 0, z: -7, scale: 1 });
-              if (controlRef.current) {
+              if (controlRef?.current) {
                 controlRef.current.autoRotateSpeed = 1;
               }
             }}

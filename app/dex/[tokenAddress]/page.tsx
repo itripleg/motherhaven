@@ -9,6 +9,8 @@ import { getFormattedTokenData } from "@/utils/tokenUtils";
 import { useTokenStats } from "@/hooks/token/useTokenStats";
 import TokenPage from "../components/TokenPage";
 import { tokenEventEmitter } from "@/components/EventWatcher";
+import { Skeleton } from "@/components/ui/skeleton";
+import { TokenNotFound } from "../components/TokenNotFound";
 
 export default function Page() {
   const { tokenAddress } = useParams();
@@ -97,23 +99,19 @@ export default function Page() {
   if (!publicClient) return <div>Initializing...</div>;
   if (loading || statsLoading) {
     return (
-      <TokenPage
-        loading
-        tokenData={null}
-        price={0}
-        tokenState={tokenState}
-        isConnected={false}
-        address={String(tokenAddress)}
-      />
+      <div className="container mx-auto py-8">
+        <Skeleton className="h-12 w-3/4 mb-4" />
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+          <Skeleton className="h-[200px]" />
+          <Skeleton className="h-[200px]" />
+          <Skeleton className="h-[200px]" />
+        </div>
+      </div>
     );
   }
 
   if (!tokenData) {
-    return (
-      <div className="p-4 text-center">
-        <h1 className="text-2xl font-bold text-red-500">Token not found</h1>
-      </div>
-    );
+    return <TokenNotFound address={String(tokenAddress)} />;
   }
 
   if (statsError) {

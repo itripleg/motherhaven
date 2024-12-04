@@ -8,7 +8,7 @@ import OuijAi from "@/components-3d/Ouija/OuijaAndFletcha";
 
 // CameraSearch.tsx
 interface CameraSearchProps {
-  cameraRef: React.RefObject<any>;
+  cameraRef?: React.RefObject<any>;
   onSecretFound: () => void;
   showSecret: boolean;
 }
