@@ -1,56 +1,4 @@
 import React from "react";
-<<<<<<< Updated upstream
-import {
-  Card,
-  CardContent,
-  CardDescription,
-  CardHeader,
-  CardTitle,
-} from "@/components/ui/card";
-import { Label } from "@/components/ui/label";
-import { Badge } from "@/components/ui/badge";
-import { AddressComponent } from "@/components/AddressComponent";
-import { TokenData, TokenState } from "@/types";
-
-interface TokenHeaderProps {
-  tokenData: TokenData;
-  price: number;
-  tokenState: TokenState;
-}
-
-export function TokenHeader({
-  tokenData,
-  price,
-  tokenState,
-}: TokenHeaderProps) {
-  const getTokenStateDisplay = (state: TokenState) => {
-    switch (state) {
-      case TokenState.NOT_CREATED:
-        return {
-          text: "Not Created",
-          color: "bg-red-500/80",
-        };
-      case TokenState.TRADING:
-        return {
-          text: "Trading",
-          color: "bg-green-600/70",
-        };
-      case TokenState.HALTED:
-        return {
-          text: "Goal Reached", // Using "Goal Reached" as the display text since that's currently the only way to halt
-          color: "bg-blue-500/80",
-        };
-      default:
-        return {
-          text: "Unknown",
-          color: "bg-gray-500/80",
-        };
-    }
-  };
-
-  const stateDisplay = getTokenStateDisplay(tokenState);
-  // console.log("Token data, is there state?", tokenData);
-=======
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Label } from "@/components/ui/label";
 import { Badge } from "@/components/ui/badge";
@@ -99,12 +47,8 @@ export function TokenHeader() {
         color: "bg-yellow-500/80",
       },
       [TokenState.NOT_CREATED]: {
-        text: "Not Created",
+        text: "Liquidated",
         color: "bg-red-500/80",
-      },
-      [TokenState.RESUMED]: {
-        text: "Resumed",
-        color: "bg-blue-500/80",
       },
     };
 
@@ -118,7 +62,6 @@ export function TokenHeader() {
 
   const stateDisplay = getStateDisplay(token.state);
 
->>>>>>> Stashed changes
   return (
     <Card className="relative overflow-hidden min-h-[300px]">
       {/* Background Image Layer */}
@@ -160,12 +103,8 @@ export function TokenHeader() {
               <div className="backdrop-blur-sm bg-white/10 p-4 rounded-lg">
                 <Label className="text-gray-200">Current Price</Label>
                 <p className="text-white text-lg font-semibold">
-<<<<<<< Updated upstream
-                  {price} <span className="text-gray-300">AVAX</span>
-=======
                   {stats?.currentPrice || "0"}{" "}
                   <span className="text-gray-300">AVAX</span>
->>>>>>> Stashed changes
                 </p>
               </div>
               {token.fundingGoal !== "0" && (
@@ -178,17 +117,6 @@ export function TokenHeader() {
                 </div>
               )}
             </div>
-<<<<<<< Updated upstream
-            {tokenData.statistics && (
-              <div className="space-y-4">
-                <div className="backdrop-blur-sm bg-white/10 p-4 rounded-lg">
-                  <Label className="text-gray-200">Trading Volume</Label>
-                  <p className="text-white text-lg font-semibold">
-                    {tokenData.statistics.volumeETH}
-                    <span className="text-gray-300">AVAX</span>
-                  </p>
-                </div>
-=======
 
             <div className="space-y-4">
               <div className="backdrop-blur-sm bg-white/10 p-4 rounded-lg">
@@ -203,9 +131,8 @@ export function TokenHeader() {
                 <p className="text-white text-lg font-semibold">
                   {stats?.uniqueHolders || 0}
                 </p>
->>>>>>> Stashed changes
               </div>
-            )}
+            </div>
           </div>
         </CardContent>
       </div>

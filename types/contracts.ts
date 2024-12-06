@@ -1,13 +1,6 @@
-<<<<<<< Updated upstream
-import tokenFactoryMetadata from "@/contracts/token-factory/artifacts/TokenFactory_metadata.json";
-import tokenMetadata from "@/contracts/token-factory/artifacts/Token_metadata.json";
-import factoryABI from "@/contracts/token-factory/BigBoss_abi.json";
-import { Abi } from "viem";
-=======
 import tokenABI from "@/contracts/new-factory/Token_abi.json";
 import factoryABI from "@/contracts/new-factory/Factory_abi.json";
 import { Abi, Address } from "viem";
->>>>>>> Stashed changes
 
 // Helper type for Ethereum addresses
 // export type Address = `0x${string}`;

@@ -1,62 +1,22 @@
-import React, {
-  createContext,
-  useContext,
-  useEffect,
-  useState,
-  useCallback,
-} from "react";
-import { doc, onSnapshot, updateDoc, increment } from "firebase/firestore";
-import { formatEther, parseEther } from "viem";
+"use client";
+import React, { createContext, useContext, useEffect, useState } from "react";
+import { doc, onSnapshot } from "firebase/firestore";
 import { db } from "@/firebase";
-import { TokenState, TokenStats } from "@/types";
+import { Token, TokenState, TokenStats } from "@/types";
 
-interface Token {
-  address: string;
-  name: string;
-  symbol: string;
-  imageUrl: string;
-  creator: string;
-  burnManager: string;
-  state: TokenState;
-  collateral: string;
-  fundingGoal: string;
-  createdAt: string;
-  blockNumber: number;
-  transactionHash: string;
-  stats: TokenStats;
-}
-
-// Simplified context state
 interface TokenContextState {
   token: Token | null;
   loading: boolean;
   error: string | null;
-  updateTokenStats: (newStats: Partial<TokenStats>) => Promise<void>;
 }
 
 const TokenContext = createContext<TokenContextState | null>(null);
 
-// Initial token state
-const DEFAULT_TOKEN: Token = {
-  address: "0x0",
-  name: "",
-  symbol: "",
-  imageUrl: "",
-  creator: "0x0",
-  burnManager: "0x0",
-  state: TokenState.NOT_CREATED,
-  collateral: "0",
-  fundingGoal: "0",
-  createdAt: "",
-  blockNumber: 0,
-  transactionHash: "",
-  stats: {
-    totalSupply: "0",
-    currentPrice: "0",
-    volumeETH: "0",
-    tradeCount: 0,
-    uniqueHolders: 0,
-  },
+// Helper to safely get nested properties
+const safeGet = (obj: any, path: string, defaultValue: any) => {
+  return path
+    .split(".")
+    .reduce((acc, part) => (acc && acc[part] ? acc[part] : defaultValue), obj);
 };
 
 export function TokenProvider({
@@ -70,37 +30,6 @@ export function TokenProvider({
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
-  // Update token stats in both Firestore and local state
-  const updateTokenStats = useCallback(
-    async (newStats: Partial<TokenStats>) => {
-      if (!token) return;
-
-      try {
-        const tokenRef = doc(db, "tokens", token.address);
-
-        // Update Firestore
-        await updateDoc(tokenRef, {
-          stats: { ...token.stats, ...newStats },
-        });
-
-        // Update local state
-        setToken((currentToken: any) =>
-          currentToken
-            ? {
-                ...currentToken,
-                stats: { ...currentToken.stats, ...newStats },
-              }
-            : null
-        );
-      } catch (err) {
-        console.error("Error updating token stats:", err);
-        setError("Failed to update token statistics");
-      }
-    },
-    [token]
-  );
-
-  // Listen to Firestore updates
   useEffect(() => {
     if (!tokenAddress) return;
 
@@ -112,28 +41,97 @@ export function TokenProvider({
       (doc) => {
         if (doc.exists()) {
           const data = doc.data();
-          setToken({
-            address: tokenAddress,
-            name: data.name,
-            symbol: data.symbol,
-            imageUrl: data.imageUrl,
-            creator: data.creator,
-            burnManager: data.burnManager,
-            state: data.state,
-            collateral: data.collateral,
-            fundingGoal: data.fundingGoal,
-            createdAt: data.createdAt,
-            blockNumber: data.blockNumber,
-            transactionHash: data.transactionHash,
-            stats: {
-              totalSupply: data.stats?.totalSupply || "0",
-              currentPrice: data.stats?.currentPrice || "0",
-              volumeETH: data.stats?.volumeETH || "0",
-              tradeCount: data.stats?.tradeCount || 0,
-              uniqueHolders: data.stats?.uniqueHolders || 0,
-            },
-          });
-          setError(null);
+          console.log("Raw Firestore data:", data); // Debug log
+
+          try {
+            const tokenData: Token = {
+              // Basic token information
+              address: tokenAddress as `0x${string}`,
+              name: data.name || "",
+              symbol: data.symbol || "",
+              imageUrl: data.imageUrl || "",
+              description: data.description,
+
+              // Contract parameters
+              creator: (data.creator || "0x0") as `0x${string}`,
+              burnManager: (data.burnManager || "0x0") as `0x${string}`,
+              fundingGoal: data.fundingGoal?.toString() || "0",
+              initialPrice: safeGet(data, "initialPrice", "0").toString(),
+              maxSupply: safeGet(data, "maxSupply", "0").toString(),
+              priceRate: safeGet(data, "priceRate", "0").toString(),
+              tradeCooldown: safeGet(data, "tradeCooldown", 0),
+              maxWalletPercentage: safeGet(data, "maxWalletPercentage", 0),
+
+              // Current state
+              state: data.currentState || TokenState.Active,
+              collateral: data.collateral?.toString() || "0",
+
+              // Metadata
+              createdAt: data.createdAt || "",
+              blockNumber: data.blockNumber || 0,
+              transactionHash: data.transactionHash || "",
+
+              // Statistics
+              stats: {
+                totalSupply: safeGet(
+                  data,
+                  "statistics.totalSupply",
+                  "0"
+                ).toString(),
+                currentPrice: safeGet(
+                  data,
+                  "statistics.currentPrice",
+                  "0"
+                ).toString(),
+                volumeETH: safeGet(
+                  data,
+                  "statistics.volumeETH",
+                  "0"
+                ).toString(),
+                tradeCount: safeGet(data, "statistics.tradeCount", 0),
+                uniqueHolders: safeGet(data, "statistics.uniqueHolders", 0),
+
+                // 24h metrics
+                volumeETH24h: safeGet(
+                  data,
+                  "statistics.volumeETH24h",
+                  "0"
+                ).toString(),
+                priceChange24h: safeGet(data, "statistics.priceChange24h", 0),
+                highPrice24h: safeGet(
+                  data,
+                  "statistics.highPrice24h",
+                  "0"
+                ).toString(),
+                lowPrice24h: safeGet(
+                  data,
+                  "statistics.lowPrice24h",
+                  "0"
+                ).toString(),
+                buyPressure24h: safeGet(data, "statistics.buyPressure24h", 0),
+              },
+
+              // Latest trade (if exists)
+              lastTrade: data.lastTrade
+                ? {
+                    timestamp: data.lastTrade.timestamp,
+                    type: data.lastTrade.type,
+                    price: data.lastTrade.price.toString(),
+                    amount: data.lastTrade.amount.toString(),
+                    ethAmount: data.lastTrade.ethAmount.toString(),
+                    trader: data.lastTrade.trader as `0x${string}`,
+                  }
+                : undefined,
+            };
+
+            console.log("Mapped token data:", tokenData); // Debug log
+            setToken(tokenData);
+            setError(null);
+          } catch (err) {
+            console.error("Error mapping token data:", err);
+            setError("Error processing token data");
+            setToken(null);
+          }
         } else {
           setToken(null);
           setError("Token not found");
@@ -143,6 +141,7 @@ export function TokenProvider({
       (err) => {
         console.error("Error fetching token:", err);
         setError("Failed to load token data");
+        setToken(null);
         setLoading(false);
       }
     );
@@ -154,7 +153,6 @@ export function TokenProvider({
     token,
     loading,
     error,
-    updateTokenStats,
   };
 
   return (
@@ -162,7 +160,7 @@ export function TokenProvider({
   );
 }
 
-// Main hook for accessing token context
+// Hook for accessing token context
 export function useToken() {
   const context = useContext(TokenContext);
   if (!context) {
@@ -177,11 +175,6 @@ export function useTokenStats() {
   return token?.stats;
 }
 
-export function useTokenState() {
-  const { token } = useToken();
-  return token?.state;
-}
-
 export function useTokenMetadata() {
   const { token } = useToken();
   if (!token) return null;
@@ -190,6 +183,7 @@ export function useTokenMetadata() {
     name: token.name,
     symbol: token.symbol,
     imageUrl: token.imageUrl,
+    description: token.description,
     creator: token.creator,
   };
 }

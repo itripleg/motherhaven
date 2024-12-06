@@ -1,6 +1,3 @@
-// Core type for Ethereum addresses with validation
-type Address = `0x${string}`;
-
 // every token
 enum TokenState {
   NOT_CREATED = 0,
@@ -9,59 +6,74 @@ enum TokenState {
   RESUMED = 3,
 }
 
-// Basic token statistics that we track
+// types/token.ts
+
+type Address = `0x${string}`;
+
+enum TokenState {
+  Active = 1,
+  Paused = 2,
+  Liquidated = 3,
+}
+
 interface TokenStats {
   totalSupply: string;
   currentPrice: string;
   volumeETH: string;
   tradeCount: number;
   uniqueHolders: number;
+
+  // 24h metrics
+  volumeETH24h: string;
+  priceChange24h: number;
+  highPrice24h: string;
+  lowPrice24h: string;
+  buyPressure24h: number;
 }
 
-// Main token data structure combining essential fields
+interface TokenTrade {
+  timestamp: string;
+  type: "buy" | "sell";
+  price: string;
+  amount: string;
+  ethAmount: string;
+  trader: Address;
+}
+
 interface Token {
   // Basic token information
   address: Address;
-  burnManager: Address;
-  creator: Address;
-  state: TokenState;
   name: string;
   symbol: string;
   imageUrl: string;
-  totalSupply: string;
+  description?: string;
+
+  // Contract parameters
+  creator: Address;
+  burnManager: Address;
+  fundingGoal: string;
+  initialPrice: string;
+  maxSupply: string;
+  priceRate: string;
+  tradeCooldown: number;
+  maxWalletPercentage: number;
+
+  // Current state
+  state: TokenState;
+  collateral: string;
+
   // Metadata
   createdAt: string;
-  transactionHash: string;
-}
-
-// Event types for tracking token activities
-interface TokenEvent {
-  token: Address;
-  timestamp: string;
   blockNumber: number;
   transactionHash: string;
+
+  // Statistics
+  stats: TokenStats;
+
+  // Latest trade
+  lastTrade?: TokenTrade;
 }
 
-interface TradeEvent extends TokenEvent {
-  trader: Address;
-  amount: string;
-  price: string;
-  fee: string;
-  type: "buy" | "sell";
-}
-
-interface StateChangeEvent extends TokenEvent {
-  newState: TokenState;
-  reason?: string;
-}
-
-export type {
-  Address,
-  Token,
-  TokenStats,
-  TokenEvent,
-  TradeEvent,
-  StateChangeEvent,
-};
+export type { Address, Token, TokenStats, TokenTrade };
 
 export { TokenState };

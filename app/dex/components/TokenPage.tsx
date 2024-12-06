@@ -1,3 +1,4 @@
+"use client";
 import React from "react";
 import { TokenHeader } from "./TokenHeader";
 import { TokenPriceCharts } from "./TokenPriceCharts";
@@ -6,45 +7,32 @@ import { ChatComponent } from "./ChatComponent";
 import { Sheet, SheetContent, SheetTrigger } from "@/components/ui/sheet";
 import { Button } from "@/components/ui/button";
 import { MessageCircle } from "lucide-react";
-import { TokenData, TokenState } from "@/types";
 import { ConnectButton } from "@/components/ConnectButton";
 import { useDisconnect } from "wagmi";
-import BondingCurve from "@/components/bonding-curve";
 import RecentTrades from "./RecentTrades";
-<<<<<<< Updated upstream
-=======
 import { useToken } from "@/contexts/TokenContext";
->>>>>>> Stashed changes
 
-interface TokenPageProps {
-  tokenData: TokenData | null;
-  price: number;
-  tokenState: TokenState;
-  isConnected: boolean;
-  loading: boolean;
-  address?: string;
-}
-
-export default function TokenPage({
-  tokenData,
-  price,
-  tokenState,
-  isConnected,
-  loading,
-  address,
-}: TokenPageProps) {
+export default function TokenPage() {
+  const { token, loading, error } = useToken();
   const { disconnect } = useDisconnect();
-<<<<<<< Updated upstream
-=======
-  // const { contractState, metrics } = useToken();
->>>>>>> Stashed changes
 
-  if (!tokenData) {
+  if (loading) {
     return (
       <div className="container mx-auto pt-20 p-4">
-        <div className="flex justify-center items-center h-[80vh]">
-          Token or Pair Not Found. We can&apos;t seem to find the token
-          you&apos;re looking for.
+        <div className="animate-pulse space-y-6">
+          <div className="h-64 bg-gray-200/20 rounded-lg" />
+          <div className="h-96 bg-gray-200/20 rounded-lg" />
+        </div>
+      </div>
+    );
+  }
+
+  if (error || !token) {
+    return (
+      <div className="container mx-auto pt-20 p-4">
+        <div className="flex justify-center items-center h-[80vh] text-red-500">
+          {error ||
+            "Token not found. We can't seem to find the token you're looking for."}
         </div>
       </div>
     );
@@ -56,45 +44,25 @@ export default function TokenPage({
         {/* Main Content Area (3 columns on desktop) */}
         <div className="lg:col-span-3 space-y-6">
           {/* Charts Section */}
-          <div className="grid grid-cols-1 xl:grid-cols-2 gap-6 ">
+          <div className="grid grid-cols-1 xl:grid-cols-2 gap-6">
             <div className="xl:col-span-2">
-<<<<<<< Updated upstream
-              {/* Token Header */}
-              <TokenHeader
-                tokenData={tokenData}
-                price={price}
-                tokenState={tokenState}
-              />
-=======
-              {/* <TokenHeader tokenData={tokenData} /> */}
+              <TokenHeader />
             </div>
-            <div className="xl:col-span-2">
-              {/* <TokenPriceCharts
-                tokenData={tokenData}
-                price={Number(contractState.currentPrice)}
-              /> */}
->>>>>>> Stashed changes
-            </div>
-            <div className="xl:col-span-2">
-              <TokenPriceCharts tokenData={tokenData} price={price} />
-            </div>
+            <div className="xl:col-span-2">{/* <TokenPriceCharts /> */}</div>
           </div>
 
           {/* Trade Card Section */}
-          <div className="w-full">
-            <TokenTradeCard tokenData={tokenData} isConnected={isConnected} />
-          </div>
+          <div className="w-full">{/* <TokenTradeCard /> */}</div>
         </div>
 
         {/* Right Sidebar (1 column on desktop) */}
         <div className="hidden lg:flex lg:flex-col gap-6">
           <div className="sticky top-24 space-y-6">
             <ChatComponent
-              tokenAddress={tokenData.address}
-              creatorAddress={tokenData.creator}
+              tokenAddress={token.address}
+              creatorAddress={token.creator}
             />
-            {/* <BondingCurve /> */}
-            <RecentTrades tokenAddress={String(address)} />
+            <RecentTrades tokenAddress={token.address} />
           </div>
         </div>
 
@@ -110,10 +78,7 @@ export default function TokenPage({
             </Button>
           </SheetTrigger>
           <SheetContent side="right" className="w-[90%] sm:w-[440px]">
-            {/* <div className="h-full space-y-6"> */}
-            <ChatComponent tokenAddress={tokenData.address} />
-            {/* <BondingCurve /> */}
-            {/* </div> */}
+            <ChatComponent tokenAddress={token.address} />
           </SheetContent>
         </Sheet>
       </div>
