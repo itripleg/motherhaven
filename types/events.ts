@@ -8,6 +8,7 @@ export type TokenCreatedEvent = {
   imageUrl: string;
   creator: Hex;
   fundingGoal: bigint;
+  burnManager: Hex;
 };
 
 export type TokensPurchasedEvent = {
@@ -15,6 +16,7 @@ export type TokensPurchasedEvent = {
   buyer: Hex;
   amount: bigint;
   price: bigint;
+  fee: bigint;
 };
 
 export type TokensSoldEvent = {
@@ -22,6 +24,7 @@ export type TokensSoldEvent = {
   seller: Hex;
   tokenAmount: bigint;
   ethAmount: bigint;
+  fee: bigint;
 };
 
 export type TradingHaltedEvent = {

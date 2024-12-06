@@ -15,20 +15,30 @@ import { TokenInfoForm } from "./TokenInfoForm";
 import { TokenomicsForm } from "./TokenomicsForm";
 import { Button } from "@/components/ui/button";
 import { useWriteContract, useWaitForTransactionReceipt } from "wagmi";
-import { parseEther } from "viem";
+import { zeroAddress } from "viem"; // Changed from ethers to viem
 import { useToast } from "@/hooks/use-toast";
 import { AddressComponent } from "@/components/AddressComponent";
 import { ref, uploadBytes, getDownloadURL } from "firebase/storage";
 import { FACTORY_ADDRESS } from "@/types";
 
-import ABI from "@/contracts/token-factory/BigBoss_abi.json";
+import ABI from "@/contracts/new-factory/Factory_abi.json";
+
+// Update TokenInfo interface to include optional burnManager
+interface TokenInfo {
+  name: string;
+  ticker: string;
+  description: string;
+  image: File | null;
+  burnManager?: `0x${string}`; // Optional burn manager address
+}
 
 function Page() {
-  const [tokenInfo, setTokenInfo] = useState({
+  const [tokenInfo, setTokenInfo] = useState<TokenInfo>({
     name: "",
     ticker: "",
     description: "",
-    image: null as File | null,
+    image: null,
+    burnManager: undefined,
   });
 
   const [tokenomics, setTokenomics] = useState({
@@ -99,7 +109,12 @@ function Page() {
         abi: ABI,
         address: FACTORY_ADDRESS,
         functionName: "createToken",
-        args: [tokenInfo.name, tokenInfo.ticker, imageUrl],
+        args: [
+          tokenInfo.name,
+          tokenInfo.ticker,
+          imageUrl,
+          tokenInfo.burnManager || zeroAddress, // Use viem's zeroAddress
+        ],
       });
 
       toast({
@@ -198,6 +213,9 @@ function Page() {
                   <p>Name: {tokenInfo.name}</p>
                   <p>Symbol: {tokenInfo.ticker}</p>
                   <p>Funding Goal: {tokenomics.fundingGoal} ETH</p>
+                  {tokenInfo.burnManager && (
+                    <p>Burn Manager: {tokenInfo.burnManager}</p>
+                  )}
                   <div className="flex items-center mt-1">
                     <span>Transaction: </span>
                     <AddressComponent hash={`${transactionData}`} type="tx" />

@@ -11,6 +11,10 @@ import { ConnectButton } from "@/components/ConnectButton";
 import { useDisconnect } from "wagmi";
 import BondingCurve from "@/components/bonding-curve";
 import RecentTrades from "./RecentTrades";
+<<<<<<< Updated upstream
+=======
+import { useToken } from "@/contexts/TokenContext";
+>>>>>>> Stashed changes
 
 interface TokenPageProps {
   tokenData: TokenData | null;
@@ -30,6 +34,10 @@ export default function TokenPage({
   address,
 }: TokenPageProps) {
   const { disconnect } = useDisconnect();
+<<<<<<< Updated upstream
+=======
+  // const { contractState, metrics } = useToken();
+>>>>>>> Stashed changes
 
   if (!tokenData) {
     return (
@@ -50,12 +58,22 @@ export default function TokenPage({
           {/* Charts Section */}
           <div className="grid grid-cols-1 xl:grid-cols-2 gap-6 ">
             <div className="xl:col-span-2">
+<<<<<<< Updated upstream
               {/* Token Header */}
               <TokenHeader
                 tokenData={tokenData}
                 price={price}
                 tokenState={tokenState}
               />
+=======
+              {/* <TokenHeader tokenData={tokenData} /> */}
+            </div>
+            <div className="xl:col-span-2">
+              {/* <TokenPriceCharts
+                tokenData={tokenData}
+                price={Number(contractState.currentPrice)}
+              /> */}
+>>>>>>> Stashed changes
             </div>
             <div className="xl:col-span-2">
               <TokenPriceCharts tokenData={tokenData} price={price} />

@@ -12,10 +12,13 @@ import { tokenEventEmitter } from "@/components/EventWatcher";
 import { Skeleton } from "@/components/ui/skeleton";
 import { TokenNotFound } from "../components/TokenNotFound";
 
+import { Token, TokenState, isValidToken } from "@/types";
+
 export default function Page() {
   const { tokenAddress } = useParams();
-  const publicClient = usePublicClient();
+  const [token, setToken] = useState<Token | null>(null);
   const [loading, setLoading] = useState(true);
+<<<<<<< Updated upstream
   const [tokenData, setTokenData] = useState<TokenData | null>(null);
 
   const {
@@ -30,10 +33,15 @@ export default function Page() {
   } = useTokenStats({ tokenAddress: tokenAddress as string });
 
   // Fetch token data function
+=======
+  const [error, setError] = useState<string | null>(null);
+
+>>>>>>> Stashed changes
   const fetchTokenData = async () => {
-    if (!tokenAddress || !publicClient) return;
+    if (!tokenAddress) return;
 
     try {
+<<<<<<< Updated upstream
       const tokenDocRef = doc(db, "tokens", tokenAddress as string);
       const tokenDoc = await getDoc(tokenDocRef);
 
@@ -56,6 +64,22 @@ export default function Page() {
       }
     } catch (error) {
       console.error("Error fetching token data:", error);
+=======
+      const doc = await getDoc(doc(db, "tokens", tokenAddress));
+
+      if (doc.exists()) {
+        const data = doc.data();
+        if (isValidToken(data)) {
+          setToken(data);
+        } else {
+          setError("Invalid token data");
+        }
+      } else {
+        setError("Token not found");
+      }
+    } catch (error) {
+      setError("Error loading token");
+>>>>>>> Stashed changes
     } finally {
       setLoading(false);
     }
@@ -63,6 +87,7 @@ export default function Page() {
 
   // Initial data fetch
   useEffect(() => {
+<<<<<<< Updated upstream
     fetchTokenData();
   }, [
     tokenAddress,
@@ -105,11 +130,26 @@ export default function Page() {
           <Skeleton className="h-[200px]" />
           <Skeleton className="h-[200px]" />
           <Skeleton className="h-[200px]" />
+=======
+    if (tokenAddress && publicClient) {
+      console.log("Fetching token data for:", tokenAddress);
+      fetchTokenData();
+    }
+  }, [tokenAddress, publicClient, currentPrice, collateral, tokenState]);
+
+  if (error) {
+    return (
+      <div className="flex justify-center items-center min-h-screen">
+        <div className="text-red-500 text-center">
+          <p>Error encountered:</p>
+          <p>{error}</p>
+>>>>>>> Stashed changes
         </div>
       </div>
     );
   }
 
+<<<<<<< Updated upstream
   if (!tokenData) {
     return <TokenNotFound address={String(tokenAddress)} />;
   }
@@ -120,6 +160,12 @@ export default function Page() {
         <h1 className="text-2xl font-bold text-red-500">
           Error loading token stats: {statsError}
         </h1>
+=======
+  if (!publicClient) {
+    return (
+      <div className="flex justify-center items-center min-h-screen">
+        <div>Connecting to network...</div>
+>>>>>>> Stashed changes
       </div>
     );
   }

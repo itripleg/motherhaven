@@ -76,7 +76,7 @@ export function BuyTokenForm({ onAmountChange, maxAmount }: any) {
       const tokensReceivedLog = receipt.logs?.find(
         (log: any) =>
           log.topics[0] ===
-          "0xddf252ad1be2c89b69c2b068fc378daa952ba7f163c4a11628f55a4df523b3ef"
+          "0x377aadedb6b2a771959584d10a6a36eccb5f56b4eb3a48525f76108d2660d8d4"
       );
 
       if (tokensReceivedLog) {
