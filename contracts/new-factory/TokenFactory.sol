@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: UNLICENSED
+// SPDX-License-Identifier: MIT
 pragma solidity ^0.8.0;
 
 import "./SacrificeToken.sol";
@@ -15,14 +15,6 @@ contract TokenFactory is Ownable, ReentrancyGuard, AccessControl {
         GOAL_REACHED,
         HALTED,
         RESUMED
-    }
-
-    struct TokenMetadata {
-        string name;
-        string symbol;
-        string imageUrl;
-        uint256 fundingGoal;
-        uint256 createdAt;
     }
 
     // Constants
@@ -46,7 +38,6 @@ contract TokenFactory is Ownable, ReentrancyGuard, AccessControl {
     mapping(address => address) public tokenCreators;
     mapping(address => uint256) public lastPrice;
     mapping(address => uint256) private _fundingGoals;
-    mapping(address => TokenMetadata) public tokenMetadata;
     mapping(address => uint256) public virtualSupply;
 
     // Events
@@ -79,7 +70,12 @@ contract TokenFactory is Ownable, ReentrancyGuard, AccessControl {
         address indexed oldRecipient,
         address indexed newRecipient
     );
-    event MetadataUpdated(address indexed token, string imageUrl);
+    event DefaultFundingGoalUpdated(uint256 oldGoal, uint256 newGoal);
+    event TokenFundingGoalUpdated(
+        address indexed token,
+        uint256 oldGoal,
+        uint256 newGoal
+    );
 
     modifier validToken(address tokenAddress) {
         require(
@@ -113,6 +109,39 @@ contract TokenFactory is Ownable, ReentrancyGuard, AccessControl {
         emit FeeRecipientUpdated(oldRecipient, newRecipient);
     }
 
+    function setDefaultFundingGoal(uint256 newGoal) external onlyOwner {
+        require(newGoal > 0, "Invalid funding goal");
+        uint256 oldGoal = _defaultFundingGoal;
+        _defaultFundingGoal = newGoal;
+        emit DefaultFundingGoalUpdated(oldGoal, newGoal);
+    }
+
+    function setTokenFundingGoal(
+        address tokenAddress,
+        uint256 newGoal
+    ) external onlyOwner validToken(tokenAddress) {
+        require(newGoal > 0, "Invalid funding goal");
+        require(
+            tokens[tokenAddress] == TokenState.TRADING ||
+                tokens[tokenAddress] == TokenState.RESUMED,
+            "Token not in valid state"
+        );
+        require(
+            collateral[tokenAddress] < _fundingGoals[tokenAddress],
+            "Goal already reached"
+        );
+
+        uint256 oldGoal = _fundingGoals[tokenAddress];
+        _fundingGoals[tokenAddress] = newGoal;
+
+        emit TokenFundingGoalUpdated(tokenAddress, oldGoal, newGoal);
+
+        if (collateral[tokenAddress] >= newGoal) {
+            tokens[tokenAddress] = TokenState.GOAL_REACHED;
+            emit TradingHalted(tokenAddress, newGoal);
+        }
+    }
+
     function calculateFee(uint256 amount) public pure returns (uint256) {
         return (amount * TRADING_FEE) / 10000;
     }
@@ -121,7 +150,7 @@ contract TokenFactory is Ownable, ReentrancyGuard, AccessControl {
         string calldata name,
         string calldata symbol,
         string calldata imageUrl,
-        address burnManager // Optional burn manager address
+        address burnManager
     ) external returns (address) {
         require(
             bytes(name).length > 0 && bytes(name).length <= 32,
@@ -138,8 +167,8 @@ contract TokenFactory is Ownable, ReentrancyGuard, AccessControl {
             msg.sender,
             name,
             symbol,
-            _initialMint,
-            burnManager
+            burnManager,
+            imageUrl
         );
         address tokenAddress = address(token);
 
@@ -149,14 +178,6 @@ contract TokenFactory is Ownable, ReentrancyGuard, AccessControl {
         lastPrice[tokenAddress] = _initialPrice;
         _fundingGoals[tokenAddress] = _defaultFundingGoal;
         virtualSupply[tokenAddress] = _initialMint;
-
-        tokenMetadata[tokenAddress] = TokenMetadata({
-            name: name,
-            symbol: symbol,
-            imageUrl: imageUrl,
-            fundingGoal: _defaultFundingGoal,
-            createdAt: block.timestamp
-        });
 
         emit TokenCreated(
             tokenAddress,
@@ -302,20 +323,5 @@ contract TokenFactory is Ownable, ReentrancyGuard, AccessControl {
 
     function getFundingGoal(address token) external view returns (uint256) {
         return _fundingGoals[token];
-    }
-
-    function updateImageUrl(
-        address tokenAddress,
-        string calldata newImageUrl
-    ) external {
-        require(
-            msg.sender == tokenCreators[tokenAddress] ||
-                hasRole(ADMIN_ROLE, msg.sender),
-            "Not authorized"
-        );
-        require(bytes(imageUrl).length > 0, "Invalid image URL");
-
-        tokenMetadata[tokenAddress].imageUrl = newImageUrl;
-        emit MetadataUpdated(tokenAddress, newImageUrl);
     }
 }

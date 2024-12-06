@@ -13,6 +13,7 @@ contract Token is ERC20, Ownable {
     address public immutable tokenFactory;
     address public immutable creator;
     address public burnManager;
+    string public imageUrl;
 
     event BurnManagerSet(
         address indexed oldManager,
@@ -24,6 +25,7 @@ contract Token is ERC20, Ownable {
         BurnType indexed burnType,
         uint256 newTotalSupply
     );
+    event ImageUrlUpdated(string newImageUrl);
 
     enum BurnType {
         FACTORY,
@@ -35,11 +37,22 @@ contract Token is ERC20, Ownable {
         address _creator,
         string memory name,
         string memory symbol,
-        address burnManager
+        address _burnManager,
+        string memory _imageUrl
     ) ERC20(name, symbol) Ownable(initialOwner) {
+        require(bytes(_imageUrl).length > 0, "Invalid image URL");
         tokenFactory = initialOwner;
         creator = _creator;
-        _mint(initialOwner, initialMint);
+        burnManager = _burnManager; // Can be address(0)
+        imageUrl = _imageUrl;
+
+        // If burnManager is set, validate it supports this token
+        if (_burnManager != address(0)) {
+            require(
+                IBurnManager(_burnManager).supportsToken(address(this)),
+                "Burn manager not compatible"
+            );
+        }
     }
 
     // Only factory can mint
@@ -55,18 +68,16 @@ contract Token is ERC20, Ownable {
         emit TokensBurned(from, amount, BurnType.FACTORY, totalSupply());
     }
 
-    // Any holder can self-burn their tokens
+    // Any holder can self-burn their tokens if burn manager is set
     function burn(uint256 amount) public virtual {
+        require(burnManager != address(0), "Self-burn not enabled");
         require(amount > 0, "Amount must be > 0");
         require(balanceOf(msg.sender) >= amount, "Insufficient balance");
 
         _burn(msg.sender, amount);
         emit TokensBurned(msg.sender, amount, BurnType.SELF, totalSupply());
 
-        // Notify burn manager if one exists
-        if (burnManager != address(0)) {
-            IBurnManager(burnManager).notifyBurn(msg.sender, amount);
-        }
+        IBurnManager(burnManager).notifyBurn(msg.sender, amount);
     }
 
     // Only token creator can set/update burn manager
@@ -81,5 +92,13 @@ contract Token is ERC20, Ownable {
         address oldManager = burnManager;
         burnManager = newManager;
         emit BurnManagerSet(oldManager, newManager);
+    }
+
+    // Only token creator can update image URL
+    function updateImageUrl(string calldata newImageUrl) external {
+        require(msg.sender == creator, "Only creator can update image URL");
+        require(bytes(newImageUrl).length > 0, "Invalid image URL");
+        imageUrl = newImageUrl;
+        emit ImageUrlUpdated(newImageUrl);
     }
 }
