@@ -1,10 +1,13 @@
-// First, add the utility function to get price from contract
-import { config } from "@/wagmi-config";
+// /lib/hooks/useTokenPrice.ts
+import { useState, useEffect } from 'react';
+import { getPublicClient } from "@wagmi/core";
 import { formatEther } from "viem";
-import { FACTORY_ADDRESS, FACTORY_ABI } from "@/types";
+import { FACTORY_ADDRESS, FACTORY_ABI, Token } from "@/types";
+import { config } from '@/wagmi-config';
+import { safeGet } from '@/contexts/TokenContext';
 
 async function getContractPrice(tokenAddress: string): Promise<string> {
-  const { publicClient } = config;
+  const publicClient = getPublicClient(config);
   try {
     const price = await publicClient.readContract({
       address: FACTORY_ADDRESS,
@@ -12,7 +15,7 @@ async function getContractPrice(tokenAddress: string): Promise<string> {
       functionName: 'getCurrentPrice',
       args: [tokenAddress]
     });
-    return formatEther(price);
+    return formatEther(price as bigint);
   } catch (error) {
     console.error('Error getting token price:', error);
     return "0";

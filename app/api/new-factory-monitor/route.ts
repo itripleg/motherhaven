@@ -1,12 +1,10 @@
-// /app/api/factory-monitor/route.ts
+// /app/api/new-factory-monitor/route.ts
 
 import { NextResponse } from "next/server";
 import {
   collection,
-  addDoc,
   setDoc,
   doc,
-  updateDoc,
   increment,
 } from "firebase/firestore";
 import { db } from "@/firebase";
@@ -20,15 +18,13 @@ import {
   FACTORY_ADDRESS,
 } from "@/types";
 
-// const FACTORY_ADDRESS = "0x56aec6B1D4Ea8Ee0B35B526e216aDd6e8268b1eA";
-
 const EVENTS = {
   TokenCreated: {
     abi: parseAbiItem(
       "event TokenCreated(address indexed tokenAddress, string name, string symbol, string imageUrl, address creator, uint256 fundingGoal, address burnManager)"
     ),
     signature:
-      "0xb7270dff763f8f0cfdf4e1c969f741008b845810bdfae1c98b4cdf4dfe816a68",
+      "0x0e8cc4b226b8752d338d6e23e7e14f71e6dd2480faf8bfae44848d7fc596e3bf",
   },
   TokensPurchased: {
     abi: parseAbiItem(
@@ -42,7 +38,7 @@ const EVENTS = {
       "event TokensSold(address indexed token, address indexed seller, uint256 tokenAmount, uint256 ethAmount, uint256 fee)"
     ),
     signature:
-      "0x14b179a27ac1c9172deccabe43f596e97723d61e3e015fe149065fe89c89b882",
+      "0xa0fe9740856690637d999c103293d3c823fc3b81443c34c6004bb582ab4b6166",
   },
   TradingHalted: {
     abi: parseAbiItem(
@@ -68,6 +64,7 @@ async function handleTokenCreated(
 ) {
   const tokenAddress = args.tokenAddress.toLowerCase();
   const creatorAddress = args.creator.toLowerCase();
+  const fundingGoal = formatEther(args.fundingGoal);
 
   console.log("\n=== TOKEN CREATION DETAILS ===");
   console.log("Token Address:", tokenAddress);
@@ -77,20 +74,20 @@ async function handleTokenCreated(
   console.log("Image URL:", args.imageUrl);
   console.log("Timestamp:", timestamp);
   console.log("Block Number:", blockNumber);
-  console.log("Funding Goal:", formatEther(args.fundingGoal), "ETH");
+  console.log("Funding Goal:", fundingGoal, "ETH");
   console.log("Burn Manager:", args.burnManager);
   console.log("Transaction Hash:", transactionHash);
 
   try {
-    // Create token document
-    await setDoc(doc(db, COLLECTIONS.TOKENS, tokenAddress), {
+    // Prepare token document data
+    const tokenData = {
       address: tokenAddress,
       name: args.name,
       symbol: args.symbol,
       imageUrl: args.imageUrl,
       creator: creatorAddress,
       burnManager: args.burnManager,
-      fundingGoal: formatEther(args.fundingGoal),
+      fundingGoal,
       createdAt: timestamp,
       currentState: TokenState.TRADING,
       collateral: "0",
@@ -103,35 +100,50 @@ async function handleTokenCreated(
       },
       blockNumber,
       transactionHash,
-    });
-    console.log("✅ Token document created in", COLLECTIONS.TOKENS);
+    };
+
+    console.log("📝 Creating token document with data:", tokenData);
+    
+    // Create token document
+    await setDoc(
+      doc(db, COLLECTIONS.TOKENS, tokenAddress),
+      tokenData,
+      { merge: true }
+    );
+    console.log("✅ Token document created/updated in", COLLECTIONS.TOKENS);
+
+    // Prepare user document data
+    const userData = {
+      address: creatorAddress,
+      lastActive: timestamp,
+      createdTokens: [
+        {
+          address: tokenAddress,
+          name: args.name,
+          symbol: args.symbol,
+          imageUrl: args.imageUrl,
+          fundingGoal,
+          timestamp,
+        },
+      ],
+    };
+
+    console.log("📝 Updating user document with data:", userData);
 
     // Update user document
     await setDoc(
       doc(db, COLLECTIONS.USERS, creatorAddress),
-      {
-        address: creatorAddress,
-        lastActive: timestamp,
-        createdTokens: [
-          {
-            address: tokenAddress,
-            name: args.name,
-            symbol: args.symbol,
-            imageUrl: args.imageUrl,
-            fundingGoal: formatEther(args.fundingGoal),
-            timestamp,
-          },
-        ],
-      },
+      userData,
       { merge: true }
     );
     console.log("✅ User document updated in", COLLECTIONS.USERS);
   } catch (error) {
     console.error("❌ Database Error:", error);
-    console.error("Failed to save token:", {
+    console.error("Failed to save token creation data:", {
       token: tokenAddress,
       creator: creatorAddress,
       timestamp,
+      error: error instanceof Error ? error.message : String(error),
     });
     throw error;
   }
@@ -188,8 +200,8 @@ async function handleTokenTrade(
   console.log("Transaction Hash:", transactionHash);
 
   try {
-    // Create trade document
-    const tradeDoc = await addDoc(collection(db, COLLECTIONS.TRADES), {
+    // Prepare trade document data
+    const tradeData = {
       type: eventType,
       token: token.toLowerCase(),
       trader: trader.toLowerCase(),
@@ -200,19 +212,20 @@ async function handleTokenTrade(
       blockNumber,
       transactionHash,
       timestamp,
-    });
-    console.log(
-      "✅ Trade document created in",
-      COLLECTIONS.TRADES,
-      "with ID:",
-      tradeDoc.id
-    );
+    };
+
+    console.log("📝 Creating trade document with data:", tradeData);
+
+    // Create trade document with auto-generated ID
+    const tradeRef = doc(collection(db, COLLECTIONS.TRADES));
+    await setDoc(tradeRef, tradeData);
+    console.log("✅ Trade document created in", COLLECTIONS.TRADES, "with ID:", tradeRef.id);
 
     // Convert ethAmount to number for increment
     const ethAmountNum = Number(formattedEthAmount);
 
-    // Update token statistics
-    await updateDoc(doc(db, COLLECTIONS.TOKENS, token.toLowerCase()), {
+    // Prepare token statistics update data
+    const tokenUpdateData = {
       collateral: increment(eventType === "buy" ? ethAmountNum : -ethAmountNum),
       "statistics.volumeETH": increment(ethAmountNum),
       "statistics.tradeCount": increment(1),
@@ -223,15 +236,25 @@ async function handleTokenTrade(
         type: eventType,
         fee: formattedFee,
       },
-    });
+    };
+
+    console.log("📝 Updating token statistics with data:", tokenUpdateData);
+
+    // Update token statistics
+    await setDoc(
+      doc(db, COLLECTIONS.TOKENS, token.toLowerCase()),
+      tokenUpdateData,
+      { merge: true }
+    );
     console.log("✅ Token statistics updated in", COLLECTIONS.TOKENS);
   } catch (error) {
     console.error("❌ Database Error:", error);
-    console.error("Failed to save trade:", {
+    console.error("Failed to save trade data:", {
       type: eventType,
       token,
       trader,
       timestamp,
+      error: error instanceof Error ? error.message : String(error),
     });
     throw error;
   }
@@ -244,30 +267,38 @@ async function handleTradingHalted(
   blockNumber: number
 ) {
   const formattedCollateral = formatEther(collateral);
+  const tokenAddress = token.toLowerCase();
 
   console.log("\n=== TRADING HALTED DETAILS ===");
-  console.log("Token Address:", token);
+  console.log("Token Address:", tokenAddress);
   console.log("Final Collateral:", formattedCollateral);
   console.log("Block Number:", blockNumber);
   console.log("Timestamp:", timestamp);
 
   try {
-    await updateDoc(doc(db, COLLECTIONS.TOKENS, token.toLowerCase()), {
+    // Prepare token update data
+    const tokenUpdateData = {
       currentState: TokenState.HALTED,
       finalCollateral: formattedCollateral,
       haltedAt: timestamp,
       haltBlock: blockNumber,
-    });
-    console.log(
-      "✅ Token state updated to GOAL_REACHED in",
-      COLLECTIONS.TOKENS
+    };
+
+    console.log("📝 Updating token state with data:", tokenUpdateData);
+
+    await setDoc(
+      doc(db, COLLECTIONS.TOKENS, tokenAddress),
+      tokenUpdateData,
+      { merge: true }
     );
+    console.log("✅ Token state updated to HALTED in", COLLECTIONS.TOKENS);
   } catch (error) {
     console.error("❌ Database Error:", error);
-    console.error("Failed to update token state:", {
-      token,
+    console.error("Failed to update token halt state:", {
+      token: tokenAddress,
       collateral: formattedCollateral,
       timestamp,
+      error: error instanceof Error ? error.message : String(error),
     });
     throw error;
   }
@@ -296,7 +327,10 @@ export async function POST(req: Request) {
 
     for (const log of factoryLogs) {
       const eventSignature = log.topics?.[0];
-      if (!eventSignature) continue;
+      if (!eventSignature) {
+        console.log("⚠️ Skipping log - no event signature");
+        continue;
+      }
 
       console.log("\n--- Processing Log ---");
       console.log("Event Signature:", eventSignature);
@@ -307,7 +341,7 @@ export async function POST(req: Request) {
       );
 
       if (!eventEntry) {
-        console.log("⚠️ Unknown event signature");
+        console.log("⚠️ Unknown event signature:", eventSignature);
         continue;
       }
 
@@ -382,6 +416,12 @@ export async function POST(req: Request) {
         }
       } catch (error) {
         console.error(`❌ Error processing ${eventType} event:`, error);
+        console.error("Event processing failed for log:", {
+          eventType,
+          signature: eventSignature,
+          transactionHash: log.transaction?.hash,
+          error: error instanceof Error ? error.message : String(error),
+        });
       }
     }
 
@@ -392,6 +432,9 @@ export async function POST(req: Request) {
     });
   } catch (error) {
     console.error("❌ Webhook processing error:", error);
+    console.error("Request processing failed:", {
+      error: error instanceof Error ? error.message : String(error),
+    });
     return NextResponse.json(
       { error: "Internal server error" },
       { status: 500 }

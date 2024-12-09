@@ -1,19 +1,19 @@
 //@types/database.ts
 
 import { Timestamp } from "firebase/firestore";
-import { TokenState } from "./enums";
+import { TokenState } from "./token";
 import { Address } from "viem";
 
 // Basic token interface for grid display
-export interface Token {
-  id: string; //string representation of token address
-  name: string;
-  symbol: string;
-  address: Address;
-  currentPrice: number; //this may need to be a bigint? or a string?
-  createdAt: Date; //should be compatible with firestore timestamp
-  imageUrl?: string;
-}
+// export interface Token {
+//   id: string; //string representation of token address
+//   name: string;
+//   symbol: string;
+//   address: Address;
+//   currentPrice: number; //this may need to be a bigint? or a string?
+//   createdAt: Date; //should be compatible with firestore timestamp
+//   imageUrl?: string;
+// }
 
 // This whole interface needs to be rethought - do we even need it? things are things we want to calculate or derive
 export interface TokenStatistics {
@@ -28,14 +28,14 @@ export interface TokenStatistics {
   lastTradeTimestamp?: string; // Last trade event timestamp
 }
 
-export interface TokenTrade {
-  timestamp: string;
-  type: "buy" | "sell";
-  price: string;
-  amount: string;
-  ethAmount: string;
-  trader: string;
-}
+// export interface TokenTrade {
+//   timestamp: string;
+//   type: "buy" | "sell";
+//   price: string;
+//   amount: string;
+//   ethAmount: string;
+//   trader: string;
+// }
 
 export interface TokenData {
   // Basic Info (from contract creation)
@@ -61,7 +61,8 @@ export interface TokenData {
   statistics: TokenStatistics;
 
   // Trading Info
-  lastTrade?: TokenTrade; // Most recent trade details
+  lastTrade?: any; // Most recent trade details
+  // lastTrade?: TokenTrade; // Most recent trade details
   price?: number;
 
   // Additional Metrics (derived)

@@ -2,7 +2,7 @@
 import { useState, useEffect } from "react";
 import { collection, getDocs, doc, setDoc } from "firebase/firestore";
 import { db } from "@/firebase";
-import { FACTORY_ADDRESS } from "@/types";
+import { FACTORY_ADDRESS, TokensPurchasedEvent, TokensSoldEvent } from "@/types";
 import { formatEther, parseAbiItem } from "viem";
 import { usePublicClient } from "wagmi";
 import { Button } from "@/components/ui/button";
@@ -11,22 +11,6 @@ import { Container } from "@/components/craft";
 
 const STARTING_BLOCK = 36999988n;
 
-// Event types
-interface TokensPurchasedEvent {
-  token: `0x${string}`;
-  buyer: `0x${string}`;
-  amount: bigint;
-  price: bigint;
-}
-
-interface TokensSoldEvent {
-  token: `0x${string}`;
-  seller: `0x${string}`;
-  tokenAmount: bigint;
-  ethAmount: bigint;
-}
-
-// Trade types
 interface FirestoreTrade {
   blockNumber: number;
   ethAmount: string;
@@ -51,9 +35,8 @@ const calculatePricePerToken = (
   tokenAmount: bigint
 ): string => {
   if (tokenAmount === 0n) return "0";
-  const ethFloat = Number(ethAmount) / 1e18;
-  const tokenFloat = Number(tokenAmount) / 1e18;
-  return (ethFloat / tokenFloat).toString();
+  // Keep full precision by working with the raw values
+  return (Number(ethAmount) / Number(tokenAmount)).toString();
 };
 
 export default function RestoreTrades() {
@@ -80,7 +63,7 @@ export default function RestoreTrades() {
       const buyLogs = await publicClient.getLogs({
         address: FACTORY_ADDRESS,
         event: parseAbiItem(
-          "event TokensPurchased(address indexed token, address indexed buyer, uint256 amount, uint256 price)"
+          "event TokensPurchased(address indexed token, address indexed buyer, uint256 amount, uint256 price, uint256 fee)"
         ),
         fromBlock: STARTING_BLOCK,
         toBlock: "latest",
@@ -93,7 +76,7 @@ export default function RestoreTrades() {
         if (!log.args) continue;
 
         const args = log.args as TokensPurchasedEvent;
-        const blockNumber = log.blockNumber;
+        const blockNumber = Number(log.blockNumber);
         const transactionHash = log.transactionHash;
         const tokenAddress = args.token.toLowerCase();
 
@@ -106,12 +89,12 @@ export default function RestoreTrades() {
           });
         }
 
-        const block = await publicClient.getBlock({ blockNumber });
+        const block = await publicClient.getBlock({ blockNumber: BigInt(blockNumber) });
 
         const trade: FirestoreTrade = {
-          blockNumber: Number(blockNumber),
-          ethAmount: args.price.toString(),
-          tokenAmount: args.amount.toString(),
+          blockNumber,
+          ethAmount: args.price.toString(), // Keep raw value
+          tokenAmount: args.amount.toString(), // Keep raw value
           pricePerToken: calculatePricePerToken(args.price, args.amount),
           timestamp: new Date(Number(block.timestamp) * 1000).toISOString(),
           token: tokenAddress,
@@ -128,7 +111,7 @@ export default function RestoreTrades() {
       const sellLogs = await publicClient.getLogs({
         address: FACTORY_ADDRESS,
         event: parseAbiItem(
-          "event TokensSold(address indexed token, address indexed seller, uint256 tokenAmount, uint256 ethAmount)"
+          "event TokensSold(address indexed token, address indexed seller, uint256 tokenAmount, uint256 ethAmount, uint256 fee)"
         ),
         fromBlock: STARTING_BLOCK,
         toBlock: "latest",
@@ -141,7 +124,7 @@ export default function RestoreTrades() {
         if (!log.args) continue;
 
         const args = log.args as TokensSoldEvent;
-        const blockNumber = log.blockNumber;
+        const blockNumber = Number(log.blockNumber);
         const transactionHash = log.transactionHash;
         const tokenAddress = args.token.toLowerCase();
 
@@ -154,16 +137,13 @@ export default function RestoreTrades() {
           });
         }
 
-        const block = await publicClient.getBlock({ blockNumber });
+        const block = await publicClient.getBlock({ blockNumber: BigInt(blockNumber) });
 
         const trade: FirestoreTrade = {
-          blockNumber: Number(blockNumber),
-          ethAmount: args.ethAmount.toString(),
-          tokenAmount: args.tokenAmount.toString(),
-          pricePerToken: calculatePricePerToken(
-            args.ethAmount,
-            args.tokenAmount
-          ),
+          blockNumber,
+          ethAmount: args.ethAmount.toString(), // Keep raw value
+          tokenAmount: args.tokenAmount.toString(), // Keep raw value
+          pricePerToken: calculatePricePerToken(args.ethAmount, args.tokenAmount),
           timestamp: new Date(Number(block.timestamp) * 1000).toISOString(),
           token: tokenAddress,
           trader: args.seller.toLowerCase(),
@@ -173,6 +153,11 @@ export default function RestoreTrades() {
 
         console.log("Processing sell trade:", trade);
         tradesByToken.get(tokenAddress)!.trades.push(trade);
+      }
+
+      // Sort trades by block number for each token
+      for (const tokenTrades of tradesByToken.values()) {
+        tokenTrades.trades.sort((a, b) => a.blockNumber - b.blockNumber);
       }
 
       return Array.from(tradesByToken.values());

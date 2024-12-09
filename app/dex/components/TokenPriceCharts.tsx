@@ -3,7 +3,7 @@ import React from "react";
 import { Card } from "@/components/ui/card";
 import TokenPriceChart from "./charts/RechartsBarChart";
 import RechartsLineChart from "./charts/RechartsLineChart";
-import { TokenData } from "@/types";
+import { Token, TokenData } from "@/types";
 import { useTokenTrades } from "@/hooks/token/useTokenTrades";
 
 interface TokenPriceChartsProps {
@@ -11,9 +11,9 @@ interface TokenPriceChartsProps {
   price: number;
 }
 
-export function TokenPriceCharts({ tokenData, price }: TokenPriceChartsProps) {
-  const { trades, loading, error } = useTokenTrades(tokenData.address);
-
+export function TokenPriceCharts(token: Token) {
+  // const { trades, loading, error } = useTokenTrades(tokenData.address);
+console.log("Received token into TokenPriceCharts : " , token)
   if (error) {
     return (
       <div className="text-red-500 text-center p-4">

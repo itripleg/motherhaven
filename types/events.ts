@@ -1,33 +1,32 @@
-// /types/events.ts
-import { Hex } from "viem";
+import {Address} from 'viem'
 
 export type TokenCreatedEvent = {
-  tokenAddress: Hex;
+  tokenAddress: Address;
   name: string;
   symbol: string;
   imageUrl: string;
-  creator: Hex;
+  creator: Address;
   fundingGoal: bigint;
-  burnManager: Hex;
+  burnManager: Address;
 };
 
 export type TokensPurchasedEvent = {
-  token: Hex;
-  buyer: Hex;
+  token: Address;
+  buyer: Address;
   amount: bigint;
   price: bigint;
   fee: bigint;
 };
 
 export type TokensSoldEvent = {
-  token: Hex;
-  seller: Hex;
+  token: Address;
+  seller: Address;
   tokenAmount: bigint;
   ethAmount: bigint;
   fee: bigint;
 };
 
 export type TradingHaltedEvent = {
-  token: Hex;
+  token: Address;
   collateral: bigint;
 };

@@ -1,12 +1,13 @@
 // /utils/tokenUtils.tsx
 import { getContract } from "viem";
 import { formatEther, type PublicClient } from "viem";
-import { TokenData, TokenState } from "@/types";
+import { TokenData, TokenState, FACTORY_ADDRESS } from "@/types";
 import { usePublicClient } from "wagmi";
+
 
 // Contract config
 const factoryContract = {
-  address: "0x56aec6B1D4Ea8Ee0B35B526e216aDd6e8268b1eA" as const,
+  address:FACTORY_ADDRESS,
   abi: [
     {
       inputs: [

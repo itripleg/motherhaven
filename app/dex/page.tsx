@@ -5,12 +5,12 @@ import { useState, useEffect, useRef } from "react";
 import { Container } from "@/components/craft";
 import { useAccount } from "wagmi";
 import { getAddressGreeting } from "@/hooks/addressGreetings";
-import { SpaceScene } from "./scene/SpaceScene";
+import { Greeting } from "./components/Greeting";
+// import { SpaceScene } from "./scene/SpaceScene";
 import { SearchContainer } from "./components/SearchContainer";
 import { TokenContainer } from "./components/tokens/TokenContainer";
-import { Greeting } from "./components/Greeting";
 // import { useTokenData } from "@/hooks/useTokenData";
-import { Token } from "@/types";
+// import { Token } from "@/types";
 import { useTokenList } from "@/hooks/token/useTokenList";
 
 export default function DexPage() {
@@ -42,7 +42,7 @@ export default function DexPage() {
 
   return (
     <Container className="">
-      <SpaceScene cameraRef={cameraRef} controlRef={controlRef} />
+      {/* <SpaceScene cameraRef={cameraRef} controlRef={controlRef} /> */}
       <div className="container mx-auto py-8 relative">
         <Greeting greeting={greeting} showSecret={showSecret} />
 

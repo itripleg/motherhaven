@@ -12,8 +12,12 @@ import { useDisconnect } from "wagmi";
 import RecentTrades from "./RecentTrades";
 import { useToken } from "@/contexts/TokenContext";
 
-export default function TokenPage() {
-  const { token, loading, error } = useToken();
+interface TokenPageProps {
+  tokenAddress: string;
+}
+
+export default function TokenPage({ tokenAddress }: TokenPageProps) {
+  const { token, loading, error } = useToken(tokenAddress);
   const { disconnect } = useDisconnect();
 
   if (loading) {
@@ -46,17 +50,25 @@ export default function TokenPage() {
           {/* Charts Section */}
           <div className="grid grid-cols-1 xl:grid-cols-2 gap-6">
             <div className="xl:col-span-2">
-              <TokenHeader />
+              <TokenHeader address={token.address} />
             </div>
-            <div className="xl:col-span-2">{/* <TokenPriceCharts /> */}</div>
+            <div className="xl:col-span-2">
+              {/* <TokenPriceCharts token={token} /> */}
+            </div>
           </div>
 
           {/* Trade Card Section */}
-          <div className="w-full">{/* <TokenTradeCard /> */}</div>
+          <div className="w-full">
+            {/* <TokenTradeCard 
+              address={tokenAddress}
+              tokenData={token} 
+              isConnected={false} 
+            /> */}
+          </div>
         </div>
 
         {/* Right Sidebar (1 column on desktop) */}
-        <div className="hidden lg:flex lg:flex-col gap-6">
+        {/* <div className="hidden lg:flex lg:flex-col gap-6">
           <div className="sticky top-24 space-y-6">
             <ChatComponent
               tokenAddress={token.address}
@@ -64,7 +76,7 @@ export default function TokenPage() {
             />
             <RecentTrades tokenAddress={token.address} />
           </div>
-        </div>
+        </div> */}
 
         {/* Mobile Chat Button */}
         <Sheet>
@@ -78,7 +90,10 @@ export default function TokenPage() {
             </Button>
           </SheetTrigger>
           <SheetContent side="right" className="w-[90%] sm:w-[440px]">
-            <ChatComponent tokenAddress={token.address} />
+            {/* <ChatComponent 
+              tokenAddress={token.address}
+              creatorAddress={token.creator}
+            /> */}
           </SheetContent>
         </Sheet>
       </div>

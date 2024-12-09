@@ -29,6 +29,7 @@ export const TokenGrid = ({ tokens }: { tokens: Token[] }) => {
       } catch {
         acc[token.address] = "0";
       }
+      console.log("Token price from the Token Grid (acc): ", acc)
       return acc;
     },
     {}

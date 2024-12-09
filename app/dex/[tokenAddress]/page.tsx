@@ -1,16 +1,19 @@
+'use client'
 import React from "react";
 import TokenPage from "../components/TokenPage";
 import { TokenState } from "@/types/token";
 import { TokenProvider } from "@/contexts/TokenContext";
+import { useParams, usePathname } from "next/navigation";
 
 type Props = {};
 
 function page({}: Props) {
-  const tokenAddress = "0xac43f76064e0c04f3250bf5463da61026135dae8";
+  const { tokenAddress }= useParams();
   return (
     <div>
-      <TokenProvider tokenAddress={tokenAddress}>
-        <TokenPage
+      <TokenProvider>
+        
+         <TokenPage tokenAddress={tokenAddress as string}
         // tokenData={null}
         // price={0}
         // tokenState={TokenState.NOT_CREATED}

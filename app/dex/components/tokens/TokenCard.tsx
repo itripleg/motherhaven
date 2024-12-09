@@ -55,7 +55,7 @@ export const TokenCard = ({
               <span className="text-sm text-gray-200">{displayPrice}</span>
             </div>
             <p className="mt-2 text-sm text-gray-200">
-              Address:{" "}
+              Address:
               {token.address
                 ? `${token.address.slice(0, 6)}...${token.address.slice(-4)}`
                 : "N/A"}

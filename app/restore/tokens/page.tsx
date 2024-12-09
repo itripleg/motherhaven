@@ -16,8 +16,11 @@ interface TokenComparison {
   name: string;
   symbol: string;
   creator: string;
+  state: number;
   imageUrl: string;
   burnManager: string;
+  fundingGoal: string;
+  collateral: string;
   inContract: boolean;
   inFirestore: boolean;
   blockNumber: number;
@@ -48,6 +51,46 @@ export default function RestoreTokens() {
     }
   };
 
+  // Get token state from factory contract
+  const getTokenState = async (tokenAddress: string) => {
+    if (!publicClient) throw new Error("Public client not initialized");
+
+    try {
+      const data = await publicClient.readContract({
+        address: FACTORY_ADDRESS,
+        abi: FACTORY_ABI,
+        functionName: 'getTokenState',
+        args: [tokenAddress]
+      });
+
+      console.log(`Token ${tokenAddress} state:`, data);
+      return Number(data);
+    } catch (err) {
+      console.error(`Error getting state for token ${tokenAddress}:`, err);
+      throw err;
+    }
+  };
+
+    // Get token collateral from factory contract
+    const getTokenCollateral = async (tokenAddress: string) => {
+      if (!publicClient) throw new Error("Public client not initialized");
+  
+      try {
+        const data = await publicClient.readContract({
+          address: FACTORY_ADDRESS,
+          abi: FACTORY_ABI,
+          functionName: 'collateral',
+          args: [tokenAddress]
+        });
+  
+        console.log(`Token ${tokenAddress} collateral:`, data);
+        return formatEther(data as bigint);
+      } catch (err) {
+        console.error(`Error getting collateral for token ${tokenAddress}:`, err);
+        return "0";
+      }
+    };
+
   // Get contract tokens
   const fetchContractTokens = async () => {
     if (!publicClient) {
@@ -65,7 +108,7 @@ export default function RestoreTokens() {
       const logs = await publicClient.getLogs({
         address: FACTORY_ADDRESS,
         event: parseAbiItem(
-          "event TokenCreated(address indexed tokenAddress, string name, string symbol, string imageUrl, address creator, address burnManager)"
+          "event TokenCreated(address indexed tokenAddress, string name, string symbol, string imageUrl, address creator, uint256 fundingGoal, address burnManager)"
         ),
         fromBlock: STARTING_BLOCK,
         toBlock: "latest",
@@ -84,6 +127,7 @@ export default function RestoreTokens() {
             imageUrl: args.imageUrl,
             creator: args.creator.toLowerCase(),
             burnManager: args.burnManager.toLowerCase(),
+            fundingGoal: formatEther(args.fundingGoal),
             blockNumber: Number(log.blockNumber),
           };
         } catch (error) {
@@ -97,56 +141,75 @@ export default function RestoreTokens() {
       throw new Error(`Failed to fetch tokens from contract: ${err}`);
     }
   };
+// Compare tokens
+useEffect(() => {
+  const compareTokens = async () => {
+    if (!publicClient) {
+      setError("Waiting for network connection...");
+      return;
+    }
 
-  // Compare tokens
-  useEffect(() => {
-    const compareTokens = async () => {
-      if (!publicClient) {
-        setError("Waiting for network connection...");
-        return;
-      }
+    try {
+      setLoading(true);
+      console.log("Starting token comparison...");
+      console.log("Using factory address:", FACTORY_ADDRESS);
 
-      try {
-        setLoading(true);
-        console.log("Starting token comparison...");
-        console.log("Using factory address:", FACTORY_ADDRESS);
+      const [contractTokens, firestoreTokens] = await Promise.all([
+        fetchContractTokens(),
+        fetchFirestoreTokens(),
+      ]);
 
-        const [contractTokens, firestoreTokens] = await Promise.all([
-          fetchContractTokens(),
-          fetchFirestoreTokens(),
-        ]);
+      console.log("Contract tokens:", contractTokens);
+      console.log("Firestore tokens:", firestoreTokens);
 
-        console.log("Contract tokens:", contractTokens);
-        console.log("Firestore tokens:", firestoreTokens);
-
-        const allComparisons = contractTokens.map((token) => {
-          const isInFirestore = firestoreTokens.some(
-            (ft) => ft.address.toLowerCase() === token.address.toLowerCase()
-          );
-          console.log(`Token ${token.address} in Firestore: ${isInFirestore}`);
+      // Fetch states and collateral for all contract tokens
+      const tokenDetailsPromises = contractTokens.map(async (token) => {
+        try {
+          const [state, collateral] = await Promise.all([
+            getTokenState(token.address),
+            getTokenCollateral(token.address)
+          ]);
 
           return {
             ...token,
+            state,
+            collateral,
             inContract: true,
-            inFirestore: isInFirestore,
+            inFirestore: firestoreTokens.some(
+              (ft) => ft.address.toLowerCase() === token.address.toLowerCase()
+            ),
           };
-        });
+        } catch (err) {
+          console.error(`Error fetching details for token ${token.address}:`, err);
+          return {
+            ...token,
+            state: 0,
+            collateral: "0",
+            inContract: true,
+            inFirestore: firestoreTokens.some(
+              (ft) => ft.address.toLowerCase() === token.address.toLowerCase()
+            ),
+          };
+        }
+      });
 
-        // Sort by block number (newest first)
-        allComparisons.sort((a, b) => b.blockNumber - a.blockNumber);
+      const allComparisons = await Promise.all(tokenDetailsPromises);
 
-        console.log("Final comparisons:", allComparisons);
-        setComparisons(allComparisons);
-      } catch (err) {
-        console.error("Error comparing tokens:", err);
-        setError(`Failed to load token comparisons: ${err}`);
-      } finally {
-        setLoading(false);
-      }
-    };
+      // Sort by block number (newest first)
+      allComparisons.sort((a, b) => b.blockNumber - a.blockNumber);
 
-    compareTokens();
-  }, [publicClient]);
+      console.log("Final comparisons:", allComparisons);
+      setComparisons(allComparisons);
+    } catch (err) {
+      console.error("Error comparing tokens:", err);
+      setError(`Failed to load token comparisons: ${err}`);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  compareTokens();
+}, [publicClient]);
 
   // Function to restore a token to Firestore
   const handleRestoreToken = async (token: TokenComparison) => {
@@ -161,8 +224,9 @@ export default function RestoreTokens() {
         imageUrl: token.imageUrl,
         burnManager: token.burnManager,
         createdAt: new Date().toISOString(),
-        currentState: "TRADING",
-        collateral: "0",
+        currentState: token.state,
+        collateral: token.collateral,
+        fundingGoal: token.fundingGoal,
         statistics: {
           totalSupply: "0",
           currentPrice: "0",
@@ -185,6 +249,7 @@ export default function RestoreTokens() {
       setError(`Failed to restore token ${token.address}: ${err}`);
     }
   };
+
 
   if (!publicClient) {
     return (
@@ -235,6 +300,15 @@ export default function RestoreTokens() {
                     </p>
                     <p className="text-sm text-gray-500">
                       Created at block: {token.blockNumber}
+                    </p>
+                    <p className="text-sm text-gray-500">
+                      State: {token.state}
+                    </p>
+                    <p className="text-sm text-gray-500">
+                      Collateral: {token.collateral} AVAX
+                    </p>
+                    <p className="text-sm text-gray-500">
+                      Funding Goal: {token.fundingGoal} AVAX
                     </p>
                     <p className="text-sm text-gray-500">
                       Burn Manager: {token.burnManager}
