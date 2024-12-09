@@ -7,77 +7,99 @@ import { ChatComponent } from "./ChatComponent";
 import { Sheet, SheetContent, SheetTrigger } from "@/components/ui/sheet";
 import { Button } from "@/components/ui/button";
 import { MessageCircle } from "lucide-react";
-import { TokenData } from "@/types";
-import { ConnectButton } from "@/components/ConnectButton";
 import { useDisconnect } from "wagmi";
-import BondingCurve from "@/components/bonding-curve";
 import RecentTrades from "./RecentTrades";
 import { useToken } from "@/contexts/TokenContext";
 
-interface TokenPageProps {
-  tokenData: TokenData | null;
-  isConnected: boolean;
-  loading: boolean;
-  address: string;
+// Only include static/immutable data that won't change
+interface TokenMetadata {
+  address: `0x${string}`;
+  name: string;
+  symbol: string;
+  creator: string;
+  imageUrl: string;
+  fundingGoal: string;
+  burnManager: string;
+  createdAt: string;
+  blockNumber: number;
 }
 
-export function TokenPage({
-  tokenData,
-  isConnected,
-  loading,
-  address,
-}: TokenPageProps) {
-  const { disconnect } = useDisconnect();
-  const { currentPrice, tokenState } = useToken();
+interface TokenPageProps {
+  metadata: TokenMetadata | null;
+  isConnected: boolean;
+}
 
-  if (!tokenData) {
+export function TokenPage({ metadata, isConnected }: TokenPageProps) {
+  const { disconnect } = useDisconnect();
+  const { price, collateral, loading, error } = useToken();
+
+  if (loading) {
     return (
       <div className="container mx-auto pt-20 p-4">
         <div className="flex justify-center items-center h-[80vh]">
-          Token or Pair Not Found. We can&apos;t seem to find the token
-          you&apos;re looking for.
+          Loading...
         </div>
       </div>
     );
   }
 
+  if (error) {
+    return (
+      <div className="container mx-auto pt-20 p-4">
+        <div className="flex justify-center items-center h-[80vh]">
+          Error: {error}
+        </div>
+      </div>
+    );
+  }
+
+  if (!metadata) {
+    return (
+      <div className="container mx-auto pt-20 p-4">
+        <div className="flex justify-center items-center h-[80vh]">
+          Token Not Found
+        </div>
+      </div>
+    );
+  }
+
+  // Combine metadata with real-time data
+  const tokenData = {
+    ...metadata,
+    contractState: {
+      currentPrice: price,
+      collateral,
+    },
+  };
+
   return (
     <div className="container mx-auto pt-20 p-4">
       <div className="grid grid-cols-1 lg:grid-cols-4 gap-6">
-        {/* Main Content Area (3 columns on desktop) */}
         <div className="lg:col-span-3 space-y-6">
-          {/* Charts Section */}
-          <div className="grid grid-cols-1 xl:grid-cols-2 gap-6 ">
+          <div className="grid grid-cols-1 xl:grid-cols-2 gap-6">
             <div className="xl:col-span-2">
-              {/* Token Header */}
               <TokenHeader tokenData={tokenData} />
             </div>
             <div className="xl:col-span-2">
-              <TokenPriceCharts
-                tokenData={tokenData}
-                price={Number(currentPrice)}
-              />
+              <TokenPriceCharts tokenData={tokenData} price={Number(price)} />
             </div>
           </div>
 
-          {/* Trade Card Section */}
           <div className="w-full">
             <TokenTradeCard tokenData={tokenData} isConnected={isConnected} />
           </div>
         </div>
 
-        {/* Right Sidebar (1 column on desktop) */}
         <div className="hidden lg:flex lg:flex-col gap-6">
           <div className="sticky top-24 space-y-6">
             <ChatComponent
-              tokenAddress={tokenData.address}
-              creatorAddress={tokenData.creator}
+              tokenAddress={metadata.address}
+              creatorAddress={metadata.creator}
             />
-            <RecentTrades tokenAddress={String(address)} />
+            <RecentTrades tokenAddress={metadata.address} />
           </div>
         </div>
 
-        {/* Mobile Chat Button */}
         <Sheet>
           <SheetTrigger asChild>
             <Button
@@ -89,7 +111,10 @@ export function TokenPage({
             </Button>
           </SheetTrigger>
           <SheetContent side="right" className="w-[90%] sm:w-[440px]">
-            <ChatComponent tokenAddress={tokenData.address} />
+            <ChatComponent
+              tokenAddress={metadata.address}
+              creatorAddress={metadata.creator}
+            />
           </SheetContent>
         </Sheet>
       </div>
