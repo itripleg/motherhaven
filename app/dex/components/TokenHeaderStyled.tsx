@@ -1,11 +1,12 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useState } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Label } from "@/components/ui/label";
 import { Badge } from "@/components/ui/badge";
 import { AddressComponent } from "@/components/AddressComponent";
 import { Progress } from "@/components/ui/progress";
-import { useToken } from '@/contexts/TokenContext';
-import { useFactoryContract } from '@/new-hooks/useFactoryContract';
+import { useToken } from "@/contexts/TokenContext";
+import { useFactoryContract } from "@/new-hooks/useFactoryContract";
+import { FACTORY_ADDRESS } from "@/types";
 
 interface TokenHeaderProps {
   address: string;
@@ -28,7 +29,7 @@ export const TokenHeaderStyled: React.FC<TokenHeaderProps> = ({ address }) => {
       const goalAmount = parseFloat(token.fundingGoal);
       const collateralAmount = parseFloat(token.collateral);
       const percentage = (collateralAmount / goalAmount) * 100;
-      
+
       const start = 0;
       const end = Math.min(percentage, 100);
       const duration = 1500;
@@ -59,7 +60,9 @@ export const TokenHeaderStyled: React.FC<TokenHeaderProps> = ({ address }) => {
   if (error || !token) {
     return (
       <Card className="min-h-[300px]">
-        <div className="p-8 text-red-500">{error || 'Token data not available'}</div>
+        <div className="p-8 text-red-500">
+          {error || "Token data not available"}
+        </div>
       </Card>
     );
   }
@@ -70,7 +73,7 @@ export const TokenHeaderStyled: React.FC<TokenHeaderProps> = ({ address }) => {
       1: { text: "Trading", color: "bg-green-600/70" },
       2: { text: "Goal Reached", color: "bg-yellow-500/80" },
       3: { text: "Halted", color: "bg-red-500/80" },
-      4: { text: "Resumed", color: "bg-green-600/70" }
+      4: { text: "Resumed", color: "bg-green-600/70" },
     };
 
     return stateMap[state] || { text: "Unknown", color: "bg-gray-500/80" };
@@ -83,6 +86,7 @@ export const TokenHeaderStyled: React.FC<TokenHeaderProps> = ({ address }) => {
   return (
     <Card className="relative overflow-hidden min-h-[300px]">
       {/* Background Image Layer */}
+      {FACTORY_ADDRESS}
       {token.imageUrl && (
         <div className="absolute inset-0 z-0">
           <div
@@ -101,7 +105,10 @@ export const TokenHeaderStyled: React.FC<TokenHeaderProps> = ({ address }) => {
       <div className="relative z-10">
         <div className="p-4 flex justify-between items-center">
           <AddressComponent hash={token.address} type="address" />
-          <Badge className={`${stateDisplay.color} text-white px-3 py-1`} variant="outline">
+          <Badge
+            className={`${stateDisplay.color} text-white px-3 py-1`}
+            variant="outline"
+          >
             {stateDisplay.text}
           </Badge>
         </div>
@@ -152,10 +159,13 @@ export const TokenHeaderStyled: React.FC<TokenHeaderProps> = ({ address }) => {
           {/* Funding Progress */}
           {token.fundingGoal !== "0" && token.collateral && (
             <div className="mt-6 backdrop-blur-sm bg-white/10 p-4 rounded-lg">
-              <Label className="text-gray-200 mb-2 block">Funding Progress</Label>
+              <Label className="text-gray-200 mb-2 block">
+                Funding Progress
+              </Label>
               <Progress value={progress} className="h-2 mb-2" />
               <p className="text-white text-sm font-semibold">
-                {progress.toFixed(2)}% - {token.collateral} / {token.fundingGoal} AVAX
+                {progress.toFixed(2)}% - {token.collateral} /{" "}
+                {token.fundingGoal} AVAX
               </p>
             </div>
           )}
