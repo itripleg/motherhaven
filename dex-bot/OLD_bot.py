@@ -18,9 +18,11 @@ w3 = Web3(Web3.HTTPProvider(RPC_URL))
 # No middleware manipulation needed - using default middleware
 
 # Convert addresses to checksum format
-FACTORY_ADDRESS = w3.to_checksum_address("0xf6970088B8488d44d3efe52e647A9217041142F7")
+# FACTORY_ADDRESS = w3.to_checksum_address("0xf6970088B8488d44d3efe52e647A9217041142F7")
+FACTORY_ADDRESS = w3.to_checksum_address("0xB4F14dDE61af13286Bf1c97F777E889158e5875A")
 TOKENS = [
-    w3.to_checksum_address("0x599a4b621bd55bcecd5e48a40ca230569b68fd86"),  # Token 1
+    # w3.to_checksum_address("0x599a4b621bd55bcecd5e48a40ca230569b68fd86"),  # Token 1
+    # w3.to_checksum_address("0x599a4b621bd55bcecd5e48a40ca230569b68fd86"),  # Token 1
 ]
 
 FACTORY_ABI = [

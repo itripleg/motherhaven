@@ -12,6 +12,7 @@ import { TokenContainer } from "./components/tokens/TokenContainer";
 // import { useTokenData } from "@/hooks/useTokenData";
 // import { Token } from "@/types";
 import { useTokenList } from "@/hooks/token/useTokenList";
+import { SpaceScene } from "./scene/SpaceScene";
 
 export default function DexPage() {
   const account = useAccount();
@@ -42,7 +43,7 @@ export default function DexPage() {
 
   return (
     <Container className="">
-      {/* <SpaceScene cameraRef={cameraRef} controlRef={controlRef} /> */}
+      <SpaceScene cameraRef={cameraRef} controlRef={controlRef} />
       <div className="container mx-auto py-8 relative">
         <Greeting greeting={greeting} showSecret={showSecret} />
 
