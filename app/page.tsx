@@ -1,8 +1,9 @@
 "use client";
-import { LandingPage } from "@/components/landing-page";
+import { LandingPage } from "@/components/landing-page_old";
 import { useAccount } from "wagmi";
 import { useRouter } from "next/navigation";
 import { useEffect } from "react";
+import SplashPage from "@/components/landing-page";
 
 export default function Home() {
   const { isConnected } = useAccount();
@@ -16,5 +17,6 @@ export default function Home() {
   }, [isConnected, router]);
 
   // Show landing page for non-connected users
-  return <LandingPage />;
+  // return <LandingPage />;
+  return <SplashPage />;
 }

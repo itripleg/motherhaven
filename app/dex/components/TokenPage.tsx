@@ -11,6 +11,7 @@ import { ConnectButton } from "@/components/ConnectButton";
 import { useDisconnect } from "wagmi";
 import RecentTrades from "./RecentTrades";
 import { useToken } from "@/contexts/TokenContext";
+import { TradesProvider } from "@/contexts/TradesContext";
 
 interface TokenPageProps {
   tokenAddress: string;
@@ -53,22 +54,24 @@ export default function TokenPage({ tokenAddress }: TokenPageProps) {
               <TokenHeader address={token.address} />
             </div>
             <div className="xl:col-span-2">
-              {/* <TokenPriceCharts token={token} /> */}
+              <TradesProvider>
+                <TokenPriceCharts address={token.address} />
+              </TradesProvider>
             </div>
           </div>
 
           {/* Trade Card Section */}
           <div className="w-full">
-            {/* <TokenTradeCard 
+            <TokenTradeCard
               address={tokenAddress}
-              tokenData={token} 
-              isConnected={false} 
-            /> */}
+              tokenData={token}
+              isConnected={false}
+            />
           </div>
         </div>
 
         {/* Right Sidebar (1 column on desktop) */}
-        {/* <div className="hidden lg:flex lg:flex-col gap-6">
+        <div className="hidden lg:flex lg:flex-col gap-6">
           <div className="sticky top-24 space-y-6">
             <ChatComponent
               tokenAddress={token.address}
@@ -76,7 +79,7 @@ export default function TokenPage({ tokenAddress }: TokenPageProps) {
             />
             <RecentTrades tokenAddress={token.address} />
           </div>
-        </div> */}
+        </div>
 
         {/* Mobile Chat Button */}
         <Sheet>

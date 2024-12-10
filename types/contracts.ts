@@ -1,15 +1,15 @@
 // types/contracts.ts
-import { Abi, Address } from 'viem';
+import { Abi, Address } from "viem";
 import tokenABI from "@/contracts/new-factory/Token_abi.json";
 import factoryABI from "@/contracts/new-factory/Factory_abi.json";
-import managerABI from "@/contracts/new-factory/Manager_abi.json"
+import managerABI from "@/contracts/new-factory/Manager_abi.json";
 
 export const ADDRESSES = {
   MAINNET: {
     FACTORY: "0x0000000000000000000000000000000000000000" as Address,
   },
   TESTNET: {
-    Factory: "0xf6970088B8488d44d3efe52e647A9217041142F7" as Address,
+    Factory: process.env.NEXT_PUBLIC_FACTORY_ADDRESS as Address,
   },
 } as const;
 

@@ -80,7 +80,9 @@ export const TokenHeaderStyled: React.FC<TokenHeaderProps> = ({ address }) => {
   };
 
   const stateDisplay = getStateDisplay(token.state);
-  const formattedPrice = currentPrice ? formatPriceDecimals(currentPrice) : "0";
+  const formattedPrice = currentPrice
+    ? formatPriceDecimals(currentPrice as bigint)
+    : "0";
   const stats = token.stats || {};
 
   return (
