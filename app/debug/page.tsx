@@ -18,7 +18,7 @@ export default function SimpleTestPage() {
       try {
         setLoading(true);
         const data = await getTokenMetadata(
-          "0x5862c9c0b2b90053aae075b6cfa584d849243ddc",
+          "0xcb29808987d58170d5b954e692e778799b54dd2d",
           publicClient
         );
         setResult(data);
@@ -62,7 +62,7 @@ export default function SimpleTestPage() {
       </div>
       <div className="mt-4">
         <h2 className="text-xl font-bold mb-2">Raw Data:</h2>
-        <pre className="bg-gray-100 p-4 rounded overflow-auto">
+        <pre className="bg-gray-100 p-4 rounded overflow-auto text-black">
           {JSON.stringify(result, null, 2)}
         </pre>
       </div>

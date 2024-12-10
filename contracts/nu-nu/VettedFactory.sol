@@ -3,7 +3,7 @@ pragma solidity ^0.8.22;
 
 import "./VettedToken.sol";
 import "@openzeppelin/contracts/access/Ownable.sol";
-import "@openzeppelin/contracts/security/ReentrancyGuard.sol";
+import "@openzeppelin/contracts/utils/ReentrancyGuard.sol";
 
 contract TokenFactory is Ownable, ReentrancyGuard {
     enum TokenState {

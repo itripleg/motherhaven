@@ -9,7 +9,7 @@ export const ADDRESSES = {
     FACTORY: "0x0000000000000000000000000000000000000000" as Address,
   },
   TESTNET: {
-    Factory: process.env.NEXT_PUBLIC_FACTORY_ADDRESS as Address,
+    Factory: process.env.NEXT_PUBLIC_TESTNET_FACTORY_ADDRESS as Address,
   },
 } as const;
 
