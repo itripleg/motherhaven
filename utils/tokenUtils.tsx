@@ -4,10 +4,9 @@ import { formatEther, type PublicClient } from "viem";
 import { TokenData, TokenState, FACTORY_ADDRESS } from "@/types";
 import { usePublicClient } from "wagmi";
 
-
 // Contract config
 const factoryContract = {
-  address:FACTORY_ADDRESS,
+  address: FACTORY_ADDRESS,
   abi: [
     {
       inputs: [
@@ -135,3 +134,25 @@ export async function getFormattedTokenData(
   const metadata = await getTokenMetadata(tokenAddress, publicClient);
   return formatTokenData(firestoreData, tokenAddress, metadata, realtimeStats);
 }
+
+export const truncateAddress = (address: string) => {
+  if (!address) return "";
+  return `${address.slice(0, 6)}...${address.slice(-4)}`;
+};
+
+export const getExplorerUrl = (network: string, address: string) => {
+  switch (network) {
+    case "Ethereum":
+      return `https://etherscan.io/token/${address}`;
+    case "Polygon":
+      return `https://polygonscan.com/token/${address}`;
+    case "Avalanche":
+      return `https://snowtrace.io/token/${address}`;
+    case "Avalanche Fuji":
+      return `https://testnet.snowtrace.io/token/${address}`;
+    case "BSC":
+      return `https://bscscan.com/token/${address}`;
+    default:
+      return "#";
+  }
+};
