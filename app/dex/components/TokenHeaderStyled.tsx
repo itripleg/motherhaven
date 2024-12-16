@@ -4,9 +4,8 @@ import { Label } from "@/components/ui/label";
 import { Badge } from "@/components/ui/badge";
 import { AddressComponent } from "@/components/AddressComponent";
 import { Progress } from "@/components/ui/progress";
-import { useToken } from "@/contexts/TokenContext";
-import { useFactoryContract } from "@/new-hooks/useFactoryContract";
-import { FACTORY_ADDRESS } from "@/types";
+import { useToken, useTokenContractState } from "@/contexts/TokenContext";
+import { Address } from "viem";
 
 interface TokenHeaderProps {
   address: string;
@@ -18,51 +17,51 @@ interface StateDisplay {
 }
 
 export const TokenHeaderStyled: React.FC<TokenHeaderProps> = ({ address }) => {
-  const { token, loading, error } = useToken(address);
   const [progress, setProgress] = useState(0);
-  const { useCurrentPrice, formatPriceDecimals } = useFactoryContract();
-  const { data: currentPrice } = useCurrentPrice(token?.address);
 
-  // Progress animation effect
+  // Get immutable data from Firestore
+  const { token, loading } = useToken(address);
+
+  // Get real-time contract state
+  const { state, collateral, currentPrice } = useTokenContractState(
+    address as Address
+  );
+
+  // Update progress animation when collateral changes
   useEffect(() => {
-    if (token?.fundingGoal && token?.collateral) {
+    if (token?.fundingGoal && collateral) {
       const goalAmount = parseFloat(token.fundingGoal);
-      const collateralAmount = parseFloat(token.collateral);
+      const collateralAmount = parseFloat(collateral);
       const percentage = (collateralAmount / goalAmount) * 100;
 
-      const start = 0;
-      const end = Math.min(percentage, 100);
-      const duration = 1500;
-      const startTime = performance.now();
+      const animateProgress = (
+        start: number,
+        end: number,
+        duration: number
+      ) => {
+        const startTime = performance.now();
 
-      const animateProgress = (currentTime: number) => {
-        const elapsedTime = currentTime - startTime;
-        const progress = Math.min(elapsedTime / duration, 1);
-        setProgress(start + progress * (end - start));
+        const update = (currentTime: number) => {
+          const elapsedTime = currentTime - startTime;
+          const progress = Math.min(elapsedTime / duration, 1);
+          setProgress(start + progress * (end - start));
 
-        if (progress < 1) {
-          requestAnimationFrame(animateProgress);
-        }
+          if (progress < 1) {
+            requestAnimationFrame(update);
+          }
+        };
+
+        requestAnimationFrame(update);
       };
 
-      requestAnimationFrame(animateProgress);
+      animateProgress(0, Math.min(percentage, 100), 1500);
     }
-  }, [token?.fundingGoal, token?.collateral]);
+  }, [token?.fundingGoal, collateral]);
 
-  if (loading) {
+  if (loading || !token) {
     return (
       <Card className="min-h-[300px]">
         <div className="p-8">Loading token data...</div>
-      </Card>
-    );
-  }
-
-  if (error || !token) {
-    return (
-      <Card className="min-h-[300px]">
-        <div className="p-8 text-red-500">
-          {error || "Token data not available"}
-        </div>
       </Card>
     );
   }
@@ -79,16 +78,11 @@ export const TokenHeaderStyled: React.FC<TokenHeaderProps> = ({ address }) => {
     return stateMap[state] || { text: "Unknown", color: "bg-gray-500/80" };
   };
 
-  const stateDisplay = getStateDisplay(token.state);
-  const formattedPrice = currentPrice
-    ? formatPriceDecimals(currentPrice as bigint)
-    : "0";
-  const stats = token.stats || {};
+  const stateDisplay = getStateDisplay(state);
 
   return (
     <Card className="relative overflow-hidden min-h-[300px]">
       {/* Background Image Layer */}
-      {FACTORY_ADDRESS}
       {token.imageUrl && (
         <div className="absolute inset-0 z-0">
           <div
@@ -106,7 +100,7 @@ export const TokenHeaderStyled: React.FC<TokenHeaderProps> = ({ address }) => {
       {/* Content Layer */}
       <div className="relative z-10">
         <div className="p-4 flex justify-between items-center">
-          <AddressComponent hash={token.address} type="address" />
+          <AddressComponent hash={address} type="address" />
           <Badge
             className={`${stateDisplay.color} text-white px-3 py-1`}
             variant="outline"
@@ -127,47 +121,24 @@ export const TokenHeaderStyled: React.FC<TokenHeaderProps> = ({ address }) => {
         <CardContent>
           <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
             <div className="space-y-4">
-              {formattedPrice !== "0" && (
-                <div className="backdrop-blur-sm bg-white/10 p-4 rounded-lg">
-                  <Label className="text-gray-200">Current Price</Label>
-                  <p className="text-white text-lg font-semibold">
-                    {formattedPrice} <span className="text-gray-300">AVAX</span>
-                  </p>
-                </div>
-              )}
-            </div>
-
-            <div className="space-y-4">
-              {stats.volumeETH24h !== "0" && (
-                <div className="backdrop-blur-sm bg-white/10 p-4 rounded-lg">
-                  <Label className="text-gray-200">24h Volume</Label>
-                  <p className="text-white text-lg font-semibold">
-                    {stats.volumeETH24h}
-                    <span className="text-gray-300"> AVAX</span>
-                  </p>
-                </div>
-              )}
-              {stats.uniqueHolders > 0 && (
-                <div className="backdrop-blur-sm bg-white/10 p-4 rounded-lg">
-                  <Label className="text-gray-200">Unique Holders</Label>
-                  <p className="text-white text-lg font-semibold">
-                    {stats.uniqueHolders}
-                  </p>
-                </div>
-              )}
+              <div className="backdrop-blur-sm bg-white/10 p-4 rounded-lg">
+                <Label className="text-gray-200">Current Price</Label>
+                <p className="text-white text-lg font-semibold">
+                  {currentPrice} <span className="text-gray-300">AVAX</span>
+                </p>
+              </div>
             </div>
           </div>
 
           {/* Funding Progress */}
-          {token.fundingGoal !== "0" && token.collateral && (
+          {token.fundingGoal && collateral && (
             <div className="mt-6 backdrop-blur-sm bg-white/10 p-4 rounded-lg">
               <Label className="text-gray-200 mb-2 block">
                 Funding Progress
               </Label>
               <Progress value={progress} className="h-2 mb-2" />
               <p className="text-white text-sm font-semibold">
-                {progress.toFixed(2)}% - {token.collateral} /{" "}
-                {token.fundingGoal} AVAX
+                {progress.toFixed(2)}% - {collateral} / {token.fundingGoal} AVAX
               </p>
             </div>
           )}

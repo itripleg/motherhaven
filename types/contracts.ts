@@ -1,7 +1,7 @@
 // types/contracts.ts
 import { Abi, Address } from "viem";
-import tokenABI from "@/contracts/new-factory/Token_abi.json";
-import factoryABI from "@/contracts/new-factory/Factory_abi.json";
+import tokenABI from "@/contracts/nu-nu/VettedToken_abi.json";
+import factoryABI from "@/contracts/nu-nu/VettedFactory_abi.json";
 import managerABI from "@/contracts/new-factory/Manager_abi.json";
 
 export const ADDRESSES = {

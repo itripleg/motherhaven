@@ -1,12 +1,7 @@
 // /app/api/new-factory-monitor/route.ts
 
 import { NextResponse } from "next/server";
-import {
-  collection,
-  setDoc,
-  doc,
-  increment,
-} from "firebase/firestore";
+import { collection, setDoc, doc, increment } from "firebase/firestore";
 import { db } from "@/firebase";
 import { decodeEventLog, formatEther, parseAbiItem } from "viem";
 import {
@@ -66,20 +61,8 @@ async function handleTokenCreated(
   const creatorAddress = args.creator.toLowerCase();
   const fundingGoal = formatEther(args.fundingGoal);
 
-  console.log("\n=== TOKEN CREATION DETAILS ===");
-  console.log("Token Address:", tokenAddress);
-  console.log("Name:", args.name);
-  console.log("Symbol:", args.symbol);
-  console.log("Creator:", creatorAddress);
-  console.log("Image URL:", args.imageUrl);
-  console.log("Timestamp:", timestamp);
-  console.log("Block Number:", blockNumber);
-  console.log("Funding Goal:", fundingGoal, "ETH");
-  console.log("Burn Manager:", args.burnManager);
-  console.log("Transaction Hash:", transactionHash);
-
   try {
-    // Prepare token document data
+    // Store only immutable token data
     const tokenData = {
       address: tokenAddress,
       name: args.name,
@@ -89,30 +72,14 @@ async function handleTokenCreated(
       burnManager: args.burnManager,
       fundingGoal,
       createdAt: timestamp,
-      currentState: TokenState.TRADING,
-      collateral: "0",
-      statistics: {
-        totalSupply: "0",
-        currentPrice: "0",
-        volumeETH: "0",
-        tradeCount: 0,
-        uniqueHolders: 0,
-      },
       blockNumber,
       transactionHash,
     };
 
-    console.log("📝 Creating token document with data:", tokenData);
-    
-    // Create token document
-    await setDoc(
-      doc(db, COLLECTIONS.TOKENS, tokenAddress),
-      tokenData,
-      { merge: true }
-    );
-    console.log("✅ Token document created/updated in", COLLECTIONS.TOKENS);
+    await setDoc(doc(db, COLLECTIONS.TOKENS, tokenAddress), tokenData);
+    console.log("✅ Token document created in", COLLECTIONS.TOKENS);
 
-    // Prepare user document data
+    // Update user's created tokens list
     const userData = {
       address: creatorAddress,
       lastActive: timestamp,
@@ -128,23 +95,12 @@ async function handleTokenCreated(
       ],
     };
 
-    console.log("📝 Updating user document with data:", userData);
-
-    // Update user document
-    await setDoc(
-      doc(db, COLLECTIONS.USERS, creatorAddress),
-      userData,
-      { merge: true }
-    );
+    await setDoc(doc(db, COLLECTIONS.USERS, creatorAddress), userData, {
+      merge: true,
+    });
     console.log("✅ User document updated in", COLLECTIONS.USERS);
   } catch (error) {
     console.error("❌ Database Error:", error);
-    console.error("Failed to save token creation data:", {
-      token: tokenAddress,
-      creator: creatorAddress,
-      timestamp,
-      error: error instanceof Error ? error.message : String(error),
-    });
     throw error;
   }
 }
@@ -170,7 +126,6 @@ async function handleTokenTrade(
     formattedEthAmount = formatEther(ethAmount);
     formattedFee = formatEther(fee);
 
-    // Add validation before division
     const tokenAmountNum = Number(formattedTokenAmount);
     if (tokenAmountNum === 0) {
       throw new Error("Token amount cannot be zero");
@@ -178,7 +133,6 @@ async function handleTokenTrade(
 
     pricePerToken = Number(formattedEthAmount) / tokenAmountNum;
 
-    // Validate the calculated price
     if (!Number.isFinite(pricePerToken)) {
       throw new Error("Invalid price calculation");
     }
@@ -187,20 +141,8 @@ async function handleTokenTrade(
     throw new Error(`Failed to process trade amounts: ${error.message}`);
   }
 
-  console.log("\n=== TRADE DETAILS ===");
-  console.log("Type:", eventType);
-  console.log("Token Address:", token);
-  console.log("Trader:", trader);
-  console.log("Token Amount:", formattedTokenAmount);
-  console.log("ETH Amount:", formattedEthAmount);
-  console.log("Fee Amount:", formattedFee);
-  console.log("Price per Token:", pricePerToken);
-  console.log("Block Number:", blockNumber);
-  console.log("Timestamp:", timestamp);
-  console.log("Transaction Hash:", transactionHash);
-
   try {
-    // Prepare trade document data
+    // Store trade data in Firestore
     const tradeData = {
       type: eventType,
       token: token.toLowerCase(),
@@ -214,48 +156,12 @@ async function handleTokenTrade(
       timestamp,
     };
 
-    console.log("📝 Creating trade document with data:", tradeData);
-
     // Create trade document with auto-generated ID
     const tradeRef = doc(collection(db, COLLECTIONS.TRADES));
     await setDoc(tradeRef, tradeData);
-    console.log("✅ Trade document created in", COLLECTIONS.TRADES, "with ID:", tradeRef.id);
-
-    // Convert ethAmount to number for increment
-    const ethAmountNum = Number(formattedEthAmount);
-
-    // Prepare token statistics update data
-    const tokenUpdateData = {
-      collateral: increment(eventType === "buy" ? ethAmountNum : -ethAmountNum),
-      "statistics.volumeETH": increment(ethAmountNum),
-      "statistics.tradeCount": increment(1),
-      "statistics.currentPrice": pricePerToken.toString(),
-      lastTrade: {
-        price: pricePerToken.toString(),
-        timestamp,
-        type: eventType,
-        fee: formattedFee,
-      },
-    };
-
-    console.log("📝 Updating token statistics with data:", tokenUpdateData);
-
-    // Update token statistics
-    await setDoc(
-      doc(db, COLLECTIONS.TOKENS, token.toLowerCase()),
-      tokenUpdateData,
-      { merge: true }
-    );
-    console.log("✅ Token statistics updated in", COLLECTIONS.TOKENS);
+    console.log("✅ Trade document created in", COLLECTIONS.TRADES);
   } catch (error) {
     console.error("❌ Database Error:", error);
-    console.error("Failed to save trade data:", {
-      type: eventType,
-      token,
-      trader,
-      timestamp,
-      error: error instanceof Error ? error.message : String(error),
-    });
     throw error;
   }
 }
@@ -266,40 +172,21 @@ async function handleTradingHalted(
   timestamp: string,
   blockNumber: number
 ) {
-  const formattedCollateral = formatEther(collateral);
-  const tokenAddress = token.toLowerCase();
-
-  console.log("\n=== TRADING HALTED DETAILS ===");
-  console.log("Token Address:", tokenAddress);
-  console.log("Final Collateral:", formattedCollateral);
-  console.log("Block Number:", blockNumber);
-  console.log("Timestamp:", timestamp);
-
   try {
-    // Prepare token update data
-    const tokenUpdateData = {
-      currentState: TokenState.HALTED,
-      finalCollateral: formattedCollateral,
-      haltedAt: timestamp,
-      haltBlock: blockNumber,
+    // Store the halt event in trades collection for historical record
+    const haltData = {
+      type: "halt",
+      token: token.toLowerCase(),
+      collateral: collateral.toString(),
+      timestamp,
+      blockNumber,
     };
 
-    console.log("📝 Updating token state with data:", tokenUpdateData);
-
-    await setDoc(
-      doc(db, COLLECTIONS.TOKENS, tokenAddress),
-      tokenUpdateData,
-      { merge: true }
-    );
-    console.log("✅ Token state updated to HALTED in", COLLECTIONS.TOKENS);
+    const tradeRef = doc(collection(db, COLLECTIONS.TRADES));
+    await setDoc(tradeRef, haltData);
+    console.log("✅ Halt event recorded in", COLLECTIONS.TRADES);
   } catch (error) {
     console.error("❌ Database Error:", error);
-    console.error("Failed to update token halt state:", {
-      token: tokenAddress,
-      collateral: formattedCollateral,
-      timestamp,
-      error: error instanceof Error ? error.message : String(error),
-    });
     throw error;
   }
 }

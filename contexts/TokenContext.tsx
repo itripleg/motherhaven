@@ -1,12 +1,41 @@
 "use client";
-import React, { createContext, useContext, useEffect, useState, useCallback } from "react";
-import { doc, onSnapshot, collection, query, limit as limitQuery, getDocs } from "firebase/firestore";
+import React, {
+  createContext,
+  useContext,
+  useEffect,
+  useState,
+  useCallback,
+} from "react";
+import {
+  doc,
+  onSnapshot,
+  collection,
+  query,
+  limit as limitQuery,
+  getDocs,
+} from "firebase/firestore";
 import { db } from "@/firebase";
-import { Token, TokenState } from "@/types";
-import { Address } from "viem";
+import { Address, formatEther } from "viem";
+import { useFactoryContract } from "@/new-hooks/useFactoryContract";
+import { useTokenContract } from "@/new-hooks/useTokenContract";
+
+// Types for immutable token data
+interface TokenData {
+  address: Address;
+  name: string;
+  symbol: string;
+  imageUrl: string;
+  description: string;
+  creator: Address;
+  burnManager: Address;
+  fundingGoal: string;
+  createdAt: string;
+  blockNumber: number;
+  transactionHash: string;
+}
 
 interface TokenMap {
-  [address: string]: Token;
+  [address: string]: TokenData;
 }
 
 interface TokenContextState {
@@ -15,212 +44,169 @@ interface TokenContextState {
   errors: { [address: string]: string | null };
   watchToken: (address: string) => void;
   unwatchToken: (address: string) => void;
-  getToken: (address: string) => Token | null;
-  getRecentTokens: () => Promise<Token[]>;
+  getToken: (address: string) => TokenData | null;
+  getRecentTokens: () => Promise<TokenData[]>;
 }
 
+// Create context
 const TokenContext = createContext<TokenContextState | null>(null);
 
-// Helper to safely get nested properties
-export const safeGet = (obj: any, path: string, defaultValue: any) => {
-  return path
-    .split(".")
-    .reduce((acc, part) => (acc && acc[part] ? acc[part] : defaultValue), obj);
-};
-
-
-const mapTokenData = (address: string, data: any): Token => {
-  console.log('Raw Firestore data for token mapping:', { address, data });
-  
-  const tokenState = (data.currentState);
-  
-  const token = {
-    // Basic token information
-    // address: address.toLowerCase() as `0x${string}`,
-    address: address as Address,
+// Map token data from Firestore to our TokenData type
+const mapTokenData = (address: string, data: any): TokenData => {
+  return {
+    address: address.toLowerCase() as Address,
     name: data.name || "",
     symbol: data.symbol || "",
     imageUrl: data.imageUrl || "",
     description: data.description || "",
-
-    // Contract parameters
-    creator: (data.creator || "0x0").toLowerCase() as `0x${string}`,
-    burnManager: (data.burnManager || "0x0").toLowerCase() as `0x${string}`,
+    creator: (data.creator || "0x0").toLowerCase() as Address,
+    burnManager: (data.burnManager || "0x0").toLowerCase() as Address,
     fundingGoal: data.fundingGoal?.toString() || "0",
-    initialPrice: "0", // These fields don't exist in Firestore yet
-    maxSupply: "0",
-    priceRate: "0",
-    tradeCooldown: 0,
-    maxWalletPercentage: 0,
-
-    // Current state
-    state: tokenState,
-    collateral: data.collateral?.toString() || "0",
-
-    // Metadata
     createdAt: data.createdAt || "",
     blockNumber: data.blockNumber || 0,
     transactionHash: data.transactionHash || "",
-
-    // Statistics
-    stats: {
-      totalSupply: safeGet(data, "statistics.totalSupply", "0").toString(),
-      currentPrice: safeGet(data, "statistics.currentPrice", "0").toString(),
-      volumeETH: safeGet(data, "statistics.volumeETH", "0").toString(),
-      tradeCount: safeGet(data, "statistics.tradeCount", 0),
-      uniqueHolders: safeGet(data, "statistics.uniqueHolders", 0),
-      // Additional 24h stats (not in Firestore yet, using defaults)
-      volumeETH24h: safeGet(data, "statistics.volumeETH", "0").toString(), // Fallback to total volume
-      priceChange24h: 0,
-      highPrice24h: safeGet(data, "statistics.currentPrice", "0").toString(),
-      lowPrice24h: safeGet(data, "statistics.currentPrice", "0").toString(),
-      buyPressure24h: 0,
-    },
-
-    // Latest trade (not in Firestore yet)
-    lastTrade: data.lastTrade ? {
-      timestamp: data.lastTrade.timestamp,
-      type: data.lastTrade.type,
-      price: data.lastTrade.price?.toString() || "0",
-      amount: data.lastTrade.amount?.toString() || "0",
-      ethAmount: data.lastTrade.ethAmount?.toString() || "0",
-      trader: (data.lastTrade.trader || "0x0").toLowerCase() as `0x${string}`,
-    } : undefined,
   };
-
-  console.log('Mapped token data:', token);
-  return token;
 };
 
+// Provider component
 export function TokenProvider({ children }: { children: React.ReactNode }) {
   const [tokens, setTokens] = useState<TokenMap>({});
   const [loading, setLoading] = useState<{ [address: string]: boolean }>({});
-  const [errors, setErrors] = useState<{ [address: string]: string | null }>({});
+  const [errors, setErrors] = useState<{ [address: string]: string | null }>(
+    {}
+  );
   const [activeSubscriptions] = useState(new Set<string>());
 
-  const watchToken = useCallback((tokenAddress: string) => {
-    if (!tokenAddress || activeSubscriptions.has(tokenAddress)) return;
+  const watchToken = useCallback(
+    (tokenAddress: string) => {
+      if (!tokenAddress || activeSubscriptions.has(tokenAddress)) return;
 
-    console.log(`📌 Starting to watch token: ${tokenAddress}`);
-    
-    setLoading(prev => ({ ...prev, [tokenAddress]: true }));
-    const tokenRef = doc(db, "tokens", tokenAddress.toLowerCase());
+      setLoading((prev) => ({ ...prev, [tokenAddress]: true }));
+      const tokenRef = doc(db, "tokens", tokenAddress.toLowerCase());
 
-    const unsubscribe = onSnapshot(
-      tokenRef,
-      (doc) => {
-        if (doc.exists()) {
-          const data = doc.data();
-          console.log(`📥 Received update for token ${tokenAddress}:`, data);
-
-          try {
-            const tokenData = mapTokenData(tokenAddress, data);
-            setTokens(prev => ({ ...prev, [tokenAddress]: tokenData }));
-            setErrors(prev => ({ ...prev, [tokenAddress]: null }));
-          } catch (err) {
-            console.error(`❌ Error mapping token data for ${tokenAddress}:`, err);
-            setErrors(prev => ({ 
-              ...prev, 
-              [tokenAddress]: "Error processing token data" 
+      const unsubscribe = onSnapshot(
+        tokenRef,
+        (doc) => {
+          if (doc.exists()) {
+            const data = doc.data();
+            try {
+              const tokenData = mapTokenData(tokenAddress, data);
+              setTokens((prev) => ({ ...prev, [tokenAddress]: tokenData }));
+              setErrors((prev) => ({ ...prev, [tokenAddress]: null }));
+            } catch (err) {
+              console.error(
+                `Error mapping token data for ${tokenAddress}:`,
+                err
+              );
+              setErrors((prev) => ({
+                ...prev,
+                [tokenAddress]: "Error processing token data",
+              }));
+            }
+          } else {
+            setErrors((prev) => ({
+              ...prev,
+              [tokenAddress]: "Token not found",
             }));
           }
-        } else {
-          console.log(`⚠️ Token not found: ${tokenAddress}`);
-          setErrors(prev => ({ ...prev, [tokenAddress]: "Token not found" }));
+          setLoading((prev) => ({ ...prev, [tokenAddress]: false }));
+        },
+        (err) => {
+          console.error(`Error fetching token ${tokenAddress}:`, err);
+          setErrors((prev) => ({
+            ...prev,
+            [tokenAddress]: "Failed to load token data",
+          }));
+          setLoading((prev) => ({ ...prev, [tokenAddress]: false }));
         }
-        setLoading(prev => ({ ...prev, [tokenAddress]: false }));
-      },
-      (err) => {
-        console.error(`❌ Error fetching token ${tokenAddress}:`, err);
-        setErrors(prev => ({ 
-          ...prev, 
-          [tokenAddress]: "Failed to load token data" 
-        }));
-        setLoading(prev => ({ ...prev, [tokenAddress]: false }));
-      }
-    );
+      );
 
-    activeSubscriptions.add(tokenAddress);
-    
-    // Store cleanup function
-    return () => {
-      console.log(`👋 Stopping watch for token: ${tokenAddress}`);
-      unsubscribe();
+      activeSubscriptions.add(tokenAddress);
+      return () => {
+        unsubscribe();
+        activeSubscriptions.delete(tokenAddress);
+      };
+    },
+    [activeSubscriptions]
+  );
+
+  const unwatchToken = useCallback(
+    (tokenAddress: string) => {
+      if (!tokenAddress || !activeSubscriptions.has(tokenAddress)) return;
       activeSubscriptions.delete(tokenAddress);
-    };
-  }, [activeSubscriptions]);
 
-  const unwatchToken = useCallback((tokenAddress: string) => {
-    if (!tokenAddress || !activeSubscriptions.has(tokenAddress)) return;
-    
-    console.log(`👋 Unwatching token: ${tokenAddress}`);
-    activeSubscriptions.delete(tokenAddress);
-    
-    // Remove token data
-    setTokens(prev => {
-      const newTokens = { ...prev };
-      delete newTokens[tokenAddress];
-      return newTokens;
-    });
-    
-    // Clean up loading and error states
-    setLoading(prev => {
-      const newLoading = { ...prev };
-      delete newLoading[tokenAddress];
-      return newLoading;
-    });
-    
-    setErrors(prev => {
-      const newErrors = { ...prev };
-      delete newErrors[tokenAddress];
-      return newErrors;
-    });
-  }, [activeSubscriptions]);
-
-  const getToken = useCallback((address: string): Token | null => {
-    return tokens[address] || null;
-  }, [tokens]);
-
-  const getRecentTokens = useCallback(async (limit: number = 10): Promise<Token[]> => {
-    try {
-      console.log(`📊 Fetching ${limit} recent tokens...`);
-      const tokensRef = collection(db, "tokens");
-      const q = query(tokensRef, limitQuery(limit));
-      const querySnapshot = await getDocs(q);
-      
-      const recentTokens: Token[] = [];
-      querySnapshot.forEach(doc => {
-        try {
-          const tokenData = mapTokenData(doc.id, doc.data());
-          recentTokens.push(tokenData);
-        } catch (err) {
-          console.error(`❌ Error mapping recent token ${doc.id}:`, err);
-        }
+      setTokens((prev) => {
+        const newTokens = { ...prev };
+        delete newTokens[tokenAddress];
+        return newTokens;
       });
-      
-      return recentTokens;
-    } catch (err) {
-      console.error("❌ Error fetching recent tokens:", err);
-      return [];
-    }
-  }, []);
 
-  const value = {
-    tokens,
-    loading,
-    errors,
-    watchToken,
-    unwatchToken,
-    getToken,
-    getRecentTokens,
-  };
+      setLoading((prev) => {
+        const newLoading = { ...prev };
+        delete newLoading[tokenAddress];
+        return newLoading;
+      });
+
+      setErrors((prev) => {
+        const newErrors = { ...prev };
+        delete newErrors[tokenAddress];
+        return newErrors;
+      });
+    },
+    [activeSubscriptions]
+  );
+
+  const getToken = useCallback(
+    (address: string): TokenData | null => {
+      return tokens[address] || null;
+    },
+    [tokens]
+  );
+
+  const getRecentTokens = useCallback(
+    async (limit: number = 10): Promise<TokenData[]> => {
+      try {
+        const tokensRef = collection(db, "tokens");
+        const q = query(tokensRef, limitQuery(limit));
+        const querySnapshot = await getDocs(q);
+
+        const recentTokens: TokenData[] = [];
+        querySnapshot.forEach((doc) => {
+          try {
+            const tokenData = mapTokenData(doc.id, doc.data());
+            recentTokens.push(tokenData);
+          } catch (err) {
+            console.error(`Error mapping recent token ${doc.id}:`, err);
+          }
+        });
+
+        return recentTokens;
+      } catch (err) {
+        console.error("Error fetching recent tokens:", err);
+        return [];
+      }
+    },
+    []
+  );
 
   return (
-    <TokenContext.Provider value={value}>{children}</TokenContext.Provider>
+    <TokenContext.Provider
+      value={{
+        tokens,
+        loading,
+        errors,
+        watchToken,
+        unwatchToken,
+        getToken,
+        getRecentTokens,
+      }}
+    >
+      {children}
+    </TokenContext.Provider>
   );
 }
 
-// Base hook for accessing token context
+// Hook for accessing token context
 export function useTokenContext() {
   const context = useContext(TokenContext);
   if (!context) {
@@ -229,7 +215,7 @@ export function useTokenContext() {
   return context;
 }
 
-// Hook for accessing a specific token's data
+// Hook for accessing a specific token's immutable data
 export function useToken(address: string) {
   const { tokens, loading, errors, watchToken } = useTokenContext();
 
@@ -246,21 +232,30 @@ export function useToken(address: string) {
   };
 }
 
-// Convenience hooks for specific token data
-export function useTokenStats(address: string) {
-  const { token } = useToken(address);
-  return token?.stats;
-}
+// Create a new hook for accessing token contract state
+export function useTokenContractState(address: Address) {
+  const { useTokenState, useCollateral, useCurrentPrice, formatPriceDecimals } =
+    useFactoryContract();
 
-export function useTokenMetadata(address: string) {
-  const { token } = useToken(address);
-  if (!token) return null;
+  // Get state from factory contract
+  const { data: state } = useTokenState(address);
+
+  // Get collateral from factory contract
+  const { data: collateral } = useCollateral(address);
+
+  // Get current price from factory contract
+  const { data: currentPrice } = useCurrentPrice(address);
+
+  // Get total supply from token contract
+  const { useTotalSupply } = useTokenContract(address);
+  const { data: totalSupply } = useTotalSupply();
 
   return {
-    name: token.name,
-    symbol: token.symbol,
-    imageUrl: token.imageUrl,
-    description: token.description,
-    creator: token.creator,
+    state: Number(state || 0),
+    collateral: collateral || "0",
+    currentPrice: currentPrice ? formatPriceDecimals(currentPrice) : "0",
+    totalSupply: totalSupply || "0",
   };
 }
+
+export { TokenContext };
