@@ -16,7 +16,7 @@ export function AuthWrapper({ children }: AuthWrapperProps) {
 
   if (!isConnected) {
     return (
-      <Container className="flex h-screen justify-center items-center">
+      <Container className="">
         <WalletConnector
           connectors={connectors}
           onConnect={handleConnect}

@@ -1,9 +1,25 @@
-import React from "react";
+"use client";
 
-type Props = {};
+import { Container } from "@/components/craft";
+import { TokensCreated } from "./TokensCreated";
+import { CoinTransactions } from "./CoinTransactions";
+import { HoldingsOverview } from "./HoldingsOverview";
+import { BundledTokensMap } from "./BundledTokensMap";
+import { AuthWrapper } from "@/components/AuthWrapper";
+import TokenBalanceLookup from "./TokenBalanceLookup";
 
-function page({}: Props) {
-  return <div>page</div>;
+export default function Dashboard() {
+  return (
+    <AuthWrapper>
+      <Container className="grid grid-cols-1 md:grid-cols-2 gap-4">
+        <div className="col-span-2">
+          <TokenBalanceLookup />
+        </div>
+        <TokensCreated />
+        <CoinTransactions />
+        <HoldingsOverview />
+        <BundledTokensMap />
+      </Container>
+    </AuthWrapper>
+  );
 }
-
-export default page;
