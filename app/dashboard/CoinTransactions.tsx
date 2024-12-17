@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { useAccount, useReadContracts } from "wagmi";
+import { useAccount } from "wagmi";
 import {
   Card,
   CardContent,
@@ -20,30 +20,26 @@ import {
 import { collection, query, where, orderBy, getDocs } from "firebase/firestore";
 import { db } from "@/firebase";
 import { formatEther } from "viem";
-import { FACTORY_ABI, FACTORY_ADDRESS } from "@/types";
 
 interface Trade {
   id: string;
   type: "buy" | "sell";
-  tokenAddress: string;
-  tokenName: string;
+  token: string;
+  tokenName?: string;
+  blockNumber: number;
   tokenAmount: string;
   ethAmount: string;
-  timestamp: number;
+  fee: string;
   pricePerToken: string;
-}
-
-interface ProcessedTrade extends Trade {
-  currentPrice?: string;
-  pnl?: number;
+  timestamp: string;
+  transactionHash: string;
 }
 
 export function CoinTransactions() {
   const { address } = useAccount();
-  const [trades, setTrades] = useState<ProcessedTrade[]>([]);
+  const [trades, setTrades] = useState<Trade[]>([]);
   const [loading, setLoading] = useState(true);
 
-  // Fetch trades from Firestore
   useEffect(() => {
     const fetchTrades = async () => {
       if (!address) return;
@@ -52,7 +48,7 @@ export function CoinTransactions() {
         const tradesRef = collection(db, "trades");
         const q = query(
           tradesRef,
-          where("userAddress", "==", address.toLowerCase()),
+          where("trader", "==", address.toLowerCase()),
           orderBy("timestamp", "desc")
         );
 
@@ -68,17 +64,21 @@ export function CoinTransactions() {
                 where("address", "==", data.token)
               )
             );
-            const tokenName = tokenDoc.docs[0]?.data()?.name || "Unknown Token";
+            const tokenData = tokenDoc.docs[0]?.data();
+            const tokenName = tokenData?.name || "Unknown Token";
 
             return {
               id: doc.id,
-              type: data.type,
-              tokenAddress: data.token,
+              type: data.type as "buy" | "sell",
+              token: data.token,
               tokenName,
+              blockNumber: data.blockNumber,
               tokenAmount: data.tokenAmount,
               ethAmount: data.ethAmount,
-              timestamp: data.timestamp,
+              fee: data.fee,
               pricePerToken: data.pricePerToken,
+              timestamp: data.timestamp,
+              transactionHash: data.transactionHash,
             };
           })
         );
@@ -94,99 +94,23 @@ export function CoinTransactions() {
     fetchTrades();
   }, [address]);
 
-  // Get current prices for tokens
-  const { data: currentPrices } = useReadContracts({
-    contracts: [...new Set(trades.map((trade) => trade.tokenAddress))].map(
-      (tokenAddress) => ({
-        address: FACTORY_ADDRESS,
-        abi: FACTORY_ABI,
-        functionName: "getCurrentPrice",
-        args: [tokenAddress],
-      })
-    ),
-  });
-
-  // Calculate PnL for trades
-  useEffect(() => {
-    if (!currentPrices) return;
-
-    const uniqueTokens = [
-      ...new Set(trades.map((trade) => trade.tokenAddress)),
-    ];
-    const priceMap = new Map();
-
-    uniqueTokens.forEach((tokenAddress, index) => {
-      const price = currentPrices[index]?.result;
-      if (price) {
-        priceMap.set(tokenAddress, formatEther(BigInt(price.toString())));
-      }
-    });
-
-    const tradesWithPnL = trades.map((trade) => {
-      const currentPrice = priceMap.get(trade.tokenAddress);
-      if (!currentPrice) return trade;
-
-      let pnl = 0;
-      if (trade.type === "buy") {
-        // For buys, calculate unrealized PnL if token wasn't sold
-        const soldAmount = trades
-          .filter(
-            (t) =>
-              t.type === "sell" &&
-              t.tokenAddress === trade.tokenAddress &&
-              t.timestamp > trade.timestamp
-          )
-          .reduce((acc, t) => acc + Number(t.tokenAmount), 0);
-
-        const remainingAmount = Number(trade.tokenAmount) - soldAmount;
-        if (remainingAmount > 0) {
-          const buyPrice = Number(trade.pricePerToken);
-          const currentPriceNum = Number(currentPrice);
-          pnl = remainingAmount * (currentPriceNum - buyPrice);
-        }
-      } else {
-        // For sells, calculate realized PnL
-        const buyTrade = trades.find(
-          (t) =>
-            t.type === "buy" &&
-            t.tokenAddress === trade.tokenAddress &&
-            t.timestamp < trade.timestamp
-        );
-
-        if (buyTrade) {
-          const buyPrice = Number(buyTrade.pricePerToken);
-          const sellPrice = Number(trade.pricePerToken);
-          pnl = Number(trade.tokenAmount) * (sellPrice - buyPrice);
-        }
-      }
-
-      return {
-        ...trade,
-        currentPrice,
-        pnl,
-      };
-    });
-
-    setTrades(tradesWithPnL);
-  }, [currentPrices, trades]);
-
   if (loading) {
     return (
       <Card>
         <CardHeader>
-          <CardTitle>Coin Transactions</CardTitle>
-          <CardDescription>Loading your transactions...</CardDescription>
+          <CardTitle>Trade History</CardTitle>
+          <CardDescription>Loading your trades...</CardDescription>
         </CardHeader>
       </Card>
     );
   }
 
-  if (trades.length === 0) {
+  if (!trades.length) {
     return (
       <Card>
         <CardHeader>
-          <CardTitle>Coin Transactions</CardTitle>
-          <CardDescription>No transactions found</CardDescription>
+          <CardTitle>Trade History</CardTitle>
+          <CardDescription>No trades found</CardDescription>
         </CardHeader>
       </Card>
     );
@@ -195,8 +119,8 @@ export function CoinTransactions() {
   return (
     <Card>
       <CardHeader>
-        <CardTitle>Coin Transactions</CardTitle>
-        <CardDescription>Recent buys and sells with PnL</CardDescription>
+        <CardTitle>Trade History</CardTitle>
+        <CardDescription>Your trading activity</CardDescription>
       </CardHeader>
       <CardContent>
         <Table>
@@ -204,38 +128,61 @@ export function CoinTransactions() {
             <TableRow>
               <TableHead>Type</TableHead>
               <TableHead>Token</TableHead>
-              <TableHead>Amount</TableHead>
-              <TableHead>Price</TableHead>
-              <TableHead>Current Price</TableHead>
-              <TableHead>PnL</TableHead>
+              <TableHead>Block</TableHead>
+              <TableHead>Token Amount</TableHead>
+              <TableHead>ETH Amount</TableHead>
+              <TableHead>Price/Token</TableHead>
+              <TableHead>Fee</TableHead>
+              <TableHead>Date</TableHead>
             </TableRow>
           </TableHeader>
           <TableBody>
             {trades.map((tx) => (
-              <TableRow key={tx.id}>
+              <TableRow key={tx.id} className="group">
                 <TableCell
                   className={
                     tx.type === "buy" ? "text-green-600" : "text-red-600"
                   }
                 >
-                  {tx.type === "buy" ? "Buy" : "Sell"}
+                  {tx.type.toUpperCase()}
                 </TableCell>
                 <TableCell>{tx.tokenName}</TableCell>
+                <TableCell>{tx.blockNumber}</TableCell>
                 <TableCell>
-                  {Number(formatEther(BigInt(tx.tokenAmount))).toFixed(4)}
+                  {Number(formatEther(BigInt(tx.tokenAmount))).toLocaleString(
+                    undefined,
+                    {
+                      minimumFractionDigits: 2,
+                      maximumFractionDigits: 2,
+                    }
+                  )}
                 </TableCell>
-                <TableCell>{Number(tx.pricePerToken).toFixed(6)} ETH</TableCell>
                 <TableCell>
-                  {tx.currentPrice
-                    ? `${Number(tx.currentPrice).toFixed(6)} ETH`
-                    : "-"}
+                  {Number(formatEther(BigInt(tx.ethAmount))).toLocaleString(
+                    undefined,
+                    {
+                      minimumFractionDigits: 4,
+                      maximumFractionDigits: 4,
+                    }
+                  )}
                 </TableCell>
-                <TableCell
-                  className={
-                    tx.pnl && tx.pnl >= 0 ? "text-green-600" : "text-red-600"
-                  }
-                >
-                  {tx.pnl ? `${tx.pnl.toFixed(6)} ETH` : "-"}
+                <TableCell>
+                  {Number(tx.pricePerToken).toLocaleString(undefined, {
+                    minimumFractionDigits: 8,
+                    maximumFractionDigits: 8,
+                  })}
+                </TableCell>
+                <TableCell>
+                  {Number(formatEther(BigInt(tx.fee))).toLocaleString(
+                    undefined,
+                    {
+                      minimumFractionDigits: 6,
+                      maximumFractionDigits: 6,
+                    }
+                  )}
+                </TableCell>
+                <TableCell>
+                  {new Date(tx.timestamp).toLocaleDateString()}
                 </TableCell>
               </TableRow>
             ))}
