@@ -243,7 +243,7 @@ contract TokenFactory is Ownable, ReentrancyGuard {
             emit TradingHalted(tokenAddress, fundingGoals[tokenAddress]);
         }
     }
-
+    //updated sell
     function sell(
         address tokenAddress,
         uint256 tokenAmount
@@ -251,7 +251,7 @@ contract TokenFactory is Ownable, ReentrancyGuard {
         require(
             tokens[tokenAddress] == TokenState.TRADING ||
                 tokens[tokenAddress] == TokenState.RESUMED,
-            "Trading not allowed"
+            "Not trading"
         );
         require(tokenAmount > 0, "Amount must be > 0");
 
@@ -261,6 +261,7 @@ contract TokenFactory is Ownable, ReentrancyGuard {
             "Insufficient balance"
         );
 
+        // Calculate all amounts upfront before any state changes
         uint256 currentPrice = getCurrentPrice(tokenAddress);
         uint256 ethAmount = (tokenAmount * currentPrice) / DECIMALS;
         require(ethAmount > 0, "Too small");
@@ -268,19 +269,23 @@ contract TokenFactory is Ownable, ReentrancyGuard {
         uint256 fee = calculateFee(ethAmount);
         uint256 finalAmount = ethAmount - fee;
 
+        // Check collateral BEFORE any state changes
         require(
             collateral[tokenAddress] >= finalAmount,
             "Insufficient token collateral"
         );
 
-        collateral[tokenAddress] -= finalAmount;
-        virtualSupply[tokenAddress] -= tokenAmount;
+        // Only after all checks pass, perform state changes
         token.factoryBurn(msg.sender, tokenAmount);
+        virtualSupply[tokenAddress] -= tokenAmount;
+        collateral[tokenAddress] -= finalAmount;
         lastPrice[tokenAddress] = currentPrice;
 
+        // Transfer fee to fee recipient
         (bool feeSuccess, ) = payable(feeRecipient).call{value: fee}("");
         require(feeSuccess, "Fee transfer failed");
 
+        // Transfer final amount to seller
         (bool success, ) = payable(msg.sender).call{value: finalAmount}("");
         require(success, "Transfer failed");
 

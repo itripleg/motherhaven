@@ -192,36 +192,58 @@ async function handleTradingHalted(
 }
 
 export async function POST(req: Request) {
+  console.log("\n🔍 Starting POST request processing");
+
   try {
     const body = await req.json();
-    const { event } = body;
-    console.log("Event Received! Details: ", event);
-    const blockInfo = event.data.block;
+    console.log("\n📥 Received webhook body:", JSON.stringify(body, null, 2));
 
+    const { event } = body;
+    if (!event?.data?.block) {
+      console.error("❌ Invalid event structure:", event);
+      throw new Error("Invalid event structure");
+    }
+
+    const blockInfo = event.data.block;
     console.log("\n============================");
     console.log(`📦 Processing Block #${blockInfo.number}`);
     console.log(
-      `⏰ ${new Date(Number(blockInfo.timestamp) * 1000).toLocaleString()}`
+      `⏰ Block Timestamp: ${new Date(
+        Number(blockInfo.timestamp) * 1000
+      ).toLocaleString()}`
     );
     console.log("============================");
 
-    const factoryLogs = blockInfo.logs.filter(
-      (log: any) =>
-        log.account?.address?.toLowerCase() === FACTORY_ADDRESS.toLowerCase()
-    );
+    // Log all block info for debugging
+    console.log("\n🔍 Block Info Details:");
+    console.log(JSON.stringify(blockInfo, null, 2));
 
-    console.log(`\nFound ${factoryLogs.length} factory logs`);
+    const factoryLogs = blockInfo.logs.filter((log: any) => {
+      const matches =
+        log.account?.address?.toLowerCase() === FACTORY_ADDRESS.toLowerCase();
+      console.log(`\n🔍 Checking log:`, {
+        logAddress: log.account?.address?.toLowerCase(),
+        factoryAddress: FACTORY_ADDRESS.toLowerCase(),
+        isMatch: matches,
+      });
+      return matches;
+    });
+
+    console.log(`\n📊 Found ${factoryLogs.length} factory logs`);
+    console.log("\n🔍 Factory Logs:", JSON.stringify(factoryLogs, null, 2));
 
     for (const log of factoryLogs) {
+      console.log("\n--- 🔄 Processing New Log ---");
+
       const eventSignature = log.topics?.[0];
       if (!eventSignature) {
         console.log("⚠️ Skipping log - no event signature");
+        console.log("Log details:", log);
         continue;
       }
 
-      console.log("\n--- Processing Log ---");
-      console.log("Event Signature:", eventSignature);
-      console.log("Transaction Hash:", log.transaction?.hash);
+      console.log("📝 Event Signature:", eventSignature);
+      console.log("🔗 Transaction Hash:", log.transaction?.hash);
 
       const eventEntry = Object.entries(EVENTS).find(
         ([_, event]) => event.signature === eventSignature
@@ -229,6 +251,12 @@ export async function POST(req: Request) {
 
       if (!eventEntry) {
         console.log("⚠️ Unknown event signature:", eventSignature);
+        console.log(
+          "Known signatures:",
+          Object.fromEntries(
+            Object.entries(EVENTS).map(([k, v]) => [k, v.signature])
+          )
+        );
         continue;
       }
 
@@ -237,29 +265,46 @@ export async function POST(req: Request) {
         Number(blockInfo.timestamp) * 1000
       ).toISOString();
 
-      console.log("Event Type:", eventType);
+      console.log("\n🎯 Processing Event Type:", eventType);
+      console.log("📅 Event Timestamp:", timestamp);
+      console.log("📄 Log Data:", log.data);
+      console.log("🏷️ Log Topics:", log.topics);
 
       try {
+        console.log("\n🔄 Attempting to decode event log...");
         const decoded = decodeEventLog({
           abi: [eventDef.abi],
           data: log.data,
           topics: log.topics,
         });
 
+        console.log("✅ Successfully decoded event:");
+        console.log(JSON.stringify(decoded, null, 2));
+
         switch (eventType) {
           case "TokenCreated": {
+            console.log("\n🎯 Processing TokenCreated event");
             const args = decoded.args as TokenCreatedEvent;
+            console.log(
+              "📄 Token Creation Args:",
+              JSON.stringify(args, null, 2)
+            );
+
             await handleTokenCreated(
               args,
               timestamp,
               Number(blockInfo.number),
               log.transaction.hash
             );
+            console.log("✅ Token creation handled successfully");
             break;
           }
 
           case "TokensPurchased": {
+            console.log("\n🎯 Processing TokensPurchased event");
             const args = decoded.args as TokensPurchasedEvent;
+            console.log("📄 Purchase Args:", JSON.stringify(args, null, 2));
+
             await handleTokenTrade(
               "buy",
               args.token,
@@ -271,11 +316,15 @@ export async function POST(req: Request) {
               Number(blockInfo.number),
               log.transaction.hash
             );
+            console.log("✅ Token purchase handled successfully");
             break;
           }
 
           case "TokensSold": {
+            console.log("\n🎯 Processing TokensSold event");
             const args = decoded.args as TokensSoldEvent;
+            console.log("📄 Sale Args:", JSON.stringify(args, null, 2));
+
             await handleTokenTrade(
               "sell",
               args.token,
@@ -287,44 +336,94 @@ export async function POST(req: Request) {
               Number(blockInfo.number),
               log.transaction.hash
             );
+            console.log("✅ Token sale handled successfully");
             break;
           }
 
           case "TradingHalted": {
+            console.log("\n🎯 Processing TradingHalted event");
             const args = decoded.args as TradingHaltedEvent;
+            console.log("📄 Halt Args:", JSON.stringify(args, null, 2));
+
             await handleTradingHalted(
               args.token,
               args.collateral,
               timestamp,
               Number(blockInfo.number)
             );
+            console.log("✅ Trading halt handled successfully");
             break;
           }
         }
       } catch (error) {
-        console.error(`❌ Error processing ${eventType} event:`, error);
-        console.error("Event processing failed for log:", {
-          eventType,
-          signature: eventSignature,
-          transactionHash: log.transaction?.hash,
-          error: error instanceof Error ? error.message : String(error),
-        });
+        console.error(`\n❌ Error processing ${eventType} event:`, error);
+        console.error(
+          "Full log that caused error:",
+          JSON.stringify(log, null, 2)
+        );
+        console.error("Event definition:", JSON.stringify(eventDef, null, 2));
+
+        if (error instanceof Error) {
+          console.error("Error stack:", error.stack);
+        }
       }
     }
 
+    console.log("\n✅ Block processing completed successfully");
     return NextResponse.json({
       status: "success",
       blockNumber: blockInfo.number,
       logsProcessed: factoryLogs.length,
     });
   } catch (error) {
-    console.error("❌ Webhook processing error:", error);
-    console.error("Request processing failed:", {
-      error: error instanceof Error ? error.message : String(error),
+    console.error("\n❌ Webhook processing error:", error);
+    console.error("Full error details:", {
+      error:
+        error instanceof Error
+          ? {
+              message: error.message,
+              stack: error.stack,
+              name: error.name,
+            }
+          : String(error),
     });
+
     return NextResponse.json(
-      { error: "Internal server error" },
+      {
+        error: "Internal server error",
+        details: error instanceof Error ? error.message : String(error),
+      },
       { status: 500 }
     );
   }
 }
+export const GET = (req: Request, res: Response): NextResponse => {
+  return NextResponse.json(
+    {
+      status: "error",
+      message: "Method not allowed",
+      details:
+        "This endpoint is a webhook that processes factory events. It only accepts POST requests with event data.",
+      documentation:
+        "Please send POST requests with blockchain event data in the request body.",
+      allowedMethods: ["POST"],
+      expectedPayload: {
+        event: {
+          data: {
+            block: {
+              number: "number",
+              timestamp: "number",
+              logs: "array of event logs",
+            },
+          },
+        },
+      },
+    },
+    {
+      status: 405,
+      headers: {
+        Allow: "POST",
+      },
+    }
+  );
+};
