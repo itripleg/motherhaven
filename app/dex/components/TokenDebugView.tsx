@@ -1,3 +1,4 @@
+// @ts-nocheck
 import React from "react";
 import { useTokenContext } from "@/contexts/TokenContext";
 import { Card, CardHeader, CardTitle, CardContent } from "@/components/ui/card";

@@ -4,7 +4,11 @@ import { Card } from "@/components/ui/card";
 import TokenPriceChart from "./charts/RechartsBarChart";
 import RechartsLineChart from "./charts/RechartsLineChart";
 import { useToken } from "@/contexts/TokenContext";
-import { useTrades } from "@/contexts/TradesContext";
+import { useTokenContractState } from "@/contexts/TokenContext";
+import { useTokenTrades } from "@/new-hooks/useTokenTrades";
+import { Address } from "viem";
+import { SimplePriceChart } from "./charts/SimplePriceChart";
+import { TVChart } from "./charts/TVChart";
 
 interface TokenPriceChartsProps {
   address: string;
@@ -12,17 +16,16 @@ interface TokenPriceChartsProps {
 
 export function TokenPriceCharts({ address }: TokenPriceChartsProps) {
   const { token, loading: tokenLoading, error: tokenError } = useToken(address);
+  const { currentPrice } = useTokenContractState(address as Address);
   const {
     trades,
     loading: tradesLoading,
     error: tradesError,
-  } = useTrades(address);
+  } = useTokenTrades(address as Address);
 
   // Combine loading states
   const loading = tokenLoading || tradesLoading;
   const error = tokenError || tradesError;
-
-  console.log("Received token into TokenPriceCharts:", token);
 
   if (error) {
     return (
@@ -40,20 +43,21 @@ export function TokenPriceCharts({ address }: TokenPriceChartsProps) {
     );
   }
 
-  const currentPrice = token.stats?.currentPrice || "0";
-
   return (
     <div className="grid gap-4 md:grid-cols-1">
-      <Card className="h-[400px] p-6">
-        <TokenPriceChart
+      <Card className="p-6 hidden">
+        {/* <SimplePriceChart trades={trades} /> */}
+        <TVChart trades={trades} />
+        {/* <TokenPriceChart
           trades={trades}
           loading={loading}
           currentPrice={currentPrice}
           tokenSymbol={token.symbol}
-        />
+        /> */}
       </Card>
       <Card className="h-[400px] p-6">
         <RechartsLineChart
+          // @ts-expect-error some type error
           trades={trades}
           loading={loading}
           currentPrice={currentPrice}

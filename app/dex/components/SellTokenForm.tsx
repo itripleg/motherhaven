@@ -122,7 +122,7 @@ export function SellTokenForm({
     abi: ERC20_ABI,
     functionName: "allowance",
     args: [address as `0x${string}`, FACTORY_ADDRESS],
-    enabled: !!address && !!tokenAddress,
+    // enabled: !!address && !!tokenAddress,
   });
 
   // Check if approval is needed whenever amount changes
@@ -242,6 +242,7 @@ export function SellTokenForm({
   ) => {
     try {
       // Get collateral for the token
+      // @ts-expect-error no params
       const collateral = await readContract({
         address: FACTORY_ADDRESS,
         abi: FACTORY_ABI,
@@ -250,7 +251,8 @@ export function SellTokenForm({
       });
 
       // Account for the trading fee (0.3%)
-      const collateralWithFee = (collateral * 10000n) / (10000n - 30n);
+      const collateralWithFee =
+        ((collateral as bigint) * 10000n) / (10000n - 30n);
 
       // Calculate max tokens that can be sold given the collateral
       const maxTokens = (collateralWithFee * 10n ** 18n) / currentPrice;

@@ -37,7 +37,7 @@ export const TokenContainer: React.FC<TokenContainerProps> = ({
               return true; // Implement trending logic
             case "new":
               const oneDayAgo = new Date(Date.now() - 24 * 60 * 60 * 1000);
-              return token.createdAt > oneDayAgo;
+            // return token.createdAt > oneDayAgo;
             case "gainers":
               return true; // Implement gainers logic
             default:

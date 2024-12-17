@@ -253,7 +253,9 @@ export function useTokenContractState(address: Address) {
   return {
     state: Number(state || 0),
     collateral: collateral || "0",
-    currentPrice: currentPrice ? formatPriceDecimals(currentPrice) : "0",
+    currentPrice: currentPrice
+      ? formatPriceDecimals(currentPrice as bigint)
+      : "0",
     totalSupply: totalSupply || "0",
   };
 }

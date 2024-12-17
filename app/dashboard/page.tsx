@@ -7,6 +7,8 @@ import { HoldingsOverview } from "./HoldingsOverview";
 import { BundledTokensMap } from "./BundledTokensMap";
 import { AuthWrapper } from "@/components/AuthWrapper";
 import TokenBalanceLookup from "./TokenBalanceLookup";
+import BalanceOverview from "./components/BalanceOverview";
+import { BudgetManager } from "./components/BudgetManager";
 
 export default function Dashboard() {
   return (

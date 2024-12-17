@@ -13,7 +13,7 @@ import {
   NavigationMenuLink,
   NavigationMenuList,
   NavigationMenuTrigger,
-} from "../ui/navigation-menu";
+} from "@/components/ui/navigation-menu";
 
 const Nav = () => {
   const [mounted, setMounted] = useState(false);

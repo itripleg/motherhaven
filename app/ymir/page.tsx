@@ -1,15 +1,32 @@
-export {};
-// "use client"
-// import React, { useState, useEffect } from 'react';
-// import { useAccount, useReadContract, useWriteContract, useWaitForTransactionReceipt } from 'wagmi';
-// import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
-// import { Button } from '@/components/ui/button';
-// import { Progress } from '@/components/ui/progress';
-// import { useToast } from '@/hooks/use-toast';
-// import { Loader2, Flame } from 'lucide-react';
-// import { formatUnits } from 'viem';
+export default function YmirSacrificeForm() {
+  return (
+    <>
+      <div></div>
+    </>
+  );
+}
+// "use client";
+// import React, { useState, useEffect } from "react";
+// import {
+//   useAccount,
+//   useReadContract,
+//   useWriteContract,
+//   useWaitForTransactionReceipt,
+// } from "wagmi";
+// import {
+//   Card,
+//   CardContent,
+//   CardDescription,
+//   CardHeader,
+//   CardTitle,
+// } from "@/components/ui/card";
+// import { Button } from "@/components/ui/button";
+// import { Progress } from "@/components/ui/progress";
+// import { useToast } from "@/hooks/use-toast";
+// import { Loader2, Flame } from "lucide-react";
+// import { formatUnits } from "viem";
 // import YMIR_ABI from "./YMIR_ABI.json";
-// import SHINZOU_ABI from "./SHINZOU_ABI.json"
+// import SHINZOU_ABI from "./SHINZOU_ABI.json";
 
 // // Import contract addresses from your config
 // // import { YMIR_ADDRESS, SHINZOU_ADDRESS } from '@/types';
@@ -25,10 +42,8 @@ export {};
 //   "Jaw Titan",
 //   "Cart Titan",
 //   "War Hammer Titan",
-//   "Founding Titan"
+//   "Founding Titan",
 // ];
-// ;
-
 // export function YmirSacrificeForm() {
 //   const { address, isConnected } = useAccount();
 //   const { toast } = useToast();
@@ -38,8 +53,8 @@ export {};
 //   const { data: tokensNeeded } = useReadContract({
 //     address: YMIR_ADDRESS,
 //     abi: YMIR_ABI,
-//     functionName: 'tokensNeededForNextTitan',
-//     args: [address ?? '0x0000000000000000000000000000000000000000'],
+//     functionName: "tokensNeededForNextTitan",
+//     args: [address ?? "0x0000000000000000000000000000000000000000"],
 //     // enabled: !!address,
 //   });
 
@@ -47,8 +62,11 @@ export {};
 //   const { data: currentAllowance } = useReadContract({
 //     address: SHINZOU_ADDRESS,
 //     abi: SHINZOU_ABI,
-//     functionName: 'allowance',
-//     args: [address ?? '0x0000000000000000000000000000000000000000', YMIR_ADDRESS],
+//     functionName: "allowance",
+//     args: [
+//       address ?? "0x0000000000000000000000000000000000000000",
+//       YMIR_ADDRESS,
+//     ],
 //     // enabled: !!address,
 //   });
 
@@ -77,32 +95,33 @@ export {};
 //     });
 
 //   // Calculate progress
-//   const progress = tokensNeeded ?
-//     100 - (Number(formatUnits(tokensNeeded, 18)) / 1000) * 100 : 0;
+//   const progress = tokensNeeded
+//     ? 100 - (Number(formatUnits(tokensNeeded as bigint, 18)) / 1000) * 100
+//     : 0;
 
 //   // Check if approval is needed
 //   useEffect(() => {
 //     if (currentAllowance) {
-//       setNeedsApproval(currentAllowance < BigInt(1000 * 10 ** 18));
+//       setNeedsApproval((currentAllowance as bigint) < BigInt(1000 * 10 ** 18));
 //     }
 //   }, [currentAllowance]);
 
 //   // Handle approval
 //   const handleApprove = async () => {
-//     console.log("Approving...")
+//     console.log("Approving...");
 //     try {
 //       writeApproval({
 //         address: SHINZOU_ADDRESS,
 //         abi: SHINZOU_ABI,
-//         functionName: 'approve',
+//         functionName: "approve",
 //         args: [YMIR_ADDRESS, BigInt(1000 * 10 ** 18)],
 //       });
 //     } catch (err) {
-//       console.error('Error approving:', err);
+//       console.error("Error approving:", err);
 //       toast({
-//         title: 'Error',
-//         description: 'Failed to approve tokens. Please try again.',
-//         variant: 'destructive',
+//         title: "Error",
+//         description: "Failed to approve tokens. Please try again.",
+//         variant: "destructive",
 //       });
 //     }
 //   };
@@ -113,14 +132,14 @@ export {};
 //       writeMint({
 //         address: YMIR_ADDRESS,
 //         abi: YMIR_ABI,
-//         functionName: 'createTitan',
+//         functionName: "createTitan",
 //       });
 //     } catch (err) {
-//       console.error('Error minting:', err);
+//       console.error("Error minting:", err);
 //       toast({
-//         title: 'Error',
-//         description: 'Failed to mint titan. Please try again.',
-//         variant: 'destructive',
+//         title: "Error",
+//         description: "Failed to mint titan. Please try again.",
+//         variant: "destructive",
 //       });
 //     }
 //   };
@@ -129,14 +148,14 @@ export {};
 //   useEffect(() => {
 //     if (isApprovalSuccess) {
 //       toast({
-//         title: 'Success!',
-//         description: 'Token approval successful!',
+//         title: "Success!",
+//         description: "Token approval successful!",
 //       });
 //     }
 //     if (isMintSuccess) {
 //       toast({
-//         title: 'Success!',
-//         description: 'Your Titan has been minted successfully!',
+//         title: "Success!",
+//         description: "Your Titan has been minted successfully!",
 //       });
 //     }
 //   }, [isApprovalSuccess, isMintSuccess, toast]);
@@ -161,10 +180,9 @@ export {};
 //           </div>
 //           <Progress value={progress} className="h-2" />
 //           <p className="text-sm text-muted-foreground">
-//             {tokensNeeded ?
-//               `${formatUnits(tokensNeeded, 18)} more tokens needed` :
-//               'Loading...'
-//             }
+//             {tokensNeeded
+//               ? `${formatUnits(tokensNeeded as bigint, 18)} more tokens needed`
+//               : "Loading..."}
 //           </p>
 //         </div>
 
@@ -176,7 +194,7 @@ export {};
 //               className="aspect-square rounded-lg bg-muted flex items-center justify-center p-2 text-center text-xs"
 //               title={name}
 //             >
-//               {name.split(' ')[0]}
+//               {name.split(" ")[0]}
 //             </div>
 //           ))}
 //         </div>
@@ -190,14 +208,14 @@ export {};
 //             onClick={handleApprove}
 //           >
 //             {!isConnected ? (
-//               'Connect Wallet'
+//               "Connect Wallet"
 //             ) : isApproving || isApprovalLoading ? (
 //               <>
 //                 <Loader2 className="mr-2 h-4 w-4 animate-spin" />
 //                 Approving...
 //               </>
 //             ) : (
-//               'Approve SHINZOU Tokens'
+//               "Approve SHINZOU Tokens"
 //             )}
 //           </Button>
 //         ) : (
@@ -213,16 +231,16 @@ export {};
 //             onClick={handleMint}
 //           >
 //             {!isConnected ? (
-//               'Connect Wallet'
+//               "Connect Wallet"
 //             ) : Number(tokensNeeded) > 0 ? (
-//               'Insufficient Tokens'
+//               "Insufficient Tokens"
 //             ) : isMinting || isMintLoading ? (
 //               <>
 //                 <Loader2 className="mr-2 h-4 w-4 animate-spin" />
 //                 Minting Titan...
 //               </>
 //             ) : (
-//               'Mint Your Titan'
+//               "Mint Your Titan"
 //             )}
 //           </Button>
 //         )}

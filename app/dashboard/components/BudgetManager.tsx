@@ -1,9 +1,9 @@
 "use client";
 
 import { useState, useEffect } from "react";
-import Projection from "@/components/dashboard/projection"; // Import the Projection component
 import { doc, getDoc, setDoc } from "firebase/firestore";
 import { db } from "@/firebase";
+import Projection from "./projection";
 
 export function BudgetManager() {
   const [currentSpending, setCurrentSpending] = useState(0);

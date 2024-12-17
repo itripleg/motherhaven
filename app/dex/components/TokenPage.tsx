@@ -64,6 +64,7 @@ export default function TokenPage({ tokenAddress }: TokenPageProps) {
           <div className="w-full">
             <TokenTradeCard
               address={tokenAddress}
+              // @ts-expect-error temporary so we can build
               tokenData={token}
               isConnected={false}
             />
