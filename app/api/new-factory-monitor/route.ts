@@ -61,8 +61,20 @@ async function handleTokenCreated(
   const creatorAddress = args.creator.toLowerCase();
   const fundingGoal = formatEther(args.fundingGoal);
 
+  console.log("\n=== TOKEN CREATION DETAILS ===");
+  console.log("Token Address:", tokenAddress);
+  console.log("Name:", args.name);
+  console.log("Symbol:", args.symbol);
+  console.log("Creator:", creatorAddress);
+  console.log("Image URL:", args.imageUrl);
+  console.log("Timestamp:", timestamp);
+  console.log("Block Number:", blockNumber);
+  console.log("Funding Goal:", fundingGoal, "ETH");
+  console.log("Burn Manager:", args.burnManager);
+  console.log("Transaction Hash:", transactionHash);
+
   try {
-    // Store only immutable token data
+    // Prepare token document data
     const tokenData = {
       address: tokenAddress,
       name: args.name,
@@ -72,14 +84,28 @@ async function handleTokenCreated(
       burnManager: args.burnManager,
       fundingGoal,
       createdAt: timestamp,
+      currentState: TokenState.TRADING,
+      collateral: "0",
+      statistics: {
+        totalSupply: "0",
+        currentPrice: "0",
+        volumeETH: "0",
+        tradeCount: 0,
+        uniqueHolders: 0,
+      },
       blockNumber,
       transactionHash,
     };
 
-    await setDoc(doc(db, COLLECTIONS.TOKENS, tokenAddress), tokenData);
-    console.log("✅ Token document created in", COLLECTIONS.TOKENS);
+    console.log("📝 Creating token document with data:", tokenData);
 
-    // Update user's created tokens list
+    // Create token document
+    await setDoc(doc(db, COLLECTIONS.TOKENS, tokenAddress), tokenData, {
+      merge: true,
+    });
+    console.log("✅ Token document created/updated in", COLLECTIONS.TOKENS);
+
+    // Prepare user document data
     const userData = {
       address: creatorAddress,
       lastActive: timestamp,
@@ -95,12 +121,21 @@ async function handleTokenCreated(
       ],
     };
 
+    console.log("📝 Updating user document with data:", userData);
+
+    // Update user document
     await setDoc(doc(db, COLLECTIONS.USERS, creatorAddress), userData, {
       merge: true,
     });
     console.log("✅ User document updated in", COLLECTIONS.USERS);
   } catch (error) {
     console.error("❌ Database Error:", error);
+    console.error("Failed to save token creation data:", {
+      token: tokenAddress,
+      creator: creatorAddress,
+      timestamp,
+      error: error instanceof Error ? error.message : String(error),
+    });
     throw error;
   }
 }
@@ -126,6 +161,7 @@ async function handleTokenTrade(
     formattedEthAmount = formatEther(ethAmount);
     formattedFee = formatEther(fee);
 
+    // Add validation before division
     const tokenAmountNum = Number(formattedTokenAmount);
     if (tokenAmountNum === 0) {
       throw new Error("Token amount cannot be zero");
@@ -133,6 +169,7 @@ async function handleTokenTrade(
 
     pricePerToken = Number(formattedEthAmount) / tokenAmountNum;
 
+    // Validate the calculated price
     if (!Number.isFinite(pricePerToken)) {
       throw new Error("Invalid price calculation");
     }
@@ -141,8 +178,20 @@ async function handleTokenTrade(
     throw new Error(`Failed to process trade amounts: ${error.message}`);
   }
 
+  console.log("\n=== TRADE DETAILS ===");
+  console.log("Type:", eventType);
+  console.log("Token Address:", token);
+  console.log("Trader:", trader);
+  console.log("Token Amount:", formattedTokenAmount);
+  console.log("ETH Amount:", formattedEthAmount);
+  console.log("Fee Amount:", formattedFee);
+  console.log("Price per Token:", pricePerToken);
+  console.log("Block Number:", blockNumber);
+  console.log("Timestamp:", timestamp);
+  console.log("Transaction Hash:", transactionHash);
+
   try {
-    // Store trade data in Firestore
+    // Prepare trade document data
     const tradeData = {
       type: eventType,
       token: token.toLowerCase(),
@@ -156,12 +205,53 @@ async function handleTokenTrade(
       timestamp,
     };
 
+    console.log("📝 Creating trade document with data:", tradeData);
+
     // Create trade document with auto-generated ID
     const tradeRef = doc(collection(db, COLLECTIONS.TRADES));
     await setDoc(tradeRef, tradeData);
-    console.log("✅ Trade document created in", COLLECTIONS.TRADES);
+    console.log(
+      "✅ Trade document created in",
+      COLLECTIONS.TRADES,
+      "with ID:",
+      tradeRef.id
+    );
+
+    // Convert ethAmount to number for increment
+    const ethAmountNum = Number(formattedEthAmount);
+
+    // Prepare token statistics update data
+    const tokenUpdateData = {
+      collateral: increment(eventType === "buy" ? ethAmountNum : -ethAmountNum),
+      "statistics.volumeETH": increment(ethAmountNum),
+      "statistics.tradeCount": increment(1),
+      "statistics.currentPrice": pricePerToken.toString(),
+      lastTrade: {
+        price: pricePerToken.toString(),
+        timestamp,
+        type: eventType,
+        fee: formattedFee,
+      },
+    };
+
+    console.log("📝 Updating token statistics with data:", tokenUpdateData);
+
+    // Update token statistics
+    await setDoc(
+      doc(db, COLLECTIONS.TOKENS, token.toLowerCase()),
+      tokenUpdateData,
+      { merge: true }
+    );
+    console.log("✅ Token statistics updated in", COLLECTIONS.TOKENS);
   } catch (error) {
     console.error("❌ Database Error:", error);
+    console.error("Failed to save trade data:", {
+      type: eventType,
+      token,
+      trader,
+      timestamp,
+      error: error instanceof Error ? error.message : String(error),
+    });
     throw error;
   }
 }
@@ -172,78 +262,73 @@ async function handleTradingHalted(
   timestamp: string,
   blockNumber: number
 ) {
+  const formattedCollateral = formatEther(collateral);
+  const tokenAddress = token.toLowerCase();
+
+  console.log("\n=== TRADING HALTED DETAILS ===");
+  console.log("Token Address:", tokenAddress);
+  console.log("Final Collateral:", formattedCollateral);
+  console.log("Block Number:", blockNumber);
+  console.log("Timestamp:", timestamp);
+
   try {
-    // Store the halt event in trades collection for historical record
-    const haltData = {
-      type: "halt",
-      token: token.toLowerCase(),
-      collateral: collateral.toString(),
-      timestamp,
-      blockNumber,
+    // Prepare token update data
+    const tokenUpdateData = {
+      currentState: TokenState.HALTED,
+      finalCollateral: formattedCollateral,
+      haltedAt: timestamp,
+      haltBlock: blockNumber,
     };
 
-    const tradeRef = doc(collection(db, COLLECTIONS.TRADES));
-    await setDoc(tradeRef, haltData);
-    console.log("✅ Halt event recorded in", COLLECTIONS.TRADES);
+    console.log("📝 Updating token state with data:", tokenUpdateData);
+
+    await setDoc(doc(db, COLLECTIONS.TOKENS, tokenAddress), tokenUpdateData, {
+      merge: true,
+    });
+    console.log("✅ Token state updated to HALTED in", COLLECTIONS.TOKENS);
   } catch (error) {
     console.error("❌ Database Error:", error);
+    console.error("Failed to update token halt state:", {
+      token: tokenAddress,
+      collateral: formattedCollateral,
+      timestamp,
+      error: error instanceof Error ? error.message : String(error),
+    });
     throw error;
   }
 }
 
 export async function POST(req: Request) {
-  console.log("\n🔍 Starting POST request processing");
-
   try {
     const body = await req.json();
-    console.log("\n📥 Received webhook body:", JSON.stringify(body, null, 2));
-
     const { event } = body;
-    if (!event?.data?.block) {
-      console.error("❌ Invalid event structure:", event);
-      throw new Error("Invalid event structure");
-    }
-
+    console.log("Event Received! Details: ", event);
     const blockInfo = event.data.block;
+
     console.log("\n============================");
     console.log(`📦 Processing Block #${blockInfo.number}`);
     console.log(
-      `⏰ Block Timestamp: ${new Date(
-        Number(blockInfo.timestamp) * 1000
-      ).toLocaleString()}`
+      `⏰ ${new Date(Number(blockInfo.timestamp) * 1000).toLocaleString()}`
     );
     console.log("============================");
 
-    // Log all block info for debugging
-    console.log("\n🔍 Block Info Details:");
-    console.log(JSON.stringify(blockInfo, null, 2));
+    const factoryLogs = blockInfo.logs.filter(
+      (log: any) =>
+        log.account?.address?.toLowerCase() === FACTORY_ADDRESS.toLowerCase()
+    );
 
-    const factoryLogs = blockInfo.logs.filter((log: any) => {
-      const matches =
-        log.account?.address?.toLowerCase() === FACTORY_ADDRESS.toLowerCase();
-      console.log(`\n🔍 Checking log:`, {
-        logAddress: log.account?.address?.toLowerCase(),
-        factoryAddress: FACTORY_ADDRESS.toLowerCase(),
-        isMatch: matches,
-      });
-      return matches;
-    });
-
-    console.log(`\n📊 Found ${factoryLogs.length} factory logs`);
-    console.log("\n🔍 Factory Logs:", JSON.stringify(factoryLogs, null, 2));
+    console.log(`\nFound ${factoryLogs.length} factory logs`);
 
     for (const log of factoryLogs) {
-      console.log("\n--- 🔄 Processing New Log ---");
-
       const eventSignature = log.topics?.[0];
       if (!eventSignature) {
         console.log("⚠️ Skipping log - no event signature");
-        console.log("Log details:", log);
         continue;
       }
 
-      console.log("📝 Event Signature:", eventSignature);
-      console.log("🔗 Transaction Hash:", log.transaction?.hash);
+      console.log("\n--- Processing Log ---");
+      console.log("Event Signature:", eventSignature);
+      console.log("Transaction Hash:", log.transaction?.hash);
 
       const eventEntry = Object.entries(EVENTS).find(
         ([_, event]) => event.signature === eventSignature
@@ -251,12 +336,6 @@ export async function POST(req: Request) {
 
       if (!eventEntry) {
         console.log("⚠️ Unknown event signature:", eventSignature);
-        console.log(
-          "Known signatures:",
-          Object.fromEntries(
-            Object.entries(EVENTS).map(([k, v]) => [k, v.signature])
-          )
-        );
         continue;
       }
 
@@ -265,46 +344,29 @@ export async function POST(req: Request) {
         Number(blockInfo.timestamp) * 1000
       ).toISOString();
 
-      console.log("\n🎯 Processing Event Type:", eventType);
-      console.log("📅 Event Timestamp:", timestamp);
-      console.log("📄 Log Data:", log.data);
-      console.log("🏷️ Log Topics:", log.topics);
+      console.log("Event Type:", eventType);
 
       try {
-        console.log("\n🔄 Attempting to decode event log...");
         const decoded = decodeEventLog({
           abi: [eventDef.abi],
           data: log.data,
           topics: log.topics,
         });
 
-        console.log("✅ Successfully decoded event:");
-        console.log(JSON.stringify(decoded, null, 2));
-
         switch (eventType) {
           case "TokenCreated": {
-            console.log("\n🎯 Processing TokenCreated event");
             const args = decoded.args as TokenCreatedEvent;
-            console.log(
-              "📄 Token Creation Args:",
-              JSON.stringify(args, null, 2)
-            );
-
             await handleTokenCreated(
               args,
               timestamp,
               Number(blockInfo.number),
               log.transaction.hash
             );
-            console.log("✅ Token creation handled successfully");
             break;
           }
 
           case "TokensPurchased": {
-            console.log("\n🎯 Processing TokensPurchased event");
             const args = decoded.args as TokensPurchasedEvent;
-            console.log("📄 Purchase Args:", JSON.stringify(args, null, 2));
-
             await handleTokenTrade(
               "buy",
               args.token,
@@ -316,15 +378,11 @@ export async function POST(req: Request) {
               Number(blockInfo.number),
               log.transaction.hash
             );
-            console.log("✅ Token purchase handled successfully");
             break;
           }
 
           case "TokensSold": {
-            console.log("\n🎯 Processing TokensSold event");
             const args = decoded.args as TokensSoldEvent;
-            console.log("📄 Sale Args:", JSON.stringify(args, null, 2));
-
             await handleTokenTrade(
               "sell",
               args.token,
@@ -336,68 +394,49 @@ export async function POST(req: Request) {
               Number(blockInfo.number),
               log.transaction.hash
             );
-            console.log("✅ Token sale handled successfully");
             break;
           }
 
           case "TradingHalted": {
-            console.log("\n🎯 Processing TradingHalted event");
             const args = decoded.args as TradingHaltedEvent;
-            console.log("📄 Halt Args:", JSON.stringify(args, null, 2));
-
             await handleTradingHalted(
               args.token,
               args.collateral,
               timestamp,
               Number(blockInfo.number)
             );
-            console.log("✅ Trading halt handled successfully");
             break;
           }
         }
       } catch (error) {
-        console.error(`\n❌ Error processing ${eventType} event:`, error);
-        console.error(
-          "Full log that caused error:",
-          JSON.stringify(log, null, 2)
-        );
-        console.error("Event definition:", JSON.stringify(eventDef, null, 2));
-
-        if (error instanceof Error) {
-          console.error("Error stack:", error.stack);
-        }
+        console.error(`❌ Error processing ${eventType} event:`, error);
+        console.error("Event processing failed for log:", {
+          eventType,
+          signature: eventSignature,
+          transactionHash: log.transaction?.hash,
+          error: error instanceof Error ? error.message : String(error),
+        });
       }
     }
 
-    console.log("\n✅ Block processing completed successfully");
     return NextResponse.json({
       status: "success",
       blockNumber: blockInfo.number,
       logsProcessed: factoryLogs.length,
     });
   } catch (error) {
-    console.error("\n❌ Webhook processing error:", error);
-    console.error("Full error details:", {
-      error:
-        error instanceof Error
-          ? {
-              message: error.message,
-              stack: error.stack,
-              name: error.name,
-            }
-          : String(error),
+    console.error("❌ Webhook processing error:", error);
+    console.error("Request processing failed:", {
+      error: error instanceof Error ? error.message : String(error),
     });
-
     return NextResponse.json(
-      {
-        error: "Internal server error",
-        details: error instanceof Error ? error.message : String(error),
-      },
+      { error: "Internal server error" },
       { status: 500 }
     );
   }
 }
-export const GET = (req: Request, res: Response): NextResponse => {
+
+export async function GET(req: Request) {
   return NextResponse.json(
     {
       status: "error",
@@ -426,4 +465,4 @@ export const GET = (req: Request, res: Response): NextResponse => {
       },
     }
   );
-};
+}
