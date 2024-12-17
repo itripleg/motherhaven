@@ -163,7 +163,7 @@ export function TokenBalanceLookup() {
 
   useEffect(() => {
     if (!userAddress) return;
-    fetchBalances(userAddress);
+    // fetchBalances(userAddress);
     const q = query(
       collection(db, "watchlist"),
       where("userId", "==", userAddress.toLowerCase())
