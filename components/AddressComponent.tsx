@@ -40,7 +40,7 @@ export function AddressComponent({ hash, type }: TransactionHashProps) {
   return (
     <TooltipProvider>
       <motion.div
-        className="flex items-center space-x-2 bg-primary/10 p-2 rounded-md text-center justify-center"
+        className="flex items-center space-x-2 p-2 rounded-md text-center justify-center"
         initial={{ opacity: 0, y: -20 }}
         animate={{ opacity: 1, y: 0 }}
         transition={{ duration: 0.5 }}

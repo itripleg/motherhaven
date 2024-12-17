@@ -1,25 +1,23 @@
-import tokenFactoryMetadata from "@/contracts/token-factory/artifacts/TokenFactory_metadata.json";
-import tokenMetadata from "@/contracts/token-factory/artifacts/Token_metadata.json";
-import factoryABI from "@/contracts/token-factory/BigBoss_abi.json";
-import { Abi } from "viem";
-
-// Helper type for Ethereum addresses
-export type Address = `0x${string}`;
+// types/contracts.ts
+import { Abi, Address } from "viem";
+import tokenABI from "@/contracts/nu-nu/VettedToken_abi.json";
+import factoryABI from "@/contracts/nu-nu/VettedFactory_abi.json";
+import managerABI from "@/contracts/new-factory/Manager_abi.json";
 
 export const ADDRESSES = {
   MAINNET: {
-    FACTORY: "0x0000000000000000000000000000000000000000" as Address, // placeholder
+    FACTORY: "0x0000000000000000000000000000000000000000" as Address,
   },
   TESTNET: {
-    FACTORY: "0x56aec6B1D4Ea8Ee0B35B526e216aDd6e8268b1eA" as Address,
+    Factory: process.env.NEXT_PUBLIC_TESTNET_FACTORY_ADDRESS as Address,
   },
 } as const;
 
-// Ensure the returned address is properly typed for viem
 export const FACTORY_ADDRESS: Address =
   process.env.NEXT_PUBLIC_NETWORK === "testnet"
-    ? ADDRESSES.TESTNET.FACTORY
+    ? ADDRESSES.TESTNET.Factory
     : ADDRESSES.MAINNET.FACTORY;
 
 export const FACTORY_ABI = factoryABI as Abi;
-export const TOKEN_ABI = tokenMetadata.output.abi as Abi;
+export const TOKEN_ABI = tokenABI as Abi;
+export const MANAGER_ABI = managerABI as Abi;

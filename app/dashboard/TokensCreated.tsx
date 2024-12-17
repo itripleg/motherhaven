@@ -1,164 +1,196 @@
-"use client";
-
-import { useState, useEffect } from "react";
+import React, { useState, useEffect } from "react";
+import { useAccount } from "wagmi";
+import {
+  collection,
+  query,
+  where,
+  onSnapshot,
+  doc,
+  getDoc,
+} from "firebase/firestore";
+import { db } from "@/firebase";
 import {
   Card,
   CardContent,
-  CardDescription,
   CardHeader,
   CardTitle,
+  CardDescription,
 } from "@/components/ui/card";
+import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Progress } from "@/components/ui/progress";
-import { useTokenList } from "@/hooks/token/useTokenList";
-import { Token } from "@/types/database";
-import { doc, getDoc } from "firebase/firestore";
-import { db } from "@/firebase";
+import Image from "next/image";
+import { Loader2 } from "lucide-react";
 
 interface TokenProgressData {
+  id: string;
   address: string;
   name: string;
   symbol: string;
+  imageUrl?: string;
+  creator: string;
+  status: string;
   collateral: number;
   fundingGoal: number;
   progress: number;
-  imageUrl?: string;
 }
 
-const TokenProgressItem = ({ token }: { token: TokenProgressData }) => {
-  const progress =
-    token.fundingGoal > 0 ? (token.collateral / token.fundingGoal) * 100 : 0;
-
-  return (
-    <div className="mb-4">
-      <div className="flex items-center justify-between mb-1">
-        <div className="flex items-center gap-2">
-          {token.imageUrl && (
-            <img
-              src={token.imageUrl}
-              alt={token.name}
-              className="w-6 h-6 rounded-full"
-            />
-          )}
-          <span className="text-sm font-medium">
-            {token.name} ({token.symbol})
-          </span>
-        </div>
-        <span className="text-sm font-medium">
-          {Math.min(progress, 100).toFixed(1)}%
-        </span>
-      </div>
-      <Progress value={Math.min(progress, 100)} className="w-full" />
-      <div className="flex justify-between text-xs text-muted-foreground mt-1">
-        <span>Raised: {token.collateral.toFixed(4)} ETH</span>
-        <span>Goal: {token.fundingGoal.toFixed(4)} ETH</span>
-      </div>
-    </div>
-  );
-};
-
 export function TokensCreated() {
-  const { tokens, isLoading, error } = useTokenList({
-    orderByField: "createdAt",
-    orderDirection: "desc",
-    limitCount: 5,
-  });
-
-  const [processedTokens, setProcessedTokens] = useState<TokenProgressData[]>(
-    []
-  );
-  const [loadingDetails, setLoadingDetails] = useState(false);
+  const { address: userAddress } = useAccount();
+  const [tokens, setTokens] = useState<TokenProgressData[]>([]);
+  const [error, setError] = useState("");
+  const [isLoading, setIsLoading] = useState(true);
 
   useEffect(() => {
-    async function fetchTokenDetails() {
-      if (!tokens.length) return;
+    if (!userAddress) {
+      setIsLoading(false);
+      return;
+    }
 
-      setLoadingDetails(true);
-      try {
-        const tokenDetails = await Promise.all(
-          tokens.map(async (token) => {
-            // Fetch additional details from Firestore
-            const tokenDoc = await getDoc(doc(db, "tokens", token.address));
+    setIsLoading(true);
+
+    const q = query(
+      collection(db, "tokens"),
+      where("creator", "==", userAddress.toLowerCase())
+    );
+
+    const unsubscribe = onSnapshot(
+      q,
+      async (snapshot) => {
+        try {
+          const tokensPromises = snapshot.docs.map(async (doc) => {
+            const tokenBaseData = doc.data();
+            const tokenDoc = await getDoc(doc.ref);
             const tokenData = tokenDoc.data();
 
+            const progress = tokenData?.fundingGoal
+              ? (parseFloat(tokenData.collateral || "0") /
+                  parseFloat(tokenData.fundingGoal)) *
+                100
+              : 0;
+
             return {
-              address: token.address,
-              name: token.name,
-              symbol: token.symbol,
+              id: doc.id,
+              address: doc.id,
+              name: tokenBaseData.name,
+              symbol: tokenBaseData.symbol,
+              imageUrl: tokenBaseData.imageUrl,
+              creator: tokenBaseData.creator,
+              status: tokenBaseData.status || "Active",
               collateral: parseFloat(tokenData?.collateral || "0"),
               fundingGoal: parseFloat(tokenData?.fundingGoal || "0"),
-              progress: tokenData?.fundingGoal
-                ? (parseFloat(tokenData.collateral || "0") /
-                    parseFloat(tokenData.fundingGoal)) *
-                  100
-                : 0,
-              imageUrl: token.imageUrl,
+              progress: Math.min(progress, 100),
             };
-          })
-        );
+          });
 
-        setProcessedTokens(tokenDetails);
-      } catch (err) {
-        console.error("Error fetching token details:", err);
-      } finally {
-        setLoadingDetails(false);
+          const processedTokens = await Promise.all(tokensPromises);
+          setTokens(processedTokens);
+        } catch (err) {
+          console.error("Error processing tokens:", err);
+          setError("Failed to process token details");
+        } finally {
+          setIsLoading(false);
+        }
+      },
+      (error) => {
+        console.error("Error fetching tokens:", error);
+        setError("Failed to load tokens");
+        setIsLoading(false);
       }
-    }
+    );
 
-    if (tokens && tokens.length > 0) {
-      fetchTokenDetails();
-    }
-  }, [tokens]);
+    return () => unsubscribe();
+  }, [userAddress]);
 
-  if (isLoading || loadingDetails) {
+  if (!userAddress) {
     return (
-      <Card>
-        <CardHeader>
-          <CardTitle>Tokens Created</CardTitle>
-          <CardDescription>Loading token data...</CardDescription>
-        </CardHeader>
-        <CardContent>
-          <div className="space-y-4">
-            {[...Array(3)].map((_, i) => (
-              <div key={i} className="animate-pulse space-y-2">
-                <div className="flex items-center gap-2">
-                  <div className="w-6 h-6 bg-gray-200 rounded-full"></div>
-                  <div className="h-4 bg-gray-200 rounded w-32"></div>
-                </div>
-                <div className="h-2 bg-gray-200 rounded w-full"></div>
-              </div>
-            ))}
-          </div>
+      <Alert>
+        <AlertDescription>
+          Please connect your wallet to view your created tokens
+        </AlertDescription>
+      </Alert>
+    );
+  }
+
+  if (isLoading) {
+    return (
+      <Card className="border-border dark:border-white">
+        <CardContent className="flex items-center justify-center py-6">
+          <Loader2 className="h-6 w-6 animate-spin" />
         </CardContent>
       </Card>
     );
   }
 
-  if (error) {
-    return (
-      <Card>
-        <CardHeader>
-          <CardTitle>Tokens Created</CardTitle>
-          <CardDescription className="text-red-500">{error}</CardDescription>
-        </CardHeader>
-      </Card>
-    );
-  }
-
   return (
-    <Card>
+    <Card className="">
       <CardHeader>
-        <CardTitle>Tokens Created</CardTitle>
-        <CardDescription>Progress towards funding goals</CardDescription>
+        <CardTitle className="text-foreground dark:text-white">
+          Tokens Created
+        </CardTitle>
+        <CardDescription className="text-muted-foreground dark:text-gray-400">
+          Progress towards funding goals
+        </CardDescription>
       </CardHeader>
       <CardContent>
-        {processedTokens.length === 0 ? (
-          <div className="text-center text-muted-foreground py-4">
-            No tokens created yet
-          </div>
+        {error ? (
+          <Alert variant="destructive">
+            <AlertDescription>{error}</AlertDescription>
+          </Alert>
+        ) : tokens.length === 0 ? (
+          <p className="text-muted-foreground dark:text-gray-400 text-center py-8">
+            You haven&apos;t created any tokens yet
+          </p>
         ) : (
-          processedTokens.map((token) => (
-            <TokenProgressItem key={token.address} token={token} />
-          ))
+          <div className="space-y-4">
+            {tokens.map((token) => (
+              <div key={token.id} className="flex flex-col space-y-2">
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center space-x-3">
+                    <div className="relative h-8 w-8 overflow-hidden rounded-full">
+                      {token.imageUrl ? (
+                        <Image
+                          src={token.imageUrl}
+                          alt={`${token.name} logo`}
+                          className="object-cover"
+                          fill
+                          unoptimized
+                        />
+                      ) : (
+                        <div className="h-full w-full bg-muted dark:bg-gray-700 flex items-center justify-center">
+                          <span className="text-sm font-bold text-muted-foreground dark:text-gray-400">
+                            {token.symbol?.[0]}
+                          </span>
+                        </div>
+                      )}
+                    </div>
+                    <div className="flex items-center space-x-2">
+                      <span className="font-medium text-foreground dark:text-white">
+                        {token.name}
+                      </span>
+                      <span className="text-muted-foreground dark:text-gray-400">
+                        ({token.symbol})
+                      </span>
+                    </div>
+                  </div>
+                  <span className="text-sm text-muted-foreground dark:text-gray-400">
+                    {token.progress.toFixed(1)}%
+                  </span>
+                </div>
+                <Progress
+                  value={token.progress}
+                  className="h-2 bg-purple-950 dark:bg-purple-900"
+                />
+                <div className="flex justify-between text-sm">
+                  <span className="text-muted-foreground dark:text-gray-400">
+                    Raised: {token.collateral.toFixed(4)} ETH
+                  </span>
+                  <span className="text-muted-foreground dark:text-gray-400">
+                    Goal: {token.fundingGoal.toFixed(4)} ETH
+                  </span>
+                </div>
+              </div>
+            ))}
+          </div>
         )}
       </CardContent>
     </Card>

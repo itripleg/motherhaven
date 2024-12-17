@@ -6,17 +6,21 @@ import { CoinTransactions } from "./CoinTransactions";
 import { HoldingsOverview } from "./HoldingsOverview";
 import { BundledTokensMap } from "./BundledTokensMap";
 import { AuthWrapper } from "@/components/AuthWrapper";
+import TokenBalanceLookup from "./TokenBalanceLookup";
+import BalanceOverview from "./components/BalanceOverview";
+import { BudgetManager } from "./components/BudgetManager";
 
 export default function Dashboard() {
   return (
     <AuthWrapper>
-      <Container className="mt-8">
-        <div className="grid gap-6 md:grid-cols-2 pt-12">
-          <TokensCreated />
-          <CoinTransactions />
-          <HoldingsOverview />
-          <BundledTokensMap />
+      <Container className="grid grid-cols-1 md:grid-cols-2 gap-4">
+        <div className="col-span-2">
+          <TokenBalanceLookup />
         </div>
+        <TokensCreated />
+        <CoinTransactions />
+        <HoldingsOverview />
+        <BundledTokensMap />
       </Container>
     </AuthWrapper>
   );

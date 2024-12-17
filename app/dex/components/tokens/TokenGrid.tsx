@@ -29,6 +29,7 @@ export const TokenGrid = ({ tokens }: { tokens: Token[] }) => {
       } catch {
         acc[token.address] = "0";
       }
+      console.log("Token price from the Token Grid (acc): ", acc);
       return acc;
     },
     {}
@@ -43,7 +44,7 @@ export const TokenGrid = ({ tokens }: { tokens: Token[] }) => {
     >
       {tokens.map((token) => (
         <TokenCard
-          key={token.id}
+          key={token.address}
           token={token}
           price={tokenPrices[token.address]}
         />

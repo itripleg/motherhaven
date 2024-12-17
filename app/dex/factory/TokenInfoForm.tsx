@@ -5,6 +5,7 @@ import { useState, useEffect } from "react";
 import { Button } from "@/components/ui/button";
 import { Upload, X } from "lucide-react";
 import Image from "next/image";
+import { isAddress } from "viem";
 
 interface TokenInfoFormProps {
   tokenInfo: {
@@ -12,6 +13,7 @@ interface TokenInfoFormProps {
     ticker: string;
     description: string;
     image: File | null;
+    burnManager?: `0x${string}`;
   };
   onTokenInfoChange: (tokenInfo: TokenInfoFormProps["tokenInfo"]) => void;
 }
@@ -22,6 +24,7 @@ export function TokenInfoForm({
 }: TokenInfoFormProps) {
   const [dragActive, setDragActive] = useState(false);
   const [previewUrl, setPreviewUrl] = useState<string | null>(null);
+  const [burnManagerError, setBurnManagerError] = useState<string>("");
 
   useEffect(() => {
     if (tokenInfo.image) {
@@ -39,6 +42,31 @@ export function TokenInfoForm({
     e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>
   ) => {
     const { name, value } = e.target;
+
+    if (name === "burnManager") {
+      // Clear error if field is empty
+      if (!value) {
+        setBurnManagerError("");
+        onTokenInfoChange({ ...tokenInfo, burnManager: undefined });
+        return;
+      }
+
+      // Validate Ethereum address
+      if (!value.startsWith("0x")) {
+        setBurnManagerError("Address must start with 0x");
+        onTokenInfoChange({ ...tokenInfo, [name]: value as `0x${string}` });
+        return;
+      }
+
+      if (!isAddress(value)) {
+        setBurnManagerError("Invalid Ethereum address");
+        onTokenInfoChange({ ...tokenInfo, [name]: value as `0x${string}` });
+        return;
+      }
+
+      setBurnManagerError("");
+    }
+
     onTokenInfoChange({ ...tokenInfo, [name]: value });
   };
 
@@ -105,6 +133,20 @@ export function TokenInfoForm({
           rows={4}
           className="resize-none"
         />
+      </div>
+      <div className="grid w-full items-center gap-1.5">
+        <Label htmlFor="burnManager">Burn Manager Address (Optional)</Label>
+        <Input
+          id="burnManager"
+          name="burnManager"
+          value={tokenInfo.burnManager || ""}
+          onChange={handleChange}
+          placeholder="0x..."
+          className={burnManagerError ? "border-red-500" : ""}
+        />
+        {burnManagerError && (
+          <p className="text-sm text-red-500 mt-1">{burnManagerError}</p>
+        )}
       </div>
       <div className="grid w-full items-center gap-1.5">
         <Label htmlFor="image">Token Image</Label>

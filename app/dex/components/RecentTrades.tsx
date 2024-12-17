@@ -1,3 +1,4 @@
+"use client";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { InfoIcon, ArrowUpIcon, ArrowDownIcon } from "lucide-react";
 import { useEffect, useState } from "react";

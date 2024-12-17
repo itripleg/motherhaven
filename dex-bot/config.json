@@ -1,0 +1,11 @@
+{
+  "factory_address": "0xB4F14dDE61af13286Bf1c97F777E889158e5875A",
+  "tokens": ["0xcb29808987d58170d5b954e692e778799b54dd2d"],
+  "trading_params": {
+    "min_trade_interval": 5,
+    "max_trade_interval": 20,
+    "min_avax": 0.01,
+    "max_avax": 0.05,
+    "max_avax_risk": 0.5
+  }
+}

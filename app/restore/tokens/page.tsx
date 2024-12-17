@@ -3,45 +3,43 @@ import { useState, useEffect } from "react";
 import { collection, getDocs, doc, setDoc } from "firebase/firestore";
 import { db } from "@/firebase";
 import { FACTORY_ADDRESS, FACTORY_ABI, TokenCreatedEvent } from "@/types";
-import {
-  formatEther,
-  createPublicClient,
-  http,
-  getContract,
-  parseAbiItem,
-  Log,
-} from "viem";
-import { sepolia } from "viem/chains";
+import { formatEther, parseAbiItem } from "viem";
+import { usePublicClient } from "wagmi";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { Container } from "@/components/craft";
 
-// Create a public client
-const publicClient = createPublicClient({
-  chain: sepolia,
-  transport: http(process.env.NEXT_PUBLIC_TESTNET_RPC),
-});
+const STARTING_BLOCK = 36999988n;
 
 interface TokenComparison {
   address: string;
   name: string;
   symbol: string;
   creator: string;
+  state: number;
   imageUrl: string;
+  burnManager: string;
   fundingGoal: string;
+  collateral: string;
   inContract: boolean;
   inFirestore: boolean;
+  blockNumber: number;
 }
 
 export default function RestoreTokens() {
   const [comparisons, setComparisons] = useState<TokenComparison[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const publicClient = usePublicClient();
 
   // Get Firestore tokens
   const fetchFirestoreTokens = async () => {
     try {
       const tokenDocs = await getDocs(collection(db, "tokens"));
+      console.log(
+        "Firestore tokens raw:",
+        tokenDocs.docs.map((doc) => doc.data())
+      );
       return tokenDocs.docs.map((doc) => ({
         address: doc.id.toLowerCase(),
         ...doc.data(),
@@ -53,86 +51,182 @@ export default function RestoreTokens() {
     }
   };
 
-  // Get contract tokens
-  const fetchContractTokens = async () => {
+  // Get token state from factory contract
+  const getTokenState = async (tokenAddress: string) => {
+    if (!publicClient) throw new Error("Public client not initialized");
+
     try {
-      // Create event filter for TokenCreated events
-      const logs = await publicClient.getLogs({
+      const data = await publicClient.readContract({
         address: FACTORY_ADDRESS,
-        event: parseAbiItem(
-          "event TokenCreated(address indexed tokenAddress, string name, string symbol, string imageUrl, address creator, uint256 fundingGoal)"
-        ),
-        fromBlock: 0n,
-        toBlock: "latest",
+        abi: FACTORY_ABI,
+        functionName: 'getTokenState',
+        args: [tokenAddress]
       });
 
-      // Parse the logs
-      return logs.map((log) => {
-        const { args } = log as unknown as { args: TokenCreatedEvent };
-        return {
-          address: args.tokenAddress.toLowerCase(),
-          name: args.name,
-          symbol: args.symbol,
-          imageUrl: args.imageUrl,
-          creator: args.creator.toLowerCase(),
-          fundingGoal: formatEther(args.fundingGoal),
-        };
-      });
+      console.log(`Token ${tokenAddress} state:`, data);
+      return Number(data);
     } catch (err) {
-      console.error("Error fetching contract tokens:", err);
-      throw new Error("Failed to fetch tokens from contract");
+      console.error(`Error getting state for token ${tokenAddress}:`, err);
+      throw err;
     }
   };
 
-  // Compare tokens
-  useEffect(() => {
-    const compareTokens = async () => {
+    // Get token collateral from factory contract
+    const getTokenCollateral = async (tokenAddress: string) => {
+      if (!publicClient) throw new Error("Public client not initialized");
+  
       try {
-        setLoading(true);
-        console.log("Fetching tokens...");
-
-        const [contractTokens, firestoreTokens] = await Promise.all([
-          fetchContractTokens(),
-          fetchFirestoreTokens(),
-        ]);
-
-        console.log("Contract tokens:", contractTokens);
-        console.log("Firestore tokens:", firestoreTokens);
-
-        const allComparisons = contractTokens.map((token) => ({
-          ...token,
-          inContract: true,
-          inFirestore: firestoreTokens.some(
-            (ft) => ft.address.toLowerCase() === token.address.toLowerCase()
-          ),
-        }));
-
-        console.log("Comparisons:", allComparisons);
-        setComparisons(allComparisons);
+        const data = await publicClient.readContract({
+          address: FACTORY_ADDRESS,
+          abi: FACTORY_ABI,
+          functionName: 'collateral',
+          args: [tokenAddress]
+        });
+  
+        console.log(`Token ${tokenAddress} collateral:`, data);
+        return formatEther(data as bigint);
       } catch (err) {
-        console.error("Error comparing tokens:", err);
-        setError("Failed to load token comparisons");
-      } finally {
-        setLoading(false);
+        console.error(`Error getting collateral for token ${tokenAddress}:`, err);
+        return "0";
       }
     };
 
-    compareTokens();
-  }, []);
+  // Get contract tokens
+  const fetchContractTokens = async () => {
+    if (!publicClient) {
+      console.error("Public client not initialized");
+      throw new Error("Public client not initialized");
+    }
+
+    try {
+      console.log("Fetching logs for factory address:", FACTORY_ADDRESS);
+      console.log("Starting from block:", STARTING_BLOCK.toString());
+
+      const currentBlock = await publicClient.getBlockNumber();
+      console.log("Current block:", currentBlock);
+
+      const logs = await publicClient.getLogs({
+        address: FACTORY_ADDRESS,
+        event: parseAbiItem(
+          "event TokenCreated(address indexed tokenAddress, string name, string symbol, string imageUrl, address creator, uint256 fundingGoal, address burnManager)"
+        ),
+        fromBlock: STARTING_BLOCK,
+        toBlock: "latest",
+      });
+
+      console.log(`Found ${logs.length} token creation events`);
+      console.log("Raw logs from contract:", logs);
+
+      return logs.map((log) => {
+        try {
+          const { args } = log as unknown as { args: TokenCreatedEvent };
+          return {
+            address: args.tokenAddress.toLowerCase(),
+            name: args.name,
+            symbol: args.symbol,
+            imageUrl: args.imageUrl,
+            creator: args.creator.toLowerCase(),
+            burnManager: args.burnManager.toLowerCase(),
+            fundingGoal: formatEther(args.fundingGoal),
+            blockNumber: Number(log.blockNumber),
+          };
+        } catch (error) {
+          console.error("Error decoding log:", error);
+          console.log("Problematic log:", log);
+          throw error;
+        }
+      });
+    } catch (err) {
+      console.error("Error fetching contract tokens:", err);
+      throw new Error(`Failed to fetch tokens from contract: ${err}`);
+    }
+  };
+// Compare tokens
+useEffect(() => {
+  const compareTokens = async () => {
+    if (!publicClient) {
+      setError("Waiting for network connection...");
+      return;
+    }
+
+    try {
+      setLoading(true);
+      console.log("Starting token comparison...");
+      console.log("Using factory address:", FACTORY_ADDRESS);
+
+      const [contractTokens, firestoreTokens] = await Promise.all([
+        fetchContractTokens(),
+        fetchFirestoreTokens(),
+      ]);
+
+      console.log("Contract tokens:", contractTokens);
+      console.log("Firestore tokens:", firestoreTokens);
+
+      // Fetch states and collateral for all contract tokens
+      const tokenDetailsPromises = contractTokens.map(async (token) => {
+        try {
+          const [state, collateral] = await Promise.all([
+            getTokenState(token.address),
+            getTokenCollateral(token.address)
+          ]);
+
+          return {
+            ...token,
+            state,
+            collateral,
+            inContract: true,
+            inFirestore: firestoreTokens.some(
+              (ft) => ft.address.toLowerCase() === token.address.toLowerCase()
+            ),
+          };
+        } catch (err) {
+          console.error(`Error fetching details for token ${token.address}:`, err);
+          return {
+            ...token,
+            state: 0,
+            collateral: "0",
+            inContract: true,
+            inFirestore: firestoreTokens.some(
+              (ft) => ft.address.toLowerCase() === token.address.toLowerCase()
+            ),
+          };
+        }
+      });
+
+      const allComparisons = await Promise.all(tokenDetailsPromises);
+
+      // Sort by block number (newest first)
+      allComparisons.sort((a, b) => b.blockNumber - a.blockNumber);
+
+      console.log("Final comparisons:", allComparisons);
+      setComparisons(allComparisons);
+    } catch (err) {
+      console.error("Error comparing tokens:", err);
+      setError(`Failed to load token comparisons: ${err}`);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  compareTokens();
+}, [publicClient]);
 
   // Function to restore a token to Firestore
   const handleRestoreToken = async (token: TokenComparison) => {
     try {
+      console.log("Restoring token to Firestore:", token);
+
       await setDoc(doc(db, "tokens", token.address), {
         name: token.name,
         symbol: token.symbol,
         address: token.address,
         creator: token.creator,
         imageUrl: token.imageUrl,
-        fundingGoal: token.fundingGoal,
+        burnManager: token.burnManager,
         createdAt: new Date().toISOString(),
-        currentState: "TRADING",
-        collateral: "0",
+        currentState: token.state,
+        collateral: token.collateral,
+        fundingGoal: token.fundingGoal,
         statistics: {
           totalSupply: "0",
           currentPrice: "0",
@@ -140,7 +234,10 @@ export default function RestoreTokens() {
           tradeCount: 0,
           uniqueHolders: 0,
         },
+        blockNumber: token.blockNumber,
       });
+
+      console.log("Token restored successfully");
 
       setComparisons((prev) =>
         prev.map((t) =>
@@ -149,9 +246,18 @@ export default function RestoreTokens() {
       );
     } catch (err) {
       console.error("Error restoring token:", err);
-      setError(`Failed to restore token ${token.address}`);
+      setError(`Failed to restore token ${token.address}: ${err}`);
     }
   };
+
+
+  if (!publicClient) {
+    return (
+      <div className="flex justify-center items-center min-h-[200px]">
+        <div>Connecting to network...</div>
+      </div>
+    );
+  }
 
   if (loading) {
     return (
@@ -162,13 +268,22 @@ export default function RestoreTokens() {
   }
 
   if (error) {
-    return <div className="text-red-500 text-center p-4">{error}</div>;
+    return (
+      <div className="text-red-500 text-center p-4">
+        <p>Error encountered:</p>
+        <p>{error}</p>
+      </div>
+    );
   }
 
   return (
     <Container>
       <div className="p-4">
         <h1 className="text-2xl font-bold mb-4">Token Restore Interface</h1>
+        <div className="mb-4 text-sm">
+          <p>Factory Address: {FACTORY_ADDRESS}</p>
+          <p>Starting Block: {STARTING_BLOCK.toString()}</p>
+        </div>
         {comparisons.length === 0 ? (
           <div className="text-center text-gray-500">No tokens found</div>
         ) : (
@@ -180,7 +295,27 @@ export default function RestoreTokens() {
                     <h3 className="font-bold">
                       {token.name} ({token.symbol})
                     </h3>
-                    <p className="text-sm text-gray-500">{token.address}</p>
+                    <p className="text-sm text-gray-500">
+                      Address: {token.address}
+                    </p>
+                    <p className="text-sm text-gray-500">
+                      Created at block: {token.blockNumber}
+                    </p>
+                    <p className="text-sm text-gray-500">
+                      State: {token.state}
+                    </p>
+                    <p className="text-sm text-gray-500">
+                      Collateral: {token.collateral} AVAX
+                    </p>
+                    <p className="text-sm text-gray-500">
+                      Funding Goal: {token.fundingGoal} AVAX
+                    </p>
+                    <p className="text-sm text-gray-500">
+                      Burn Manager: {token.burnManager}
+                    </p>
+                    <p className="text-sm text-gray-500">
+                      Creator: {token.creator}
+                    </p>
                     <div className="flex gap-2 mt-2">
                       <span
                         className={

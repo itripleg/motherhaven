@@ -1,68 +1,77 @@
-import { createPublicClient, http, getContract } from "viem";
-import { avalancheFuji } from "viem/chains";
+// // First, add the utility function to get price from contract
+// import { config } from "@/wagmi-config";
+// import { formatEther } from "viem";
+// import { FACTORY_ADDRESS, FACTORY_ABI } from "@/types";
 
-// Simple test function focused just on metadata
-export async function testTokenMetadata(tokenAddress: string) {
-  // Create Fuji client
-  const client = createPublicClient({
-    chain: avalancheFuji,
-    transport: http("https://api.avax-test.network/ext/bc/C/rpc"),
-  });
+// async function getContractPrice(tokenAddress: string): Promise<string> {
+//   const { publicClient } = config;
+//   try {
+//     const price = await publicClient.readContract({
+//       address: FACTORY_ADDRESS,
+//       abi: FACTORY_ABI,
+//       functionName: 'getCurrentPrice',
+//       args: [tokenAddress]
+//     });
+//     return formatEther(price);
+//   } catch (error) {
+//     console.error('Error getting token price:', error);
+//     return "0";
+//   }
+// }
 
-  // Factory contract config
-  const factoryContract = {
-    address: "0x56aec6B1D4Ea8Ee0B35B526e216aDd6e8268b1eA" as const,
-    abi: [
-      {
-        inputs: [
-          { internalType: "address", name: "tokenAddress", type: "address" },
-        ],
-        name: "getTokenMetadata",
-        outputs: [
-          { internalType: "string", name: "name", type: "string" },
-          { internalType: "string", name: "symbol", type: "string" },
-          { internalType: "string", name: "imageUrl", type: "string" },
-          { internalType: "uint256", name: "fundingGoal", type: "uint256" },
-          { internalType: "uint256", name: "createdAt", type: "uint256" },
-        ],
-        stateMutability: "view",
-        type: "function",
-      },
-    ],
-  } as const;
+// // Then add a new hook for real-time price
+// export function useTokenPrice(address: string) {
+//   const [price, setPrice] = useState<string>("0");
+//   const [loading, setLoading] = useState(true);
+//   const [error, setError] = useState<string | null>(null);
 
-  try {
-    // Get contract instance
-    const contract = getContract({
-      ...factoryContract,
-      client,
-    });
+//   useEffect(() => {
+//     let isMounted = true;
 
-    console.log("Fetching metadata for:", tokenAddress);
-    console.log("From factory:", factoryContract.address);
+//     async function fetchPrice() {
+//       try {
+//         setLoading(true);
+//         const contractPrice = await getContractPrice(address);
+//         if (isMounted) {
+//           setPrice(contractPrice);
+//           setError(null);
+//         }
+//       } catch (err) {
+//         if (isMounted) {
+//           setError(err instanceof Error ? err.message : "Failed to fetch price");
+//         }
+//       } finally {
+//         if (isMounted) {
+//           setLoading(false);
+//         }
+//       }
+//     }
 
-    // Call getTokenMetadata
-    const result = await contract.read.getTokenMetadata([
-      tokenAddress as `0x${string}`,
-    ]);
+//     // Initial fetch
+//     fetchPrice();
 
-    console.log("Raw result:", result);
+//     // Set up periodic refresh (every 10 seconds)
+//     const interval = setInterval(fetchPrice, 10000);
 
-    // Format the result
-    const [name, symbol, imageUrl, fundingGoal, createdAt] = result;
+//     return () => {
+//       isMounted = false;
+//       clearInterval(interval);
+//     };
+//   }, [address]);
 
-    const formatted = {
-      name,
-      symbol,
-      imageUrl,
-      fundingGoal,
-      createdAt,
-    };
+//   return { price, loading, error };
+// }
 
-    console.log("Formatted result:", formatted);
-    return formatted;
-  } catch (error) {
-    console.error("Error in testTokenMetadata:", error);
-    throw error;
-  }
-}
+// // Update mapTokenData to include contract price
+// const mapTokenData = async (address: string, data: any): Promise<Token> => {
+//   const contractPrice = await getContractPrice(address);
+
+//   return {
+//     // ... rest of your existing mapping
+//     stats: {
+//       ...safeGet(data, "statistics", {}),
+//       currentPrice: contractPrice, // Use contract price instead of Firestore price
+//     },
+//     // ... rest of your existing mapping
+//   };
+// };
