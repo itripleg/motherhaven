@@ -3,12 +3,12 @@
 import { Container } from "@/components/craft";
 import { TokensCreated } from "./TokensCreated";
 import { CoinTransactions } from "./CoinTransactions";
-import { HoldingsOverview } from "./HoldingsOverview";
-import { BundledTokensMap } from "./BundledTokensMap";
+// import { HoldingsOverview } from "./HoldingsOverview";
+// import { BundledTokensMap } from "./BundledTokensMap";
 import { AuthWrapper } from "@/components/AuthWrapper";
 import TokenBalanceLookup from "./TokenBalanceLookup";
-import BalanceOverview from "./components/BalanceOverview";
-import { BudgetManager } from "./components/BudgetManager";
+// import BalanceOverview from "./components/BalanceOverview";
+// import { BudgetManager } from "./components/BudgetManager";
 
 export default function Dashboard() {
   return (
@@ -19,8 +19,9 @@ export default function Dashboard() {
         </div>
         <TokensCreated />
         <CoinTransactions />
-        <HoldingsOverview />
-        <BundledTokensMap />
+        {/* <UserTrades /> */}
+        {/* <HoldingsOverview /> */}
+        {/* <BundledTokensMap /> */}
       </Container>
     </AuthWrapper>
   );

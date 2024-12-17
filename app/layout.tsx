@@ -6,7 +6,6 @@ import MyMenu from "@/components/my-menu";
 import WagmiContext from "@/contexts/WagmiContext";
 import { Toaster } from "@/components/ui/toaster";
 import { EventWatcher } from "../components/EventWatcher";
-import { GlobalFinanceProvider } from "@/contexts/GlobalFinanceContext";
 import { UserSection } from "@/components/UserSection";
 import { Header } from "./Header";
 import { FactoryGuard } from "@/components/FactoryGuard";
@@ -52,12 +51,10 @@ export default function RootLayout({
           <FactoryGuard>
             <MyMenu />
             <WagmiContext>
-              <GlobalFinanceProvider>
-                <EventWatcher />
-                <Header />
-                {children}
-                <Toaster />
-              </GlobalFinanceProvider>
+              <EventWatcher />
+              <Header />
+              {children}
+              <Toaster />
             </WagmiContext>
           </FactoryGuard>
         </ThemeProvider>
