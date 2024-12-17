@@ -2,7 +2,7 @@
 import { Abi, Address } from "viem";
 import tokenABI from "@/contracts/nu-nu/VettedToken_abi.json";
 import factoryABI from "@/contracts/nu-nu/VettedFactory_abi.json";
-import managerABI from "@/contracts/new-factory/Manager_abi.json";
+import managerABI from "@/contracts/nu-nu/Ymir_abi.json";
 
 export const ADDRESSES = {
   MAINNET: {
@@ -21,3 +21,4 @@ export const FACTORY_ADDRESS: Address =
 export const FACTORY_ABI = factoryABI as Abi;
 export const TOKEN_ABI = tokenABI as Abi;
 export const MANAGER_ABI = managerABI as Abi;
+export const FAUCET_ADDRESS = "0x0B50C987D357a8000FCD88f7eC6D35A88775AfD2";

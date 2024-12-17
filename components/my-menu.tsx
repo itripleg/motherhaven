@@ -34,7 +34,10 @@ export default function MyMenu2() {
             <Link href="/dex">DEX</Link>
           </MenubarItem>
           <MenubarItem>
-            <Link href="/dashboard">Dash</Link>
+            <Link href="/faucet">Faucet</Link>
+          </MenubarItem>
+          <MenubarItem>
+            <Link href="/dashboard">Dashboard</Link>
           </MenubarItem>
           {/* <MenubarItem>
             <Link href="/casino">Casino</Link>

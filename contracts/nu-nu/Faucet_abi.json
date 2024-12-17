@@ -2,54 +2,17 @@
   {
     "inputs": [
       {
-        "internalType": "address",
-        "name": "tokenAddress",
-        "type": "address"
-      }
-    ],
-    "name": "buy",
-    "outputs": [],
-    "stateMutability": "payable",
-    "type": "function"
-  },
-  {
-    "inputs": [
-      {
-        "internalType": "string",
-        "name": "name",
-        "type": "string"
+        "internalType": "address[]",
+        "name": "accounts",
+        "type": "address[]"
       },
       {
-        "internalType": "string",
-        "name": "ticker",
-        "type": "string"
+        "internalType": "bool",
+        "name": "status",
+        "type": "bool"
       }
     ],
-    "name": "createToken",
-    "outputs": [
-      {
-        "internalType": "address",
-        "name": "",
-        "type": "address"
-      }
-    ],
-    "stateMutability": "nonpayable",
-    "type": "function"
-  },
-  {
-    "inputs": [
-      {
-        "internalType": "address",
-        "name": "tokenAddress",
-        "type": "address"
-      },
-      {
-        "internalType": "uint256",
-        "name": "tokenAmount",
-        "type": "uint256"
-      }
-    ],
-    "name": "sell",
+    "name": "batchUpdateWhitelist",
     "outputs": [],
     "stateMutability": "nonpayable",
     "type": "function"
@@ -58,12 +21,7 @@
     "inputs": [
       {
         "internalType": "address",
-        "name": "factory",
-        "type": "address"
-      },
-      {
-        "internalType": "address",
-        "name": "router",
+        "name": "initialOwner",
         "type": "address"
       }
     ],
@@ -71,35 +29,26 @@
     "type": "constructor"
   },
   {
-    "anonymous": false,
     "inputs": [
       {
-        "indexed": true,
         "internalType": "address",
-        "name": "tokenAddress",
-        "type": "address"
-      },
-      {
-        "indexed": false,
-        "internalType": "string",
-        "name": "name",
-        "type": "string"
-      },
-      {
-        "indexed": false,
-        "internalType": "string",
-        "name": "ticker",
-        "type": "string"
-      },
-      {
-        "indexed": false,
-        "internalType": "address",
-        "name": "creator",
+        "name": "owner",
         "type": "address"
       }
     ],
-    "name": "TokenCreated",
-    "type": "event"
+    "name": "OwnableInvalidOwner",
+    "type": "error"
+  },
+  {
+    "inputs": [
+      {
+        "internalType": "address",
+        "name": "account",
+        "type": "address"
+      }
+    ],
+    "name": "OwnableUnauthorizedAccount",
+    "type": "error"
   },
   {
     "anonymous": false,
@@ -107,13 +56,7 @@
       {
         "indexed": true,
         "internalType": "address",
-        "name": "token",
-        "type": "address"
-      },
-      {
-        "indexed": true,
-        "internalType": "address",
-        "name": "buyer",
+        "name": "recipient",
         "type": "address"
       },
       {
@@ -121,15 +64,47 @@
         "internalType": "uint256",
         "name": "amount",
         "type": "uint256"
+      }
+    ],
+    "name": "Drip",
+    "type": "event"
+  },
+  {
+    "anonymous": false,
+    "inputs": [
+      {
+        "indexed": false,
+        "internalType": "uint256",
+        "name": "oldAmount",
+        "type": "uint256"
       },
       {
         "indexed": false,
         "internalType": "uint256",
-        "name": "price",
+        "name": "newAmount",
         "type": "uint256"
       }
     ],
-    "name": "TokensPurchased",
+    "name": "DripAmountUpdated",
+    "type": "event"
+  },
+  {
+    "anonymous": false,
+    "inputs": [
+      {
+        "indexed": false,
+        "internalType": "uint256",
+        "name": "oldInterval",
+        "type": "uint256"
+      },
+      {
+        "indexed": false,
+        "internalType": "uint256",
+        "name": "newInterval",
+        "type": "uint256"
+      }
+    ],
+    "name": "DripIntervalUpdated",
     "type": "event"
   },
   {
@@ -138,29 +113,17 @@
       {
         "indexed": true,
         "internalType": "address",
-        "name": "token",
-        "type": "address"
-      },
-      {
-        "indexed": true,
-        "internalType": "address",
-        "name": "seller",
+        "name": "sender",
         "type": "address"
       },
       {
         "indexed": false,
         "internalType": "uint256",
-        "name": "tokenAmount",
-        "type": "uint256"
-      },
-      {
-        "indexed": false,
-        "internalType": "uint256",
-        "name": "ethAmount",
+        "name": "amount",
         "type": "uint256"
       }
     ],
-    "name": "TokensSold",
+    "name": "FundsReceived",
     "type": "event"
   },
   {
@@ -169,134 +132,155 @@
       {
         "indexed": true,
         "internalType": "address",
-        "name": "token",
+        "name": "owner",
         "type": "address"
       },
       {
         "indexed": false,
         "internalType": "uint256",
-        "name": "collateral",
+        "name": "amount",
         "type": "uint256"
       }
     ],
-    "name": "TradingHalted",
+    "name": "FundsWithdrawn",
     "type": "event"
   },
   {
+    "anonymous": false,
     "inputs": [
       {
+        "indexed": true,
         "internalType": "address",
-        "name": "tokenAddress",
+        "name": "previousOwner",
         "type": "address"
       },
       {
-        "internalType": "uint256",
-        "name": "ethAmount",
-        "type": "uint256"
-      }
-    ],
-    "name": "calculateTokenAmount",
-    "outputs": [
-      {
-        "internalType": "uint256",
-        "name": "",
-        "type": "uint256"
-      }
-    ],
-    "stateMutability": "view",
-    "type": "function"
-  },
-  {
-    "inputs": [],
-    "name": "DECIMALS",
-    "outputs": [
-      {
-        "internalType": "uint256",
-        "name": "",
-        "type": "uint256"
-      }
-    ],
-    "stateMutability": "view",
-    "type": "function"
-  },
-  {
-    "inputs": [],
-    "name": "FUNDING_GOAL",
-    "outputs": [
-      {
-        "internalType": "uint256",
-        "name": "",
-        "type": "uint256"
-      }
-    ],
-    "stateMutability": "view",
-    "type": "function"
-  },
-  {
-    "inputs": [],
-    "name": "getAllTokens",
-    "outputs": [
-      {
-        "internalType": "address[]",
-        "name": "",
-        "type": "address[]"
-      }
-    ],
-    "stateMutability": "view",
-    "type": "function"
-  },
-  {
-    "inputs": [
-      {
+        "indexed": true,
         "internalType": "address",
-        "name": "tokenAddress",
+        "name": "newOwner",
         "type": "address"
       }
     ],
-    "name": "getCollateral",
-    "outputs": [
+    "name": "OwnershipTransferred",
+    "type": "event"
+  },
+  {
+    "inputs": [],
+    "name": "renounceOwnership",
+    "outputs": [],
+    "stateMutability": "nonpayable",
+    "type": "function"
+  },
+  {
+    "inputs": [],
+    "name": "requestDrip",
+    "outputs": [],
+    "stateMutability": "nonpayable",
+    "type": "function"
+  },
+  {
+    "inputs": [
       {
         "internalType": "uint256",
-        "name": "",
+        "name": "newAmount",
         "type": "uint256"
       }
     ],
-    "stateMutability": "view",
+    "name": "setDripAmount",
+    "outputs": [],
+    "stateMutability": "nonpayable",
+    "type": "function"
+  },
+  {
+    "inputs": [
+      {
+        "internalType": "uint256",
+        "name": "newInterval",
+        "type": "uint256"
+      }
+    ],
+    "name": "setDripInterval",
+    "outputs": [],
+    "stateMutability": "nonpayable",
     "type": "function"
   },
   {
     "inputs": [
       {
         "internalType": "address",
-        "name": "tokenAddress",
+        "name": "newOwner",
         "type": "address"
       }
     ],
-    "name": "getCurrentPrice",
-    "outputs": [
-      {
-        "internalType": "uint256",
-        "name": "",
-        "type": "uint256"
-      }
-    ],
-    "stateMutability": "view",
+    "name": "transferOwnership",
+    "outputs": [],
+    "stateMutability": "nonpayable",
     "type": "function"
   },
   {
     "inputs": [
       {
         "internalType": "address",
-        "name": "tokenAddress",
+        "name": "account",
         "type": "address"
       },
       {
+        "internalType": "bool",
+        "name": "status",
+        "type": "bool"
+      }
+    ],
+    "name": "updateWhitelist",
+    "outputs": [],
+    "stateMutability": "nonpayable",
+    "type": "function"
+  },
+  {
+    "anonymous": false,
+    "inputs": [
+      {
+        "indexed": true,
+        "internalType": "address",
+        "name": "account",
+        "type": "address"
+      },
+      {
+        "indexed": false,
+        "internalType": "bool",
+        "name": "status",
+        "type": "bool"
+      }
+    ],
+    "name": "WhitelistUpdated",
+    "type": "event"
+  },
+  {
+    "inputs": [],
+    "name": "withdrawAll",
+    "outputs": [],
+    "stateMutability": "nonpayable",
+    "type": "function"
+  },
+  {
+    "stateMutability": "payable",
+    "type": "receive"
+  },
+  {
+    "inputs": [],
+    "name": "BLOCK_TIME",
+    "outputs": [
+      {
         "internalType": "uint256",
-        "name": "ethAmount",
+        "name": "",
         "type": "uint256"
       }
     ],
-    "name": "getMinSellableTokens",
+    "stateMutability": "view",
+    "type": "function"
+  },
+  {
+    "inputs": [],
+    "name": "BLOCKS_PER_DAY",
     "outputs": [
       {
         "internalType": "uint256",
@@ -311,11 +295,88 @@
     "inputs": [
       {
         "internalType": "address",
-        "name": "tokenAddress",
+        "name": "account",
         "type": "address"
       }
     ],
-    "name": "getTokenCreator",
+    "name": "canRequestDrip",
+    "outputs": [
+      {
+        "internalType": "bool",
+        "name": "",
+        "type": "bool"
+      }
+    ],
+    "stateMutability": "view",
+    "type": "function"
+  },
+  {
+    "inputs": [],
+    "name": "dripAmount",
+    "outputs": [
+      {
+        "internalType": "uint256",
+        "name": "",
+        "type": "uint256"
+      }
+    ],
+    "stateMutability": "view",
+    "type": "function"
+  },
+  {
+    "inputs": [],
+    "name": "dripInterval",
+    "outputs": [
+      {
+        "internalType": "uint256",
+        "name": "",
+        "type": "uint256"
+      }
+    ],
+    "stateMutability": "view",
+    "type": "function"
+  },
+  {
+    "inputs": [
+      {
+        "internalType": "address",
+        "name": "account",
+        "type": "address"
+      }
+    ],
+    "name": "getNextDripBlock",
+    "outputs": [
+      {
+        "internalType": "uint256",
+        "name": "",
+        "type": "uint256"
+      }
+    ],
+    "stateMutability": "view",
+    "type": "function"
+  },
+  {
+    "inputs": [
+      {
+        "internalType": "address",
+        "name": "",
+        "type": "address"
+      }
+    ],
+    "name": "lastDripBlock",
+    "outputs": [
+      {
+        "internalType": "uint256",
+        "name": "",
+        "type": "uint256"
+      }
+    ],
+    "stateMutability": "view",
+    "type": "function"
+  },
+  {
+    "inputs": [],
+    "name": "owner",
     "outputs": [
       {
         "internalType": "address",
@@ -330,94 +391,16 @@
     "inputs": [
       {
         "internalType": "address",
-        "name": "tokenAddress",
-        "type": "address"
-      }
-    ],
-    "name": "getTokenState",
-    "outputs": [
-      {
-        "internalType": "enum TokenFactory.TokenState",
-        "name": "",
-        "type": "uint8"
-      }
-    ],
-    "stateMutability": "view",
-    "type": "function"
-  },
-  {
-    "inputs": [],
-    "name": "INITIAL_MINT",
-    "outputs": [
-      {
-        "internalType": "uint256",
-        "name": "",
-        "type": "uint256"
-      }
-    ],
-    "stateMutability": "view",
-    "type": "function"
-  },
-  {
-    "inputs": [],
-    "name": "INITIAL_PRICE",
-    "outputs": [
-      {
-        "internalType": "uint256",
-        "name": "",
-        "type": "uint256"
-      }
-    ],
-    "stateMutability": "view",
-    "type": "function"
-  },
-  {
-    "inputs": [],
-    "name": "MAX_SUPPLY",
-    "outputs": [
-      {
-        "internalType": "uint256",
-        "name": "",
-        "type": "uint256"
-      }
-    ],
-    "stateMutability": "view",
-    "type": "function"
-  },
-  {
-    "inputs": [],
-    "name": "PRICE_RATE",
-    "outputs": [
-      {
-        "internalType": "uint256",
-        "name": "",
-        "type": "uint256"
-      }
-    ],
-    "stateMutability": "view",
-    "type": "function"
-  },
-  {
-    "inputs": [],
-    "name": "UNISWAP_V2_FACTORY",
-    "outputs": [
-      {
-        "internalType": "address",
         "name": "",
         "type": "address"
       }
     ],
-    "stateMutability": "view",
-    "type": "function"
-  },
-  {
-    "inputs": [],
-    "name": "UNISWAP_V2_ROUTER",
+    "name": "whitelisted",
     "outputs": [
       {
-        "internalType": "address",
+        "internalType": "bool",
         "name": "",
-        "type": "address"
+        "type": "bool"
       }
     ],
     "stateMutability": "view",

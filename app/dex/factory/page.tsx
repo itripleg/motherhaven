@@ -22,7 +22,7 @@ import { AddressComponent } from "@/components/AddressComponent";
 import { ref, uploadBytes, getDownloadURL } from "firebase/storage";
 import { FACTORY_ADDRESS } from "@/types";
 
-import ABI from "@/contracts/new-factory/Factory_abi.json";
+import ABI from "@/contracts/nu-nu/VettedFactory_abi.json";
 
 // Update TokenInfo interface to include optional burnManager
 interface TokenInfo {
@@ -30,7 +30,7 @@ interface TokenInfo {
   ticker: string;
   description: string;
   image: File | null;
-  burnManager?: `0x${string}`; // Optional burn manager address
+  burnManager?: `0x${string}`;
 }
 
 function Page() {
