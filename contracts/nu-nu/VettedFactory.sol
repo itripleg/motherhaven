@@ -243,7 +243,8 @@ contract TokenFactory is Ownable, ReentrancyGuard {
             emit TradingHalted(tokenAddress, fundingGoals[tokenAddress]);
         }
     }
-    //updated sell
+
+    // should now remove fee from final proceeds to fix collaterall bug
     function sell(
         address tokenAddress,
         uint256 tokenAmount
@@ -256,36 +257,31 @@ contract TokenFactory is Ownable, ReentrancyGuard {
         require(tokenAmount > 0, "Amount must be > 0");
 
         Token token = Token(tokenAddress);
+        
+        uint256 currentPrice = getCurrentPrice(tokenAddress);
+        uint256 ethAmount = (tokenAmount * currentPrice) / DECIMALS;
+        require(ethAmount >= MIN_PURCHASE && ethAmount <= MAX_PURCHASE, "Invalid amount");
+
+        uint256 fee = calculateFee(ethAmount);
+        uint256 finalAmount = ethAmount - fee;
+        
         require(
             token.balanceOf(msg.sender) >= tokenAmount,
             "Insufficient balance"
         );
-
-        // Calculate all amounts upfront before any state changes
-        uint256 currentPrice = getCurrentPrice(tokenAddress);
-        uint256 ethAmount = (tokenAmount * currentPrice) / DECIMALS;
-        require(ethAmount > 0, "Too small");
-
-        uint256 fee = calculateFee(ethAmount);
-        uint256 finalAmount = ethAmount - fee;
-
-        // Check collateral BEFORE any state changes
         require(
-            collateral[tokenAddress] >= finalAmount,
+            collateral[tokenAddress] >= ethAmount,
             "Insufficient token collateral"
         );
 
-        // Only after all checks pass, perform state changes
         token.factoryBurn(msg.sender, tokenAmount);
         virtualSupply[tokenAddress] -= tokenAmount;
-        collateral[tokenAddress] -= finalAmount;
+        collateral[tokenAddress] -= ethAmount;
         lastPrice[tokenAddress] = currentPrice;
 
-        // Transfer fee to fee recipient
         (bool feeSuccess, ) = payable(feeRecipient).call{value: fee}("");
         require(feeSuccess, "Fee transfer failed");
 
-        // Transfer final amount to seller
         (bool success, ) = payable(msg.sender).call{value: finalAmount}("");
         require(success, "Transfer failed");
 
