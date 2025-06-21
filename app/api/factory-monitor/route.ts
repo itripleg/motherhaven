@@ -22,6 +22,7 @@ import {
 
 // import { FACTORY_ADDRESS } from "@/types";
 const FACTORY_ADDRESS = "0x56aec6B1D4Ea8Ee0B35B526e216aDd6e8268b1eA";
+// const FACTORY_ADDRESS = "0x24852e0F8cd3f4127f998B54c54a14b956eaB344";
 
 const EVENTS = {
   TokenCreated: {

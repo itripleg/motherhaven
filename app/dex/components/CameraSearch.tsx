@@ -4,14 +4,22 @@ import { motion, AnimatePresence } from "framer-motion";
 import { useState } from "react";
 import { moveCamPosition } from "@/hooks/CamTools";
 import { Skull } from "lucide-react";
+import { TokenCard } from "@/app/dex/components/tokens/TokenCard";
 import OuijAi from "@/components-3d/Ouija/OuijaAndFletcha";
 
-// CameraSearch.tsx
 interface CameraSearchProps {
   cameraRef?: React.RefObject<any>;
   onSecretFound: () => void;
   showSecret: boolean;
 }
+
+const cursedToken = {
+  name: "Cursed Memecoin",
+  symbol: "CURSE",
+  address: "0x666666666666666666666666666666666666666",
+  imageUrl: "/cursed-token.jpg", // You can add a spooky image here
+  description: "The forbidden token that should never have been found...",
+};
 
 export const CameraSearch = ({
   cameraRef,
@@ -20,6 +28,7 @@ export const CameraSearch = ({
 }: CameraSearchProps) => {
   const [position, setPosition] = useState("");
   const [lastPosition, setLastPosition] = useState([0, 0, -7]);
+  const [ouijaResult, setOuijaResult] = useState<string | null>(null);
 
   const checkSecretPosition = (pos: number[]) => {
     return (
@@ -95,7 +104,7 @@ export const CameraSearch = ({
             initial={{ opacity: 0, height: 0 }}
             animate={{
               opacity: 1,
-              height: "36vh",
+              height: "auto",
               transition: {
                 height: {
                   type: "spring",
@@ -117,35 +126,25 @@ export const CameraSearch = ({
                 opacity: { duration: 0.2 },
               },
             }}
-            className="overflow-hidden w-full flex flex-col items-center"
+            className="overflow-hidden w-full max-w-md mx-auto"
           >
             <motion.div
-            // animate={{
-            //   rotate: [0, 360],
-            //   scale: [1, 1.2, 1],
-            // }}
-            // transition={{
-            //   duration: 2,
-            //   repeat: Infinity,
-            //   ease: "linear",
-            // }}
+              initial={{ rotateY: 180 }}
+              animate={{ rotateY: 0 }}
+              transition={{ duration: 1 }}
+              className="mb-8"
             >
-              <Skull className="w-16 h-16 text-red-500" />
-              <OuijAi />
+              <TokenCard
+                // @ts-expect-error not a real token
+                token={cursedToken}
+                price={ouijaResult || "6.66666666"}
+              />
             </motion.div>
-            <motion.h2
-              animate={{
-                color: ["#ff0000", "#ff6666", "#ff0000"],
-              }}
-              transition={{
-                duration: 2,
-                repeat: Infinity,
-                ease: "linear",
-              }}
-              className="text-2xl font-bold text-red-500 h-20"
-            >
-              You found the secret!
-            </motion.h2>
+
+            <motion.div className="w-full">
+              {/* <Skull className="w-16 h-16 text-red-500 mx-auto mb-4" /> */}
+              <OuijAi onResultChange={setOuijaResult} />
+            </motion.div>
           </motion.div>
         )}
       </AnimatePresence>

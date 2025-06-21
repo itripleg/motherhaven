@@ -1,19 +1,28 @@
 "use client";
-// import { OuijaBoard } from "../components/OuijaBoard";
+
 import { Environment, PresentationControls } from "@react-three/drei";
 import { Canvas, useThree } from "@react-three/fiber";
 import { motion, useAnimation } from "framer-motion";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 
 import { Flecha } from "./Flecha";
 import { OuijaBoard } from "./OuijaBoard";
 
-type Props = {};
+interface OuijAiProps {
+  onResultChange?: (result: string) => void;
+}
 
-function OuijaAndFlecha({}: Props) {
+function OuijaAndFlecha({ onResultChange }: OuijAiProps) {
   const [questionInput, setQuestionInput] = useState("");
-  const [result, setResult] = useState();
+  const [result, setResult] = useState<string | null>(null);
   const animationControls = useAnimation();
+
+  // Update the parent component whenever the result changes
+  useEffect(() => {
+    if (result && onResultChange) {
+      onResultChange(result);
+    }
+  }, [result, onResultChange]);
 
   async function handleKeyPress(key: any) {
     // get the last key pressed and move ouija arrow
@@ -23,27 +32,29 @@ function OuijaAndFlecha({}: Props) {
 
   async function onSubmit(event: any) {
     event.preventDefault();
-    setQuestionInput("");
-    console.log("submitting...", questionInput);
-    animationControls.start("default");
-    const response = await fetch("/api/generate", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ question: questionInput }),
-    });
-    const data = await response.json();
-    if (response.status !== 200) {
-      throw (
-        data.error || new Error(`Request failed with status ${response.status}`)
-      );
+    try {
+      setQuestionInput("");
+      console.log("submitting...", questionInput);
+      animationControls.start("default");
+
+      const response = await fetch("/api/generate", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ question: questionInput }),
+      });
+
+      if (!response.ok) {
+        throw new Error(`Request failed with status ${response.status}`);
+      }
+
+      const data = await response.json();
+      console.log("Response:", data.result);
+
+      setResult(data.result);
+    } catch (error) {
+      console.error("Error:", error);
+      setResult("[error]");
     }
-    // console.log(data.result);
-    const reply = String(data.result.substring("["));
-    setResult(data.result);
-    const regex = /[1-9][0-9]* [a-zA-Z]+ [a-zA-Z]+/;
-    const matchedResult = reply.match(regex);
-    console.log("reply is ", reply);
-    console.log("reply is ", matchedResult);
   }
 
   return (
@@ -80,7 +91,6 @@ function OuijaAndFlecha({}: Props) {
         </form>
       </motion.div>
       <div className="px-6 text-center italic">{result}</div>
-      {/* <button className="bg-red-800 p-4 rounded-md"></button> */}
     </>
   );
 }

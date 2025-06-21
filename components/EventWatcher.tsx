@@ -51,6 +51,7 @@ export const tokenEventEmitter = {
 };
 
 export function EventWatcher() {
+  console.log("EventWatcher");
   const handleEvents = useCallback((logs: any) => {
     logs.forEach((log: LogWithArgs) => {
       const { eventName, args } = log;

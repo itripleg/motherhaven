@@ -8,7 +8,7 @@ import { Toaster } from "@/components/ui/toaster";
 import { EventWatcher } from "../components/EventWatcher";
 import { UserSection } from "@/components/UserSection";
 import { Header } from "./Header";
-import { FactoryGuard } from "@/components/FactoryGuard";
+// import { FactoryGuard } from "@/components/FactoryGuard";
 
 const geistSans = localFont({
   src: "./fonts/GeistVF.woff",
@@ -48,15 +48,15 @@ export default function RootLayout({
           enableSystem
           disableTransitionOnChange
         >
-          <FactoryGuard>
-            <MyMenu />
-            <WagmiContext>
-              <EventWatcher />
-              <Header />
-              {children}
-              <Toaster />
-            </WagmiContext>
-          </FactoryGuard>
+          {/* <FactoryGuard> */}
+          <MyMenu />
+          <WagmiContext>
+            <EventWatcher />
+            <Header />
+            {children}
+            <Toaster />
+          </WagmiContext>
+          {/* </FactoryGuard> */}
         </ThemeProvider>
       </body>
     </html>

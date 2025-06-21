@@ -6,6 +6,7 @@ import { TokenSearch } from "./tokens/TokenSearch";
 import { CameraSearch } from "./CameraSearch";
 import { OuijaSearch } from "./OuijaSearch";
 import { TokenPriceCategory } from "@/hooks/token/useTokenList";
+import { motion } from "framer-motion";
 
 interface SearchContainerProps {
   searchMode: string;
@@ -58,7 +59,13 @@ export const SearchContainer = ({
 
   return (
     <div>
-      <div className="z-30 flex gap-2 py-2 hidden">
+      <motion.div
+        className="z-30 flex gap-2 py-2"
+        initial={{ opacity: 0 }}
+        animate={{ opacity: 1 }}
+        exit={{ opacity: 0 }}
+        transition={{ duration: 0.5 }}
+      >
         <Button className="z-60" onClick={handleSearchModeChange}>
           {searchMode === "token"
             ? "👀"
@@ -79,7 +86,7 @@ export const SearchContainer = ({
             Default
           </Button>
         )}
-      </div>
+      </motion.div>
 
       {searchMode === "camera" ? (
         <CameraSearch
@@ -88,7 +95,9 @@ export const SearchContainer = ({
           showSecret={showSecret}
         />
       ) : searchMode === "ouija" ? (
-        <OuijaSearch onOuijaInput={handleOuijaInput} />
+        <div className="">
+          <OuijaSearch onOuijaInput={handleOuijaInput} />
+        </div>
       ) : (
         // <div>Token Search</div>
         <TokenSearch

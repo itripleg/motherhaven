@@ -38,7 +38,7 @@ export const OuijaSearch = ({ onOuijaInput }: any) => {
   };
 
   return (
-    <form onSubmit={handleSubmit} className="relative mb-8">
+    <form onSubmit={handleSubmit} className="relative mb-8 ">
       <div className="flex gap-2">
         <div className="relative flex-1">
           <Input

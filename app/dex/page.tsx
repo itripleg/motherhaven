@@ -57,6 +57,7 @@ export default function DexPage() {
           setActiveCategory={setCategory}
           onSecretFound={handleSecretFound}
           showSecret={showSecret}
+          // showSecret={showSecret}
         />
 
         {!showSecret && (

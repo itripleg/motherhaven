@@ -244,7 +244,7 @@ contract TokenFactory is Ownable, ReentrancyGuard {
         }
     }
 
-    // should now remove fee from final proceeds to fix collaterall bug
+    // should now remove fee from final proceeds to fix collateral bug
     function sell(
         address tokenAddress,
         uint256 tokenAmount
@@ -257,35 +257,46 @@ contract TokenFactory is Ownable, ReentrancyGuard {
         require(tokenAmount > 0, "Amount must be > 0");
 
         Token token = Token(tokenAddress);
-        
-        uint256 currentPrice = getCurrentPrice(tokenAddress);
-        uint256 ethAmount = (tokenAmount * currentPrice) / DECIMALS;
-        require(ethAmount >= MIN_PURCHASE && ethAmount <= MAX_PURCHASE, "Invalid amount");
 
-        uint256 fee = calculateFee(ethAmount);
-        uint256 finalAmount = ethAmount - fee;
-        
+        uint256 currentPrice = getCurrentPrice(tokenAddress);
+        uint256 desiredAmount = (tokenAmount * currentPrice) / DECIMALS;
+
+        // require a valid selling amount
+
+        uint256 fee = calculateFee(desiredAmount);
+        uint256 finalAmountToReceive = desiredAmount - fee;
+
+        // make sure they have enough of the token trying to sell
         require(
             token.balanceOf(msg.sender) >= tokenAmount,
             "Insufficient balance"
         );
+
         require(
-            collateral[tokenAddress] >= ethAmount,
+            collateral[tokenAddress] >= desiredAmount,
             "Insufficient token collateral"
         );
 
         token.factoryBurn(msg.sender, tokenAmount);
         virtualSupply[tokenAddress] -= tokenAmount;
-        collateral[tokenAddress] -= ethAmount;
+        collateral[tokenAddress] -= desiredAmount;
         lastPrice[tokenAddress] = currentPrice;
 
         (bool feeSuccess, ) = payable(feeRecipient).call{value: fee}("");
         require(feeSuccess, "Fee transfer failed");
 
-        (bool success, ) = payable(msg.sender).call{value: finalAmount}("");
+        (bool success, ) = payable(msg.sender).call{
+            value: finalAmountToReceive
+        }("");
         require(success, "Transfer failed");
 
-        emit TokensSold(tokenAddress, msg.sender, tokenAmount, ethAmount, fee);
+        emit TokensSold(
+            tokenAddress,
+            msg.sender,
+            tokenAmount,
+            desiredAmount,
+            fee
+        );
     }
 
     function resumeTrading(address tokenAddress) external {
