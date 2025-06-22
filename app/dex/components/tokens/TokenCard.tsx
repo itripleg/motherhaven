@@ -6,30 +6,27 @@ import {
   CardContent,
   CardFooter,
 } from "@/components/ui/card";
-import { Token } from "@/types";
+import { Token } from "@/types"; // 1. Use the main Token type
 import { motion } from "framer-motion";
-import { Badge } from "@/components/ui/badge";
 import { useRouter } from "next/navigation";
 import { Button } from "@/components/ui/button";
-// import useTokenDetails from "@/hooks/useTokenDetails";
+import { Label } from "@/components/ui/label";
 
-export const TokenCard = ({
-  token,
-  price,
-}: {
-  token: Token;
-  price: string;
-}) => {
+// 2. The component now accepts a single, complete Token object
+export const TokenCard = ({ token }: { token: Token }) => {
   const router = useRouter();
-  const displayPrice = `$${Number(price).toFixed(9)}`;
+
+  // 3. Access all data directly from the token object's top-level properties
+  const { name, symbol, imageUrl, address, currentPrice, collateral } = token;
 
   return (
     <motion.div whileHover={{ scale: 1.05 }} whileTap={{ scale: 0.95 }}>
-      <Card className="h-full relative overflow-hidden">
+      <Card className="h-full relative overflow-hidden flex flex-col">
+        {/* Background Image Layer */}
         <div
           className="absolute inset-0 z-0"
           style={{
-            backgroundImage: token.imageUrl ? `url(${token.imageUrl})` : "none",
+            backgroundImage: imageUrl ? `url(${imageUrl})` : "none",
             backgroundSize: "cover",
             backgroundPosition: "center",
           }}
@@ -37,43 +34,42 @@ export const TokenCard = ({
           <div className="absolute inset-0 bg-gradient-to-b from-black/60 via-black/50 to-black/70" />
         </div>
 
-        <div className="relative z-10">
+        {/* Content Layer */}
+        <div className="relative z-10 flex flex-col flex-grow">
           <CardHeader>
-            <CardTitle className="text-white">{token.name}</CardTitle>
+            <CardTitle className="text-white truncate">{name}</CardTitle>
             <CardDescription className="text-gray-200">
-              Ticker: {token.symbol}
+              Ticker: ${symbol}
             </CardDescription>
           </CardHeader>
-          <CardContent>
-            <div className="flex justify-between items-center">
-              <Badge
-                variant="secondary"
-                className="bg-white/10 text-white border-white/20"
-              >
-                {token.symbol}
-              </Badge>
-              <span className="text-sm text-gray-200">{displayPrice}</span>
+
+          <CardContent className="flex-grow space-y-4">
+            <div className="grid grid-cols-2 gap-4 text-sm">
+              <div className="backdrop-blur-sm bg-white/10 p-3 rounded-lg">
+                <Label className="text-gray-300 text-xs">Price</Label>
+                <p className="text-white font-semibold truncate">
+                  {currentPrice} AVAX
+                </p>
+              </div>
+              <div className="backdrop-blur-sm bg-white/10 p-3 rounded-lg">
+                <Label className="text-gray-300 text-xs">Collateral</Label>
+                <p className="text-white font-semibold truncate">
+                  {collateral} AVAX
+                </p>
+              </div>
             </div>
-            <p className="mt-2 text-sm text-gray-200">
-              Address:
-              {token.address
-                ? `${token.address.slice(0, 6)}...${token.address.slice(-4)}`
-                : "N/A"}
-            </p>
+            {/* You can add more fields like virtualSupply here if you wish */}
           </CardContent>
+
           <CardFooter>
             <Button
               className="w-full bg-white/20 hover:bg-white/30 backdrop-blur-sm"
-              onClick={() => router.push(`/dex/${token.address}`)}
+              onClick={() => router.push(`/dex/${address}`)}
             >
-              View Token
+              View & Trade
             </Button>
           </CardFooter>
         </div>
-
-        {!token.imageUrl && (
-          <div className="absolute inset-0 bg-gradient-to-br from-gray-900 to-gray-800" />
-        )}
       </Card>
     </motion.div>
   );
