@@ -20,9 +20,7 @@ import { zeroAddress } from "viem"; // Changed from ethers to viem
 import { useToast } from "@/hooks/use-toast";
 import { AddressComponent } from "@/components/AddressComponent";
 import { ref, uploadBytes, getDownloadURL } from "firebase/storage";
-import { FACTORY_ADDRESS } from "@/types";
-
-import ABI from "@/contracts/nu-nu/VettedFactory_abi.json";
+import { FACTORY_ADDRESS, FACTORY_ABI } from "@/types";
 
 // Update TokenInfo interface to include optional burnManager
 interface TokenInfo {
@@ -107,7 +105,7 @@ function Page() {
       }
 
       writeContract({
-        abi: ABI,
+        abi: FACTORY_ABI,
         address: FACTORY_ADDRESS,
         functionName: "createToken",
         args: [

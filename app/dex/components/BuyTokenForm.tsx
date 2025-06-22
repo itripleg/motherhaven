@@ -16,6 +16,7 @@ export function BuyTokenForm({ onAmountChange, maxAmount }: any) {
   const tokenAddress = pathname.split("/").pop() || "";
 
   const [amount, setAmount] = useState("");
+  const [errorDetails, setErrorDetails] = useState<string | null>(null);
   const [receiptDetails, setReceiptDetails] = useState<{
     pricePaid?: string;
     tokensReceived?: string;
@@ -35,6 +36,76 @@ export function BuyTokenForm({ onAmountChange, maxAmount }: any) {
       hash: transactionData,
     });
 
+  // Helper function to extract revert reason
+  const extractRevertReason = (error: any): string => {
+    if (!error) return "Unknown error";
+
+    const errorMessage = error.message || error.toString();
+    console.log("Full error object:", error);
+    console.log("Error message:", errorMessage);
+
+    // Extract revert reason from different error formats
+    if (errorMessage.includes("execution reverted:")) {
+      const match = errorMessage.match(/execution reverted: (.+)/);
+      return match ? match[1] : "Transaction reverted";
+    }
+
+    if (errorMessage.includes("revert")) {
+      const match = errorMessage.match(/revert (.+)/);
+      return match ? match[1] : "Transaction reverted";
+    }
+
+    // Check for specific contract errors
+    if (errorMessage.includes("Invalid amount")) {
+      return "Invalid purchase amount - check min/max limits";
+    }
+
+    if (errorMessage.includes("Max supply")) {
+      return "Transaction would exceed maximum token supply";
+    }
+
+    if (errorMessage.includes("Exceeds max wallet")) {
+      return "Purchase would exceed maximum wallet percentage (5%)";
+    }
+
+    if (errorMessage.includes("Not trading")) {
+      return "Token is not currently trading";
+    }
+
+    // Check for gas/value issues
+    if (errorMessage.includes("insufficient funds")) {
+      return "Insufficient AVAX balance for this purchase";
+    }
+
+    if (
+      errorMessage.includes("gas required exceeds allowance") ||
+      errorMessage.includes("intrinsic gas too low")
+    ) {
+      return "Transaction would fail - check AVAX balance and purchase amount";
+    }
+
+    // Return simplified error message
+    return errorMessage.split("\n")[0] || "Transaction failed";
+  };
+
+  // Clear error when amount changes
+  useEffect(() => {
+    setErrorDetails(null);
+  }, [amount]);
+
+  // Handle errors
+  useEffect(() => {
+    if (error) {
+      const revertReason = extractRevertReason(error);
+      setErrorDetails(revertReason);
+      toast({
+        title: "Transaction Failed",
+        description: revertReason,
+        variant: "destructive",
+      });
+    }
+  }, [error, toast]);
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!tokenAddress) {
@@ -47,6 +118,8 @@ export function BuyTokenForm({ onAmountChange, maxAmount }: any) {
     }
 
     try {
+      setErrorDetails(null);
+
       writeContract({
         abi: FACTORY_ABI,
         address: FACTORY_ADDRESS,
@@ -54,15 +127,18 @@ export function BuyTokenForm({ onAmountChange, maxAmount }: any) {
         args: [tokenAddress],
         value: parseEther(amount || "1"),
       });
+
       toast({
         title: "Transaction Submitted",
         description: "Waiting for confirmation...",
       });
     } catch (error) {
       console.error("Error:", error);
+      const revertReason = extractRevertReason(error);
+      setErrorDetails(revertReason);
       toast({
         title: "Error",
-        description: "Failed to purchase tokens. Please try again.",
+        description: revertReason,
         variant: "destructive",
       });
     }
@@ -86,6 +162,7 @@ export function BuyTokenForm({ onAmountChange, maxAmount }: any) {
           tokensReceived,
         });
 
+        setErrorDetails(null);
         toast({
           title: "Purchase Confirmed",
           description: `You purchased ${(Number(tokensReceived) / 1e18).toFixed(
@@ -140,6 +217,19 @@ export function BuyTokenForm({ onAmountChange, maxAmount }: any) {
         {isConfirming && (
           <div className="mt-2 text-center">Waiting for confirmation...</div>
         )}
+
+        {/* Enhanced Error Display */}
+        {errorDetails && (
+          <div className="mt-4 p-3 bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 rounded-md">
+            <p className="text-red-600 dark:text-red-400 font-medium text-sm">
+              Error Details:
+            </p>
+            <p className="text-red-700 dark:text-red-300 text-sm mt-1">
+              {errorDetails}
+            </p>
+          </div>
+        )}
+
         {receiptDetails.tokensReceived && (
           <div className="mt-4">
             <p className="font-semibold">Transaction Receipt:</p>
@@ -154,11 +244,6 @@ export function BuyTokenForm({ onAmountChange, maxAmount }: any) {
                 <AddressComponent hash={`${transactionData}`} type="tx" />
               </li>
             </ul>
-          </div>
-        )}
-        {error && (
-          <div className="mt-4 text-red-600">
-            Error: {error.message || "An error occurred"}
           </div>
         )}
       </form>

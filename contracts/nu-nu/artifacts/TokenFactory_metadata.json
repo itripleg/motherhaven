@@ -432,6 +432,30 @@
 			{
 				"inputs": [
 					{
+						"internalType": "address",
+						"name": "tokenAddress",
+						"type": "address"
+					},
+					{
+						"internalType": "uint256",
+						"name": "tokenAmount",
+						"type": "uint256"
+					}
+				],
+				"name": "calculateBuyPrice",
+				"outputs": [
+					{
+						"internalType": "uint256",
+						"name": "",
+						"type": "uint256"
+					}
+				],
+				"stateMutability": "view",
+				"type": "function"
+			},
+			{
+				"inputs": [
+					{
 						"internalType": "uint256",
 						"name": "amount",
 						"type": "uint256"
@@ -446,6 +470,30 @@
 					}
 				],
 				"stateMutability": "pure",
+				"type": "function"
+			},
+			{
+				"inputs": [
+					{
+						"internalType": "address",
+						"name": "tokenAddress",
+						"type": "address"
+					},
+					{
+						"internalType": "uint256",
+						"name": "tokenAmount",
+						"type": "uint256"
+					}
+				],
+				"name": "calculateSellPrice",
+				"outputs": [
+					{
+						"internalType": "uint256",
+						"name": "",
+						"type": "uint256"
+					}
+				],
+				"stateMutability": "view",
 				"type": "function"
 			},
 			{
@@ -559,25 +607,6 @@
 						"internalType": "address[]",
 						"name": "",
 						"type": "address[]"
-					}
-				],
-				"stateMutability": "view",
-				"type": "function"
-			},
-			{
-				"inputs": [
-					{
-						"internalType": "address",
-						"name": "tokenAddress",
-						"type": "address"
-					}
-				],
-				"name": "getCurrentPrice",
-				"outputs": [
-					{
-						"internalType": "uint256",
-						"name": "",
-						"type": "uint256"
 					}
 				],
 				"stateMutability": "view",
@@ -839,6 +868,9 @@
 				"renounceOwnership()": {
 					"details": "Leaves the contract without owner. It will not be possible to call `onlyOwner` functions. Can only be called by the current owner. NOTE: Renouncing ownership will leave the contract without an owner, thereby disabling any functionality that is only available to the owner."
 				},
+				"sell(address,uint256)": {
+					"details": "[REVISED] Updated sell function with correct collateral accounting."
+				},
 				"transferOwnership(address)": {
 					"details": "Transfers ownership of the contract to a new account (`newOwner`). Can only be called by the current owner."
 				}
@@ -853,7 +885,7 @@
 	},
 	"settings": {
 		"compilationTarget": {
-			"nu-nu/VettedFactory.sol": "TokenFactory"
+			"VettedFactory.sol": "TokenFactory"
 		},
 		"evmVersion": "prague",
 		"libraries": {},
@@ -923,20 +955,20 @@
 				"dweb:/ipfs/QmZiKwtKU1SBX4RGfQtY7PZfiapbbu6SZ9vizGQD9UHjRA"
 			]
 		},
-		"nu-nu/VettedFactory.sol": {
-			"keccak256": "0x50e8cf2ddaed853c6b77abd43cf9f8eb292de15741969b7f5f5450c955785c59",
+		"VettedFactory.sol": {
+			"keccak256": "0x7693c66f3f644aab169fb9ad5cc9ba38d9ae360f6b625955651922a061e5a90a",
 			"license": "MIT",
 			"urls": [
-				"bzz-raw://0e3e8ba666060f3a063618f4e557aba222f5e6f2c0e6b47962ca058c4269cf6a",
-				"dweb:/ipfs/QmRGTF7dmZzVQMvfR9xaEoCQKbbAXeDFk8ds9Tqffe4RQp"
+				"bzz-raw://4b5159af1d5c43a840ad999995716dfff46d1b29512f1d83cedcad6bf39847bb",
+				"dweb:/ipfs/QmYsJf4yc31dyYH2HEvj6r4eyzEgssABukoK62eshTKb1Y"
 			]
 		},
-		"nu-nu/VettedToken.sol": {
-			"keccak256": "0x9efca48f8575f0b848c73bcbb2e439b4c5a3fa743aa290dcb96f8a33b8195150",
+		"VettedToken.sol": {
+			"keccak256": "0xc042fef1a0e9028ce63070387fb3b39d813fa3ca0c7964033441bf47a4f24819",
 			"license": "MIT",
 			"urls": [
-				"bzz-raw://d7c36b80d880826d1722161fe66d2f785595949224baf4afcb4f5b63cb7add10",
-				"dweb:/ipfs/QmQWbPbndxUUsDuJVEa4ScqiYoxnRAVJNzMUxvC2tiCqHu"
+				"bzz-raw://8660a9c7cfafbe04e4313b3a6e424f62422d568e24608cd830488b85f96fde4b",
+				"dweb:/ipfs/QmPFV5RCKnTfGD9k9rm2xoi3CAKw6GeE2tq3A7CtBrXM3i"
 			]
 		}
 	},

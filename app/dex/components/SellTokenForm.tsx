@@ -70,12 +70,12 @@ export function SellTokenForm({
   onAmountChange,
   maxAmount,
   decimals = 18,
-  address, // Add wallet address prop
+  address,
 }: {
   onAmountChange?: (amount: string) => void;
   maxAmount?: string;
   decimals?: number;
-  address?: `0x${string}`; // Wallet address
+  address?: `0x${string}`;
 }) {
   const pathname = usePathname();
   const tokenAddress = pathname.split("/").pop() || "";
@@ -83,6 +83,7 @@ export function SellTokenForm({
   const [amount, setAmount] = useState("");
   const [needsApproval, setNeedsApproval] = useState(false);
   const [isApproving, setIsApproving] = useState(false);
+  const [errorDetails, setErrorDetails] = useState<string | null>(null);
   const [receiptDetails, setReceiptDetails] = useState<{
     avaxReceived?: string;
     tokensSold?: string;
@@ -122,8 +123,59 @@ export function SellTokenForm({
     abi: ERC20_ABI,
     functionName: "allowance",
     args: [address as `0x${string}`, FACTORY_ADDRESS],
-    // enabled: !!address && !!tokenAddress,
   });
+
+  // Helper function to extract revert reason
+  const extractRevertReason = (error: any): string => {
+    if (!error) return "Unknown error";
+
+    // Check for common revert patterns
+    const errorMessage = error.message || error.toString();
+
+    // Extract revert reason from different error formats
+    if (errorMessage.includes("execution reverted:")) {
+      const match = errorMessage.match(/execution reverted: (.+)/);
+      return match ? match[1] : "Transaction reverted";
+    }
+
+    if (errorMessage.includes("revert")) {
+      const match = errorMessage.match(/revert (.+)/);
+      return match ? match[1] : "Transaction reverted";
+    }
+
+    // Check for specific contract errors
+    if (errorMessage.includes("Insufficient token collateral")) {
+      return "Insufficient token collateral - try selling a smaller amount";
+    }
+
+    if (errorMessage.includes("Insufficient balance")) {
+      return "You don't have enough tokens to sell this amount";
+    }
+
+    if (errorMessage.includes("Not trading")) {
+      return "Token is not currently trading";
+    }
+
+    if (errorMessage.includes("Amount must be > 0")) {
+      return "Amount must be greater than 0";
+    }
+
+    // Check for gas estimation failures (often indicates revert)
+    if (
+      errorMessage.includes("gas required exceeds allowance") ||
+      errorMessage.includes("intrinsic gas too low")
+    ) {
+      return "Transaction would fail - check token balance and collateral";
+    }
+
+    // Return simplified error message
+    return errorMessage.split("\n")[0] || "Transaction failed";
+  };
+
+  // Clear error when amount changes
+  useEffect(() => {
+    setErrorDetails(null);
+  }, [amount]);
 
   // Check if approval is needed whenever amount changes
   useEffect(() => {
@@ -133,11 +185,37 @@ export function SellTokenForm({
     }
   }, [amount, allowance]);
 
+  // Handle errors
+  useEffect(() => {
+    if (sellError) {
+      const revertReason = extractRevertReason(sellError);
+      setErrorDetails(revertReason);
+      toast({
+        title: "Transaction Failed",
+        description: revertReason,
+        variant: "destructive",
+      });
+    }
+  }, [sellError, toast]);
+
+  useEffect(() => {
+    if (approvalError) {
+      const revertReason = extractRevertReason(approvalError);
+      setErrorDetails(revertReason);
+      toast({
+        title: "Approval Failed",
+        description: revertReason,
+        variant: "destructive",
+      });
+    }
+  }, [approvalError, toast]);
+
   const handleApprove = async () => {
     if (!tokenAddress || !amount) return;
 
     try {
       setIsApproving(true);
+      setErrorDetails(null);
       const parsedAmount = parseEther(amount);
 
       writeApprovalContract({
@@ -153,9 +231,11 @@ export function SellTokenForm({
       });
     } catch (error) {
       console.error("Approval error:", error);
+      const revertReason = extractRevertReason(error);
+      setErrorDetails(revertReason);
       toast({
         title: "Error",
-        description: "Failed to approve tokens. Please try again.",
+        description: revertReason,
         variant: "destructive",
       });
       setIsApproving(false);
@@ -175,6 +255,7 @@ export function SellTokenForm({
     }
 
     try {
+      setErrorDetails(null);
       const parsedAmount = parseEther(amount);
 
       writeSellContract({
@@ -190,9 +271,11 @@ export function SellTokenForm({
       });
     } catch (error) {
       console.error("Error:", error);
+      const revertReason = extractRevertReason(error);
+      setErrorDetails(revertReason);
       toast({
         title: "Error",
-        description: "Failed to sell tokens. Please try again.",
+        description: revertReason,
         variant: "destructive",
       });
     }
@@ -203,6 +286,7 @@ export function SellTokenForm({
     if (approvalReceipt) {
       setIsApproving(false);
       setNeedsApproval(false);
+      setErrorDetails(null);
       toast({
         title: "Approval Confirmed",
         description: "You can now proceed with selling your tokens.",
@@ -227,6 +311,7 @@ export function SellTokenForm({
           tokensSold: amount,
         });
 
+        setErrorDetails(null);
         toast({
           title: "Sale Confirmed",
           description: `You sold ${amount} tokens for ${avaxReceived} AVAX.`,
@@ -235,13 +320,11 @@ export function SellTokenForm({
     }
   }, [sellReceipt, amount, toast]);
 
-  // Add this function to your SellTokenForm component
   const calculateMaxSellAmount = async (
     tokenAddress: string,
     currentPrice: bigint
   ) => {
     try {
-      // Get collateral for the token
       // @ts-expect-error no params
       const collateral = await readContract({
         address: FACTORY_ADDRESS,
@@ -250,15 +333,12 @@ export function SellTokenForm({
         args: [tokenAddress],
       });
 
-      // Account for the trading fee (0.3%)
       const collateralWithFee =
         ((collateral as bigint) * 10000n) / (10000n - 30n);
 
-      // Calculate max tokens that can be sold given the collateral
       const maxTokens = (collateralWithFee * 10n ** 18n) / currentPrice;
 
-      // Return slightly less to account for price impact
-      return (maxTokens * 995n) / 1000n; // 0.5% buffer
+      return (maxTokens * 995n) / 1000n;
     } catch (error) {
       console.error("Error calculating max sell amount:", error);
       return 0n;
@@ -320,6 +400,33 @@ export function SellTokenForm({
         <div className="mt-2 text-center">Waiting for confirmation...</div>
       )}
 
+      {/* Enhanced Error Display */}
+      {errorDetails && (
+        <div className="mt-4 p-3 bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 rounded-md">
+          <p className="text-red-600 dark:text-red-400 font-medium text-sm">
+            Error Details:
+          </p>
+          <p className="text-red-700 dark:text-red-300 text-sm mt-1">
+            {errorDetails}
+          </p>
+        </div>
+      )}
+
+      {process.env.NODE_ENV === "development" && (
+        <div className="mt-4 p-3 bg-gray-50 dark:bg-gray-900/20 border border-gray-200 dark:border-gray-800 rounded-md">
+          <p className="text-gray-600 dark:text-gray-400 font-medium text-sm mb-2">
+            Debug Info:
+          </p>
+          <div className="text-xs space-y-1">
+            <div>Token Address: {tokenAddress}</div>
+            <div>Amount to Sell: {amount}</div>
+            <div>Token Balance: {maxAmount}</div>
+            <div>Allowance: {allowance?.toString()}</div>
+            <div>Needs Approval: {needsApproval.toString()}</div>
+          </div>
+        </div>
+      )}
+
       {receiptDetails.tokensSold && (
         <div className="mt-4">
           <p className="font-semibold">Transaction Receipt:</p>
@@ -330,12 +437,6 @@ export function SellTokenForm({
               Transaction: <AddressComponent hash={`${sellData}`} type="tx" />
             </li>
           </ul>
-        </div>
-      )}
-
-      {(sellError || approvalError) && (
-        <div className="mt-4 text-red-600">
-          Error: {(sellError || approvalError)?.message || "An error occurred"}
         </div>
       )}
     </form>

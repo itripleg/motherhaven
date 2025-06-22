@@ -1,3 +1,5 @@
+// /types/events.ts
+
 import { Address } from "viem";
 
 export type TokenCreatedEvent = {
@@ -29,4 +31,8 @@ export type TokensSoldEvent = {
 export type TradingHaltedEvent = {
   token: Address;
   collateral: bigint;
+};
+
+export type TradingResumedEvent = {
+  token: Address;
 };

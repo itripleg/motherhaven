@@ -3,46 +3,18 @@
 import { NextResponse } from "next/server";
 import { collection, setDoc, doc, increment } from "firebase/firestore";
 import { db } from "@/firebase";
-import { decodeEventLog, formatEther, parseAbiItem } from "viem";
+import { decodeEventLog, formatEther } from "viem";
 import {
   TokenCreatedEvent,
   TokensPurchasedEvent,
   TokensSoldEvent,
   TokenState,
   TradingHaltedEvent,
-  FACTORY_ADDRESS,
+  TradingResumedEvent,
 } from "@/types";
 
-const EVENTS = {
-  TokenCreated: {
-    abi: parseAbiItem(
-      "event TokenCreated(address indexed tokenAddress, string name, string symbol, string imageUrl, address creator, uint256 fundingGoal, address burnManager)"
-    ),
-    signature:
-      "0x0e8cc4b226b8752d338d6e23e7e14f71e6dd2480faf8bfae44848d7fc596e3bf",
-  },
-  TokensPurchased: {
-    abi: parseAbiItem(
-      "event TokensPurchased(address indexed token, address indexed buyer, uint256 amount, uint256 price, uint256 fee)"
-    ),
-    signature:
-      "0x377aadedb6b2a771959584d10a6a36eccb5f56b4eb3a48525f76108d2660d8d4",
-  },
-  TokensSold: {
-    abi: parseAbiItem(
-      "event TokensSold(address indexed token, address indexed seller, uint256 tokenAmount, uint256 ethAmount, uint256 fee)"
-    ),
-    signature:
-      "0xa0fe9740856690637d999c103293d3c823fc3b81443c34c6004bb582ab4b6166",
-  },
-  TradingHalted: {
-    abi: parseAbiItem(
-      "event TradingHalted(address indexed token, uint256 collateral)"
-    ),
-    signature:
-      "0xb88b7874f043c64f2f74ff66df3ca7559f7253821a4f862a4a7af74e9c147170",
-  },
-} as const;
+// Import from the updated contracts types
+import { FACTORY_ADDRESS, FACTORY_EVENTS } from "@/types/contracts";
 
 // Collection names
 const COLLECTIONS = {
@@ -51,6 +23,7 @@ const COLLECTIONS = {
   TRADES: "trades",
 };
 
+// Your existing handler functions remain exactly the same...
 async function handleTokenCreated(
   args: TokenCreatedEvent,
   timestamp: string,
@@ -74,7 +47,6 @@ async function handleTokenCreated(
   console.log("Transaction Hash:", transactionHash);
 
   try {
-    // Prepare token document data
     const tokenData = {
       address: tokenAddress,
       name: args.name,
@@ -97,15 +69,11 @@ async function handleTokenCreated(
       transactionHash,
     };
 
-    console.log("📝 Creating token document with data:", tokenData);
-
-    // Create token document
     await setDoc(doc(db, COLLECTIONS.TOKENS, tokenAddress), tokenData, {
       merge: true,
     });
     console.log("✅ Token document created/updated in", COLLECTIONS.TOKENS);
 
-    // Prepare user document data
     const userData = {
       address: creatorAddress,
       lastActive: timestamp,
@@ -121,21 +89,12 @@ async function handleTokenCreated(
       ],
     };
 
-    console.log("📝 Updating user document with data:", userData);
-
-    // Update user document
     await setDoc(doc(db, COLLECTIONS.USERS, creatorAddress), userData, {
       merge: true,
     });
     console.log("✅ User document updated in", COLLECTIONS.USERS);
   } catch (error) {
     console.error("❌ Database Error:", error);
-    console.error("Failed to save token creation data:", {
-      token: tokenAddress,
-      creator: creatorAddress,
-      timestamp,
-      error: error instanceof Error ? error.message : String(error),
-    });
     throw error;
   }
 }
@@ -161,7 +120,6 @@ async function handleTokenTrade(
     formattedEthAmount = formatEther(ethAmount);
     formattedFee = formatEther(fee);
 
-    // Add validation before division
     const tokenAmountNum = Number(formattedTokenAmount);
     if (tokenAmountNum === 0) {
       throw new Error("Token amount cannot be zero");
@@ -169,7 +127,6 @@ async function handleTokenTrade(
 
     pricePerToken = Number(formattedEthAmount) / tokenAmountNum;
 
-    // Validate the calculated price
     if (!Number.isFinite(pricePerToken)) {
       throw new Error("Invalid price calculation");
     }
@@ -186,12 +143,8 @@ async function handleTokenTrade(
   console.log("ETH Amount:", formattedEthAmount);
   console.log("Fee Amount:", formattedFee);
   console.log("Price per Token:", pricePerToken);
-  console.log("Block Number:", blockNumber);
-  console.log("Timestamp:", timestamp);
-  console.log("Transaction Hash:", transactionHash);
 
   try {
-    // Prepare trade document data
     const tradeData = {
       type: eventType,
       token: token.toLowerCase(),
@@ -205,9 +158,6 @@ async function handleTokenTrade(
       timestamp,
     };
 
-    console.log("📝 Creating trade document with data:", tradeData);
-
-    // Create trade document with auto-generated ID
     const tradeRef = doc(collection(db, COLLECTIONS.TRADES));
     await setDoc(tradeRef, tradeData);
     console.log(
@@ -217,10 +167,8 @@ async function handleTokenTrade(
       tradeRef.id
     );
 
-    // Convert ethAmount to number for increment
     const ethAmountNum = Number(formattedEthAmount);
 
-    // Prepare token statistics update data
     const tokenUpdateData = {
       collateral: increment(eventType === "buy" ? ethAmountNum : -ethAmountNum),
       "statistics.volumeETH": increment(ethAmountNum),
@@ -234,9 +182,6 @@ async function handleTokenTrade(
       },
     };
 
-    console.log("📝 Updating token statistics with data:", tokenUpdateData);
-
-    // Update token statistics
     await setDoc(
       doc(db, COLLECTIONS.TOKENS, token.toLowerCase()),
       tokenUpdateData,
@@ -245,13 +190,6 @@ async function handleTokenTrade(
     console.log("✅ Token statistics updated in", COLLECTIONS.TOKENS);
   } catch (error) {
     console.error("❌ Database Error:", error);
-    console.error("Failed to save trade data:", {
-      type: eventType,
-      token,
-      trader,
-      timestamp,
-      error: error instanceof Error ? error.message : String(error),
-    });
     throw error;
   }
 }
@@ -268,11 +206,8 @@ async function handleTradingHalted(
   console.log("\n=== TRADING HALTED DETAILS ===");
   console.log("Token Address:", tokenAddress);
   console.log("Final Collateral:", formattedCollateral);
-  console.log("Block Number:", blockNumber);
-  console.log("Timestamp:", timestamp);
 
   try {
-    // Prepare token update data
     const tokenUpdateData = {
       currentState: TokenState.HALTED,
       finalCollateral: formattedCollateral,
@@ -280,20 +215,39 @@ async function handleTradingHalted(
       haltBlock: blockNumber,
     };
 
-    console.log("📝 Updating token state with data:", tokenUpdateData);
-
     await setDoc(doc(db, COLLECTIONS.TOKENS, tokenAddress), tokenUpdateData, {
       merge: true,
     });
     console.log("✅ Token state updated to HALTED in", COLLECTIONS.TOKENS);
   } catch (error) {
     console.error("❌ Database Error:", error);
-    console.error("Failed to update token halt state:", {
-      token: tokenAddress,
-      collateral: formattedCollateral,
-      timestamp,
-      error: error instanceof Error ? error.message : String(error),
+    throw error;
+  }
+}
+
+async function handleTradingResumed(
+  token: string,
+  timestamp: string,
+  blockNumber: number
+) {
+  const tokenAddress = token.toLowerCase();
+
+  console.log("\n=== TRADING RESUMED DETAILS ===");
+  console.log("Token Address:", tokenAddress);
+
+  try {
+    const tokenUpdateData = {
+      currentState: TokenState.TRADING,
+      resumedAt: timestamp,
+      resumeBlock: blockNumber,
+    };
+
+    await setDoc(doc(db, COLLECTIONS.TOKENS, tokenAddress), tokenUpdateData, {
+      merge: true,
     });
+    console.log("✅ Token state updated to TRADING in", COLLECTIONS.TOKENS);
+  } catch (error) {
+    console.error("❌ Database Error:", error);
     throw error;
   }
 }
@@ -307,55 +261,53 @@ export async function POST(req: Request) {
 
     console.log("\n============================");
     console.log(`📦 Processing Block #${blockInfo.number}`);
+    console.log(`🏭 Factory Address: ${FACTORY_ADDRESS}`);
+    console.log(`🌐 Network: ${process.env.NEXT_PUBLIC_NETWORK || "testnet"}`);
     console.log(
       `⏰ ${new Date(Number(blockInfo.timestamp) * 1000).toLocaleString()}`
     );
     console.log("============================");
 
+    // Use dynamic factory address
     const factoryLogs = blockInfo.logs.filter(
       (log: any) =>
-        log.account?.address?.toLowerCase() === FACTORY_ADDRESS.toLowerCase()
+        log.account?.address?.toLowerCase() === FACTORY_ADDRESS?.toLowerCase()
     );
 
     console.log(`\nFound ${factoryLogs.length} factory logs`);
 
     for (const log of factoryLogs) {
-      const eventSignature = log.topics?.[0];
-      if (!eventSignature) {
-        console.log("⚠️ Skipping log - no event signature");
-        continue;
-      }
-
-      console.log("\n--- Processing Log ---");
-      console.log("Event Signature:", eventSignature);
-      console.log("Transaction Hash:", log.transaction?.hash);
-
-      const eventEntry = Object.entries(EVENTS).find(
-        ([_, event]) => event.signature === eventSignature
-      );
-
-      if (!eventEntry) {
-        console.log("⚠️ Unknown event signature:", eventSignature);
-        continue;
-      }
-
-      const [eventType, eventDef] = eventEntry;
       const timestamp = new Date(
         Number(blockInfo.timestamp) * 1000
       ).toISOString();
 
-      console.log("Event Type:", eventType);
+      console.log("\n--- Processing Log ---");
+      console.log("Transaction Hash:", log.transaction?.hash);
 
       try {
+        // Use the events directly from the metadata - NO HARDCODED VALUES!
         const decoded = decodeEventLog({
-          abi: [eventDef.abi],
+          abi: FACTORY_EVENTS,
           data: log.data,
           topics: log.topics,
         });
 
-        switch (eventType) {
+        // Type-safe access to eventName
+        if (
+          !("eventName" in decoded) ||
+          typeof decoded.eventName !== "string"
+        ) {
+          console.log("⚠️ Decoded event missing eventName, skipping");
+          continue;
+        }
+
+        const eventName = decoded.eventName;
+        console.log(`🎯 Processing ${eventName} event`);
+
+        // Handle each event type
+        switch (eventName) {
           case "TokenCreated": {
-            const args = decoded.args as TokenCreatedEvent;
+            const args = decoded.args as unknown as TokenCreatedEvent;
             await handleTokenCreated(
               args,
               timestamp,
@@ -366,7 +318,7 @@ export async function POST(req: Request) {
           }
 
           case "TokensPurchased": {
-            const args = decoded.args as TokensPurchasedEvent;
+            const args = decoded.args as unknown as TokensPurchasedEvent;
             await handleTokenTrade(
               "buy",
               args.token,
@@ -382,7 +334,7 @@ export async function POST(req: Request) {
           }
 
           case "TokensSold": {
-            const args = decoded.args as TokensSoldEvent;
+            const args = decoded.args as unknown as TokensSoldEvent;
             await handleTokenTrade(
               "sell",
               args.token,
@@ -398,7 +350,7 @@ export async function POST(req: Request) {
           }
 
           case "TradingHalted": {
-            const args = decoded.args as TradingHaltedEvent;
+            const args = decoded.args as unknown as TradingHaltedEvent;
             await handleTradingHalted(
               args.token,
               args.collateral,
@@ -407,15 +359,28 @@ export async function POST(req: Request) {
             );
             break;
           }
+
+          case "TradingResumed": {
+            const args = decoded.args as unknown as TradingResumedEvent;
+            await handleTradingResumed(
+              args.token,
+              timestamp,
+              Number(blockInfo.number)
+            );
+            break;
+          }
+
+          default:
+            console.log(`⚠️ Unhandled event: ${eventName}`);
+            console.log(
+              "Available events:",
+              FACTORY_EVENTS.map((e: any) => e.name)
+            );
         }
-      } catch (error) {
-        console.error(`❌ Error processing ${eventType} event:`, error);
-        console.error("Event processing failed for log:", {
-          eventType,
-          signature: eventSignature,
-          transactionHash: log.transaction?.hash,
-          error: error instanceof Error ? error.message : String(error),
-        });
+      } catch (decodeError) {
+        console.log(
+          "📝 Could not decode log - likely not a factory event, skipping"
+        );
       }
     }
 
@@ -423,12 +388,12 @@ export async function POST(req: Request) {
       status: "success",
       blockNumber: blockInfo.number,
       logsProcessed: factoryLogs.length,
+      factoryAddress: FACTORY_ADDRESS,
+      network: process.env.NEXT_PUBLIC_NETWORK || "testnet",
+      eventsSupported: FACTORY_EVENTS.map((e: any) => e.name),
     });
   } catch (error) {
     console.error("❌ Webhook processing error:", error);
-    console.error("Request processing failed:", {
-      error: error instanceof Error ? error.message : String(error),
-    });
     return NextResponse.json(
       { error: "Internal server error" },
       { status: 500 }
@@ -439,29 +404,23 @@ export async function POST(req: Request) {
 export async function GET(req: Request) {
   return NextResponse.json(
     {
-      status: "error",
-      message: "Method not allowed",
-      details:
-        "This endpoint is a webhook that processes factory events. It only accepts POST requests with event data.",
-      documentation:
-        "Please send POST requests with blockchain event data in the request body.",
-      allowedMethods: ["POST"],
-      expectedPayload: {
-        event: {
-          data: {
-            block: {
-              number: "number",
-              timestamp: "number",
-              logs: "array of event logs",
-            },
-          },
-        },
+      status: "info",
+      message: "Factory Event Monitor Webhook",
+      configuration: {
+        factoryAddress: FACTORY_ADDRESS,
+        network: process.env.NEXT_PUBLIC_NETWORK || "testnet",
+        supportedEvents: FACTORY_EVENTS.map((e: any) => e.name),
+      },
+      usage: {
+        description:
+          "This endpoint processes blockchain factory events via POST requests",
+        allowedMethods: ["POST"],
       },
     },
     {
-      status: 405,
+      status: 200,
       headers: {
-        Allow: "POST",
+        Allow: "GET, POST",
       },
     }
   );

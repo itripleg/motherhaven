@@ -14,7 +14,8 @@ contract Token is ERC20, Ownable {
     address public immutable creator;
     string public imageUrl;
     address public burnManager;
-
+    string public test;
+    
     event BurnManagerSet(
         address indexed oldManager,
         address indexed newManager
@@ -37,7 +38,7 @@ contract Token is ERC20, Ownable {
         string memory name,
         string memory symbol,
         string memory _imageUrl,
-        address _burnManager
+        address _burnManager //can be set optionally by creator for experimental actionseW
     ) ERC20(name, symbol) Ownable(initialOwner) {
         require(initialOwner != address(0), "Invalid factory address");
         require(_creator != address(0), "Invalid creator address");

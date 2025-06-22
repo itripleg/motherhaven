@@ -497,6 +497,19 @@
 			},
 			{
 				"inputs": [],
+				"name": "test",
+				"outputs": [
+					{
+						"internalType": "string",
+						"name": "",
+						"type": "string"
+					}
+				],
+				"stateMutability": "view",
+				"type": "function"
+			},
+			{
+				"inputs": [],
 				"name": "tokenFactory",
 				"outputs": [
 					{
@@ -710,7 +723,7 @@
 	},
 	"settings": {
 		"compilationTarget": {
-			"nu-nu/VettedToken.sol": "Token"
+			"VettedToken.sol": "Token"
 		},
 		"evmVersion": "prague",
 		"libraries": {},
@@ -772,12 +785,12 @@
 				"dweb:/ipfs/Qmax9WHBnVsZP46ZxEMNRQpLQnrdE4dK8LehML1Py8FowF"
 			]
 		},
-		"nu-nu/VettedToken.sol": {
-			"keccak256": "0x9efca48f8575f0b848c73bcbb2e439b4c5a3fa743aa290dcb96f8a33b8195150",
+		"VettedToken.sol": {
+			"keccak256": "0xc042fef1a0e9028ce63070387fb3b39d813fa3ca0c7964033441bf47a4f24819",
 			"license": "MIT",
 			"urls": [
-				"bzz-raw://d7c36b80d880826d1722161fe66d2f785595949224baf4afcb4f5b63cb7add10",
-				"dweb:/ipfs/QmQWbPbndxUUsDuJVEa4ScqiYoxnRAVJNzMUxvC2tiCqHu"
+				"bzz-raw://8660a9c7cfafbe04e4313b3a6e424f62422d568e24608cd830488b85f96fde4b",
+				"dweb:/ipfs/QmPFV5RCKnTfGD9k9rm2xoi3CAKw6GeE2tq3A7CtBrXM3i"
 			]
 		}
 	},
