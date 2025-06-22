@@ -3,13 +3,35 @@
 import { useReadContract, useReadContracts, useWriteContract } from "wagmi";
 import { FACTORY_ADDRESS, FACTORY_ABI, Token } from "@/types";
 import { type Address, type Abi, formatEther, parseEther } from "viem";
-import { useMemo } from "react";
+import { useEffect, useMemo } from "react";
 
 // Define the factory contract config once
 const factoryContract = {
   address: FACTORY_ADDRESS as Address,
   abi: FACTORY_ABI as Abi,
 } as const;
+
+// A custom hook that wraps useReadContract to add polling
+function useLiveReadContract(hookParameters: any) {
+  const { data, refetch, ...rest } = useReadContract(hookParameters);
+
+  useEffect(() => {
+    // Only set up the interval if the query is enabled
+    if (hookParameters.query?.enabled === false) {
+      return;
+    }
+
+    // Set up an interval to call the 'refetch' function every 4 seconds
+    const intervalId = setInterval(() => {
+      refetch();
+    }, 4000); // 4000ms = 4 seconds
+
+    // Clean up the interval when the component unmounts
+    return () => clearInterval(intervalId);
+  }, [refetch, hookParameters.query?.enabled]);
+
+  return { data, ...rest };
+}
 
 export function useFactoryContract() {
   const {
@@ -19,9 +41,9 @@ export function useFactoryContract() {
     ...writeRest
   } = useWriteContract();
 
-  // Read Operations
+  // Read Operations - now use live-updating hook for real-time data
   const useTokenState = (tokenAddress?: Address) => {
-    return useReadContract({
+    return useLiveReadContract({
       ...factoryContract,
       functionName: "getTokenState",
       args: tokenAddress ? [tokenAddress] : undefined,
@@ -30,7 +52,7 @@ export function useFactoryContract() {
   };
 
   const useCollateral = (tokenAddress?: Address) => {
-    const { data, ...rest } = useReadContract({
+    const { data, ...rest } = useLiveReadContract({
       ...factoryContract,
       functionName: "collateral",
       args: tokenAddress ? [tokenAddress] : undefined,
@@ -43,7 +65,7 @@ export function useFactoryContract() {
   };
 
   const useCurrentPrice = (tokenAddress?: Address) => {
-    return useReadContract({
+    return useLiveReadContract({
       ...factoryContract,
       functionName: "lastPrice",
       args: tokenAddress ? [tokenAddress] : undefined,
@@ -148,14 +170,18 @@ export function useFactoryContract() {
     });
   };
 
-  // Helper Functions
   const formatPriceDecimals = (
     price: bigint | undefined,
-    precision: number = 6
+    precision: number = 7 // Use a higher default precision for consistency
   ): string => {
-    if (price === undefined || price === null) return "0.00000";
+    if (price === undefined || price === null) return "0.000000";
     const formatted = formatEther(price);
-    return parseFloat(formatted).toFixed(precision);
+    // Use toLocaleString to handle different locales and avoid unnecessary trailing zeros
+    // while ensuring a minimum number of decimal places.
+    return parseFloat(formatted).toLocaleString(undefined, {
+      minimumFractionDigits: precision,
+      maximumFractionDigits: precision,
+    });
   };
 
   return {

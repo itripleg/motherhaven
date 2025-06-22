@@ -1,4 +1,5 @@
-// hooks/useTokenTrades.ts
+// /new-hooks/useTokenTrades.ts
+
 import { useEffect, useState } from "react";
 import {
   collection,
@@ -9,29 +10,26 @@ import {
   onSnapshot,
 } from "firebase/firestore";
 import { db } from "@/firebase";
-import { Address, formatEther } from "viem";
-import { tokenEventEmitter } from "@/components/EventWatcher";
+import { type Address } from "viem";
+import { Trade } from "@/types"; // Use the single, official Trade type
 
-export interface Trade {
-  type: "buy" | "sell" | "halt";
-  pricePerToken: string;
-  timestamp: string;
-  ethAmount?: string;
-  tokenAmount?: string;
-  collateral?: string;
-  blockNumber: number;
-}
-
+/**
+ * A robust hook to fetch both historical and real-time trade history for a given token.
+ * It correctly maps the Firestore data structure to the official Trade type.
+ */
 export function useTokenTrades(tokenAddress?: Address) {
   const [trades, setTrades] = useState<Trade[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
-  // Listen to historical trades from Firestore
   useEffect(() => {
-    if (!tokenAddress) return;
+    if (!tokenAddress) {
+      setLoading(false);
+      return;
+    }
 
     setLoading(true);
+
     const tradesRef = collection(db, "trades");
     const tradesQuery = query(
       tradesRef,
@@ -45,81 +43,38 @@ export function useTokenTrades(tokenAddress?: Address) {
       (snapshot) => {
         const tradeDocs: Trade[] = snapshot.docs.map((doc) => {
           const data = doc.data();
+
+          // --- DEFINITIVE FIX FOR DATA MAPPING ---
+
+          // 1. Convert ISO string from Firestore to a UNIX timestamp number (in seconds)
+          // This creates a consistent, usable format for all components.
+          const timestampInSeconds = data.timestamp
+            ? Math.floor(new Date(data.timestamp).getTime() / 1000)
+            : 0;
+
           return {
-            type: data.type,
-            pricePerToken: data.pricePerToken,
-            timestamp: data.timestamp,
-            ethAmount: data.ethAmount,
-            tokenAmount: data.tokenAmount,
-            collateral: data.collateral,
-            blockNumber: data.blockNumber,
+            // 2. Use the correct timestamp format
+            timestamp: timestampInSeconds,
+            type: data.type || "buy",
+            // 3. Use the correct field name from Firestore: `tokenAmount`
+            amount: data.tokenAmount?.toString() || "0",
+            ethAmount: data.ethAmount?.toString() || "0",
+            trader: data.trader || "0x0000000000000000000000000000000000000000",
           };
         });
-        setTrades(tradeDocs);
+
+        setTrades(tradeDocs.reverse());
         setLoading(false);
         setError(null);
       },
       (err) => {
-        console.error("Error fetching trades:", err);
+        console.error("Error fetching trades from Firestore:", err);
         setError("Failed to load trade history");
         setLoading(false);
       }
     );
 
     return () => unsubscribe();
-  }, [tokenAddress]);
-
-  // Listen to real-time trade events
-  useEffect(() => {
-    if (!tokenAddress) return;
-
-    const handleTokenEvent = (event: any) => {
-      if (
-        event.eventName === "TokensPurchased" ||
-        event.eventName === "TokensSold"
-      ) {
-        // Format the amounts from BigInt
-        const ethAmount = formatEther(event.data.price);
-        const tokenAmount = formatEther(event.data.amount);
-
-        // Calculate price per token
-        const pricePerToken = (
-          Number(ethAmount) / Number(tokenAmount)
-        ).toString();
-
-        const newTrade: Trade = {
-          type: event.eventName === "TokensPurchased" ? "buy" : "sell",
-          pricePerToken,
-          timestamp: new Date().toISOString(),
-          ethAmount,
-          tokenAmount,
-          blockNumber: event.blockNumber,
-        };
-
-        setTrades((prev) => [newTrade, ...prev]);
-      } else if (event.eventName === "TradingHalted") {
-        const haltTrade: Trade = {
-          type: "halt",
-          pricePerToken: "0",
-          timestamp: new Date().toISOString(),
-          collateral: formatEther(event.data.collateral),
-          blockNumber: event.blockNumber,
-        };
-
-        setTrades((prev) => [haltTrade, ...prev]);
-      }
-    };
-
-    tokenEventEmitter.addEventListener(
-      tokenAddress.toLowerCase(),
-      handleTokenEvent
-    );
-    return () => {
-      tokenEventEmitter.removeEventListener(
-        tokenAddress.toLowerCase(),
-        handleTokenEvent
-      );
-    };
   }, [tokenAddress]);
 
   return { trades, loading, error };

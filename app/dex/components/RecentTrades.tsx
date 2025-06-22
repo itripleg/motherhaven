@@ -1,114 +1,56 @@
 "use client";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { InfoIcon, ArrowUpIcon, ArrowDownIcon } from "lucide-react";
-import { useEffect, useState } from "react";
-import {
-  collection,
-  query,
-  where,
-  orderBy,
-  limit,
-  onSnapshot,
-} from "firebase/firestore";
-import { db } from "@/firebase";
-
-interface Trade {
-  pricePerToken: string;
-  timestamp: number;
-  type: "buy" | "sell";
-  ethAmount: string;
-  tokenAmount: string;
-  token: string;
-}
+import { useMemo } from "react";
+import { useTokenTrades } from "@/new-hooks/useTokenTrades"; // 1. Use our centralized hook
+import { Trade } from "@/types"; // 2. Use the official, unified Trade type
+import { formatUnits, Address } from "viem";
 
 interface RecentTradesProps {
   tokenAddress: string;
 }
 
+// Helper function for safe, consistent formatting
+const formatDisplayAmount = (amountInWei: string): string => {
+  try {
+    const value = parseFloat(formatUnits(BigInt(amountInWei), 18));
+    if (value < 0.0001) return value.toFixed(6);
+    return value.toFixed(4);
+  } catch {
+    return "0.00";
+  }
+};
+
 export default function RecentTrades({ tokenAddress }: RecentTradesProps) {
-  const [trades, setTrades] = useState<Trade[]>([]);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
-  const [buySellPressure, setBuySellPressure] = useState({
-    buyAmount: 0,
-    sellAmount: 0,
-  });
+  // 3. Get all data from our single, robust hook. No more internal fetching!
+  const { trades, loading, error } = useTokenTrades(tokenAddress as Address);
 
-  useEffect(() => {
-    if (!tokenAddress) return;
-
-    setLoading(true);
-    setError(null);
-
-    // Create query for specific token's trades
-    const tradesRef = collection(db, "trades");
-    const q = query(
-      tradesRef,
-      where("token", "==", tokenAddress.toLowerCase()),
-      orderBy("timestamp", "desc"),
-      limit(8)
-    );
-
-    const unsubscribe = onSnapshot(
-      q,
-      (snapshot) => {
-        const tradeData: Trade[] = [];
-        let buyPressure = 0;
-        let sellPressure = 0;
-
-        snapshot.docs.forEach((doc) => {
-          const data = doc.data() as Trade;
-          tradeData.push(data);
-
-          // Calculate buy/sell pressure
-          const ethAmount = parseFloat(data.ethAmount) / 1e18;
-          if (data.type === "buy") {
-            buyPressure += ethAmount;
+  // 4. Calculate buy/sell pressure with useMemo for efficiency.
+  const buySellPressure = useMemo(() => {
+    return trades.reduce(
+      (acc, trade) => {
+        try {
+          const ethAmount = parseFloat(
+            formatUnits(BigInt(trade.ethAmount), 18)
+          );
+          if (trade.type === "buy") {
+            acc.buyAmount += ethAmount;
           } else {
-            sellPressure += ethAmount;
+            acc.sellAmount += ethAmount;
           }
-        });
-
-        setTrades(tradeData);
-        setBuySellPressure({
-          buyAmount: buyPressure,
-          sellAmount: sellPressure,
-        });
-        setLoading(false);
+        } catch {}
+        return acc;
       },
-      (err) => {
-        console.error("Error fetching trades:", err);
-        setError("Failed to fetch trade data");
-        setLoading(false);
-      }
+      { buyAmount: 0, sellAmount: 0 }
     );
-
-    return () => unsubscribe();
-  }, [tokenAddress]);
+  }, [trades]);
 
   const formatTimestamp = (timestamp: number) => {
-    const date = new Date(timestamp);
-    return date.toLocaleTimeString([], {
+    return new Date(timestamp * 1000).toLocaleTimeString([], {
+      // Assuming timestamp is in seconds
       hour: "2-digit",
       minute: "2-digit",
-      hour12: true,
     });
-  };
-
-  const formatEthAmount = (amount: string | number) => {
-    const ethValue = Number(amount) / 1e18;
-    if (ethValue < 0.000001) return "0";
-    if (ethValue < 0.001) return ethValue.toFixed(6);
-    if (ethValue < 1) return ethValue.toFixed(4);
-    return ethValue.toFixed(2);
-  };
-
-  const formatTokenAmount = (amount: string | number) => {
-    const value = Number(amount) / 1e18;
-    if (value < 0.000001) return "0";
-    if (value < 0.001) return value.toFixed(6);
-    if (value < 1) return value.toFixed(4);
-    return value.toFixed(2);
   };
 
   if (loading) {
@@ -136,22 +78,19 @@ export default function RecentTrades({ tokenAddress }: RecentTradesProps) {
       <CardHeader className="py-3">
         <CardTitle className="text-lg flex items-center gap-2">
           Recent Trades
-          <InfoIcon className="h-4 w-4 text-muted-foreground" />
         </CardTitle>
       </CardHeader>
-      <CardContent className="space-y-4 overflow-auto max-h-[360px]">
+      <CardContent className="space-y-4 overflow-auto max-h-[360px] scrollbar-thin">
         <div className="bg-card rounded-lg p-3 border">
-          <h4 className="text-sm font-medium mb-2">Buy/Sell Volume (ETH)</h4>
+          <h4 className="text-sm font-medium mb-2">Buy/Sell Volume</h4>
           <div className="flex items-center justify-between text-sm">
-            <div className="flex items-center gap-2">
-              <div className="h-2 w-2 rounded-full bg-green-500" />
-              <span>Buy: {formatEthAmount(buySellPressure.buyAmount)} ETH</span>
+            <div className="flex items-center gap-2 text-green-500">
+              <ArrowUpIcon className="h-4 w-4" />
+              <span>{buySellPressure.buyAmount.toFixed(4)} ETH</span>
             </div>
-            <div className="flex items-center gap-2">
-              <div className="h-2 w-2 rounded-full bg-red-500" />
-              <span>
-                Sell: {formatEthAmount(buySellPressure.sellAmount)} ETH
-              </span>
+            <div className="flex items-center gap-2 text-red-500">
+              <ArrowDownIcon className="h-4 w-4" />
+              <span>{buySellPressure.sellAmount.toFixed(4)} ETH</span>
             </div>
           </div>
         </div>
@@ -162,23 +101,19 @@ export default function RecentTrades({ tokenAddress }: RecentTradesProps) {
               No trades yet
             </div>
           ) : (
-            trades.map((trade, index) => (
+            // 5. The JSX can remain largely the same, as it now receives correctly typed data.
+            [...trades].reverse().map((trade, index) => (
               <div
                 key={`${trade.timestamp}-${index}`}
                 className="bg-card rounded-lg p-2 border hover:bg-accent/50 transition-colors"
               >
                 <div className="flex items-center justify-between">
                   <span
-                    className={`text-sm font-medium ${
+                    className={`text-sm font-bold ${
                       trade.type === "buy" ? "text-green-500" : "text-red-500"
                     }`}
                   >
-                    {trade.type === "buy" ? (
-                      <ArrowUpIcon className="h-3 w-3 inline mr-1" />
-                    ) : (
-                      <ArrowDownIcon className="h-3 w-3 inline mr-1" />
-                    )}
-                    {trade.type === "buy" ? "Bought" : "Sold"}
+                    {trade.type.toUpperCase()}
                   </span>
                   <span className="text-xs text-muted-foreground">
                     {formatTimestamp(trade.timestamp)}
@@ -187,11 +122,11 @@ export default function RecentTrades({ tokenAddress }: RecentTradesProps) {
                 <div className="text-xs grid grid-cols-2 gap-1 mt-1">
                   <div>
                     <span className="text-muted-foreground">Amount:</span>{" "}
-                    {formatTokenAmount(trade.tokenAmount)}
+                    {formatDisplayAmount(trade.amount)}
                   </div>
                   <div>
-                    <span className="text-muted-foreground">Price:</span>{" "}
-                    {formatEthAmount(trade.ethAmount)} ETH
+                    <span className="text-muted-foreground">Value:</span>{" "}
+                    {formatDisplayAmount(trade.ethAmount)} ETH
                   </div>
                 </div>
               </div>
