@@ -237,7 +237,7 @@ export default function RandomTypingGame({
       )}
 
       <p className={`text-center text-gray-300 ${embedded ? "text-xs" : ""}`}>
-        Just type random letters! We'll count how many real words you
+        Just type random letters! We&apos;ll count how many real words you
         accidentally make.
       </p>
 
