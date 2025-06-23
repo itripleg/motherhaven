@@ -8,6 +8,7 @@ import { Toaster } from "@/components/ui/toaster";
 import { EventWatcher } from "../components/EventWatcher";
 import { UserSection } from "@/components/UserSection";
 import { Header } from "./Header";
+import { FactoryConfigProvider } from "@/contexts/FactoryConfigProvider";
 // import { FactoryGuard } from "@/components/FactoryGuard";
 
 const geistSans = localFont({
@@ -51,10 +52,12 @@ export default function RootLayout({
           {/* <FactoryGuard> */}
           <MyMenu />
           <WagmiContext>
+            {/* <FactoryConfigProvider> */}
             <EventWatcher />
             <Header />
             {children}
             <Toaster />
+            {/* </FactoryConfigProvider> */}
           </WagmiContext>
           {/* </FactoryGuard> */}
         </ThemeProvider>

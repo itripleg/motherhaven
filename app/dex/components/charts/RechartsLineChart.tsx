@@ -1,235 +1,132 @@
 "use client";
-import React, { useMemo, useEffect, useState } from "react";
+import React, { useMemo } from "react";
 import {
+  ResponsiveContainer,
   LineChart,
   Line,
   XAxis,
   YAxis,
-  CartesianGrid,
   Tooltip,
-  ResponsiveContainer,
+  CartesianGrid,
 } from "recharts";
-import { format } from "date-fns";
-import { tokenEventEmitter } from "@/components/EventWatcher";
+import { format, fromUnixTime } from "date-fns";
+import { formatUnits, parseUnits } from "viem";
+import { Token, Trade } from "@/types"; // Use the official types
+import { useFactoryContract } from "@/new-hooks/useFactoryContract";
 
-interface RechartsChartProps {
-  trades: Array<{
-    pricePerToken: string;
-    timestamp: string;
-    type: "buy" | "sell";
-    ethAmount: string;
-    tokenAmount: string;
-  }>;
+// 1. Update props to accept the full Token object
+interface RechartsLineChartProps {
+  trades: Trade[];
   loading: boolean;
-  currentPrice?: string;
-  tokenSymbol?: string;
-  tokenAddress?: string;
+  token: Token; // Changed from tokenSymbol
 }
 
-const RechartsChart = ({
-  trades: initialTrades,
-  loading,
-  currentPrice,
-  tokenSymbol,
-  tokenAddress,
-}: RechartsChartProps) => {
-  // State to hold live trades
-  const [liveTrades, setLiveTrades] = useState<typeof initialTrades>([]);
-
-  // Combine initial and live trades
-  const allTrades = useMemo(
-    () => [...initialTrades, ...liveTrades],
-    [initialTrades, liveTrades]
-  );
-
-  useEffect(() => {
-    if (!tokenAddress) return;
-
-    const handleTokenEvent = (event: {
-      eventName: string;
-      data: {
-        pricePerToken: bigint | number;
-        ethAmount: bigint | number;
-        tokenAmount: bigint | number;
-      };
-    }) => {
-      if (
-        event.eventName === "TokensPurchased" ||
-        event.eventName === "TokensSold"
-      ) {
-        const newTrade = {
-          pricePerToken: event.data.pricePerToken.toString(),
-          timestamp: new Date().toISOString(),
-          type:
-            event.eventName === "TokensPurchased"
-              ? ("buy" as const)
-              : ("sell" as const),
-          ethAmount: event.data.ethAmount.toString(),
-          tokenAmount: event.data.tokenAmount.toString(),
-        };
-
-        setLiveTrades((prev) => [...prev, newTrade]);
-      }
-    };
-
-    const normalizedAddress = tokenAddress.toLowerCase();
-
-    // Subscribe to events for this token
-    tokenEventEmitter.addEventListener(normalizedAddress, handleTokenEvent);
-
-    return () => {
-      // Cleanup subscription
-      tokenEventEmitter.removeEventListener(
-        normalizedAddress,
-        handleTokenEvent
-      );
-    };
-  }, [tokenAddress]);
-
-  // Memoize chart data calculation
-  const chartData = useMemo(() => {
-    const data = [
-      // Add all trades (both initial and live)
-      ...allTrades.map((trade) => ({
-        time: new Date(trade.timestamp).getTime(),
-        price: parseFloat(trade.pricePerToken),
-        volume: parseFloat(trade.ethAmount) / 1e18,
-        type: trade.type,
-      })),
-      // Add current price if different from last trade
-      ...(currentPrice &&
-      allTrades.length > 0 &&
-      parseFloat(currentPrice) !== parseFloat(allTrades[0].pricePerToken)
-        ? [
-            {
-              time: Date.now(),
-              price: parseFloat(currentPrice),
-              volume: 0,
-              type: "current",
-            },
-          ]
-        : []),
-    ].sort((a, b) => a.time - b.time);
-
-    return data;
-  }, [allTrades, currentPrice]);
-
-  const CustomDot = (props: any) => {
-    const { cx, cy, payload, index } = props;
-
-    const colors = {
-      buy: "#10b981",
-      sell: "#ef4444",
-      current: "#3b82f6",
-    };
-
+// 2. Update the tooltip to use a pre-formatted price string
+const CustomTooltip = ({ active, payload, label }: any) => {
+  if (active && payload && payload.length) {
     return (
-      <circle
-        key={`dot-${index}`}
-        cx={cx}
-        cy={cy}
-        r={4}
-        fill={colors[payload.type as keyof typeof colors] || "#10b981"}
-      />
+      <div className="p-2 bg-gray-800/80 backdrop-blur-sm border border-gray-700 rounded-lg text-white">
+        {/* It now receives a 'formattedPrice' directly from the payload */}
+        <p className="label text-sm">{`Price: ${payload[0].payload.formattedPrice} AVAX`}</p>
+        <p className="intro text-xs text-gray-400">{`On: ${label}`}</p>
+      </div>
     );
-  };
+  }
+  return null;
+};
 
-  // Rest of your component remains the same...
-  const CustomTooltip = ({ active, payload, label }: any) => {
-    if (active && payload && payload.length) {
-      const data = payload[0].payload;
-      return (
-        <div className="bg-background/80 backdrop-blur-sm border rounded-lg p-2 shadow-lg">
-          <p className="text-sm font-medium">
-            {format(new Date(label), "MMM dd yyyy HH:mm")}
-          </p>
-          <p className="text-sm text-primary">
-            Price: {data.price.toFixed(12)} ETH
-          </p>
-          {data.type !== "current" && (
-            <p className="text-sm text-primary">
-              Volume: {data.volume.toFixed(4)} ETH
-            </p>
-          )}
-          <p className="text-xs text-muted-foreground capitalize">
-            Type: {data.type}
-          </p>
-        </div>
-      );
-    }
-    return null;
-  };
+export default function RechartsLineChart({
+  trades,
+  loading,
+  token,
+}: RechartsLineChartProps) {
+  const { formatPriceDecimals } = useFactoryContract();
+
+  const { chartData, displayPrice } = useMemo(() => {
+    // 3. Create a "Genesis Point" for the chart's origin
+    // This ensures there are always at least two points to draw a line from the start.
+    const genesisPoint = {
+      timestamp: token.createdAt
+        ? Math.floor(new Date(token.createdAt).getTime() / 1000)
+        : Date.now() / 1000 - 3600,
+      priceInWei: parseUnits(token.initialPrice, 18), // Use the token's initialPrice
+    };
+
+    const processedTrades = trades.map((trade) => ({
+      timestamp: trade.timestamp,
+      priceInWei: (BigInt(trade.ethAmount) * 10n ** 18n) / BigInt(trade.amount),
+    }));
+
+    // Combine the genesis point with actual trades
+    const allPoints = [genesisPoint, ...processedTrades];
+
+    const dataForChart = allPoints.map((point) => {
+      const priceAsNumber = parseFloat(formatUnits(point.priceInWei, 18));
+      return {
+        // Data for plotting
+        timestamp: format(fromUnixTime(point.timestamp), "MMM d, h:mm a"),
+        price: priceAsNumber,
+        // 4. Pre-format the price for consistent display in tooltips
+        formattedPrice: formatPriceDecimals(point.priceInWei),
+      };
+    });
+
+    // The final display price is always derived from the very last point in our series.
+    const lastDisplayPrice =
+      dataForChart.length > 0
+        ? dataForChart[dataForChart.length - 1].formattedPrice
+        : formatPriceDecimals(genesisPoint.priceInWei);
+
+    return { chartData: dataForChart, displayPrice: lastDisplayPrice };
+  }, [trades, token, formatPriceDecimals]);
 
   if (loading) {
     return (
-      <div className="flex items-center justify-center h-full text-sm text-muted-foreground">
-        Loading trades...
+      <div className="text-center text-gray-400 animate-pulse">
+        Loading Chart...
       </div>
     );
   }
-
-  if (allTrades.length === 0) {
-    return (
-      <div className="flex items-center justify-center h-full text-sm text-muted-foreground">
-        No trades found for this token
-      </div>
-    );
-  }
-
-  // Calculate price range for better scaling
-  const prices = chartData.map((d) => d.price);
-  const minPrice = Math.min(...prices);
-  const maxPrice = Math.max(...prices);
-  const priceDiff = maxPrice - minPrice;
-  const yDomain = [
-    Math.max(0, minPrice - priceDiff * 0.1),
-    maxPrice + priceDiff * 0.1,
-  ];
 
   return (
-    <div className="w-full h-full">
-      <div className="absolute top-4 left-4 text-sm text-muted-foreground">
-        {tokenSymbol ? `${tokenSymbol}/ETH` : "Price Chart"}
+    <div className="h-full w-full">
+      <div className="mb-4">
+        <h3 className="text-lg font-bold text-white">
+          {token.symbol} Price History
+        </h3>
+        <p className="text-2xl text-green-400">{displayPrice} AVAX</p>
       </div>
-      <ResponsiveContainer width="100%" height="100%">
+      <ResponsiveContainer width="100%" height="80%">
         <LineChart
           data={chartData}
-          margin={{ top: 40, right: 30, left: 0, bottom: 0 }}
+          margin={{ top: 5, right: 20, left: -10, bottom: 5 }}
         >
-          <CartesianGrid strokeDasharray="3 3" stroke="#2f3540" />
+          <CartesianGrid strokeDasharray="3 3" strokeOpacity={0.2} />
           <XAxis
-            dataKey="time"
-            stroke="#6b7280"
-            tick={{ fill: "#6b7280" }}
-            tickFormatter={(value) => {
-              const date = new Date(value);
-              return `${date.getHours()}:${String(date.getMinutes()).padStart(
-                2,
-                "0"
-              )}`;
-            }}
-            type="number"
-            domain={["dataMin", "dataMax"]}
+            dataKey="timestamp"
+            stroke="#9ca3af"
+            fontSize={12}
+            tickLine={false}
+            axisLine={false}
           />
           <YAxis
-            stroke="#6b7280"
-            tick={{ fill: "#6b7280" }}
-            domain={yDomain}
-            tickFormatter={(value) => value.toFixed(12)}
-            tickCount={5}
+            stroke="#9ca3af"
+            fontSize={12}
+            tickLine={false}
+            axisLine={false}
+            tickFormatter={(value) => `${value.toFixed(5)}`}
+            domain={["dataMin", "dataMax"]}
           />
           <Tooltip content={<CustomTooltip />} />
           <Line
             type="monotone"
             dataKey="price"
-            stroke="#10b981"
+            stroke="#4ade80"
             strokeWidth={2}
-            dot={CustomDot}
+            dot={true} /* Enable dots */
           />
         </LineChart>
       </ResponsiveContainer>
     </div>
   );
-};
-
-export default RechartsChart;
+}
