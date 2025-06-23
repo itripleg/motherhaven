@@ -1,4 +1,4 @@
-// types.ts
+// /types/token.ts
 export enum TokenState {
   NOT_CREATED = 0,
   TRADING = 1,

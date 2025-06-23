@@ -5,7 +5,8 @@ import { useReadContracts } from "wagmi";
 import { FACTORY_ABI, FACTORY_ADDRESS } from "@/types";
 import { formatUnits } from "viem";
 
-// 1. The Type Definition lives here and is exported for other files to use.
+// 1. DEFINE AND EXPORT THE TYPE HERE
+//// TODO: Move this to /contracts/types.ts
 export interface FactoryConfig {
   decimals: string;
   initialPrice: string;
@@ -18,7 +19,8 @@ export interface FactoryConfig {
   tradingFee: number;
 }
 
-// 2. The Data-Fetching logic is a local helper hook, NOT exported.
+// 2. DEFINE THE DATA-FETCHING LOGIC AS A LOCAL HOOK
+// It no longer needs to be in a separate file.
 function useFactoryConfig() {
   const factoryContractCalls = [
     { functionName: "DECIMALS" },
@@ -65,7 +67,7 @@ function useFactoryConfig() {
   return { config, isLoading, error: error?.message || null };
 }
 
-// 3. The Context and Provider are defined and exported.
+// 3. CREATE AND EXPORT THE CONTEXT AND PROVIDER as before
 interface FactoryConfigContextState {
   config: FactoryConfig | null;
   isLoading: boolean;
@@ -89,7 +91,7 @@ export function FactoryConfigProvider({
   );
 }
 
-// 4. The Consumer Hook is exported for other components to use.
+// 4. EXPORT THE CONSUMER HOOK for other components to use
 export function useFactoryConfigContext() {
   const context = useContext(FactoryConfigContext);
   if (!context) {
