@@ -34,7 +34,7 @@ export function useTokenTrades(tokenAddress?: Address) {
     const tradesQuery = query(
       tradesRef,
       where("token", "==", tokenAddress.toLowerCase()),
-      orderBy("timestamp", "desc"),
+      orderBy("timestamp", "desc"), // Fetches newest trades first
       limit(100)
     );
 
@@ -45,25 +45,24 @@ export function useTokenTrades(tokenAddress?: Address) {
           const data = doc.data();
 
           // --- DEFINITIVE FIX FOR DATA MAPPING ---
-
-          // 1. Convert ISO string from Firestore to a UNIX timestamp number (in seconds)
-          // This creates a consistent, usable format for all components.
-          const timestampInSeconds = data.timestamp
-            ? Math.floor(new Date(data.timestamp).getTime() / 1000)
-            : 0;
-
+          // This object now includes all required fields from the 'Trade' type.
           return {
-            // 2. Use the correct timestamp format
-            timestamp: timestampInSeconds,
-            type: data.type || "buy",
-            // 3. Use the correct field name from Firestore: `tokenAmount`
-            amount: data.tokenAmount?.toString() || "0",
-            ethAmount: data.ethAmount?.toString() || "0",
-            trader: data.trader || "0x0000000000000000000000000000000000000000",
-          };
+            blockNumber: data.blockNumber,
+            ethAmount: data.ethAmount,
+            pricePerToken: data.pricePerToken,
+            timestamp: data.timestamp, // Kept as a string to match the 'Trade' type
+            token: data.token,
+            tokenAmount: data.tokenAmount, // Use the correct property name
+            trader: data.trader,
+            transactionHash: data.transactionHash,
+            type: data.type,
+            fee: data.fee, // Include optional fields
+          } as Trade;
         });
 
-        setTrades(tradeDocs.reverse());
+        // The query already returns trades with the newest first,
+        // so we can set the state directly without reversing.
+        setTrades(tradeDocs);
         setLoading(false);
         setError(null);
       },
