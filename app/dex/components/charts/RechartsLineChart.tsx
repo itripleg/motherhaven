@@ -11,22 +11,19 @@ import {
 } from "recharts";
 import { format, fromUnixTime } from "date-fns";
 import { formatUnits, parseUnits } from "viem";
-import { Token, Trade } from "@/types"; // Use the official types
+import { Token, Trade } from "@/types";
 import { useFactoryContract } from "@/new-hooks/useFactoryContract";
 
-// 1. Update props to accept the full Token object
 interface RechartsLineChartProps {
   trades: Trade[];
   loading: boolean;
-  token: Token; // Changed from tokenSymbol
+  token: Token;
 }
 
-// 2. Update the tooltip to use a pre-formatted price string
 const CustomTooltip = ({ active, payload, label }: any) => {
   if (active && payload && payload.length) {
     return (
       <div className="p-2 bg-gray-800/80 backdrop-blur-sm border border-gray-700 rounded-lg text-white">
-        {/* It now receives a 'formattedPrice' directly from the payload */}
         <p className="label text-sm">{`Price: ${payload[0].payload.formattedPrice} AVAX`}</p>
         <p className="intro text-xs text-gray-400">{`On: ${label}`}</p>
       </div>
@@ -40,45 +37,51 @@ export default function RechartsLineChart({
   loading,
   token,
 }: RechartsLineChartProps) {
-  const { formatPriceDecimals } = useFactoryContract();
+  // Use the central formatter from the hook
+  const { formatValue } = useFactoryContract();
 
   const { chartData, displayPrice } = useMemo(() => {
-    // 3. Create a "Genesis Point" for the chart's origin
-    // This ensures there are always at least two points to draw a line from the start.
+    // Genesis point ensures the chart starts from the token's creation
     const genesisPoint = {
       timestamp: token.createdAt
         ? Math.floor(new Date(token.createdAt).getTime() / 1000)
-        : Date.now() / 1000 - 3600,
-      priceInWei: parseUnits(token.initialPrice, 18), // Use the token's initialPrice
+        : Date.now() / 1000,
+      // Use parseUnits to convert the friendly initialPrice string into a bigint
+      priceInWei: parseUnits(token.initialPrice, 18),
     };
 
-    const processedTrades = trades.map((trade) => ({
-      timestamp: trade.timestamp,
-      priceInWei: (BigInt(trade.ethAmount) * 10n ** 18n) / BigInt(trade.amount),
-    }));
-
-    // Combine the genesis point with actual trades
-    const allPoints = [genesisPoint, ...processedTrades];
-
-    const dataForChart = allPoints.map((point) => {
-      const priceAsNumber = parseFloat(formatUnits(point.priceInWei, 18));
+    const processedTrades = trades.map((trade) => {
+      // FIX: Correctly calculate price per token from trade data.
+      // This assumes trade.ethAmount and trade.tokenAmount are in their smallest units (Wei).
+      const priceInWei =
+        (BigInt(trade.ethAmount) * BigInt(10 ** 18)) /
+        BigInt(trade.tokenAmount);
       return {
-        // Data for plotting
-        timestamp: format(fromUnixTime(point.timestamp), "MMM d, h:mm a"),
-        price: priceAsNumber,
-        // 4. Pre-format the price for consistent display in tooltips
-        formattedPrice: formatPriceDecimals(point.priceInWei),
+        timestamp: Number(trade.timestamp), // Ensure timestamp is a number
+        priceInWei,
       };
     });
 
-    // The final display price is always derived from the very last point in our series.
+    // Combine and sort all points to ensure chronological order
+    const allPoints = [genesisPoint, ...processedTrades].sort(
+      (a, b) => a.timestamp - b.timestamp
+    );
+
+    const dataForChart = allPoints.map((point) => ({
+      timestamp: format(fromUnixTime(point.timestamp), "MMM d, h:mm a"),
+      price: parseFloat(formatUnits(point.priceInWei, 18)),
+      // Use the centralized formatter for consistent display
+      formattedPrice: formatValue(point.priceInWei, 6),
+    }));
+
+    // Display price is the price of the last available point
     const lastDisplayPrice =
       dataForChart.length > 0
         ? dataForChart[dataForChart.length - 1].formattedPrice
-        : formatPriceDecimals(genesisPoint.priceInWei);
+        : formatValue(genesisPoint.priceInWei, 6);
 
     return { chartData: dataForChart, displayPrice: lastDisplayPrice };
-  }, [trades, token, formatPriceDecimals]);
+  }, [trades, token, formatValue]);
 
   if (loading) {
     return (
@@ -114,7 +117,7 @@ export default function RechartsLineChart({
             fontSize={12}
             tickLine={false}
             axisLine={false}
-            tickFormatter={(value) => `${value.toFixed(5)}`}
+            tickFormatter={(value) => `${Number(value).toFixed(5)}`}
             domain={["dataMin", "dataMax"]}
           />
           <Tooltip content={<CustomTooltip />} />
@@ -123,7 +126,7 @@ export default function RechartsLineChart({
             dataKey="price"
             stroke="#4ade80"
             strokeWidth={2}
-            dot={true} /* Enable dots */
+            dot={true}
           />
         </LineChart>
       </ResponsiveContainer>

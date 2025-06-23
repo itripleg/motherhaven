@@ -6,7 +6,7 @@ import { AddressComponent } from "@/components/AddressComponent";
 import { Progress } from "@/components/ui/progress";
 import { useToken } from "@/contexts/TokenContext";
 import { useFactoryContract } from "@/new-hooks/useFactoryContract";
-import { Address } from "viem";
+import { Address, formatEther } from "viem";
 
 interface TokenHeaderProps {
   address: string;
@@ -20,56 +20,56 @@ interface StateDisplay {
 export const TokenHeaderStyled: React.FC<TokenHeaderProps> = ({ address }) => {
   const [progress, setProgress] = useState(0);
 
-  // Get immutable data from Firestore
+  // Get token metadata (name, symbol, image, etc.) from the TokenContext
   const { token, loading } = useToken(address);
 
-  // Get real-time contract state using factory contract hooks
+  // Get real-time, formatted contract data from our centralized hook
   const { useTokenState, useCollateral, useCurrentPrice } =
     useFactoryContract();
   const { data: state } = useTokenState(address as Address);
-  const { data: collateral } = useCollateral(address as Address);
-  const { data: currentPriceData } = useCurrentPrice(address as Address);
 
-  // Format current price
-  const currentPrice = currentPriceData
-    ? (Number(currentPriceData) / 1e18).toFixed(8)
-    : "0";
+  // The hook now provides the raw bigint for calculations and a formatted string for display
+  const { data: rawCollateral, formatted: formattedCollateral } = useCollateral(
+    address as Address
+  ); //
+  const { formatted: currentPrice } = useCurrentPrice(address as Address); //
 
-  // Update progress animation when collateral changes
+  // Update progress bar animation when collateral changes
   useEffect(() => {
-    if (token?.fundingGoal && collateral) {
+    // Use the raw bigint collateral for accurate percentage calculation
+    if (token?.fundingGoal && rawCollateral) {
       const goalAmount = parseFloat(token.fundingGoal);
-      const collateralAmount = parseFloat(collateral);
-      const percentage = (collateralAmount / goalAmount) * 100;
+      const collateralAmount = parseFloat(formatEther(rawCollateral)); // Convert bigint to number
+      const percentage =
+        goalAmount > 0 ? (collateralAmount / goalAmount) * 100 : 0;
 
+      // Animation logic
       const animateProgress = (
         start: number,
         end: number,
         duration: number
       ) => {
         const startTime = performance.now();
-
         const update = (currentTime: number) => {
           const elapsedTime = currentTime - startTime;
           const progress = Math.min(elapsedTime / duration, 1);
           setProgress(start + progress * (end - start));
-
           if (progress < 1) {
             requestAnimationFrame(update);
           }
         };
-
         requestAnimationFrame(update);
       };
 
-      animateProgress(0, Math.min(percentage, 100), 1500);
+      animateProgress(progress, Math.min(percentage, 100), 1000);
     }
-  }, [token?.fundingGoal, collateral]);
+  }, [token?.fundingGoal, rawCollateral]); // Dependency on the raw value
 
+  // Loading state while fetching initial token metadata
   if (loading || !token) {
     return (
-      <Card className="min-h-[300px]">
-        <div className="p-8">Loading token data...</div>
+      <Card className="min-h-[300px] flex items-center justify-center">
+        <div className="p-8 text-gray-400">Loading token data...</div>
       </Card>
     );
   }
@@ -83,11 +83,10 @@ export const TokenHeaderStyled: React.FC<TokenHeaderProps> = ({ address }) => {
       3: { text: "Halted", color: "bg-red-500/80" },
       4: { text: "Resumed", color: "bg-green-600/70" },
     };
-
     return stateMap[stateValue] || { text: "Unknown", color: "bg-gray-500/80" };
   };
-  // @ts-ignore
-  const stateDisplay = getStateDisplay(state);
+
+  const stateDisplay = getStateDisplay(state as number | undefined);
 
   return (
     <Card className="relative overflow-hidden min-h-[300px]">
@@ -132,22 +131,25 @@ export const TokenHeaderStyled: React.FC<TokenHeaderProps> = ({ address }) => {
             <div className="space-y-4">
               <div className="backdrop-blur-sm bg-white/10 p-4 rounded-lg">
                 <Label className="text-gray-200">Current Price</Label>
+                {/* Use the pre-formatted value directly from the hook */}
                 <p className="text-white text-lg font-semibold">
-                  {currentPrice} <span className="text-gray-300">AVAX</span>
+                  {currentPrice || "0.000000"}{" "}
+                  <span className="text-gray-300">AVAX</span>
                 </p>
               </div>
             </div>
           </div>
 
           {/* Funding Progress */}
-          {token.fundingGoal && collateral && (
+          {token.fundingGoal && token.fundingGoal !== "0" && (
             <div className="mt-6 backdrop-blur-sm bg-white/10 p-4 rounded-lg">
               <Label className="text-gray-200 mb-2 block">
                 Funding Progress
               </Label>
               <Progress value={progress} className="h-2 mb-2" />
               <p className="text-white text-sm font-semibold">
-                {progress.toFixed(2)}% - {collateral} / {token.fundingGoal} AVAX
+                {progress.toFixed(2)}% - {formattedCollateral || "0.00"} /{" "}
+                {token.fundingGoal} AVAX
               </p>
             </div>
           )}

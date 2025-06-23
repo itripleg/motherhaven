@@ -1,16 +1,11 @@
-// @/new-hooks/useFactoryContract.ts
+// /new-hooks/useFactoryContract.ts
 
-import {
-  useReadContract,
-  useWriteContract,
-  useWaitForTransactionReceipt,
-  useSimulateContract,
-} from "wagmi";
-import { FACTORY_ADDRESS, FACTORY_ABI, Token, TokenState } from "@/types";
-import { type Address, formatEther, parseEther } from "viem";
 import { useEffect } from "react";
+import { useReadContract, useWriteContract } from "wagmi";
+import { FACTORY_ADDRESS, FACTORY_ABI } from "@/types";
+import { type Address, formatEther, parseEther } from "viem";
 
-// A custom hook that wraps useReadContract to add polling
+// A custom hook that wraps useReadContract to add polling for live updates
 function useLiveReadContract(hookParameters: any) {
   const { data, refetch, ...rest } = useReadContract(hookParameters);
 
@@ -33,167 +28,122 @@ function useLiveReadContract(hookParameters: any) {
 }
 
 export function useFactoryContract() {
-  const { writeContract, isPending: isWritePending } = useWriteContract();
+  const {
+    writeContract,
+    isPending: isWritePending,
+    data: hash,
+    ...writeRest
+  } = useWriteContract();
 
-  // Read Operations - now use live-updating hook for real-time data
+  // Centralized formatter for consistent display of values
+  const formatValue = (
+    value: bigint | undefined,
+    precision: number = 6
+  ): string => {
+    if (value === undefined || value === null)
+      return parseFloat("0").toFixed(precision);
+    const formatted = formatEther(value);
+    return parseFloat(formatted).toLocaleString(undefined, {
+      minimumFractionDigits: precision,
+      maximumFractionDigits: precision,
+    });
+  };
+
+  // --- Read Operations now use the useLiveReadContract hook ---
+
   const useTokenState = (tokenAddress?: Address) => {
-    return useReadContract({
+    return useLiveReadContract({
       address: FACTORY_ADDRESS,
       abi: FACTORY_ABI,
       functionName: "getTokenState",
       args: tokenAddress ? [tokenAddress] : undefined,
       query: {
-        enabled: Boolean(tokenAddress),
+        enabled: !!tokenAddress,
       },
     });
   };
 
   const useCollateral = (tokenAddress?: Address) => {
-    const { data, ...rest } = useReadContract({
+    const { data, ...rest } = useLiveReadContract({
       address: FACTORY_ADDRESS,
       abi: FACTORY_ABI,
       functionName: "collateral",
       args: tokenAddress ? [tokenAddress] : undefined,
       query: {
-        enabled: Boolean(tokenAddress),
+        enabled: !!tokenAddress,
       },
     });
-
     return {
-      data: data ? formatEther(data as bigint) : undefined,
+      data: data as bigint | undefined,
+      formatted: formatValue(data as bigint | undefined, 2),
       ...rest,
     };
   };
 
-  // Write Operations with Simulation
-  const useCreateToken = (name?: string, symbol?: string) => {
-    const simulation = useSimulateContract({
+  const useCurrentPrice = (tokenAddress?: Address) => {
+    const { data, ...rest } = useLiveReadContract({
+      address: FACTORY_ADDRESS,
+      abi: FACTORY_ABI,
+      functionName: "lastPrice",
+      args: tokenAddress ? [tokenAddress] : undefined,
+      query: {
+        enabled: !!tokenAddress,
+      },
+    });
+    return {
+      data: data as bigint | undefined,
+      formatted: formatValue(data as bigint | undefined, 6),
+      ...rest,
+    };
+  };
+
+  // --- Write Operations remain the same ---
+
+  const createToken = (
+    name: string,
+    symbol: string,
+    imageUrl: string,
+    burnManager: Address
+  ) => {
+    writeContract({
       address: FACTORY_ADDRESS,
       abi: FACTORY_ABI,
       functionName: "createToken",
-      args: name && symbol ? [name, symbol] : undefined,
-      query: {
-        enabled: Boolean(name && symbol),
-      },
+      args: [name, symbol, imageUrl, burnManager],
     });
-
-    const write = async () => {
-      if (!name || !symbol) throw new Error("Name and symbol are required");
-
-      const hash = await writeContract({
-        address: FACTORY_ADDRESS,
-        abi: FACTORY_ABI,
-        functionName: "createToken",
-        args: [name, symbol],
-      });
-
-      return hash;
-    };
-
-    return {
-      simulation,
-      write,
-      isPending: isWritePending,
-    };
   };
 
-  const useBuyTokens = (tokenAddress?: Address, amount?: string) => {
-    const simulation = useSimulateContract({
+  const buyTokens = (tokenAddress: Address, amount: string) => {
+    writeContract({
       address: FACTORY_ADDRESS,
       abi: FACTORY_ABI,
       functionName: "buy",
-      args: tokenAddress ? [tokenAddress] : undefined,
-      value: amount ? parseEther(amount) : undefined,
-      query: {
-        enabled: Boolean(tokenAddress && amount),
-      },
+      args: [tokenAddress],
+      value: parseEther(amount),
     });
-
-    const write = async () => {
-      if (!tokenAddress || !amount)
-        throw new Error("Token address and amount are required");
-
-      const hash = await writeContract({
-        address: FACTORY_ADDRESS,
-        abi: FACTORY_ABI,
-        functionName: "buy",
-        args: [tokenAddress],
-        value: parseEther(amount),
-      });
-
-      return hash;
-    };
-
-    return {
-      simulation,
-      write,
-      isPending: isWritePending,
-    };
   };
 
-  const useSellTokens = (tokenAddress?: Address, amount?: string) => {
-    const simulation = useSimulateContract({
+  const sellTokens = (tokenAddress: Address, amount: string) => {
+    writeContract({
       address: FACTORY_ADDRESS,
       abi: FACTORY_ABI,
       functionName: "sell",
-      args:
-        tokenAddress && amount ? [tokenAddress, parseEther(amount)] : undefined,
-      query: {
-        enabled: Boolean(tokenAddress && amount),
-      },
-    });
-
-    const write = async () => {
-      if (!tokenAddress || !amount)
-        throw new Error("Token address and amount are required");
-
-      const hash = await writeContract({
-        address: FACTORY_ADDRESS,
-        abi: FACTORY_ABI,
-        functionName: "sell",
-        args: [tokenAddress, parseEther(amount)],
-      });
-
-      return hash;
-    };
-
-    return {
-      simulation,
-      write,
-      isPending: isWritePending,
-    };
-  };
-
-  const useCurrentPrice = (tokenAddress?: Address) => {
-    return useReadContract({
-      address: FACTORY_ADDRESS,
-      abi: FACTORY_ABI,
-      functionName: "getCurrentPrice",
-      args: tokenAddress ? [tokenAddress] : undefined,
-      query: {
-        enabled: Boolean(tokenAddress), // Only run query if tokenAddress is provided
-        // You can add caching or polling here if needed
-        // gcTime: 1000 * 60 * 5, // Cache for 5 minutes
-        // refetchInterval: 1000 * 30 // Refetch every 30 seconds
-      },
+      args: [tokenAddress, parseEther(amount)],
     });
   };
-  // Function to format price with a specified number of decimals
-  const formatPriceDecimals = (
-    price: bigint | undefined,
-    decimals: number = 18
-  ): string => {
-    if (!price) return "0";
-    const formatted = formatEther(price);
-    return Number(formatted).toFixed(decimals);
-  };
+
+  // --- Final returned object ---
+
   return {
     useTokenState,
     useCollateral,
-    useCreateToken,
-    useBuyTokens,
-    useSellTokens,
     useCurrentPrice,
-    formatPriceDecimals,
+    createToken,
+    buyTokens,
+    sellTokens,
+    formatValue,
+    isWritePending,
+    writeHash: hash,
+    ...writeRest,
   };
 }
