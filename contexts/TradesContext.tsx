@@ -5,6 +5,7 @@ import React, {
   useEffect,
   useState,
   useCallback,
+  useRef,
 } from "react";
 import {
   collection,
@@ -13,6 +14,7 @@ import {
   onSnapshot,
   orderBy,
   limit,
+  Unsubscribe,
 } from "firebase/firestore";
 import { db } from "@/firebase";
 import { Address } from "viem";
@@ -35,7 +37,6 @@ interface TradesContextState {
   errors: { [tokenAddress: string]: string | null };
   watchTrades: (tokenAddress: string) => void;
   unwatchTrades: (tokenAddress: string) => void;
-  getTrades: (tokenAddress: string) => Trade[];
 }
 
 const TradesContext = createContext<TradesContextState | null>(null);
@@ -48,103 +49,63 @@ export function TradesProvider({ children }: { children: React.ReactNode }) {
   const [errors, setErrors] = useState<{
     [tokenAddress: string]: string | null;
   }>({});
-  const [activeSubscriptions] = useState(new Set<string>());
+  const subscriptions = useRef<{ [key: string]: Unsubscribe }>({}).current;
 
   const watchTrades = useCallback(
     (tokenAddress: string) => {
-      if (!tokenAddress || activeSubscriptions.has(tokenAddress)) return;
+      const lowercasedAddress = tokenAddress.toLowerCase();
+      if (!tokenAddress || subscriptions[lowercasedAddress]) return;
 
-      console.log(`📊 Starting to watch trades for token: ${tokenAddress}`);
+      setLoading((prev) => ({ ...prev, [lowercasedAddress]: true }));
 
-      setLoading((prev) => ({ ...prev, [tokenAddress]: true }));
-
-      // Create query for trades collection
       const tradesRef = collection(db, "trades");
       const tradesQuery = query(
         tradesRef,
-        where("token", "==", tokenAddress.toLowerCase()),
+        where("token", "==", lowercasedAddress),
         orderBy("timestamp", "desc"),
-        limit(100) // Limit to last 100 trades
+        limit(100)
       );
 
       const unsubscribe = onSnapshot(
         tradesQuery,
         (snapshot) => {
-          const newTrades: Trade[] = [];
-          snapshot.forEach((doc) => {
-            const data = doc.data() as Trade;
-            newTrades.push({
-              ...data,
-              token: data.token as Address,
-              trader: data.trader as Address,
-            });
-          });
-
+          const newTrades: Trade[] = snapshot.docs.map(
+            (doc) => doc.data() as Trade
+          );
           setTrades((prev) => ({
             ...prev,
-            [tokenAddress]: newTrades,
+            [lowercasedAddress]: newTrades,
           }));
-          setErrors((prev) => ({ ...prev, [tokenAddress]: null }));
-          setLoading((prev) => ({ ...prev, [tokenAddress]: false }));
+          setErrors((prev) => ({ ...prev, [lowercasedAddress]: null }));
+          setLoading((prev) => ({ ...prev, [lowercasedAddress]: false }));
         },
         (error) => {
           console.error(
-            `❌ Error fetching trades for token ${tokenAddress}:`,
+            `Error fetching trades for token ${lowercasedAddress}:`,
             error
           );
           setErrors((prev) => ({
             ...prev,
-            [tokenAddress]: "Failed to load trades",
+            [lowercasedAddress]: "Failed to load trades",
           }));
-          setLoading((prev) => ({ ...prev, [tokenAddress]: false }));
+          setLoading((prev) => ({ ...prev, [lowercasedAddress]: false }));
         }
       );
 
-      activeSubscriptions.add(tokenAddress);
-
-      return () => {
-        console.log(`👋 Stopping trades watch for token: ${tokenAddress}`);
-        unsubscribe();
-        activeSubscriptions.delete(tokenAddress);
-      };
+      subscriptions[lowercasedAddress] = unsubscribe;
     },
-    [activeSubscriptions]
+    [subscriptions]
   );
 
   const unwatchTrades = useCallback(
     (tokenAddress: string) => {
-      if (!tokenAddress || !activeSubscriptions.has(tokenAddress)) return;
-
-      console.log(`👋 Unwatching trades for token: ${tokenAddress}`);
-      activeSubscriptions.delete(tokenAddress);
-
-      // Clean up state
-      setTrades((prev) => {
-        const newTrades = { ...prev };
-        delete newTrades[tokenAddress];
-        return newTrades;
-      });
-
-      setLoading((prev) => {
-        const newLoading = { ...prev };
-        delete newLoading[tokenAddress];
-        return newLoading;
-      });
-
-      setErrors((prev) => {
-        const newErrors = { ...prev };
-        delete newErrors[tokenAddress];
-        return newErrors;
-      });
+      const lowercasedAddress = tokenAddress.toLowerCase();
+      if (subscriptions[lowercasedAddress]) {
+        subscriptions[lowercasedAddress]();
+        delete subscriptions[lowercasedAddress];
+      }
     },
-    [activeSubscriptions]
-  );
-
-  const getTrades = useCallback(
-    (tokenAddress: string): Trade[] => {
-      return trades[tokenAddress] || [];
-    },
-    [trades]
+    [subscriptions]
   );
 
   const value = {
@@ -153,7 +114,6 @@ export function TradesProvider({ children }: { children: React.ReactNode }) {
     errors,
     watchTrades,
     unwatchTrades,
-    getTrades,
   };
 
   return (
@@ -161,7 +121,6 @@ export function TradesProvider({ children }: { children: React.ReactNode }) {
   );
 }
 
-// Base hook for accessing trades context
 export function useTradesContext() {
   const context = useContext(TradesContext);
   if (!context) {
@@ -170,19 +129,24 @@ export function useTradesContext() {
   return context;
 }
 
-// Hook for accessing a specific token's trades
 export function useTrades(tokenAddress: string | undefined) {
-  const { trades, loading, errors, watchTrades } = useTradesContext();
+  const { trades, loading, errors, watchTrades, unwatchTrades } =
+    useTradesContext();
 
   useEffect(() => {
     if (tokenAddress) {
       watchTrades(tokenAddress);
+      return () => {
+        unwatchTrades(tokenAddress);
+      };
     }
-  }, [tokenAddress, watchTrades]);
+  }, [tokenAddress, watchTrades, unwatchTrades]);
+
+  const lowercasedAddress = tokenAddress?.toLowerCase();
 
   return {
-    trades: tokenAddress ? trades[tokenAddress] || [] : [],
-    loading: tokenAddress ? loading[tokenAddress] || false : false,
-    error: tokenAddress ? errors[tokenAddress] || null : null,
+    trades: lowercasedAddress ? trades[lowercasedAddress] || [] : [],
+    loading: lowercasedAddress ? loading[lowercasedAddress] ?? true : false,
+    error: lowercasedAddress ? errors[lowercasedAddress] || null : null,
   };
 }

@@ -26,8 +26,7 @@ import {
 } from "./FactoryConfigProvider";
 
 interface TokenContextState {
-  tokens: { [address: string]: Token };
-  loading: { [address: string]: boolean };
+  tokens: { [address: string]: Token | null }; // Use null to indicate "not found"
   errors: { [address: string]: string | null };
   watchToken: (address: string) => void;
   unwatchToken: (address: string) => void;
@@ -36,13 +35,12 @@ interface TokenContextState {
 
 const TokenContext = createContext<TokenContextState | null>(null);
 
+// (mapTokenData function remains the same)
 const mapTokenData = (
   address: string,
   data: any,
   factoryConfig: FactoryConfig
 ): Token => {
-  console.log("Mapping token data:", { address, data, factoryConfig });
-
   return {
     address: address.toLowerCase() as Address,
     name: data.name || "Unnamed Token",
@@ -65,190 +63,65 @@ const mapTokenData = (
 };
 
 export function TokenProvider({ children }: { children: React.ReactNode }) {
-  const { config: factoryConfig, isLoading: isConfigLoading } =
-    useFactoryConfigContext();
-  const [tokens, setTokens] = useState<{ [address: string]: Token }>({});
-  const [loading, setLoading] = useState<{ [address: string]: boolean }>({});
+  const { config: factoryConfig } = useFactoryConfigContext();
+  const [tokens, setTokens] = useState<{ [address: string]: Token | null }>({});
   const [errors, setErrors] = useState<{ [address: string]: string | null }>(
     {}
   );
   const subscriptions = useRef<{ [key: string]: Unsubscribe }>({}).current;
-  const refCounts = useRef<{ [key: string]: number }>({}).current; // Add reference counting
-
-  console.log("TokenProvider render:", {
-    isConfigLoading,
-    hasFactoryConfig: !!factoryConfig,
-    tokensCount: Object.keys(tokens).length,
-    loadingCount: Object.keys(loading).length,
-  });
 
   const watchToken = useCallback(
     (tokenAddress: string) => {
-      console.log("watchToken called:", {
-        tokenAddress,
-        hasFactoryConfig: !!factoryConfig,
-        isConfigLoading,
-        alreadyWatching: !!subscriptions[tokenAddress.toLowerCase()],
-        currentRefCount: refCounts[tokenAddress.toLowerCase()] || 0,
-      });
-
-      if (!factoryConfig || !tokenAddress) {
-        console.log("Early return from watchToken - no config or address");
+      const lowercasedAddress = tokenAddress.toLowerCase();
+      if (!factoryConfig || !tokenAddress || subscriptions[lowercasedAddress]) {
         return;
       }
 
-      const lowercasedAddress = tokenAddress.toLowerCase();
+      const tokenRef = doc(db, "tokens", lowercasedAddress);
 
-      // Increment reference count
-      refCounts[lowercasedAddress] = (refCounts[lowercasedAddress] || 0) + 1;
-      console.log(
-        "📈 Incremented ref count for",
-        lowercasedAddress,
-        "to",
-        refCounts[lowercasedAddress]
-      );
-
-      // Only set up subscription if this is the first reference
-      if (refCounts[lowercasedAddress] === 1) {
-        console.log(
-          "🚀 Setting loading to TRUE for:",
-          lowercasedAddress,
-          "(first reference)"
-        );
-        setLoading((prev) => {
-          const newLoading = { ...prev, [lowercasedAddress]: true };
-          console.log("📊 New loading state (start):", newLoading);
-          return newLoading;
-        });
-        const tokenRef = doc(db, "tokens", lowercasedAddress);
-
-        console.log(
-          "Setting up Firestore subscription for:",
-          lowercasedAddress
-        );
-
-        const unsubscribe = onSnapshot(
-          tokenRef,
-          (doc) => {
-            console.log("Firestore snapshot received:", {
-              address: lowercasedAddress,
-              exists: doc.exists(),
-              data: doc.data(),
-            });
-
-            if (doc.exists()) {
-              const tokenData = mapTokenData(
-                lowercasedAddress,
-                doc.data(),
-                factoryConfig
-              );
-              setTokens((prev) => ({
-                ...prev,
-                [lowercasedAddress]: tokenData,
-              }));
-              setErrors((prev) => ({ ...prev, [lowercasedAddress]: null }));
-              console.log(
-                "✅ Setting loading to FALSE for:",
-                lowercasedAddress
-              );
-            } else {
-              console.log("Token document does not exist:", lowercasedAddress);
-              setErrors((prev) => ({
-                ...prev,
-                [lowercasedAddress]: "Token not found in database",
-              }));
-              console.log(
-                "❌ Setting loading to FALSE for:",
-                lowercasedAddress
-              );
-            }
-            setLoading((prev) => {
-              const newLoading = { ...prev, [lowercasedAddress]: false };
-              console.log("📊 New loading state:", newLoading);
-              return newLoading;
-            });
-          },
-          (error) => {
-            console.error("Firestore subscription error:", error);
+      const unsubscribe = onSnapshot(
+        tokenRef,
+        (doc) => {
+          if (doc.exists()) {
+            const tokenData = mapTokenData(
+              lowercasedAddress,
+              doc.data(),
+              factoryConfig
+            );
+            setTokens((prev) => ({ ...prev, [lowercasedAddress]: tokenData }));
+            setErrors((prev) => ({ ...prev, [lowercasedAddress]: null }));
+          } else {
+            setTokens((prev) => ({ ...prev, [lowercasedAddress]: null })); // Explicitly mark as not found
             setErrors((prev) => ({
               ...prev,
-              [lowercasedAddress]: error.message,
+              [lowercasedAddress]: "Token not found in database.",
             }));
-            console.log(
-              "🔥 Setting loading to FALSE due to error for:",
-              lowercasedAddress
-            );
-            setLoading((prev) => {
-              const newLoading = { ...prev, [lowercasedAddress]: false };
-              console.log("📊 New loading state (error):", newLoading);
-              return newLoading;
-            });
           }
-        );
+        },
+        (error) => {
+          console.error("Firestore subscription error:", error);
+          setTokens((prev) => ({ ...prev, [lowercasedAddress]: null })); // Mark as error
+          setErrors((prev) => ({
+            ...prev,
+            [lowercasedAddress]: error.message,
+          }));
+        }
+      );
 
-        subscriptions[lowercasedAddress] = unsubscribe;
-      } else {
-        console.log(
-          "🔄 Subscription already exists for",
-          lowercasedAddress,
-          "- just incremented ref count"
-        );
-      }
+      subscriptions[lowercasedAddress] = unsubscribe;
     },
-    [subscriptions, factoryConfig, isConfigLoading, refCounts]
+    [subscriptions, factoryConfig]
   );
 
   const unwatchToken = useCallback(
     (tokenAddress: string) => {
       const lowercasedAddress = tokenAddress.toLowerCase();
-      const currentRefCount = refCounts[lowercasedAddress] || 0;
-
-      console.log(
-        "unwatchToken called:",
-        lowercasedAddress,
-        "current ref count:",
-        currentRefCount
-      );
-
-      if (currentRefCount <= 0) {
-        console.log(
-          "⚠️ Ref count already 0 or negative for",
-          lowercasedAddress
-        );
-        return;
-      }
-
-      // Decrement reference count
-      refCounts[lowercasedAddress] = currentRefCount - 1;
-      console.log(
-        "📉 Decremented ref count for",
-        lowercasedAddress,
-        "to",
-        refCounts[lowercasedAddress]
-      );
-
-      // Only clean up subscription if no more references
-      if (refCounts[lowercasedAddress] === 0) {
-        console.log(
-          "🧹 Cleaning up subscription for",
-          lowercasedAddress,
-          "(no more references)"
-        );
-        if (subscriptions[lowercasedAddress]) {
-          subscriptions[lowercasedAddress]();
-          delete subscriptions[lowercasedAddress];
-        }
-      } else {
-        console.log(
-          "🔄 Still have",
-          refCounts[lowercasedAddress],
-          "references for",
-          lowercasedAddress,
-          "- keeping subscription"
-        );
+      if (subscriptions[lowercasedAddress]) {
+        subscriptions[lowercasedAddress]();
+        delete subscriptions[lowercasedAddress];
       }
     },
-    [subscriptions, refCounts]
+    [subscriptions]
   );
 
   const getRecentTokens = useCallback(
@@ -261,9 +134,10 @@ export function TokenProvider({ children }: { children: React.ReactNode }) {
         limitQuery(limit)
       );
       const querySnapshot = await getDocs(q);
-      return querySnapshot.docs.map((doc) =>
-        mapTokenData(doc.id, doc.data(), factoryConfig)
-      );
+      // Filter out any potential nulls if mapTokenData could fail, though it's typed not to.
+      return querySnapshot.docs
+        .map((doc) => mapTokenData(doc.id, doc.data(), factoryConfig))
+        .filter(Boolean) as Token[];
     },
     [factoryConfig]
   );
@@ -272,7 +146,6 @@ export function TokenProvider({ children }: { children: React.ReactNode }) {
     <TokenContext.Provider
       value={{
         tokens,
-        loading,
         errors,
         watchToken,
         unwatchToken,
@@ -292,46 +165,29 @@ export function useTokenContext() {
 }
 
 export function useToken(address: string) {
-  const { tokens, loading, errors, watchToken, unwatchToken } =
-    useTokenContext();
+  const { tokens, errors, watchToken, unwatchToken } = useTokenContext();
   const lowercasedAddress = address?.toLowerCase();
 
-  console.log("useToken called:", {
-    address,
-    lowercasedAddress,
-    hasToken: !!tokens[lowercasedAddress],
-    isLoading: loading[lowercasedAddress],
-    error: errors[lowercasedAddress],
-  });
-
   useEffect(() => {
-    console.log("useToken useEffect:", {
-      lowercasedAddress,
-      shouldWatch: !!lowercasedAddress,
-    });
-
     if (lowercasedAddress) {
       watchToken(lowercasedAddress);
       return () => {
         unwatchToken(lowercasedAddress);
       };
     }
-  }, [lowercasedAddress]); // REMOVED watchToken, unwatchToken from dependencies
+  }, [lowercasedAddress, watchToken, unwatchToken]);
 
-  const result = {
-    token: tokens[lowercasedAddress] || null,
-    loading: loading[lowercasedAddress] || false,
-    error: errors[lowercasedAddress] || null,
+  const tokenData = lowercasedAddress ? tokens[lowercasedAddress] : null;
+  const error = lowercasedAddress ? errors[lowercasedAddress] : null;
+
+  // The loading state is now derived: it's loading if we have no data yet.
+  // `undefined` means the fetch hasn't completed. `null` means it failed.
+  const isLoading =
+    lowercasedAddress && tokens[lowercasedAddress] === undefined;
+
+  return {
+    token: tokenData, // This will be Token object, null, or undefined
+    loading: isLoading,
+    error: error,
   };
-
-  console.log("🎯 useToken returning:", {
-    address: lowercasedAddress,
-    hasToken: !!result.token,
-    loading: result.loading,
-    error: result.error,
-    rawLoadingState: loading[lowercasedAddress],
-    allLoadingStates: loading,
-  });
-
-  return result;
 }

@@ -1,7 +1,6 @@
 "use client";
 import React from "react";
 import TokenPage from "../components/TokenPage";
-import { TokenState } from "@/types/token";
 import { TokenProvider } from "@/contexts/TokenContext";
 import { useParams } from "next/navigation";
 import { useFactoryConfigContext } from "@/contexts/FactoryConfigProvider";
@@ -12,14 +11,6 @@ function PageWrapper({}: Props) {
   const { tokenAddress } = useParams();
   const { config, isLoading } = useFactoryConfigContext();
 
-  console.log("TokenPage Debug:", {
-    tokenAddress,
-    configLoading: isLoading,
-    hasConfig: !!config,
-    config,
-  });
-
-  // Show loading state while factory config loads
   if (isLoading) {
     return (
       <div className="container mx-auto pt-20 p-4">
@@ -28,7 +19,6 @@ function PageWrapper({}: Props) {
     );
   }
 
-  // Show error if no config
   if (!config) {
     return (
       <div className="container mx-auto pt-20 p-4">
