@@ -1,3 +1,5 @@
+import { Address } from "viem";
+
 // /types/token.ts
 export enum TokenState {
   NOT_CREATED = 0,
@@ -8,11 +10,16 @@ export enum TokenState {
 }
 
 export interface Trade {
-  timestamp: number;
-  type: "buy" | "sell";
-  amount: string;
+  blockNumber: number;
   ethAmount: string;
-  trader: `0x${string}`;
+  pricePerToken: string;
+  timestamp: string; // We will handle this string format in the chart
+  token: Address;
+  tokenAmount: string; // This is the missing property
+  trader: Address;
+  transactionHash: string;
+  type: "buy" | "sell";
+  fee?: string; // Optional fee property
 }
 
 export interface Token {

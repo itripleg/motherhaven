@@ -9,17 +9,26 @@ import {
   Tooltip,
   CartesianGrid,
 } from "recharts";
-import { format, fromUnixTime } from "date-fns";
+import { format, parseISO } from "date-fns";
 import { formatUnits, parseUnits } from "viem";
 import { Token, Trade } from "@/types";
 import { useFactoryContract } from "@/new-hooks/useFactoryContract";
 
+// This interface defines the shape of the data that our chart will use
+interface ChartPoint {
+  price: number;
+  formattedPrice: string;
+  timeLabel: string;
+}
+
+// Props for the main component
 interface RechartsLineChartProps {
   trades: Trade[];
   loading: boolean;
   token: Token;
 }
 
+// A custom tooltip component for the chart
 const CustomTooltip = ({ active, payload, label }: any) => {
   if (active && payload && payload.length) {
     return (
@@ -32,61 +41,73 @@ const CustomTooltip = ({ active, payload, label }: any) => {
   return null;
 };
 
+// The main chart component
 export default function RechartsLineChart({
   trades,
   loading,
   token,
 }: RechartsLineChartProps) {
-  // Use the central formatter from the hook
   const { formatValue } = useFactoryContract();
 
-  const { chartData, displayPrice } = useMemo(() => {
-    // Genesis point ensures the chart starts from the token's creation
+  // useMemo will re-calculate the chart data only when its dependencies change
+  const chartData: ChartPoint[] = useMemo(() => {
+    // 1. Create the "Genesis Point" from the token's creation data
+    const genesisTimestamp = token.createdAt
+      ? parseISO(token.createdAt).getTime()
+      : Date.now();
     const genesisPoint = {
-      timestamp: token.createdAt
-        ? Math.floor(new Date(token.createdAt).getTime() / 1000)
-        : Date.now() / 1000,
-      // Use parseUnits to convert the friendly initialPrice string into a bigint
+      timestamp: genesisTimestamp,
       priceInWei: parseUnits(token.initialPrice, 18),
     };
 
-    const processedTrades = trades.map((trade) => {
-      // FIX: Correctly calculate price per token from trade data.
-      // This assumes trade.ethAmount and trade.tokenAmount are in their smallest units (Wei).
-      const priceInWei =
-        (BigInt(trade.ethAmount) * BigInt(10 ** 18)) /
-        BigInt(trade.tokenAmount);
-      return {
-        timestamp: Number(trade.timestamp), // Ensure timestamp is a number
-        priceInWei,
-      };
-    });
+    // 2. Process the raw trade data from Firestore
+    const processedTrades = trades
+      .map((trade) => {
+        // Safeguard against bad data
+        if (
+          !trade.tokenAmount ||
+          BigInt(trade.tokenAmount) === 0n ||
+          !trade.timestamp
+        ) {
+          return null;
+        }
 
-    // Combine and sort all points to ensure chronological order
-    const allPoints = [genesisPoint, ...processedTrades].sort(
+        const tradeTimestamp = parseISO(trade.timestamp).getTime();
+        const priceInWei =
+          (BigInt(trade.ethAmount) * BigInt(10 ** 18)) /
+          BigInt(trade.tokenAmount);
+
+        return {
+          timestamp: tradeTimestamp,
+          priceInWei,
+        };
+      })
+      // FIX: This is the corrected filter syntax
+      .filter((point) => point !== null);
+
+    // 3. Combine the genesis point with actual trades and sort chronologically
+    const allPoints = [...processedTrades, genesisPoint].sort(
       (a, b) => a.timestamp - b.timestamp
     );
 
-    const dataForChart = allPoints.map((point) => ({
-      timestamp: format(fromUnixTime(point.timestamp), "MMM d, h:mm a"),
+    // 4. Format the sorted points into the final shape for the chart
+    return allPoints.map((point) => ({
       price: parseFloat(formatUnits(point.priceInWei, 18)),
-      // Use the centralized formatter for consistent display
       formattedPrice: formatValue(point.priceInWei, 6),
+      timeLabel: format(point.timestamp, "MMM d, h:mm a"),
     }));
-
-    // Display price is the price of the last available point
-    const lastDisplayPrice =
-      dataForChart.length > 0
-        ? dataForChart[dataForChart.length - 1].formattedPrice
-        : formatValue(genesisPoint.priceInWei, 6);
-
-    return { chartData: dataForChart, displayPrice: lastDisplayPrice };
   }, [trades, token, formatValue]);
+
+  // The price displayed in the header is always the most recent one
+  const displayPrice =
+    chartData.length > 0
+      ? chartData[chartData.length - 1].formattedPrice
+      : formatValue(parseUnits(token.initialPrice, 18), 6);
 
   if (loading) {
     return (
       <div className="text-center text-gray-400 animate-pulse">
-        Loading Chart...
+        Loading Chart Data...
       </div>
     );
   }
@@ -99,37 +120,47 @@ export default function RechartsLineChart({
         </h3>
         <p className="text-2xl text-green-400">{displayPrice} AVAX</p>
       </div>
-      <ResponsiveContainer width="100%" height="80%">
-        <LineChart
-          data={chartData}
-          margin={{ top: 5, right: 20, left: -10, bottom: 5 }}
-        >
-          <CartesianGrid strokeDasharray="3 3" strokeOpacity={0.2} />
-          <XAxis
-            dataKey="timestamp"
-            stroke="#9ca3af"
-            fontSize={12}
-            tickLine={false}
-            axisLine={false}
-          />
-          <YAxis
-            stroke="#9ca3af"
-            fontSize={12}
-            tickLine={false}
-            axisLine={false}
-            tickFormatter={(value) => `${Number(value).toFixed(5)}`}
-            domain={["dataMin", "dataMax"]}
-          />
-          <Tooltip content={<CustomTooltip />} />
-          <Line
-            type="monotone"
-            dataKey="price"
-            stroke="#4ade80"
-            strokeWidth={2}
-            dot={true}
-          />
-        </LineChart>
-      </ResponsiveContainer>
+      {chartData.length > 1 ? (
+        <ResponsiveContainer width="100%" height="80%">
+          <LineChart
+            data={chartData}
+            margin={{ top: 5, right: 20, left: -10, bottom: 5 }}
+          >
+            <CartesianGrid strokeDasharray="3 3" strokeOpacity={0.2} />
+            <XAxis
+              dataKey="timeLabel"
+              stroke="#9ca3af"
+              fontSize={12}
+              tickLine={false}
+              axisLine={false}
+            />
+            <YAxis
+              stroke="#9ca3af"
+              fontSize={12}
+              tickLine={false}
+              axisLine={false}
+              tickFormatter={(value) => `${Number(value).toFixed(5)}`}
+              domain={["dataMin", "dataMax"]}
+            />
+            <Tooltip content={<CustomTooltip />} />
+            <Line
+              type="monotone"
+              dataKey="price"
+              stroke="#4ade80"
+              strokeWidth={2}
+              dot={chartData.length < 50}
+            />
+          </LineChart>
+        </ResponsiveContainer>
+      ) : (
+        <div className="flex items-center justify-center h-4/5">
+          <p className="text-gray-500">
+            {chartData.length === 1
+              ? "Waiting for the first trade..."
+              : "No trade data available."}
+          </p>
+        </div>
+      )}
     </div>
   );
 }

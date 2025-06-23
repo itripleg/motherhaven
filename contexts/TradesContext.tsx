@@ -17,23 +17,12 @@ import {
   Unsubscribe,
 } from "firebase/firestore";
 import { db } from "@/firebase";
-import { Address } from "viem";
-
-export interface Trade {
-  blockNumber: number;
-  ethAmount: string;
-  pricePerToken: string;
-  timestamp: string;
-  token: Address;
-  tokenAmount: string;
-  trader: Address;
-  transactionHash: string;
-  type: "buy" | "sell";
-}
+import { Address, formatUnits, parseUnits } from "viem";
+import { Trade } from "@/types";
+import { tokenEventEmitter } from "@/components/EventWatcher"; // Import the event emitter
 
 interface TradesContextState {
-  trades: { [tokenAddress: string]: Trade[] };
-  loading: { [tokenAddress: string]: boolean };
+  trades: { [tokenAddress: string]: Trade[] | null };
   errors: { [tokenAddress: string]: string | null };
   watchTrades: (tokenAddress: string) => void;
   unwatchTrades: (tokenAddress: string) => void;
@@ -42,21 +31,71 @@ interface TradesContextState {
 const TradesContext = createContext<TradesContextState | null>(null);
 
 export function TradesProvider({ children }: { children: React.ReactNode }) {
-  const [trades, setTrades] = useState<{ [tokenAddress: string]: Trade[] }>({});
-  const [loading, setLoading] = useState<{ [tokenAddress: string]: boolean }>(
-    {}
-  );
+  const [trades, setTrades] = useState<{
+    [tokenAddress: string]: Trade[] | null;
+  }>({});
   const [errors, setErrors] = useState<{
     [tokenAddress: string]: string | null;
   }>({});
   const subscriptions = useRef<{ [key: string]: Unsubscribe }>({}).current;
 
+  // --- NEW ---
+  // This effect listens for real-time events from the client-side EventWatcher
+  useEffect(() => {
+    const handleClientEvent = (event: any) => {
+      console.log(
+        `[TradesContext] Received optimistic event: ${event.eventName}`
+      );
+      const { eventName, tokenAddress, data } = event;
+
+      // We only care about buy/sell events for optimistic updates
+      if (eventName !== "TokensPurchased" && eventName !== "TokensSold") {
+        return;
+      }
+
+      // Create a temporary Trade object from the event data
+      const optimisticTrade: Trade = {
+        trader: data.trader,
+        token: tokenAddress,
+        type: eventName === "TokensPurchased" ? "buy" : "sell",
+        ethAmount: data.ethAmount.toString(),
+        tokenAmount: data.tokenAmount.toString(),
+        timestamp: new Date().toISOString(), // Use current time for optimistic update
+        transactionHash: data.transactionHash || `optimistic_${Date.now()}`,
+        // These fields might not be in the event, so we provide defaults
+        blockNumber: 0,
+        pricePerToken: "0",
+      };
+
+      // Update the local state immediately
+      setTrades((prev) => {
+        const currentTrades = prev[tokenAddress] || [];
+        // Add the new trade to the top of the list
+        const updatedTrades = [optimisticTrade, ...currentTrades];
+        return {
+          ...prev,
+          [tokenAddress]: updatedTrades,
+        };
+      });
+    };
+
+    // Subscribe to all events for the tokens being watched
+    Object.keys(subscriptions).forEach((tokenAddress) => {
+      tokenEventEmitter.addEventListener(tokenAddress, handleClientEvent);
+    });
+
+    // Cleanup: remove listeners when the component or dependencies change
+    return () => {
+      Object.keys(subscriptions).forEach((tokenAddress) => {
+        tokenEventEmitter.removeEventListener(tokenAddress, handleClientEvent);
+      });
+    };
+  }, [subscriptions, trades]); // Re-run when subscriptions change
+
   const watchTrades = useCallback(
     (tokenAddress: string) => {
       const lowercasedAddress = tokenAddress.toLowerCase();
       if (!tokenAddress || subscriptions[lowercasedAddress]) return;
-
-      setLoading((prev) => ({ ...prev, [lowercasedAddress]: true }));
 
       const tradesRef = collection(db, "trades");
       const tradesQuery = query(
@@ -69,26 +108,26 @@ export function TradesProvider({ children }: { children: React.ReactNode }) {
       const unsubscribe = onSnapshot(
         tradesQuery,
         (snapshot) => {
+          console.log(
+            `[TradesContext] Received canonical data from Firestore for ${lowercasedAddress}. Docs found: ${snapshot.docs.length}`
+          );
           const newTrades: Trade[] = snapshot.docs.map(
             (doc) => doc.data() as Trade
           );
-          setTrades((prev) => ({
-            ...prev,
-            [lowercasedAddress]: newTrades,
-          }));
+          // This update from Firestore will overwrite any optimistic state
+          setTrades((prev) => ({ ...prev, [lowercasedAddress]: newTrades }));
           setErrors((prev) => ({ ...prev, [lowercasedAddress]: null }));
-          setLoading((prev) => ({ ...prev, [lowercasedAddress]: false }));
         },
         (error) => {
           console.error(
-            `Error fetching trades for token ${lowercasedAddress}:`,
+            `[TradesContext] Error fetching from Firestore for ${lowercasedAddress}:`,
             error
           );
+          setTrades((prev) => ({ ...prev, [lowercasedAddress]: null }));
           setErrors((prev) => ({
             ...prev,
             [lowercasedAddress]: "Failed to load trades",
           }));
-          setLoading((prev) => ({ ...prev, [lowercasedAddress]: false }));
         }
       );
 
@@ -108,19 +147,14 @@ export function TradesProvider({ children }: { children: React.ReactNode }) {
     [subscriptions]
   );
 
-  const value = {
-    trades,
-    loading,
-    errors,
-    watchTrades,
-    unwatchTrades,
-  };
+  const value = { trades, errors, watchTrades, unwatchTrades };
 
   return (
     <TradesContext.Provider value={value}>{children}</TradesContext.Provider>
   );
 }
 
+// Other hooks (useTradesContext, useTrades) remain the same
 export function useTradesContext() {
   const context = useContext(TradesContext);
   if (!context) {
@@ -130,8 +164,7 @@ export function useTradesContext() {
 }
 
 export function useTrades(tokenAddress: string | undefined) {
-  const { trades, loading, errors, watchTrades, unwatchTrades } =
-    useTradesContext();
+  const { trades, errors, watchTrades, unwatchTrades } = useTradesContext();
 
   useEffect(() => {
     if (tokenAddress) {
@@ -143,10 +176,13 @@ export function useTrades(tokenAddress: string | undefined) {
   }, [tokenAddress, watchTrades, unwatchTrades]);
 
   const lowercasedAddress = tokenAddress?.toLowerCase();
+  const tradesData = lowercasedAddress ? trades[lowercasedAddress] : null;
+  const isLoading =
+    lowercasedAddress && trades[lowercasedAddress] === undefined;
 
   return {
-    trades: lowercasedAddress ? trades[lowercasedAddress] || [] : [],
-    loading: lowercasedAddress ? loading[lowercasedAddress] ?? true : false,
+    trades: tradesData || [],
+    loading: isLoading,
     error: lowercasedAddress ? errors[lowercasedAddress] || null : null,
   };
 }
