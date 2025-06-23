@@ -1,42 +1,39 @@
+import { useReadContracts } from "wagmi";
+import { formatUnits, type Abi } from "viem";
 import { motion } from "framer-motion";
 import { TokenCard } from "./TokenCard";
-import { Token } from "@/types"; // 1. Use the single, unified Token type
-import { useFactoryContract } from "@/new-hooks/useFactoryContract";
-import { Card } from "@/components/ui/card"; // Used for the skeleton loader
+import { Token } from "@/types";
+import { FACTORY_ABI, FACTORY_ADDRESS } from "@/types";
 
-/**
- * A placeholder component that mimics the TokenCard's layout while data is loading.
- * This provides a better user experience than a simple text loader.
- */
-const SkeletonCard = () => (
-  <Card className="h-[250px] bg-white/5 animate-pulse" />
-);
+const factoryContract = {
+  address: FACTORY_ADDRESS as `0x${string}`,
+  abi: FACTORY_ABI as Abi,
+} as const;
 
 export const TokenGrid = ({ tokens }: { tokens: Token[] }) => {
-  const { useTokenGridData } = useFactoryContract();
+  const { data: pricesData } = useReadContracts({
+    contracts: tokens.map((token) => ({
+      ...factoryContract,
+      functionName: "getCurrentPrice" as const,
+      args: [token.address as `0x${string}`] as const,
+    })),
+  });
 
-  // 2. Use a more descriptive variable name, like 'hydratedTokens'
-  const { hydratedTokens, isLoading } = useTokenGridData(tokens);
-
-  // 3. Render a skeleton grid while data is loading
-  if (isLoading) {
-    return (
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 p-2">
-        {Array.from({ length: tokens.length || 6 }).map((_, index) => (
-          <SkeletonCard key={index} />
-        ))}
-      </div>
-    );
-  }
-
-  // 4. Handle the case where there are no tokens to display
-  if (hydratedTokens.length === 0) {
-    return (
-      <div className="flex justify-center items-center h-full">
-        <p className="text-gray-400">No tokens found.</p>
-      </div>
-    );
-  }
+  const tokenPrices = tokens.reduce<Record<string, string>>(
+    (acc, token, index) => {
+      const result = pricesData?.[index]?.result;
+      try {
+        acc[token.address] = result
+          ? formatUnits(BigInt(result.toString()), 18)
+          : "0";
+      } catch {
+        acc[token.address] = "0";
+      }
+      // console.log("Token price from the Token Grid (acc): ", acc);
+      return acc;
+    },
+    {}
+  );
 
   return (
     <motion.div
@@ -45,13 +42,13 @@ export const TokenGrid = ({ tokens }: { tokens: Token[] }) => {
       animate={{ opacity: 1 }}
       transition={{ duration: 0.5 }}
     >
-      {hydratedTokens.map(
-        (
-          token: Token // 5. Map over the correctly named and typed variable
-        ) => (
-          <TokenCard key={token.address} token={token} />
-        )
-      )}
+      {tokens.map((token) => (
+        <TokenCard
+          key={token.address}
+          token={token}
+          price={tokenPrices[token.address]}
+        />
+      ))}
     </motion.div>
   );
 };
