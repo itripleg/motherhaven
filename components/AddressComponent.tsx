@@ -21,6 +21,15 @@ const SNOWTRACE_TESTNET_URL = "https://43113.testnet.snowtrace.dev";
 export function AddressComponent({ hash, type }: TransactionHashProps) {
   const [copied, setCopied] = useState(false);
 
+  // Debug: Add logging to see what's being passed
+  console.log("AddressComponent received:", { hash, type });
+
+  // Validate hash
+  if (!hash || hash === "0x0000000000000000000000000000000000000000") {
+    console.warn("Invalid hash received:", hash);
+    return <span className="text-red-500">Invalid Address</span>;
+  }
+
   const explorerUrl = `${SNOWTRACE_TESTNET_URL}/${type}/${hash}`;
 
   const copyToClipboard = () => {
@@ -29,13 +38,14 @@ export function AddressComponent({ hash, type }: TransactionHashProps) {
     setTimeout(() => setCopied(false), 2000);
   };
 
-  const truncateHash = (hash: string, isTx: boolean = true) => {
+  const truncateHash = (hash: string, type: "tx" | "address") => {
     if (!hash) return "";
-    if (isTx) {
-      return `${hash.slice(0, 6)}...${hash.slice(-4)}`;
-    }
-    return hash;
+
+    // Always truncate for display, regardless of type
+    return `${hash.slice(0, 6)}...${hash.slice(-4)}`;
   };
+
+  const displayHash = truncateHash(hash, type);
 
   return (
     <TooltipProvider>
@@ -52,8 +62,12 @@ export function AddressComponent({ hash, type }: TransactionHashProps) {
           className="text-primary hover:text-white/80 transition-colors duration-200"
           whileHover={{ scale: 1 }}
           whileTap={{ scale: 0.95 }}
+          onClick={(e) => {
+            // Debug: Log what's actually being clicked
+            console.log("Link clicked:", { href: explorerUrl, hash });
+          }}
         >
-          {truncateHash(hash)}
+          {displayHash}
         </motion.a>
         <Tooltip>
           <TooltipTrigger asChild>
@@ -81,7 +95,18 @@ export function AddressComponent({ hash, type }: TransactionHashProps) {
                 className="h-8 w-8 text-primary hover:text-white/80 hover:bg-primary/20"
                 asChild
               >
-                <a href={explorerUrl} target="_blank" rel="noopener noreferrer">
+                <a
+                  href={explorerUrl}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  onClick={(e) => {
+                    // Debug: Log what's actually being clicked
+                    console.log("External link clicked:", {
+                      href: explorerUrl,
+                      hash,
+                    });
+                  }}
+                >
                   <ExternalLink className="h-4 w-4" />
                 </a>
               </Button>
