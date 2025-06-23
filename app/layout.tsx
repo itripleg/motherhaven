@@ -50,11 +50,12 @@ export default function RootLayout({
           disableTransitionOnChange
         >
           {/* <FactoryGuard> */}
-          <MyMenu />
           <WagmiContext>
+            <MyMenu />
+            <div className="p-20" />
             <FactoryConfigProvider>
               <EventWatcher />
-              <Header />
+              {/* <Header /> */}
               {children}
               <Toaster />
             </FactoryConfigProvider>
