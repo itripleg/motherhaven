@@ -52,21 +52,12 @@ export default function RootLayout({
           {/* <FactoryGuard> */}
           <MyMenu />
           <WagmiContext>
-<<<<<<< HEAD
-            {/* <FactoryConfigProvider> */}
-            <EventWatcher />
-            <Header />
-            {children}
-            <Toaster />
-            {/* </FactoryConfigProvider> */}
-=======
             <FactoryConfigProvider>
               <EventWatcher />
               <Header />
               {children}
               <Toaster />
             </FactoryConfigProvider>
->>>>>>> main
           </WagmiContext>
           {/* </FactoryGuard> */}
         </ThemeProvider>
