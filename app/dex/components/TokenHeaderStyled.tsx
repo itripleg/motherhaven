@@ -4,7 +4,8 @@ import { Label } from "@/components/ui/label";
 import { Badge } from "@/components/ui/badge";
 import { AddressComponent } from "@/components/AddressComponent";
 import { Progress } from "@/components/ui/progress";
-import { useToken, useTokenContractState } from "@/contexts/TokenContext";
+import { useToken } from "@/contexts/TokenContext";
+import { useFactoryContract } from "@/new-hooks/useFactoryContract";
 import { Address } from "viem";
 
 interface TokenHeaderProps {
@@ -22,10 +23,17 @@ export const TokenHeaderStyled: React.FC<TokenHeaderProps> = ({ address }) => {
   // Get immutable data from Firestore
   const { token, loading } = useToken(address);
 
-  // Get real-time contract state
-  const { state, collateral, currentPrice } = useTokenContractState(
-    address as Address
-  );
+  // Get real-time contract state using factory contract hooks
+  const { useTokenState, useCollateral, useCurrentPrice } =
+    useFactoryContract();
+  const { data: state } = useTokenState(address as Address);
+  const { data: collateral } = useCollateral(address as Address);
+  const { data: currentPriceData } = useCurrentPrice(address as Address);
+
+  // Format current price
+  const currentPrice = currentPriceData
+    ? (Number(currentPriceData) / 1e18).toFixed(8)
+    : "0";
 
   // Update progress animation when collateral changes
   useEffect(() => {
@@ -66,7 +74,8 @@ export const TokenHeaderStyled: React.FC<TokenHeaderProps> = ({ address }) => {
     );
   }
 
-  const getStateDisplay = (state: number): StateDisplay => {
+  const getStateDisplay = (state: number | undefined): StateDisplay => {
+    const stateValue = state ?? 0;
     const stateMap: Record<number, StateDisplay> = {
       0: { text: "Not Created", color: "bg-red-500/80" },
       1: { text: "Trading", color: "bg-green-600/70" },
@@ -75,9 +84,9 @@ export const TokenHeaderStyled: React.FC<TokenHeaderProps> = ({ address }) => {
       4: { text: "Resumed", color: "bg-green-600/70" },
     };
 
-    return stateMap[state] || { text: "Unknown", color: "bg-gray-500/80" };
+    return stateMap[stateValue] || { text: "Unknown", color: "bg-gray-500/80" };
   };
-
+  // @ts-ignore
   const stateDisplay = getStateDisplay(state);
 
   return (

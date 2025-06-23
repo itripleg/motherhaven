@@ -23,7 +23,7 @@ import { Token, TokenState } from "@/types";
 import {
   useFactoryConfigContext,
   FactoryConfig,
-} from "./FactoryConfigProvider"; // This import is relative and correct
+} from "./FactoryConfigProvider";
 
 interface TokenContextState {
   tokens: { [address: string]: Token };
@@ -41,6 +41,8 @@ const mapTokenData = (
   data: any,
   factoryConfig: FactoryConfig
 ): Token => {
+  console.log("Mapping token data:", { address, data, factoryConfig });
+
   return {
     address: address.toLowerCase() as Address,
     name: data.name || "Unnamed Token",
@@ -71,44 +73,182 @@ export function TokenProvider({ children }: { children: React.ReactNode }) {
     {}
   );
   const subscriptions = useRef<{ [key: string]: Unsubscribe }>({}).current;
+  const refCounts = useRef<{ [key: string]: number }>({}).current; // Add reference counting
+
+  console.log("TokenProvider render:", {
+    isConfigLoading,
+    hasFactoryConfig: !!factoryConfig,
+    tokensCount: Object.keys(tokens).length,
+    loadingCount: Object.keys(loading).length,
+  });
 
   const watchToken = useCallback(
     (tokenAddress: string) => {
-      if (
-        !factoryConfig ||
-        !tokenAddress ||
-        subscriptions[tokenAddress.toLowerCase()]
-      )
-        return;
-      const lowercasedAddress = tokenAddress.toLowerCase();
-      setLoading((prev) => ({ ...prev, [lowercasedAddress]: true }));
-      const tokenRef = doc(db, "tokens", lowercasedAddress);
-
-      const unsubscribe = onSnapshot(tokenRef, (doc) => {
-        if (doc.exists()) {
-          const tokenData = mapTokenData(
-            lowercasedAddress,
-            doc.data(),
-            factoryConfig
-          );
-          setTokens((prev) => ({ ...prev, [lowercasedAddress]: tokenData }));
-        }
-        setLoading((prev) => ({ ...prev, [lowercasedAddress]: false }));
+      console.log("watchToken called:", {
+        tokenAddress,
+        hasFactoryConfig: !!factoryConfig,
+        isConfigLoading,
+        alreadyWatching: !!subscriptions[tokenAddress.toLowerCase()],
+        currentRefCount: refCounts[tokenAddress.toLowerCase()] || 0,
       });
-      subscriptions[lowercasedAddress] = unsubscribe;
+
+      if (!factoryConfig || !tokenAddress) {
+        console.log("Early return from watchToken - no config or address");
+        return;
+      }
+
+      const lowercasedAddress = tokenAddress.toLowerCase();
+
+      // Increment reference count
+      refCounts[lowercasedAddress] = (refCounts[lowercasedAddress] || 0) + 1;
+      console.log(
+        "📈 Incremented ref count for",
+        lowercasedAddress,
+        "to",
+        refCounts[lowercasedAddress]
+      );
+
+      // Only set up subscription if this is the first reference
+      if (refCounts[lowercasedAddress] === 1) {
+        console.log(
+          "🚀 Setting loading to TRUE for:",
+          lowercasedAddress,
+          "(first reference)"
+        );
+        setLoading((prev) => {
+          const newLoading = { ...prev, [lowercasedAddress]: true };
+          console.log("📊 New loading state (start):", newLoading);
+          return newLoading;
+        });
+        const tokenRef = doc(db, "tokens", lowercasedAddress);
+
+        console.log(
+          "Setting up Firestore subscription for:",
+          lowercasedAddress
+        );
+
+        const unsubscribe = onSnapshot(
+          tokenRef,
+          (doc) => {
+            console.log("Firestore snapshot received:", {
+              address: lowercasedAddress,
+              exists: doc.exists(),
+              data: doc.data(),
+            });
+
+            if (doc.exists()) {
+              const tokenData = mapTokenData(
+                lowercasedAddress,
+                doc.data(),
+                factoryConfig
+              );
+              setTokens((prev) => ({
+                ...prev,
+                [lowercasedAddress]: tokenData,
+              }));
+              setErrors((prev) => ({ ...prev, [lowercasedAddress]: null }));
+              console.log(
+                "✅ Setting loading to FALSE for:",
+                lowercasedAddress
+              );
+            } else {
+              console.log("Token document does not exist:", lowercasedAddress);
+              setErrors((prev) => ({
+                ...prev,
+                [lowercasedAddress]: "Token not found in database",
+              }));
+              console.log(
+                "❌ Setting loading to FALSE for:",
+                lowercasedAddress
+              );
+            }
+            setLoading((prev) => {
+              const newLoading = { ...prev, [lowercasedAddress]: false };
+              console.log("📊 New loading state:", newLoading);
+              return newLoading;
+            });
+          },
+          (error) => {
+            console.error("Firestore subscription error:", error);
+            setErrors((prev) => ({
+              ...prev,
+              [lowercasedAddress]: error.message,
+            }));
+            console.log(
+              "🔥 Setting loading to FALSE due to error for:",
+              lowercasedAddress
+            );
+            setLoading((prev) => {
+              const newLoading = { ...prev, [lowercasedAddress]: false };
+              console.log("📊 New loading state (error):", newLoading);
+              return newLoading;
+            });
+          }
+        );
+
+        subscriptions[lowercasedAddress] = unsubscribe;
+      } else {
+        console.log(
+          "🔄 Subscription already exists for",
+          lowercasedAddress,
+          "- just incremented ref count"
+        );
+      }
     },
-    [subscriptions, factoryConfig]
+    [subscriptions, factoryConfig, isConfigLoading, refCounts]
   );
 
   const unwatchToken = useCallback(
     (tokenAddress: string) => {
       const lowercasedAddress = tokenAddress.toLowerCase();
-      if (subscriptions[lowercasedAddress]) {
-        subscriptions[lowercasedAddress]();
-        delete subscriptions[lowercasedAddress];
+      const currentRefCount = refCounts[lowercasedAddress] || 0;
+
+      console.log(
+        "unwatchToken called:",
+        lowercasedAddress,
+        "current ref count:",
+        currentRefCount
+      );
+
+      if (currentRefCount <= 0) {
+        console.log(
+          "⚠️ Ref count already 0 or negative for",
+          lowercasedAddress
+        );
+        return;
+      }
+
+      // Decrement reference count
+      refCounts[lowercasedAddress] = currentRefCount - 1;
+      console.log(
+        "📉 Decremented ref count for",
+        lowercasedAddress,
+        "to",
+        refCounts[lowercasedAddress]
+      );
+
+      // Only clean up subscription if no more references
+      if (refCounts[lowercasedAddress] === 0) {
+        console.log(
+          "🧹 Cleaning up subscription for",
+          lowercasedAddress,
+          "(no more references)"
+        );
+        if (subscriptions[lowercasedAddress]) {
+          subscriptions[lowercasedAddress]();
+          delete subscriptions[lowercasedAddress];
+        }
+      } else {
+        console.log(
+          "🔄 Still have",
+          refCounts[lowercasedAddress],
+          "references for",
+          lowercasedAddress,
+          "- keeping subscription"
+        );
       }
     },
-    [subscriptions]
+    [subscriptions, refCounts]
   );
 
   const getRecentTokens = useCallback(
@@ -156,16 +296,42 @@ export function useToken(address: string) {
     useTokenContext();
   const lowercasedAddress = address?.toLowerCase();
 
-  useEffect(() => {
-    if (lowercasedAddress) watchToken(lowercasedAddress);
-    return () => {
-      if (lowercasedAddress) unwatchToken(lowercasedAddress);
-    };
-  }, [lowercasedAddress, watchToken, unwatchToken]);
+  console.log("useToken called:", {
+    address,
+    lowercasedAddress,
+    hasToken: !!tokens[lowercasedAddress],
+    isLoading: loading[lowercasedAddress],
+    error: errors[lowercasedAddress],
+  });
 
-  return {
+  useEffect(() => {
+    console.log("useToken useEffect:", {
+      lowercasedAddress,
+      shouldWatch: !!lowercasedAddress,
+    });
+
+    if (lowercasedAddress) {
+      watchToken(lowercasedAddress);
+      return () => {
+        unwatchToken(lowercasedAddress);
+      };
+    }
+  }, [lowercasedAddress]); // REMOVED watchToken, unwatchToken from dependencies
+
+  const result = {
     token: tokens[lowercasedAddress] || null,
     loading: loading[lowercasedAddress] || false,
     error: errors[lowercasedAddress] || null,
   };
+
+  console.log("🎯 useToken returning:", {
+    address: lowercasedAddress,
+    hasToken: !!result.token,
+    loading: result.loading,
+    error: result.error,
+    rawLoadingState: loading[lowercasedAddress],
+    allLoadingStates: loading,
+  });
+
+  return result;
 }

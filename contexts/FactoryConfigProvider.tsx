@@ -19,6 +19,32 @@ export interface FactoryConfig {
   tradingFee: number;
 }
 
+// Safe formatting function to prevent string length overflow
+const safeFormatUnits = (value: bigint, decimals: number): string => {
+  try {
+    // For very large values, just convert to string with basic decimal handling
+    if (value > BigInt("9".repeat(30))) {
+      const valueStr = value.toString();
+      if (valueStr.length > decimals) {
+        const integerPart = valueStr.slice(0, -decimals) || "0";
+        const decimalPart = valueStr.slice(-decimals).slice(0, 6); // Only show 6 decimal places
+        return `${integerPart}.${decimalPart}`;
+      }
+      return "0." + "0".repeat(decimals - valueStr.length) + valueStr;
+    }
+
+    return formatUnits(value, decimals);
+  } catch (error) {
+    console.error("Error formatting units:", error, "Value:", value.toString());
+    // Fallback: just show the raw value divided by 10^18
+    if (decimals === 18) {
+      const divisor = BigInt("1000000000000000000");
+      return (value / divisor).toString();
+    }
+    return "0";
+  }
+};
+
 // 2. DEFINE THE DATA-FETCHING LOGIC AS A LOCAL HOOK
 // It no longer needs to be in a separate file.
 function useFactoryConfig() {
@@ -43,22 +69,70 @@ function useFactoryConfig() {
   });
 
   const config = useMemo((): FactoryConfig | null => {
-    if (!data || data.some((d) => d.status === "failure")) return null;
-    const results = data.map((d) => d.result);
-    if (results.some((r) => r === undefined || r === null)) return null;
+    try {
+      if (!data || data.some((d) => d.status === "failure")) {
+        console.log("Factory config data not ready or has failures");
+        return null;
+      }
 
-    const decimalsNumber = Number(results[0] as bigint);
-    return {
-      decimals: decimalsNumber.toString(),
-      initialPrice: formatUnits(results[1] as bigint, decimalsNumber),
-      maxSupply: formatUnits(results[2] as bigint, decimalsNumber),
-      initialMint: formatUnits(results[3] as bigint, decimalsNumber),
-      minPurchase: formatUnits(results[4] as bigint, decimalsNumber),
-      maxPurchase: formatUnits(results[5] as bigint, decimalsNumber),
-      maxWalletPercentage: Number(results[6] as bigint),
-      priceRate: (results[7] as bigint).toString(),
-      tradingFee: Number(results[8] as bigint),
-    };
+      const results = data.map((d) => d.result);
+      if (results.some((r) => r === undefined || r === null)) {
+        console.log("Some factory config results are undefined");
+        return null;
+      }
+
+      console.log(
+        "Raw factory config results:",
+        results.map((r) => r?.toString())
+      );
+
+      // Handle the decimals value - it seems your contract returns 10^18 instead of 18
+      const rawDecimals = results[0] as bigint;
+      let decimalsNumber: number;
+
+      if (rawDecimals === 1000000000000000000n) {
+        // Contract returns 10^18, but we want 18
+        decimalsNumber = 18;
+      } else if (rawDecimals <= 30n) {
+        // Contract returns actual decimal count
+        decimalsNumber = Number(rawDecimals);
+      } else {
+        console.error("Unexpected decimals value:", rawDecimals.toString());
+        return null;
+      }
+
+      console.log("Using decimals:", decimalsNumber);
+
+      // Log each value before formatting to identify the problematic one
+      const rawValues = {
+        decimals: results[0],
+        initialPrice: results[1],
+        maxSupply: results[2],
+        initialMint: results[3],
+        minPurchase: results[4],
+        maxPurchase: results[5],
+        maxWalletPercentage: results[6],
+        priceRate: results[7],
+        tradingFee: results[8],
+      };
+
+      console.log("Raw factory values:", rawValues);
+
+      return {
+        decimals: decimalsNumber.toString(),
+        initialPrice: safeFormatUnits(results[1] as bigint, decimalsNumber),
+        maxSupply: safeFormatUnits(results[2] as bigint, decimalsNumber),
+        initialMint: safeFormatUnits(results[3] as bigint, decimalsNumber),
+        minPurchase: safeFormatUnits(results[4] as bigint, decimalsNumber),
+        maxPurchase: safeFormatUnits(results[5] as bigint, decimalsNumber),
+        maxWalletPercentage: Number(results[6] as bigint),
+        priceRate: (results[7] as bigint).toString(),
+        tradingFee: Number(results[8] as bigint),
+      };
+    } catch (error) {
+      console.error("Error processing factory config:", error);
+      return null;
+    }
   }, [data]);
 
   return { config, isLoading, error: error?.message || null };
