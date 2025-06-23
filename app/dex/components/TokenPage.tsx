@@ -1,12 +1,10 @@
 "use client";
 import React from "react";
-import { TokenHeaderStyled as TokenHeader } from "./TokenHeaderStyled"; // Assuming this is the styled header
+import { TokenHeaderStyled as TokenHeader } from "./TokenHeaderStyled";
 import { TokenPriceCharts } from "./TokenPriceCharts";
 import { TokenTradeCard } from "./TokenTradeCard";
 import { ChatComponent } from "./ChatComponent";
-import { Sheet, SheetContent, SheetTrigger } from "@/components/ui/sheet";
-import { Button } from "@/components/ui/button";
-import { MessageCircle } from "lucide-react";
+import { MobileChatModal } from "./MobileChatModal";
 import RecentTrades from "./RecentTrades";
 import { useToken } from "@/contexts/TokenContext";
 import { TradesProvider } from "@/contexts/TradesContext";
@@ -69,33 +67,24 @@ export default function TokenPage({ tokenAddress }: TokenPageProps) {
 
           {/* Right Sidebar (1 column on desktop) */}
           <div className="hidden lg:flex lg:flex-col gap-6">
-            <div className="sticky top-24 space-y-6">
-              <ChatComponent
-                tokenAddress={token.address}
-                creatorAddress={token.creator}
-              />
+            <div className="sticky top-24 space-y-6 h-fit">
+              <div className="h-[500px]">
+                <ChatComponent
+                  tokenAddress={token.address}
+                  creatorAddress={token.creator}
+                />
+              </div>
               <RecentTrades tokenAddress={token.address} />
             </div>
           </div>
+        </div>
 
-          {/* Mobile Chat Button */}
-          <Sheet>
-            <SheetTrigger asChild>
-              <Button
-                variant="default"
-                size="icon"
-                className="fixed bottom-4 right-4 lg:hidden z-40"
-              >
-                <MessageCircle className="h-4 w-4" />
-              </Button>
-            </SheetTrigger>
-            <SheetContent side="right" className="w-[90%] sm:w-[440px] p-0">
-              <ChatComponent
-                tokenAddress={token.address}
-                creatorAddress={token.creator}
-              />
-            </SheetContent>
-          </Sheet>
+        {/* Mobile Chat Modal - Only shows on mobile */}
+        <div className="lg:hidden">
+          <MobileChatModal
+            tokenAddress={token.address}
+            creatorAddress={token.creator}
+          />
         </div>
       </div>
     </TradesProvider>

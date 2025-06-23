@@ -13,7 +13,6 @@ import {
   increment,
   doc,
   serverTimestamp,
-  Timestamp,
 } from "firebase/firestore";
 import { db } from "@/firebase";
 import { Button } from "@/components/ui/button";
@@ -21,7 +20,8 @@ import { Input } from "@/components/ui/input";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { ThumbsUp, Send } from "lucide-react";
+import { ThumbsUp, Send, X } from "lucide-react";
+import { cn } from "@/lib/utils";
 
 interface Comment {
   id: string;
@@ -34,25 +34,37 @@ interface Comment {
   likes: number;
 }
 
+interface ChatComponentProps {
+  tokenAddress: string;
+  creatorAddress?: string;
+  className?: string;
+  isMobile?: boolean;
+  onClose?: () => void;
+}
+
 export function ChatComponent({
   tokenAddress,
   creatorAddress,
-}: {
-  tokenAddress: string;
-  creatorAddress?: string;
-}) {
+  className,
+  isMobile = false,
+  onClose,
+}: ChatComponentProps) {
   const [comments, setComments] = useState<Comment[]>([]);
   const [newComment, setNewComment] = useState("");
-  const { address, isConnected } = useAccount();
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [mounted, setMounted] = useState(false);
+
+  const { address, isConnected } = useAccount();
+
+  // Handle hydration
+  useEffect(() => {
+    setMounted(true);
+  }, []);
 
   useEffect(() => {
-    if (!tokenAddress) {
-      console.log("No token address provided");
+    if (!tokenAddress || !mounted) {
       return;
     }
-
-    console.log("Setting up comments listener for token:", tokenAddress);
 
     const q = query(
       collection(db, "comments"),
@@ -63,12 +75,9 @@ export function ChatComponent({
     const unsubscribe = onSnapshot(
       q,
       (querySnapshot) => {
-        console.log("Received snapshot with size:", querySnapshot.size);
-
         const fetchedComments: Comment[] = [];
         querySnapshot.forEach((doc) => {
           const data = doc.data();
-          console.log("Comment data:", data);
           fetchedComments.push({
             id: doc.id,
             text: data.text,
@@ -78,7 +87,6 @@ export function ChatComponent({
             likes: data.likes || 0,
           });
         });
-        console.log("Processed comments:", fetchedComments);
         setComments(fetchedComments);
       },
       (error) => {
@@ -87,7 +95,7 @@ export function ChatComponent({
     );
 
     return () => unsubscribe();
-  }, [tokenAddress]);
+  }, [tokenAddress, mounted]);
 
   const handleSubmitComment = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -134,104 +142,176 @@ export function ChatComponent({
     }
   };
 
+  // Don't render until mounted to prevent hydration mismatch
+  if (!mounted) {
+    return (
+      <div className={cn("w-full h-full flex flex-col", className)}>
+        <Card className="h-full flex flex-col border-0 shadow-none bg-background/50">
+          <CardHeader
+            className={cn("flex-shrink-0 pb-3", isMobile && "px-4 pt-6")}
+          >
+            <div className="flex items-center justify-between">
+              <CardTitle className="text-lg font-semibold">Chat</CardTitle>
+              {isMobile && onClose && (
+                <Button
+                  variant="ghost"
+                  size="icon"
+                  onClick={onClose}
+                  className="h-8 w-8"
+                >
+                  <X className="h-4 w-4" />
+                </Button>
+              )}
+            </div>
+          </CardHeader>
+          <CardContent className="flex-1 flex items-center justify-center p-4">
+            <div className="text-muted-foreground text-sm">Loading...</div>
+          </CardContent>
+        </Card>
+      </div>
+    );
+  }
+
   return (
-    <Card className="w-full max-w-md bg-background border-primary shadow-lg flex flex-col justify-between">
-      <CardHeader className="border-b border-border dark:border-gray-700">
-        <CardTitle className="text-2xl font-bold text-foreground dark:text-white">
-          Chat
-        </CardTitle>
-      </CardHeader>
-      <CardContent className="p-0">
-        <ScrollArea className="md:h-[500px] px-4">
-          {comments.map((comment) => (
-            <div
-              key={comment.id}
-              className="py-4 border-b border-border dark:border-gray-700 last:border-0"
-            >
-              <div className="flex items-start space-x-3">
-                <Avatar className="w-10 h-10">
-                  <AvatarImage
-                    src={`https://avatar.vercel.sh/${comment.userAddress}`}
-                  />
-                  <AvatarFallback className="bg-primary text-primary-foreground">
-                    {comment.userAddress.slice(0, 2)}
-                  </AvatarFallback>
-                </Avatar>
-                <div className="flex-1 space-y-1">
-                  <div className="flex items-center">
-                    <p className="font-semibold text-sm text-foreground dark:text-gray-200">
-                      {`${comment.userAddress.slice(
-                        0,
-                        6
-                      )}...${comment.userAddress.slice(-4)}`}
-                    </p>
-                    {creatorAddress &&
-                      comment.userAddress.toLowerCase() ===
-                        creatorAddress.toLowerCase() && (
-                        <span className="ml-2 text-xs px-1.5 py-0.5 bg-primary/10 text-primary rounded-full">
-                          dev
+    <div className={cn("w-full h-full flex flex-col", className)}>
+      <Card className="h-full flex flex-col border-0 shadow-none bg-background">
+        {/* Header */}
+        <CardHeader
+          className={cn("flex-shrink-0 pb-3 border-b", isMobile && "px-4 pt-6")}
+        >
+          <div className="flex items-center justify-between">
+            <CardTitle className="text-lg font-semibold text-foreground">
+              Chat
+            </CardTitle>
+            {isMobile && onClose && (
+              <Button
+                variant="ghost"
+                size="icon"
+                onClick={onClose}
+                className="h-8 w-8 hover:bg-muted/50"
+              >
+                <X className="h-4 w-4" />
+              </Button>
+            )}
+          </div>
+        </CardHeader>
+
+        {/* Messages */}
+        <CardContent className="flex-1 flex flex-col p-0 overflow-hidden">
+          <ScrollArea className="flex-1">
+            <div className={cn("space-y-3 p-4", isMobile && "px-4 py-3")}>
+              {comments.map((comment) => (
+                <div key={comment.id} className="space-y-2">
+                  <div className="flex items-start gap-3">
+                    <Avatar className="w-8 h-8 flex-shrink-0 ring-2 ring-muted">
+                      <AvatarImage
+                        src={`https://avatar.vercel.sh/${comment.userAddress}`}
+                      />
+                      <AvatarFallback className="bg-primary/10 text-primary text-xs font-medium">
+                        {comment.userAddress.slice(2, 4).toUpperCase()}
+                      </AvatarFallback>
+                    </Avatar>
+
+                    <div className="flex-1 min-w-0">
+                      <div className="flex items-center gap-2 mb-1">
+                        <span className="font-medium text-sm text-foreground truncate">
+                          {`${comment.userAddress.slice(
+                            0,
+                            6
+                          )}...${comment.userAddress.slice(-4)}`}
                         </span>
-                      )}
-                    <span className="ml-auto text-xs text-muted-foreground dark:text-gray-400">
-                      {comment.timestamp?.toDate().toLocaleString() ||
-                        "Just now"}
-                    </span>
+
+                        {creatorAddress &&
+                          comment.userAddress.toLowerCase() ===
+                            creatorAddress.toLowerCase() && (
+                            <span className="text-xs px-2 py-0.5 bg-primary/20 text-primary rounded-full font-medium">
+                              dev
+                            </span>
+                          )}
+
+                        <span className="text-xs text-muted-foreground">
+                          {comment.timestamp?.toDate().toLocaleString() ||
+                            "Just now"}
+                        </span>
+                      </div>
+
+                      <div className="bg-muted/30 rounded-2xl rounded-tl-sm px-3 py-2 mb-2">
+                        <p className="text-sm text-foreground break-words leading-relaxed">
+                          {comment.text}
+                        </p>
+                      </div>
+
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        onClick={() => handleLike(comment.id)}
+                        disabled={!isConnected}
+                        className="h-6 px-2 text-muted-foreground hover:text-foreground hover:bg-muted/50 -ml-2"
+                      >
+                        <ThumbsUp className="w-3 h-3 mr-1" />
+                        <span className="text-xs">{comment.likes || 0}</span>
+                      </Button>
+                    </div>
                   </div>
-                  <p className="text-sm text-foreground dark:text-gray-300">
-                    {comment.text}
+                </div>
+              ))}
+
+              {comments.length === 0 && (
+                <div className="text-center text-muted-foreground py-8">
+                  <div className="text-4xl mb-2">💬</div>
+                  <p className="text-sm">No comments yet</p>
+                  <p className="text-xs text-muted-foreground/70">
+                    Be the first to start the conversation!
                   </p>
-                  <div className="flex items-center mt-1">
+                </div>
+              )}
+            </div>
+          </ScrollArea>
+
+          {/* Input Area */}
+          <div className="flex-shrink-0 border-t bg-background">
+            {isConnected ? (
+              <form
+                onSubmit={handleSubmitComment}
+                className={cn("p-4", isMobile && "p-4 pb-6")}
+              >
+                <div className="flex gap-2">
+                  <div className="flex-1 relative">
+                    <Input
+                      value={newComment}
+                      onChange={(e) => setNewComment(e.target.value)}
+                      placeholder="Type a message..."
+                      disabled={isSubmitting}
+                      className="pr-12 bg-muted/30 border-muted/50 focus:border-primary/50 rounded-full"
+                    />
                     <Button
-                      variant="ghost"
-                      size="sm"
-                      onClick={() => handleLike(comment.id)}
-                      disabled={!isConnected}
-                      className="text-muted-foreground hover:text-foreground dark:text-gray-400 dark:hover:text-white"
+                      type="submit"
+                      disabled={isSubmitting || !newComment.trim()}
+                      size="icon"
+                      className="absolute right-1 top-1/2 -translate-y-1/2 h-7 w-7 rounded-full bg-primary hover:bg-primary/90"
                     >
-                      <ThumbsUp className="w-4 h-4 mr-1" />
-                      {comment.likes || 0}
+                      {isSubmitting ? (
+                        <div className="w-3 h-3 border border-primary-foreground/30 border-t-primary-foreground rounded-full animate-spin" />
+                      ) : (
+                        <Send className="w-3 h-3" />
+                      )}
                     </Button>
                   </div>
                 </div>
+              </form>
+            ) : (
+              <div className={cn("p-4 text-center", isMobile && "p-4 pb-6")}>
+                <p className="text-sm text-muted-foreground mb-2">
+                  Connect your wallet to join the conversation
+                </p>
+                <div className="text-xs text-muted-foreground/70">
+                  💡 Share your thoughts about this token
+                </div>
               </div>
-            </div>
-          ))}
-        </ScrollArea>
-        {isConnected ? (
-          <form
-            onSubmit={handleSubmitComment}
-            className="p-4 border-t border-border dark:border-gray-700"
-          >
-            <div className="flex space-x-2">
-              <Input
-                value={newComment}
-                onChange={(e) => setNewComment(e.target.value)}
-                placeholder="Type your comment..."
-                disabled={isSubmitting}
-                className="flex-1 bg-background dark:bg-gray-700 text-foreground dark:text-white"
-              />
-              <Button
-                type="submit"
-                disabled={isSubmitting || !newComment.trim()}
-                className="bg-primary hover:bg-primary/90 text-primary-foreground"
-              >
-                {isSubmitting ? (
-                  "Sending..."
-                ) : (
-                  <>
-                    <Send className="w-4 h-4 mr-2" />
-                    Send
-                  </>
-                )}
-              </Button>
-            </div>
-          </form>
-        ) : (
-          <p className="p-4 text-center text-muted-foreground dark:text-gray-400 border-t border-border dark:border-gray-700">
-            Please connect your wallet to comment.
-          </p>
-        )}
-      </CardContent>
-    </Card>
+            )}
+          </div>
+        </CardContent>
+      </Card>
+    </div>
   );
 }
