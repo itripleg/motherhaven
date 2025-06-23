@@ -1,429 +1,588 @@
-from web3 import Web3
-import web3
-from eth_account import Account
-import time
+#!/usr/bin/env python3
+"""
+Simple Volume Bot for DEX Testing
+Creates trading volume by randomly buying/selling tokens and occasionally creating new ones.
+"""
+
+import json
 import os
 import random
-import json
-from decimal import Decimal
+import time
+import argparse
+from web3 import Web3
+from eth_account import Account
 from dotenv import load_dotenv
-
-FACTORY_ABI = [
-    {
-        "inputs": [{"internalType": "address", "name": "token", "type": "address"}],
-        "name": "buy",
-        "outputs": [],
-        "stateMutability": "payable",
-        "type": "function"
-    },
-    {
-        "inputs": [
-            {"internalType": "address", "name": "token", "type": "address"},
-            {"internalType": "uint256", "name": "amount", "type": "uint256"}
-        ],
-        "name": "sell",
-        "outputs": [],
-        "stateMutability": "nonpayable",
-        "type": "function"
-    }
-]
-
-TOKEN_ABI = [
-    {
-        "constant": True,
-        "inputs": [{"name": "_owner", "type": "address"}],
-        "name": "balanceOf",
-        "outputs": [{"name": "balance", "type": "uint256"}],
-        "type": "function"
-    }
-]
-
-
-
-print(f"Web3.py Version: {web3.__version__}")
+from datetime import datetime
 
 # Load environment variables
 load_dotenv()
 
-def format_token_amount(amount, decimals=18):
-    """Format large token amounts to be human readable"""
-    if amount == 0:
-        return "0"
-    decimal_amount = Decimal(amount) / Decimal(10 ** decimals)
-    if decimal_amount < 0.000001:
-        return f"{decimal_amount:.8e}"
-    return f"{decimal_amount:.6f}"
-
-class Config:
-    DEFAULT_CONFIG = {
-        "factory_address": "0xf6970088B8488d44d3efe52e647A9217041142F7",
-        "tokens": [
-            "0x599a4b621bd55bcecd5e48a40ca230569b68fd86"
-        ],
-        "trading_params": {
-            "min_trade_interval": 30,
-            "max_trade_interval": 120,
-            "min_avax": 0.001,
-            "max_avax": 0.005,
-            "max_avax_risk": 0.05
-        }
-    }
-    
-    def __init__(self, filename="config.json"):
-        self.filename = filename
-        self.load()
-    
-    def load(self):
-        try:
-            if os.path.exists(self.filename):
-                with open(self.filename, 'r') as f:
-                    self.data = json.load(f)
-            else:
-                self.data = self.DEFAULT_CONFIG
-                self.save()
-        except Exception as e:
-            print(f"Error loading config: {e}")
-            self.data = self.DEFAULT_CONFIG
-    
-    def save(self):
-        with open(self.filename, 'w') as f:
-            json.dump(self.data, f, indent=4)
-    
-    def add_token(self, token_address):
-        token_address = token_address.lower()
-        if token_address not in self.data["tokens"]:
-            self.data["tokens"].append(token_address)
-            self.save()
-            return True
-        return False
-    
-    def remove_token(self, token_address):
-        token_address = token_address.lower()
-        if token_address in self.data["tokens"]:
-            self.data["tokens"].remove(token_address)
-            self.save()
-            return True
-        return False
-    
-    def update_factory(self, address):
-        self.data["factory_address"] = address.lower()
-        self.save()
-
-class TradingBot:
-    def __init__(self):
-        # Initialize config
-        self.config = Config()
+class SimpleVolumeBot:
+    def __init__(self, min_trade=None, max_trade=None, min_interval=None, max_interval=None, create_chance=None, private_key_arg=None):
+        # Load config
+        self.private_key = private_key_arg or os.getenv('BOT_PRIVATE_KEY')
+        self.factory_address = os.getenv('NEXT_PUBLIC_TESTNET_FACTORY_ADDRESS')
         
-        # Connect to Avalanche Fuji testnet
-        self.RPC_URL = "https://avax-fuji.g.alchemy.com/v2/7NBTdVMFlqXaf5D-r-0kb73aehWeZ1Aj"
-        self.w3 = Web3(Web3.HTTPProvider(self.RPC_URL))
-        
-        # Load private key
-        self.private_key = os.getenv('BOT_PRIVATE_KEY')
         if not self.private_key:
-            raise ValueError("Please set BOT_PRIVATE_KEY in .env file")
+            raise ValueError("BOT_PRIVATE_KEY not found in .env or not provided via --private-key argument")
+        if not self.factory_address:
+            raise ValueError("NEXT_PUBLIC_TESTNET_FACTORY_ADDRESS not found in .env")
         
-        # Ensure private key has 0x prefix
+        # Setup Web3
+        self.rpc_url = "https://avax-fuji.g.alchemy.com/v2/7NBTdVMFlqXaf5D-r-0kb73aehWeZ1Aj"
+        self.w3 = Web3(Web3.HTTPProvider(self.rpc_url))
+        
         if not self.private_key.startswith('0x'):
             self.private_key = f"0x{self.private_key}"
         
         self.account = Account.from_key(self.private_key)
         
-        # Initialize contract
-        self.update_contracts()
+        # Contract ABIs
+        self.factory_abi = [
+            {
+                "inputs": [
+                    {"internalType": "string", "name": "name", "type": "string"},
+                    {"internalType": "string", "name": "symbol", "type": "string"},
+                    {"internalType": "string", "name": "imageUrl", "type": "string"},
+                    {"internalType": "address", "name": "burnManager", "type": "address"}
+                ],
+                "name": "createToken",
+                "outputs": [{"internalType": "address", "name": "", "type": "address"}],
+                "stateMutability": "nonpayable",
+                "type": "function"
+            },
+            {
+                "inputs": [{"internalType": "address", "name": "token", "type": "address"}],
+                "name": "buy",
+                "outputs": [],
+                "stateMutability": "payable",
+                "type": "function"
+            },
+            {
+                "inputs": [
+                    {"internalType": "address", "name": "token", "type": "address"},
+                    {"internalType": "uint256", "name": "amount", "type": "uint256"}
+                ],
+                "name": "sell",
+                "outputs": [],
+                "stateMutability": "nonpayable",
+                "type": "function"
+            },
+            {
+                "inputs": [],
+                "name": "getAllTokens",
+                "outputs": [{"internalType": "address[]", "name": "", "type": "address[]"}],
+                "stateMutability": "view",
+                "type": "function"
+            },
+            {
+                "inputs": [{"internalType": "address", "name": "tokenAddress", "type": "address"}],
+                "name": "lastPrice",
+                "outputs": [{"internalType": "uint256", "name": "", "type": "uint256"}],
+                "stateMutability": "view",
+                "type": "function"
+            },
+            {
+                "inputs": [{"internalType": "address", "name": "tokenAddress", "type": "address"}],
+                "name": "getTokenState",
+                "outputs": [{"internalType": "uint8", "name": "", "type": "uint8"}],
+                "stateMutability": "view",
+                "type": "function"
+            }
+        ]
         
-        # Set trading parameters from config
-        self.update_trading_params()
-
-    def update_contracts(self):
-        """Update contract instances from config"""
+        self.token_abi = [
+            {
+                "inputs": [{"internalType": "address", "name": "account", "type": "address"}],
+                "name": "balanceOf",
+                "outputs": [{"internalType": "uint256", "name": "", "type": "uint256"}],
+                "stateMutability": "view",
+                "type": "function"
+            },
+            {
+                "inputs": [],
+                "name": "name",
+                "outputs": [{"internalType": "string", "name": "", "type": "string"}],
+                "stateMutability": "view",
+                "type": "function"
+            },
+            {
+                "inputs": [],
+                "name": "symbol",
+                "outputs": [{"internalType": "string", "name": "", "type": "string"}],
+                "stateMutability": "view",
+                "type": "function"
+            }
+        ]
+        
+        # Initialize contract
         self.factory_contract = self.w3.eth.contract(
-            address=self.w3.to_checksum_address(self.config.data["factory_address"]),
-            abi=FACTORY_ABI
+            address=self.w3.to_checksum_address(self.factory_address),
+            abi=self.factory_abi
         )
+        
+        # Trading parameters (can be overridden)
+        self.min_trade_amount = min_trade or 0.001  # 0.001 AVAX
+        self.max_trade_amount = max_trade or 0.01   # 0.01 AVAX
+        self.min_interval = min_interval or 10      # 10 seconds between trades
+        self.max_interval = max_interval or 60      # 60 seconds between trades
+        
+        # Token creation parameters
+        self.create_token_chance = create_chance or 0.05  # 5% chance to create new token each cycle
+        
+        # Track balances
+        self.starting_balance = self.get_avax_balance()
+        
+        # Display account info BEFORE refreshing token list
+        print(f"🤖 Simple Volume Bot initialized")
+        print(f"📍 Account: {self.account.address}")
+        print(f"🏭 Factory: {self.factory_address}")
+        print(f"💰 Starting Balance: {self.starting_balance:.6f} AVAX")
+        print(f"⚙️  Settings:")
+        print(f"   💸 Trade size: {self.min_trade_amount:.4f} - {self.max_trade_amount:.4f} AVAX")
+        print(f"   ⏰ Interval: {self.min_interval}s - {self.max_interval}s")
+        print(f"   🎲 Token creation chance: {self.create_token_chance*100:.1f}%")
 
-    def update_trading_params(self):
-        """Update trading parameters from config"""
-        params = self.config.data["trading_params"]
-        self.min_trade_interval = params["min_trade_interval"]
-        self.max_trade_interval = params["max_trade_interval"]
-        self.min_avax = params["min_avax"]
-        self.max_avax = params["max_avax"]
-        self.max_avax_risk = params["max_avax_risk"]
+        # Load tokens from factory contract
+        self.refresh_token_list()
+        
+        print(f"🪙 Found {len(self.tokens)} tokens")
 
-    def get_account_balance(self):
-        return self.w3.eth.get_balance(self.account.address)
+    def refresh_token_list(self):
+        """Get list of all tokens from the factory contract"""
+        try:
+            print("🔄 Fetching tokens from factory contract...")
+            token_addresses = self.factory_contract.functions.getAllTokens().call()
+            
+            self.tokens = []
+            for address in token_addresses:
+                try:
+                    # Get token info
+                    token_contract = self.w3.eth.contract(
+                        address=self.w3.to_checksum_address(address),
+                        abi=self.token_abi
+                    )
+                    
+                    name = token_contract.functions.name().call()
+                    symbol = token_contract.functions.symbol().call()
+                    
+                    # Get token state (1 = TRADING, 2 = GOAL_REACHED, etc.)
+                    state = self.factory_contract.functions.getTokenState(address).call()
+                    
+                    # Only include trading tokens
+                    if state in [1, 4]:  # TRADING or RESUMED
+                        token_info = {
+                            "address": address,
+                            "name": name,
+                            "symbol": symbol,
+                            "state": state
+                        }
+                        self.tokens.append(token_info)
+                        print(f"  ✅ {name} ({symbol}) - {address}")
+                    else:
+                        print(f"  ⏭️  Skipping {address} (state: {state})")
+                        
+                except Exception as e:
+                    print(f"  ❌ Error reading token {address}: {e}")
+            
+            print(f"📊 Loaded {len(self.tokens)} tradeable tokens")
+            
+        except Exception as e:
+            print(f"❌ Error fetching tokens from factory: {e}")
+            self.tokens = []
+
+    def get_token_price(self, token_address):
+        """Get current token price from factory"""
+        try:
+            price_wei = self.factory_contract.functions.lastPrice(
+                self.w3.to_checksum_address(token_address)
+            ).call()
+            return float(self.w3.from_wei(price_wei, 'ether'))
+        except Exception as e:
+            print(f"❌ Error getting price for {token_address}: {e}")
+            return 0.0
+
+    def get_avax_balance(self):
+        """Get AVAX balance"""
+        balance_wei = self.w3.eth.get_balance(self.account.address)
+        return float(self.w3.from_wei(balance_wei, 'ether'))
 
     def get_token_balance(self, token_address):
-        token_contract = self.w3.eth.contract(
-            address=self.w3.to_checksum_address(token_address),
-            abi=TOKEN_ABI
-        )
-        return token_contract.functions.balanceOf(self.account.address).call()
-
-    def log_balances(self, token_address, action=""):
-        """Log AVAX and token balances with proper formatting"""
-        avax_balance = self.w3.from_wei(self.get_account_balance(), 'ether')
-        token_balance = self.get_token_balance(token_address)
-        
-        print(f"\n💰 Current balances {action}:")
-        print(f"AVAX: {avax_balance:.6f}")
-        print(f"Token: {format_token_amount(token_balance)}")
-        
-        return avax_balance, token_balance
-
-    def execute_buy(self, token_address, amount):
+        """Get token balance"""
         try:
-            # Log before balances
-            print("\n📊 Balances before buy:")
-            avax_before, token_before = self.log_balances(token_address, "before")
+            token_contract = self.w3.eth.contract(
+                address=self.w3.to_checksum_address(token_address),
+                abi=self.token_abi
+            )
+            return token_contract.functions.balanceOf(self.account.address).call()
+        except Exception as e:
+            print(f"❌ Error getting token balance for {token_address}: {e}")
+            return 0
+
+    def create_random_token(self):
+        """Create a new random token with clever names and real images"""
+        try:
+            # Themed token collections with clever names
+            token_themes = {
+                "space": {
+                    "names": ["StarForge", "CosmoVault", "NebulaRise", "GalaxyShift", "OrbitCoin", 
+                             "AstroLaunch", "SolarFlare", "MeteorStrike", "VoidWalker", "SpaceForce"],
+                    "symbols": ["STAR", "COSMO", "NOVA", "ORBIT", "SOLAR", "ASTRO", "VOID", "SPACE", "LUNA", "MARS"],
+                    "images": ["galaxy", "space", "planet", "star", "nebula", "rocket", "astronaut", "satellite"]
+                },
+                "nature": {
+                    "names": ["ThunderStorm", "OceanWave", "MountainPeak", "ForestGreen", "DesertSand",
+                             "RiverFlow", "SkyHigh", "EarthCore", "WindStorm", "SunRise"],
+                    "symbols": ["STORM", "WAVE", "PEAK", "FOREST", "SAND", "RIVER", "SKY", "EARTH", "WIND", "SUN"],
+                    "images": ["nature", "forest", "ocean", "mountain", "storm", "sunset", "tree", "landscape"]
+                },
+                "crypto": {
+                    "names": ["DiamondHands", "MoonLambo", "RocketFuel", "GemHunter", "ChartKing",
+                             "BullRun", "DipBuyer", "HODLStrong", "ApeToken", "DegenCoin"],
+                    "symbols": ["DIAM", "MOON", "ROCKET", "GEM", "CHART", "BULL", "DIP", "HODL", "APE", "DEGEN"],
+                    "images": ["diamond", "rocket", "chart", "bull", "gem", "coin", "money", "gold"]
+                },
+                "tech": {
+                    "names": ["CyberNet", "DataStream", "CodeForge", "ByteShift", "PixelCraft",
+                             "CloudNine", "NetCore", "TechFlow", "DigitalAge", "BinaryCode"],
+                    "symbols": ["CYBER", "DATA", "CODE", "BYTE", "PIXEL", "CLOUD", "NET", "TECH", "DIGI", "BIN"],
+                    "images": ["computer", "technology", "robot", "circuit", "digital", "cyber", "matrix", "code"]
+                },
+                "fantasy": {
+                    "names": ["DragonFire", "MagicSpell", "WizardGold", "PhoenixRise", "MysticRune",
+                             "CrystalShard", "ShadowBlade", "ElvenCoin", "DwarfGold", "OrcSlayer"],
+                    "symbols": ["DRAG", "MAGIC", "WIZ", "FIRE", "RUNE", "CRYST", "SHADE", "ELF", "DWARF", "ORC"],
+                    "images": ["dragon", "magic", "crystal", "fire", "fantasy", "wizard", "castle", "sword"]
+                },
+                "gaming": {
+                    "names": ["PowerUp", "BossRaid", "LevelMax", "QuestGold", "PlayerOne",
+                             "GameOver", "HighScore", "SpeedRun", "NoobSlayer", "ProGamer"],
+                    "symbols": ["PWR", "BOSS", "LVL", "QUEST", "P1", "GAME", "SCORE", "SPEED", "NOOB", "PRO"],
+                    "images": ["game", "controller", "arcade", "pixel", "joystick", "gaming", "player", "console"]
+                }
+            }
+            
+            # Pick random theme
+            theme_name = random.choice(list(token_themes.keys()))
+            theme = token_themes[theme_name]
+            
+            # Generate unique name with minimal numbers
+            base_name = random.choice(theme["names"])
+            symbol_base = random.choice(theme["symbols"])
+            
+            # Sometimes add a small number, sometimes use name as-is
+            if random.random() < 0.3:  # 30% chance of adding a number
+                number = random.randint(2, 9)  # Small single digit
+                name = f"{base_name}{number}"
+            else:
+                name = base_name  # Use name as-is
+            
+            # Symbol gets a small number more often to ensure uniqueness
+            if random.random() < 0.7:  # 70% chance of number in symbol
+                symbol = f"{symbol_base}{random.randint(2, 9)}"
+            else:
+                symbol = symbol_base
+            
+            # Get themed image from Lorem Picsum (free, no rate limits)
+            image_keyword = random.choice(theme["images"])
+            # Generate a unique seed based on the token name for consistent images
+            seed = hash(name) % 10000
+            image_size = random.choice([200, 300, 400])  # Vary image sizes
+            
+            # Lorem Picsum provides beautiful, random images
+            image_url = f"https://picsum.photos/seed/{seed}_{image_keyword}/{image_size}/{image_size}"
+            
+            print(f"🎨 Creating {theme_name}-themed token: {name} ({symbol})")
+            print(f"🖼️  Image: {image_url}")
+            
+            # Zero address for burn manager (no burn manager)
+            burn_manager = "0x0000000000000000000000000000000000000000"
             
             nonce = self.w3.eth.get_transaction_count(self.account.address)
             gas_price = self.w3.eth.gas_price
             
-            # Build buy transaction
-            buy_txn = self.factory_contract.functions.buy(
+            # Build transaction
+            txn = self.factory_contract.functions.createToken(
+                name, symbol, image_url, burn_manager
+            ).build_transaction({
+                'from': self.account.address,
+                'gas': 3000000,
+                'gasPrice': gas_price,
+                'nonce': nonce,
+                'chainId': 43113
+            })
+            
+            # Sign and send
+            signed_txn = self.account.sign_transaction(txn)
+            tx_hash = self.w3.eth.send_raw_transaction(signed_txn.raw_transaction)
+            
+            print(f"🔄 Creating token {name} ({symbol})...")
+            print(f"📝 TX: {self.w3.to_hex(tx_hash)}")
+            
+            # Wait for confirmation
+            receipt = self.w3.eth.wait_for_transaction_receipt(tx_hash, timeout=120)
+            
+            if receipt.status == 1:
+                print(f"✅ Token created: {name} ({symbol}) - Theme: {theme_name}")
+                
+                # Refresh token list to include the new token
+                print("🔄 Refreshing token list after creation...")
+                self.refresh_token_list()
+                print(f"📊 Now tracking {len(self.tokens)} tokens")
+                return True
+            else:
+                print(f"❌ Token creation failed")
+                return False
+                
+        except Exception as e:
+            print(f"❌ Error creating token: {e}")
+            return False
+
+    def execute_buy(self, token_address, amount_avax):
+        """Execute a buy order"""
+        try:
+            nonce = self.w3.eth.get_transaction_count(self.account.address)
+            gas_price = self.w3.eth.gas_price
+            amount_wei = self.w3.to_wei(amount_avax, 'ether')
+            
+            txn = self.factory_contract.functions.buy(
                 self.w3.to_checksum_address(token_address)
             ).build_transaction({
                 'from': self.account.address,
-                'value': amount,
+                'value': amount_wei,
                 'gas': 500000,
                 'gasPrice': gas_price,
                 'nonce': nonce,
-                'chainId': 43113  # Fuji testnet
+                'chainId': 43113
             })
             
-            # Sign and send transaction
-            signed_txn = self.account.sign_transaction(buy_txn)
+            signed_txn = self.account.sign_transaction(txn)
             tx_hash = self.w3.eth.send_raw_transaction(signed_txn.raw_transaction)
-            print(f"🔄 Transaction sent: {self.w3.to_hex(tx_hash)}")
             
-            # Wait for transaction receipt
-            tx_receipt = self.w3.eth.wait_for_transaction_receipt(tx_hash)
+            print(f"🟢 BUY: {amount_avax:.4f} AVAX for {token_address[:10]}...")
+            receipt = self.w3.eth.wait_for_transaction_receipt(tx_hash, timeout=60)
             
-            # Log after balances
-            print("\n📊 Balances after buy:")
-            avax_after, token_after = self.log_balances(token_address, "after")
-            
-            print(f"\n✅ Buy successful!")
-            print(f"Amount spent: {self.w3.from_wei(amount, 'ether')} AVAX")
-            print(f"Tokens received: {format_token_amount(token_after - token_before)}")
-            print(f"TX: https://testnet.snowtrace.io/tx/{self.w3.to_hex(tx_hash)}")
-            return True
-            
+            if receipt.status == 1:
+                print(f"✅ Buy successful - TX: {self.w3.to_hex(tx_hash)}")
+                return True
+            else:
+                print(f"❌ Buy failed")
+                return False
+                
         except Exception as e:
-            print(f"\n❌ Buy failed: {str(e)}")
+            print(f"❌ Buy error: {e}")
             return False
 
-    def execute_sell(self, token_address, amount):
+    def execute_sell(self, token_address, amount_tokens):
+        """Execute a sell order"""
         try:
-            # Log before balances
-            print("\n📊 Balances before sell:")
-            avax_before, token_before = self.log_balances(token_address, "before")
-            
             nonce = self.w3.eth.get_transaction_count(self.account.address)
             gas_price = self.w3.eth.gas_price
             
-            # Build sell transaction
-            sell_txn = self.factory_contract.functions.sell(
+            txn = self.factory_contract.functions.sell(
                 self.w3.to_checksum_address(token_address),
-                amount
+                amount_tokens
             ).build_transaction({
                 'from': self.account.address,
                 'gas': 500000,
                 'gasPrice': gas_price,
                 'nonce': nonce,
-                'chainId': 43113  # Fuji testnet
+                'chainId': 43113
             })
             
-            # Sign and send transaction
-            signed_txn = self.account.sign_transaction(sell_txn)
+            signed_txn = self.account.sign_transaction(txn)
             tx_hash = self.w3.eth.send_raw_transaction(signed_txn.raw_transaction)
-            print(f"🔄 Transaction sent: {self.w3.to_hex(tx_hash)}")
             
-            # Wait for transaction receipt
-            tx_receipt = self.w3.eth.wait_for_transaction_receipt(tx_hash)
+            print(f"🔴 SELL: {amount_tokens/1e18:.4f} tokens for {token_address[:10]}...")
+            receipt = self.w3.eth.wait_for_transaction_receipt(tx_hash, timeout=60)
             
-            # Log after balances
-            print("\n📊 Balances after sell:")
-            avax_after, token_after = self.log_balances(token_address, "after")
-            
-            print(f"\n✅ Sell successful!")
-            print(f"Tokens sold: {format_token_amount(amount)}")
-            print(f"AVAX received: {avax_after - avax_before:.6f}")
-            print(f"TX: https://testnet.snowtrace.io/tx/{self.w3.to_hex(tx_hash)}")
-            return True
-            
+            if receipt.status == 1:
+                print(f"✅ Sell successful - TX: {self.w3.to_hex(tx_hash)}")
+                return True
+            else:
+                print(f"❌ Sell failed")
+                return False
+                
         except Exception as e:
-            print(f"\n❌ Sell failed: {str(e)}")
+            print(f"❌ Sell error: {e}")
             return False
 
-    def auto_trade(self, token_index):
-        tokens = self.config.data["tokens"]
-        if token_index < 0 or token_index >= len(tokens):
-            print("Invalid token index")
+    def random_trade_cycle(self):
+        """Execute one random trading cycle"""
+        current_balance = self.get_avax_balance()
+        
+        # Refresh token list every 20 cycles or if we have no tokens
+        if not hasattr(self, 'cycle_count'):
+            self.cycle_count = 0
+        self.cycle_count += 1
+        
+        if self.cycle_count % 20 == 0 or not self.tokens:
+            print("🔄 Refreshing token list...")
+            self.refresh_token_list()
+        
+        # Check if we should create a new token
+        if random.random() < self.create_token_chance and current_balance > 0.1:
+            print(f"🎲 Creating new token...")
+            self.create_random_token()
             return
-
-        token_address = tokens[token_index]
-        print(f"\n🤖 Starting auto trading for token {token_index + 1}")
-        print(f"Token address: {token_address}")
-
-        while True:
-            try:
-                # Check balances
-                avax_balance = self.w3.from_wei(self.get_account_balance(), 'ether')
-                token_balance = self.get_token_balance(token_address)
-                
-                print(f"\n💰 Current balances:")
-                print(f"AVAX: {avax_balance:.6f}")
-                print(f"Token: {format_token_amount(token_balance)}")
-
-                # Decide to buy or sell
-                if token_balance > 0:
-                    action = random.choice(['buy', 'sell'])
-                else:
-                    action = 'buy'
-
-                if action == 'buy' and avax_balance > self.min_avax:
-                    # Calculate buy amount
-                    max_possible = min(float(avax_balance), self.max_avax_risk)
-                    amount = random.uniform(self.min_avax, min(self.max_avax, max_possible))
-                    amount_wei = self.w3.to_wei(amount, 'ether')
-                    
-                    print(f"\n🛒 Attempting buy of {amount:.6f} AVAX")
-                    self.execute_buy(token_address, amount_wei)
-
-                elif action == 'sell' and token_balance > 0:
-                    # Sell a random portion of holdings
-                    amount = random.randint(1, token_balance)
-                    print(f"\n💰 Attempting sell of {format_token_amount(amount)} tokens")
-                    self.execute_sell(token_address, amount)
-
-                # Random delay before next trade
-                delay = random.randint(self.min_trade_interval, self.max_trade_interval)
-                print(f"\n⏳ Waiting {delay} seconds until next trade...")
-                time.sleep(delay)
-
-            except KeyboardInterrupt:
-                print("\n🛑 Stopping auto trading...")
-                break
-            except Exception as e:
-                print(f"\n⚠️ Error: {str(e)}")
-                print("Waiting 30 seconds before retrying...")
-                time.sleep(30)
-
-    def config_menu(self):
-        while True:
-            print("\n=== Configuration Menu ===")
-            print("1. View current config")
-            print("2. Add token")
-            print("3. Remove token")
-            print("4. Update factory address")
-            print("5. Back to main menu")
+        
+        # Skip if no tokens or low balance
+        if not self.tokens or current_balance < self.min_trade_amount * 2:
+            print(f"⏭️  Skipping: No tokens ({len(self.tokens)}) or low balance ({current_balance:.6f} AVAX)")
+            return
+        
+        # Pick a random token
+        token = random.choice(self.tokens)
+        token_address = token["address"]
+        token_name = token.get("name", "Unknown")
+        token_symbol = token.get("symbol", "???")
+        
+        print(f"🎯 Selected token: {token_name} ({token_symbol}) - {token_address}")
+        
+        # Get current price and token balance
+        current_price = self.get_token_price(token_address)
+        token_balance = self.get_token_balance(token_address)
+        current_avax = self.get_avax_balance()
+        
+        print(f"💰 Current AVAX balance: {current_avax:.6f}")
+        print(f"🪙 Token balance: {token_balance/1e18:.6f} {token_symbol}")
+        print(f"💵 Current price: {current_price:.8f} AVAX")
+        
+        # Decide: buy or sell
+        if token_balance > 1000:  # Have some tokens (accounting for 18 decimals)
+            action = random.choice(['buy', 'sell'])
+        else:
+            action = 'buy'
+        
+        print(f"🎲 Action: {action.upper()}")
+        
+        if action == 'buy':
+            # Random buy amount
+            amount = random.uniform(self.min_trade_amount, 
+                                  min(self.max_trade_amount, current_balance * 0.1))
+            print(f"💸 Buying with {amount:.6f} AVAX")
+            self.execute_buy(token_address, amount)
             
-            choice = input("\nChoose option (1-5): ").strip()
+        else:  # sell
+            # Sell random percentage of holdings
+            sell_percentage = random.uniform(0.1, 0.8)
+            amount_to_sell = int(token_balance * sell_percentage)
+            if amount_to_sell > 0:
+                print(f"💰 Selling {amount_to_sell/1e18:.6f} {token_symbol} ({sell_percentage*100:.1f}%)")
+                self.execute_sell(token_address, amount_to_sell)
+            else:
+                print(f"⏭️  Not enough tokens to sell")
+
+    def run_volume_bot(self):
+        """Main bot loop"""
+        print(f"\n🚀 Starting volume bot...")
+        print(f"⚡ Will trade every {self.min_interval}-{self.max_interval} seconds")
+        print(f"🎯 {self.create_token_chance*100}% chance to create new token each cycle")
+        print(f"💰 Trade size: {self.min_trade_amount}-{self.max_trade_amount} AVAX")
+        print(f"Press Ctrl+C to stop\n")
+        
+        cycle_count = 0
+        
+        try:
+            while True:
+                cycle_count += 1
+                timestamp = datetime.now().strftime("%H:%M:%S")
+                print(f"\n[{timestamp}] 🔄 Cycle #{cycle_count}")
+                
+                # Execute trading cycle
+                self.random_trade_cycle()
+                
+                # Status update every 10 cycles
+                if cycle_count % 10 == 0:
+                    balance = self.get_avax_balance()
+                    print(f"\n📊 Status Update - Cycle #{cycle_count}")
+                    print(f"💰 Balance: {balance:.6f} AVAX")
+                    print(f"🪙 Tokens available: {len(self.tokens)}")
+                    if self.tokens:
+                        print("📋 Token list:")
+                        for i, token in enumerate(self.tokens[:5]):  # Show first 5
+                            balance = self.get_token_balance(token["address"])
+                            print(f"  {i+1}. {token['name']} ({token['symbol']}) - Balance: {balance/1e18:.4f}")
+                        if len(self.tokens) > 5:
+                            print(f"  ... and {len(self.tokens)-5} more tokens")
+                    print("-" * 50)
+                
+                # Random delay
+                delay = random.randint(self.min_interval, self.max_interval)
+                print(f"⏳ Waiting {delay}s...")
+                time.sleep(delay)
+                
+        except KeyboardInterrupt:
+            print(f"\n🛑 Bot stopped by user after {cycle_count} cycles")
+            ending_balance = self.get_avax_balance()
+            balance_change = ending_balance - self.starting_balance
+            print(f"📊 FINAL SUMMARY")
+            print(f"💰 Starting balance: {self.starting_balance:.6f} AVAX")
+            print(f"💰 Ending balance: {ending_balance:.6f} AVAX")
+            if balance_change >= 0:
+                print(f"📈 Profit: +{balance_change:.6f} AVAX (+{(balance_change/self.starting_balance)*100:.2f}%)")
+            else:
+                print(f"📉 Loss: {balance_change:.6f} AVAX ({(balance_change/self.starting_balance)*100:.2f}%)")
+            print(f"🔄 Total cycles completed: {cycle_count}")
+        except Exception as e:
+            print(f"\n💥 Bot crashed: {e}")
+            ending_balance = self.get_avax_balance()
+            print(f"💰 Balance at crash: {ending_balance:.6f} AVAX")
+        finally:
+            print(f"👋 Bot session ended")
+
+def main():
+    print("=" * 50)
+    print("🤖 SIMPLE VOLUME BOT FOR DEX TESTING")
+    print("=" * 50)
+    
+    # Add command line argument parsing
+    parser = argparse.ArgumentParser(description='Simple Volume Bot for DEX Testing')
+    parser.add_argument('--min-trade', type=float, help='Minimum trade amount in AVAX (default: 0.001)')
+    parser.add_argument('--max-trade', type=float, help='Maximum trade amount in AVAX (default: 0.01)')
+    parser.add_argument('--min-interval', type=int, help='Minimum seconds between trades (default: 10)')
+    parser.add_argument('--max-interval', type=int, help='Maximum seconds between trades (default: 60)')
+    parser.add_argument('--create-chance', type=float, help='Chance to create new token (0-1, default: 0.05)')
+    parser.add_argument('--auto', action='store_true', help='Start bot automatically without menu')
+    parser.add_argument('--private-key', type=str, help='Override BOT_PRIVATE_KEY from .env file with this key')
+    
+    args = parser.parse_args()
+    
+    try:
+        bot = SimpleVolumeBot(
+            min_trade=args.min_trade,
+            max_trade=args.max_trade,
+            min_interval=args.min_interval,
+            max_interval=args.max_interval,
+            create_chance=args.create_chance,
+            private_key_arg=args.private_key
+        )
+        
+        if args.auto:
+            print("\n🚀 Auto-starting volume bot...")
+            bot.run_volume_bot()
+        else:
+            print("\nOptions:")
+            print("1. Start volume bot")
+            print("2. Create one token")
+            print("3. Manual trade")
+            print("4. Exit")
+            
+            choice = input("\nSelect option (1-4): ").strip()
             
             if choice == "1":
-                print("\nCurrent configuration:")
-                print(json.dumps(self.config.data, indent=2))
-                
+                bot.run_volume_bot()
             elif choice == "2":
-                token = input("Enter token address: ").strip()
-                if self.config.add_token(token):
-                    print("Token added successfully")
-                else:
-                    print("Token already exists")
-                    
+                bot.create_random_token()
             elif choice == "3":
-                print("\nAvailable tokens:")
-                for i, token in enumerate(self.config.data["tokens"], 1):
-                    print(f"{i}. {token}")
-                idx = input("\nEnter token number to remove: ").strip()
-                try:
-                    idx = int(idx) - 1
-                    token = self.config.data["tokens"][idx]
-                    if self.config.remove_token(token):
-                        print("Token removed successfully")
-                    else:
-                        print("Token not found")
-                except (ValueError, IndexError):
-                    print("Invalid input")
-                    
+                print("Manual trading not implemented in simple version")
             elif choice == "4":
-                address = input("Enter new factory address: ").strip()
-                self.config.update_factory(address)
-                self.update_contracts()
-                print("Factory address updated successfully")
+                print("👋 Goodbye!")
+            else:
+                print("❌ Invalid choice")
                 
-            elif choice == "5":
-                break
+    except Exception as e:
+        print(f"💥 Error: {e}")
 
-    def manual_trade(self):
-        while True:
-            tokens = self.config.data["tokens"]
-            print("\n=== Available Tokens ===")
-            for i, token in enumerate(tokens, 1):
-                balance = self.get_token_balance(token)
-                print(f"{i}. Token {i} - Balance: {format_token_amount(balance)}")
-            
-            print("\nOptions:")
-            print("1. Manual Buy")
-            print("2. Manual Sell")
-            print("3. Auto Trade")
-            print("4. Configuration")
-            print("5. Exit")
-            
-            action = input("\nChoose action (1-5): ").strip()
-            if action == "5":
-                print("Exiting...")
-                break
-
-            if action == "4":
-                self.config_menu()
-                continue
-
-            if action not in ["1", "2", "3"]:
-                print("Invalid choice")
-                continue
-
-            if not tokens:
-                print("No tokens configured. Please add tokens in the configuration menu.")
-                continue
-
-            token_num = int(input(f"Select token number (1-{len(tokens)}): ").strip())
-            if token_num < 1 or token_num > len(tokens):
-                print("Invalid token number")
-                continue
-
-            if action == "3":
-                self.auto_trade(token_num - 1)
-                continue
-                
-            token_address = tokens[token_num - 1]
-
-            if action == "1":  # Manual Buy
-                avax_balance = self.w3.from_wei(self.get_account_balance(), 'ether')
-                print(f"Available AVAX balance: {avax_balance:.6f}")
-                amount = float(input("Enter amount of AVAX to spend: ").strip())
-                if amount > avax_balance:
-                    print("Insufficient balance")
-                    continue
-                amount_wei = self.w3.to_wei(amount, 'ether')
-                self.execute_buy(token_address, amount_wei)
-
-            elif action == "2":  # Manual Sell
-                token_balance = self.get_token_balance(token_address)
-                print(f"Available token balance: {format_token_amount(token_balance)}")
-                amount = int(input("Enter amount of tokens to sell: ").strip())
-                if amount > token_balance:
-                    print("Insufficient balance")
-                    continue
-                self.execute_sell(token_address, amount)
-
-
-# Add this at the end of the file
 if __name__ == "__main__":
-    bot = TradingBot()
-    bot.manual_trade()
-
-print("Script execution completed.")
+    main()

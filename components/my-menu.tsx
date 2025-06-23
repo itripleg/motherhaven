@@ -461,7 +461,7 @@ export default function MyMenu() {
                     <DropdownMenuItem
                       onClick={() =>
                         window.open(
-                          `https://43113.testnet.snowtrace.dev/address/${address}`,
+                          `https://43113.testnet.snowtrace.dev/address/${FACTORY_ADDRESS}`,
                           "_blank"
                         )
                       }
