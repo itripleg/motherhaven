@@ -209,8 +209,12 @@ contract TokenFactory is Ownable, ReentrancyGuard {
     }
 
     /**
-     * @dev Allows the owner to withdraw any ETH accidentally sent to the contract.
-     * @notice This is an emergency function and should be used with caution. It does not touch token collateral.
+     * @dev Allows the owner to withdraw the entire ETH balance of this contract.
+     * @notice This is an emergency function and should be used with extreme caution.
+     * **This includes the collateral ETH backing all existing tokens, which is essential
+     * for users to sell their tokens back to the factory.**
+     * **After this withdrawal, users will be unable to sell their tokens, effectively
+     * breaking the core trading (selling) functionality of the application.**
      */
     function withdrawAll() external onlyOwner {
         uint256 balance = address(this).balance;
