@@ -52,7 +52,7 @@ export default function RootLayout({
           {/* <FactoryGuard> */}
           <WagmiContext>
             <MyMenu />
-            <div className="p-0 md:p-20" />
+            {/* <div className="p-0 md:p-20" /> */}
             <FactoryConfigProvider>
               <EventWatcher />
               {/* <Header /> */}

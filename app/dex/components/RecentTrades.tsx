@@ -46,9 +46,9 @@ export default function RecentTrades({ tokenAddress }: RecentTradesProps) {
   );
 
   return (
-    <Card>
+    <Card className="h-[600px] overflow-y-scroll scrollbar-thin">
       <CardHeader>
-        <CardTitle className="text-base">Recent Trades</CardTitle>
+        <CardTitle className="text-base text-center">Recent Trades</CardTitle>
       </CardHeader>
       <CardContent>
         {loading ? (

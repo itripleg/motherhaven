@@ -82,8 +82,10 @@ export default function RechartsLineChart({
           priceInWei,
         };
       })
-      // FIX: This is the corrected filter syntax
-      .filter((point) => point !== null);
+      .filter(
+        (point): point is { timestamp: number; priceInWei: bigint } =>
+          point !== null
+      );
 
     // 3. Combine the genesis point with actual trades and sort chronologically
     const allPoints = [...processedTrades, genesisPoint].sort(
@@ -120,7 +122,9 @@ export default function RechartsLineChart({
         </h3>
         <p className="text-2xl text-green-400">{displayPrice} AVAX</p>
       </div>
-      {chartData.length > 1 ? (
+      {/* --- MODIFICATION START --- */}
+      {/* Changed condition from chartData.length > 1 to chartData.length > 0 */}
+      {chartData.length > 0 ? (
         <ResponsiveContainer width="100%" height="80%">
           <LineChart
             data={chartData}
@@ -148,19 +152,18 @@ export default function RechartsLineChart({
               dataKey="price"
               stroke="#4ade80"
               strokeWidth={2}
+              // This prop correctly shows a dot for the first point
               dot={chartData.length < 50}
             />
           </LineChart>
         </ResponsiveContainer>
       ) : (
+        // This message now only shows if there is truly no data
         <div className="flex items-center justify-center h-4/5">
-          <p className="text-gray-500">
-            {chartData.length === 1
-              ? "Waiting for the first trade..."
-              : "No trade data available."}
-          </p>
+          <p className="text-gray-500">No trade data available.</p>
         </div>
       )}
+      {/* --- MODIFICATION END --- */}
     </div>
   );
 }
