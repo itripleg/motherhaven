@@ -1,18 +1,20 @@
-// app/api/tvb/webhook/route.ts - IMPROVED VERSION
+// app/api/tvb/webhook/route.ts - CLEAN VERSION
 
 import { NextRequest, NextResponse } from "next/server";
 
-// Bot secrets for authentication
+// Bot secrets for authentication - ONLY hardcoded data
 const BOT_SECRETS = {
   bullish_billy: "bullish_billy_secret_2024",
   jackpot_jax: "jax_trader_secret_2024",
+  melancholy_mort: "melancholy_mort_secret_2024",
 };
 
-// In-memory storage for bot status (use Redis/DB in production)
+// In-memory storage for bot status
 interface BotActivity {
   botName: string;
   displayName: string;
   avatarUrl: string;
+  bio?: string;
   lastSeen: string;
   lastAction: {
     type: string;
@@ -22,9 +24,28 @@ interface BotActivity {
   };
   totalActions: number;
   sessionStarted: string;
+  // Store bot configuration data from bots themselves
+  config?: {
+    buyBias?: number;
+    riskTolerance?: number;
+    minInterval?: number;
+    maxInterval?: number;
+    minTradeAmount?: number;
+    maxTradeAmount?: number;
+    createTokenChance?: number;
+    buyPhrases?: string[];
+    sellPhrases?: string[];
+    createPhrases?: string[];
+    errorPhrases?: string[];
+  };
+  // Store character data from bots themselves
+  character?: {
+    mood?: string;
+    personality?: string;
+  };
 }
 
-// Simple in-memory store (replace with database in production)
+// Simple in-memory store
 const botActivities = new Map<string, BotActivity>();
 
 export async function POST(request: NextRequest) {
@@ -63,11 +84,12 @@ export async function POST(request: NextRequest) {
     let botActivity = botActivities.get(botName);
 
     if (!botActivity) {
-      // First time seeing this bot
+      // First time seeing this bot - create minimal record
       botActivity = {
         botName,
         displayName: displayName || botName,
         avatarUrl: avatarUrl || "",
+        bio: details?.bio, // Get bio from bot data
         lastSeen: timestamp,
         lastAction: {
           type: action,
@@ -77,12 +99,39 @@ export async function POST(request: NextRequest) {
         },
         totalActions: 0,
         sessionStarted: timestamp,
+        character: details?.character, // Get character from bot data
+        config: details?.config, // Get config from bot data
       };
 
       console.log(`🤖 New bot registered: ${displayName}`);
     }
 
-    // Update bot activity
+    // Handle startup action specially
+    if (action === "startup") {
+      // Reset for new session
+      botActivity.sessionStarted = timestamp;
+      botActivity.totalActions = 0;
+
+      // Update bot metadata from startup details
+      if (details?.bio) botActivity.bio = details.bio;
+      if (details?.character) botActivity.character = details.character;
+      if (details?.config) botActivity.config = details.config;
+
+      console.log(`🚀 ${displayName} started new session`);
+      if (details?.startingBalance) {
+        console.log(
+          `   💰 Starting balance: ${details.startingBalance.toFixed(4)} AVAX`
+        );
+      }
+      if (details?.tokensFound) {
+        console.log(`   🎯 Found ${details.tokensFound} tradeable tokens`);
+      }
+    } else {
+      // Regular action - increment counter
+      botActivity.totalActions += 1;
+    }
+
+    // Update last seen and action
     botActivity.lastSeen = timestamp;
     botActivity.lastAction = {
       type: action,
@@ -90,31 +139,56 @@ export async function POST(request: NextRequest) {
       details: details || {},
       timestamp,
     };
-    botActivity.totalActions += 1;
+
+    // Handle config updates
+    if (action === "config_update" && details?.config) {
+      botActivity.config = details.config;
+    }
 
     // Store updated activity
     botActivities.set(botName, botActivity);
 
     // Log the activity
-    console.log(
-      `🔄 ${displayName}: ${action} - ${botActivity.lastAction.message}`
-    );
+    const logMessage = `🔄 ${displayName}: ${action}`;
+    if (details?.message) {
+      console.log(`${logMessage} - ${details.message}`);
+    } else {
+      console.log(logMessage);
+    }
 
     // Log additional details based on action type
-    if (action === "buy" && details?.tokenSymbol) {
-      console.log(
-        `   💰 Bought ${details.tokenSymbol} with ${details.amountAvax} AVAX`
-      );
-    } else if (action === "sell" && details?.tokenSymbol) {
-      console.log(
-        `   📈 Sold ${details.tokenSymbol} (${details.sellPercentage?.toFixed(
-          1
-        )}%)`
-      );
-    } else if (action === "create_token" && details?.tokenName) {
-      console.log(
-        `   🎨 Created token: ${details.tokenName} (${details.tokenSymbol})`
-      );
+    if (action === "buy" && details) {
+      if (details.tokenSymbol && details.amountAvax) {
+        console.log(
+          `   💰 Bought ${details.tokenSymbol} with ${details.amountAvax} AVAX`
+        );
+      }
+      if (details.txHash) {
+        console.log(`   📋 TX: ${details.txHash}`);
+      }
+    } else if (action === "sell" && details) {
+      if (details.tokenSymbol) {
+        const percentage = details.sellPercentage
+          ? `${details.sellPercentage.toFixed(1)}%`
+          : "";
+        console.log(`   📈 Sold ${details.tokenSymbol} ${percentage}`);
+      }
+      if (details.txHash) {
+        console.log(`   📋 TX: ${details.txHash}`);
+      }
+    } else if (action === "create_token" && details) {
+      if (details.tokenName && details.tokenSymbol) {
+        console.log(
+          `   🎨 Created token: ${details.tokenName} (${details.tokenSymbol})`
+        );
+      }
+    } else if (action === "heartbeat" && details) {
+      if (details.currentBalance !== undefined) {
+        console.log(`   💰 Balance: ${details.currentBalance.toFixed(4)} AVAX`);
+      }
+      if (details.tokensTracked !== undefined) {
+        console.log(`   🎯 Tracking: ${details.tokensTracked} tokens`);
+      }
     }
 
     return NextResponse.json({
@@ -140,13 +214,9 @@ export async function POST(request: NextRequest) {
 
 export async function GET(request: NextRequest) {
   try {
-    // Add logging to track GET requests
-    const requestSource = request.headers.get("X-Request-Source");
-    const userAgent = request.headers.get("User-Agent");
+    console.log(`📊 GET request received from frontend`);
 
-    console.log(`📊 GET request received from: ${requestSource || "unknown"}`);
-
-    // Return current bot statuses for the frontend
+    // Return current bot statuses
     const currentTime = Date.now();
     const OFFLINE_THRESHOLD = 5 * 60 * 1000; // 5 minutes
 
@@ -158,11 +228,14 @@ export async function GET(request: NextRequest) {
         name: bot.botName,
         displayName: bot.displayName,
         avatarUrl: bot.avatarUrl,
+        bio: bot.bio,
         isOnline,
         lastSeen: bot.lastSeen,
         lastAction: bot.lastAction,
         totalActions: bot.totalActions,
         sessionStarted: bot.sessionStarted,
+        character: bot.character,
+        config: bot.config,
       };
     });
 
