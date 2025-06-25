@@ -23,21 +23,29 @@ interface BotCardProps {
 
 const BotCard: React.FC<BotCardProps> = ({ bot, index }) => {
   const router = useRouter();
-  const [isNewAction, setIsNewAction] = React.useState(false);
   const [lastActionKey, setLastActionKey] = React.useState("");
+  const [lastMessageKey, setLastMessageKey] = React.useState("");
 
-  // Track when last action changes to trigger animation
+  // Track action changes for subtle animations
   React.useEffect(() => {
     if (bot.lastAction) {
-      const newKey = `${bot.lastAction.type}-${bot.lastAction.timestamp}`;
-      if (newKey !== lastActionKey) {
-        setLastActionKey(newKey);
-        setIsNewAction(true);
-        const timer = setTimeout(() => setIsNewAction(false), 3000);
-        return () => clearTimeout(timer);
+      const actionKey = `${bot.lastAction.type}-${bot.lastAction.timestamp}`;
+      const messageKey = `${bot.lastAction.message}-${bot.lastAction.timestamp}`;
+
+      if (actionKey !== lastActionKey) {
+        setLastActionKey(actionKey);
+      }
+      if (messageKey !== lastMessageKey) {
+        setLastMessageKey(messageKey);
       }
     }
-  }, [bot.lastAction?.timestamp, bot.lastAction?.type, lastActionKey]);
+  }, [
+    bot.lastAction?.timestamp,
+    bot.lastAction?.type,
+    bot.lastAction?.message,
+    lastActionKey,
+    lastMessageKey,
+  ]);
 
   const handleImageError = (
     e: React.SyntheticEvent<HTMLImageElement, Event>
@@ -61,14 +69,25 @@ const BotCard: React.FC<BotCardProps> = ({ bot, index }) => {
       (Date.now() - new Date(bot.sessionStarted).getTime()) / 3600000
     ) || 0;
 
-  // Extract token info from last action details
+  // Extract token info from last action details based on webhook structure
   const getTokenInfo = () => {
-    if (!bot.lastAction?.details) return null;
-
-    const { tokenAddress, tokenSymbol } = bot.lastAction.details;
-    if (tokenAddress && tokenSymbol) {
-      return { address: tokenAddress, symbol: tokenSymbol };
+    if (!bot.lastAction?.details) {
+      return null;
     }
+
+    const details = bot.lastAction.details;
+
+    // Based on webhook code: tokenSymbol and tokenName are direct properties
+    const tokenSymbol = details.tokenSymbol;
+    const tokenAddress = details.tokenAddress || details.contractAddress;
+
+    if (tokenSymbol) {
+      return {
+        address: tokenAddress || "unknown",
+        symbol: tokenSymbol,
+      };
+    }
+
     return null;
   };
 
@@ -79,14 +98,10 @@ const BotCard: React.FC<BotCardProps> = ({ bot, index }) => {
       initial={{ opacity: 0, y: 20 }}
       animate={{ opacity: 1, y: 0 }}
       transition={{ delay: index * 0.1 }}
-      className="h-full" // Ensure motion.div takes full height
+      className="h-full"
     >
       <Card
-        className={`bg-gray-800/50 border-gray-700/50 backdrop-blur-sm hover:bg-gray-800/70 transition-all duration-500 cursor-pointer group relative overflow-hidden h-[580px] flex flex-col ${
-          isNewAction
-            ? "ring-2 ring-purple-400/50 shadow-lg shadow-purple-400/20 animate-pulse"
-            : ""
-        }`}
+        className="bg-gray-800/50 border-gray-700/50 backdrop-blur-sm hover:bg-gray-800/70 transition-all duration-300 cursor-pointer group relative overflow-hidden"
         onClick={handleCardClick}
       >
         {/* Background */}
@@ -101,7 +116,7 @@ const BotCard: React.FC<BotCardProps> = ({ bot, index }) => {
         {/* Content */}
         <div className="relative z-10 flex flex-col h-full">
           {/* Header - Fixed Height */}
-          <CardHeader className="pb-3 flex-shrink-0">
+          <CardHeader className="pb-3 flex-shrink-0 h-[140px]">
             <div className="flex items-center justify-between mb-4">
               <Badge className={getStatusColor(bot.isOnline)} variant="outline">
                 {bot.isOnline ? (
@@ -138,11 +153,11 @@ const BotCard: React.FC<BotCardProps> = ({ bot, index }) => {
                   <div className="absolute -bottom-1 -right-1 w-5 h-5 bg-green-500 rounded-full border-2 border-gray-800 animate-pulse" />
                 )}
               </div>
-              <div className="flex-1">
-                <CardTitle className="text-white text-lg">
+              <div className="flex-1 min-w-0">
+                <CardTitle className="text-white text-lg truncate">
                   {bot.displayName}
                 </CardTitle>
-                <p className="text-gray-400 text-sm">
+                <p className="text-gray-400 text-sm truncate">
                   {bot.character?.personality?.replace(/_/g, " ") ||
                     "Trading Bot"}
                 </p>
@@ -151,119 +166,128 @@ const BotCard: React.FC<BotCardProps> = ({ bot, index }) => {
           </CardHeader>
 
           {/* Content - Flexible Height */}
-          <CardContent className="flex-1 flex flex-col justify-between space-y-4">
+          <CardContent className="flex-1 flex flex-col space-y-4 pb-4">
             {/* Bio Section - Fixed Height */}
-            <div className="h-20 flex-shrink-0">
-              {bot.bio && (
+            <div className="h-[60px] flex-shrink-0">
+              {bot.bio ? (
                 <div className="p-3 bg-gray-700/30 rounded-lg border border-gray-600/30 h-full overflow-hidden">
-                  <p className="text-gray-300 text-sm italic leading-relaxed overflow-hidden text-ellipsis">
+                  <p className="text-gray-300 text-sm italic leading-tight overflow-hidden text-ellipsis">
                     "
-                    {bot.bio.length > 100
-                      ? `${bot.bio.substring(0, 100)}...`
+                    {bot.bio.length > 80
+                      ? `${bot.bio.substring(0, 80)}...`
                       : bot.bio}
                     "
+                  </p>
+                </div>
+              ) : (
+                <div className="p-3 bg-gray-700/20 rounded-lg border border-gray-600/20 h-full flex items-center justify-center">
+                  <p className="text-gray-500 text-sm italic">
+                    No bio available
                   </p>
                 </div>
               )}
             </div>
 
             {/* Stats Grid - Fixed Height */}
-            <div className="grid grid-cols-2 gap-3 flex-shrink-0">
-              <div className="text-center p-2 bg-blue-500/10 rounded-lg">
+            <div className="grid grid-cols-2 gap-3 flex-shrink-0 h-[60px]">
+              <div className="text-center p-2 bg-blue-500/10 rounded-lg flex flex-col justify-center">
                 <p className="text-white font-bold text-lg">
                   {bot.totalActions || 0}
                 </p>
                 <p className="text-gray-400 text-xs">Actions</p>
               </div>
-              <div className="text-center p-2 bg-purple-500/10 rounded-lg">
+              <div className="text-center p-2 bg-purple-500/10 rounded-lg flex flex-col justify-center">
                 <p className="text-white font-bold text-lg">{uptimeHours}h</p>
                 <p className="text-gray-400 text-xs">Uptime</p>
               </div>
             </div>
 
             {/* Last Action Info - Fixed Height */}
-            <div className="flex-shrink-0 space-y-2">
-              {bot.lastAction && (
+            <div className="flex-shrink-0 space-y-2 h-[80px]">
+              {bot.lastAction ? (
                 <div className="space-y-2">
                   {/* Action Type and Time */}
                   <div className="flex items-center justify-between text-sm">
                     <span className="text-gray-400">Last Action:</span>
-                    <div
-                      className={`flex items-center gap-1 px-2 py-1 rounded-full text-xs ${getActionColor(
-                        bot.lastAction.type
-                      )}`}
-                    >
-                      {getActionIcon(bot.lastAction.type)}
-                      <span>{formatActionType(bot.lastAction.type)}</span>
-                    </div>
-                  </div>
-
-                  {/* Time and Token Link */}
-                  <div className="flex items-center justify-between text-sm">
-                    <span className="text-gray-400">When:</span>
                     <div className="flex items-center gap-2">
-                      <span className="text-white">
-                        {new Date(
-                          bot.lastAction.timestamp
-                        ).toLocaleTimeString()}
-                      </span>
-                      {/* Token Link */}
+                      <div
+                        className={`flex items-center gap-1 px-2 py-1 rounded-full text-xs ${getActionColor(
+                          bot.lastAction.type
+                        )}`}
+                      >
+                        {getActionIcon(bot.lastAction.type)}
+                        <span>{formatActionType(bot.lastAction.type)}</span>
+                      </div>
+                      {/* Show ticker for buy/sell actions */}
                       {tokenInfo &&
                         (bot.lastAction.type === "buy" ||
                           bot.lastAction.type === "sell") && (
                           <Link
                             href={`/dex/${tokenInfo.address}`}
-                            className="flex items-center gap-1 text-purple-400 hover:text-purple-300 transition-colors"
+                            className="flex items-center gap-1 px-2 py-1 bg-purple-500/20 text-purple-400 hover:text-purple-300 rounded-full transition-colors border border-purple-500/30"
                             onClick={(e) => e.stopPropagation()}
                           >
-                            <span className="text-xs">{tokenInfo.symbol}</span>
+                            <span className="text-xs font-medium">
+                              {tokenInfo.symbol}
+                            </span>
                             <ExternalLink className="h-3 w-3" />
                           </Link>
                         )}
+                      {/* Fallback ticker display if no token info but it's a trade action */}
+                      {!tokenInfo &&
+                        (bot.lastAction.type === "buy" ||
+                          bot.lastAction.type === "sell") && (
+                          <div className="px-2 py-1 bg-gray-500/20 text-gray-400 rounded-full border border-gray-500/30">
+                            <span className="text-xs">TOKEN</span>
+                          </div>
+                        )}
                     </div>
                   </div>
+
+                  {/* Time */}
+                  <div className="flex items-center justify-between text-sm">
+                    <span className="text-gray-400">When:</span>
+                    <span className="text-white text-xs">
+                      {new Date(bot.lastAction.timestamp).toLocaleTimeString()}
+                    </span>
+                  </div>
+                </div>
+              ) : (
+                <div className="h-full flex items-center justify-center">
+                  <p className="text-gray-500 text-sm italic">
+                    No recent actions
+                  </p>
                 </div>
               )}
             </div>
 
-            {/* Message Section - Fixed Height */}
-            <div className="h-16 flex-shrink-0">
-              {bot.lastAction?.message && (
-                <div className="p-2 bg-gray-700/40 rounded-lg h-full overflow-hidden">
+            {/* Message Section - Fixed Height with Subtle Animation */}
+            <div className=" flex-shrink-0">
+              {bot.lastAction?.message ? (
+                <div className="p-3 bg-gray-700/40 rounded-lg h-full overflow-hidden">
                   <motion.div
+                    key={lastMessageKey}
+                    initial={{ y: 10, opacity: 0 }}
+                    animate={{ y: 0, opacity: 1 }}
+                    transition={{ duration: 0.5, ease: "easeOut" }}
                     className="flex items-start gap-2 h-full"
-                    key={`${bot.lastAction.type}-${bot.lastAction.timestamp}`}
-                    initial={{ opacity: 0, x: -10, scale: 0.95 }}
-                    animate={{ opacity: 1, x: 0, scale: 1 }}
-                    transition={{
-                      duration: 0.5,
-                      type: "spring",
-                      stiffness: 100,
-                    }}
                   >
                     <MessageCircle className="h-4 w-4 text-purple-400 mt-0.5 flex-shrink-0" />
-                    <p className="text-gray-300 text-sm overflow-hidden text-ellipsis">
+                    <p className="text-gray-300 text-sm leading-tight overflow-hidden">
                       "
-                      {bot.lastAction.message.length > 70
-                        ? `${bot.lastAction.message.substring(0, 70)}...`
+                      {bot.lastAction.message.length > 60
+                        ? `${bot.lastAction.message.substring(0, 60)}...`
                         : bot.lastAction.message}
                       "
                     </p>
                   </motion.div>
                 </div>
+              ) : (
+                <div className="p-3 bg-gray-700/20 rounded-lg h-full flex items-center justify-center">
+                  <p className="text-gray-500 text-sm italic">No message</p>
+                </div>
               )}
             </div>
-
-            {/* No Action State */}
-            {!bot.lastAction && (
-              <div className="h-16 flex-shrink-0 flex items-center justify-center">
-                <div className="p-2 bg-gray-700/30 rounded-lg w-full text-center">
-                  <p className="text-gray-400 text-sm italic">
-                    No recent actions recorded
-                  </p>
-                </div>
-              </div>
-            )}
           </CardContent>
         </div>
       </Card>

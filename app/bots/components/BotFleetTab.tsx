@@ -21,7 +21,8 @@ const BotFleetTab: React.FC<BotFleetTabProps> = ({ bots, fleetStats }) => {
           <p className="text-gray-500 text-sm">
             Start a bot with:{" "}
             <code className="bg-gray-700 px-2 py-1 rounded">
-              python main.py --config configs/bullish_billy.json --auto
+              {/* python main.py --config configs/bullish_billy.json --auto */}
+              py .\launch_all.py --auto --verbose --auto
             </code>
           </p>
         </CardContent>
