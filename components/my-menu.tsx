@@ -194,7 +194,7 @@ export default function MyMenu() {
   return (
     <>
       {/* Desktop Floating Menu */}
-      <div className="hidden md:block fixed top-4 left-1/2 transform -translate-x-1/2 z-50">
+      <div className="hidden md:block fixed top-4 left-1/2 transform -translate-x-1/2 z-50 opacity-80">
         <Menubar
           className={cn(
             "bg-background/90 backdrop-blur-md border border-border/50 shadow-lg",
