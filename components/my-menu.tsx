@@ -37,6 +37,8 @@ import {
   ExternalLink,
   Settings,
   TrendingUp,
+  Bot,
+  House,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useAccount, useDisconnect } from "wagmi";
@@ -57,6 +59,12 @@ const navItems: NavItem[] = [
     label: "DEX",
     icon: <ArrowLeftRight className="h-4 w-4" />,
     description: "Trade tokens",
+  },
+  {
+    href: "/bots",
+    label: "TVBs",
+    icon: <Bot className="h-4 w-4" />,
+    description: "Transparent Volume Bots",
   },
   {
     href: "/faucet",
@@ -275,6 +283,9 @@ export default function MyMenu() {
                 </>
               )}
             </MenubarTrigger>
+            {/* <Link href={"/"}>
+              <House className="h-5 " />
+            </Link> */}
             <MenubarContent className="rounded-xl border-border/50 bg-background/95 backdrop-blur-md shadow-xl z-[110]">
               {isConnected && address ? (
                 <>
