@@ -64,10 +64,30 @@ const BotCard: React.FC<BotCardProps> = ({ bot, index }) => {
     router.push(`/bots/${bot.name}`);
   };
 
-  const uptimeHours =
-    Math.floor(
-      (Date.now() - new Date(bot.sessionStarted).getTime()) / 3600000
-    ) || 0;
+  // Use bot's calculated session duration instead of frontend calculation
+  const getSessionUptime = (): string => {
+    // Use bot's calculated session duration from webhook
+    const sessionMinutes = bot.lastAction?.details?.sessionDurationMinutes;
+
+    if (sessionMinutes !== undefined) {
+      const hours = Math.floor(sessionMinutes / 60);
+      const minutes = sessionMinutes % 60;
+
+      if (hours > 0) {
+        return `${hours}h`;
+      }
+      return `${minutes}m`;
+    }
+
+    // Fallback to frontend calculation only if bot data unavailable
+    const fallbackHours =
+      Math.floor(
+        (Date.now() - new Date(bot.sessionStarted).getTime()) / 3600000
+      ) || 0;
+    return `${fallbackHours}h`;
+  };
+
+  const uptimeDisplay = getSessionUptime();
 
   // Extract token info from last action details based on webhook structure
   const getTokenInfo = () => {
@@ -197,7 +217,7 @@ const BotCard: React.FC<BotCardProps> = ({ bot, index }) => {
                 <p className="text-gray-400 text-xs">Actions</p>
               </div>
               <div className="text-center p-2 bg-purple-500/10 rounded-lg flex flex-col justify-center">
-                <p className="text-white font-bold text-lg">{uptimeHours}h</p>
+                <p className="text-white font-bold text-lg">{uptimeDisplay}</p>
                 <p className="text-gray-400 text-xs">Uptime</p>
               </div>
             </div>
