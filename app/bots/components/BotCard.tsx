@@ -172,11 +172,11 @@ const BotCard: React.FC<BotCardProps> = ({ bot, index }) => {
               {bot.bio ? (
                 <div className="p-3 bg-gray-700/30 rounded-lg border border-gray-600/30 h-full overflow-hidden">
                   <p className="text-gray-300 text-sm italic leading-tight overflow-hidden text-ellipsis">
-                    "
+                    &quot;
                     {bot.bio.length > 80
                       ? `${bot.bio.substring(0, 80)}...`
                       : bot.bio}
-                    "
+                    &quot;
                   </p>
                 </div>
               ) : (
@@ -274,11 +274,11 @@ const BotCard: React.FC<BotCardProps> = ({ bot, index }) => {
                   >
                     <MessageCircle className="h-4 w-4 text-purple-400 mt-0.5 flex-shrink-0" />
                     <p className="text-gray-300 text-sm leading-tight overflow-hidden">
-                      "
+                      &quot;
                       {bot.lastAction.message.length > 60
                         ? `${bot.lastAction.message.substring(0, 60)}...`
                         : bot.lastAction.message}
-                      "
+                      &quot;
                     </p>
                   </motion.div>
                 </div>
