@@ -39,6 +39,7 @@ import {
   TrendingUp,
   Bot,
   House,
+  GamepadIcon,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useAccount, useDisconnect } from "wagmi";
@@ -65,6 +66,12 @@ const navItems: NavItem[] = [
     label: "TVBs",
     icon: <Bot className="h-4 w-4" />,
     description: "Transparent Volume Bots",
+  },
+  {
+    href: "/game",
+    label: "Battle",
+    icon: <GamepadIcon className="h-4 w-4" />,
+    description: "BigBrain Battle Arena",
   },
   {
     href: "/faucet",
