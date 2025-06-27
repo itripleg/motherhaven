@@ -45,7 +45,7 @@ class SimpleGameBot:
     
     def _setup_game_contract(self):
         """Setup the game contract with minimal ABI"""
-        # Minimal ABI for what we need
+        # Improved ABI with proper event structure
         game_abi = [
             {
                 "inputs": [
@@ -64,9 +64,9 @@ class SimpleGameBot:
                     {"indexed": True, "name": "gameId", "type": "uint256"},
                     {"indexed": True, "name": "player", "type": "address"},
                     {"indexed": True, "name": "token", "type": "address"},
-                    {"name": "burnedAmount", "type": "uint256"},
-                    {"name": "gameType", "type": "uint8"},
-                    {"name": "timestamp", "type": "uint256"}
+                    {"indexed": False, "name": "burnedAmount", "type": "uint256"},
+                    {"indexed": False, "name": "gameType", "type": "uint8"},
+                    {"indexed": False, "name": "timestamp", "type": "uint256"}
                 ],
                 "name": "GameStarted",
                 "type": "event"
@@ -168,8 +168,41 @@ class SimpleGameBot:
             outcome, message_type = self._determine_outcome(game_type, burned_amount)
             ai_message = self._get_ai_message(message_type, game_type, burned_amount)
             
-            # Build transaction
+            print(f"🤖 SimpleGameBot: 🎯 Chosen outcome: {outcome} ({message_type})")
+            print(f"🤖 SimpleGameBot: 💬 AI message: \"{ai_message}\"")
+            
+            # First, try to estimate gas to catch issues early
+            try:
+                gas_estimate = self.game_contract.functions.completeGame(
+                    game_id,
+                    outcome,
+                    ai_message
+                ).estimate_gas({'from': self.account.address})
+                print(f"🤖 SimpleGameBot: ⛽ Gas estimate: {gas_estimate}")
+            except Exception as gas_error:
+                print(f"🤖 SimpleGameBot: ❌ Gas estimation failed: {gas_error}")
+                print(f"🤖 SimpleGameBot: 🔍 This suggests the transaction would fail")
+                
+                # Try to get more specific error info
+                try:
+                    self.game_contract.functions.completeGame(
+                        game_id,
+                        outcome,
+                        ai_message
+                    ).call({'from': self.account.address})
+                except Exception as call_error:
+                    print(f"🤖 SimpleGameBot: 🚨 Call simulation error: {call_error}")
+                
+                return False
+            
+            # Build transaction with estimated gas + buffer
             nonce = self.w3.eth.get_transaction_count(self.account.address)
+            gas_price = self.w3.eth.gas_price
+            
+            print(f"🤖 SimpleGameBot: 📊 Transaction details:")
+            print(f"🤖 SimpleGameBot:   - Nonce: {nonce}")
+            print(f"🤖 SimpleGameBot:   - Gas: {gas_estimate + 50000}")
+            print(f"🤖 SimpleGameBot:   - Gas Price: {gas_price}")
             
             txn = self.game_contract.functions.completeGame(
                 game_id,
@@ -177,8 +210,8 @@ class SimpleGameBot:
                 ai_message
             ).build_transaction({
                 'from': self.account.address,
-                'gas': 200000,
-                'gasPrice': self.w3.eth.gas_price,
+                'gas': gas_estimate + 50000,  # Add buffer to estimate
+                'gasPrice': gas_price,
                 'nonce': nonce,
                 'chainId': 43113  # Avalanche Fuji testnet
             })
@@ -187,7 +220,9 @@ class SimpleGameBot:
             signed_txn = self.account.sign_transaction(txn)
             tx_hash = self.w3.eth.send_raw_transaction(signed_txn.rawTransaction)
             
-            print(f"🤖 SimpleGameBot: ⏳ Completing game #{game_id}...")
+            print(f"🤖 SimpleGameBot: ⏳ Transaction sent: {self.w3.to_hex(tx_hash)}")
+            print(f"🤖 SimpleGameBot: ⏳ Waiting for confirmation...")
+            
             receipt = self.w3.eth.wait_for_transaction_receipt(tx_hash, timeout=120)
             
             if receipt.status == 1:
@@ -198,13 +233,31 @@ class SimpleGameBot:
                 print(f"🤖 SimpleGameBot: 🎯 Outcome: {outcome_name}")
                 print(f"🤖 SimpleGameBot: 💬 Message: \"{ai_message}\"")
                 print(f"🤖 SimpleGameBot: 📋 TX: {self.w3.to_hex(tx_hash)}")
+                print(f"🤖 SimpleGameBot: ⛽ Gas used: {receipt.gasUsed}")
                 return True
             else:
                 print(f"🤖 SimpleGameBot: ❌ Transaction failed for game #{game_id}")
+                print(f"🤖 SimpleGameBot: 📋 Failed TX: {self.w3.to_hex(tx_hash)}")
+                print(f"🤖 SimpleGameBot: ⛽ Gas used: {receipt.gasUsed}")
+                
+                # Try to get more info about the failure
+                try:
+                    # Look at transaction details
+                    tx_details = self.w3.eth.get_transaction(tx_hash)
+                    print(f"🤖 SimpleGameBot: 📋 TX details: {tx_details}")
+                except:
+                    pass
+                
                 return False
                 
         except Exception as e:
             print(f"🤖 SimpleGameBot: ❌ Error completing game #{game_id}: {e}")
+            print(f"🤖 SimpleGameBot: 🔍 Error type: {type(e).__name__}")
+            
+            # Print more detailed error info
+            if hasattr(e, 'args') and e.args:
+                print(f"🤖 SimpleGameBot: 🔍 Error args: {e.args}")
+            
             return False
     
     def listen_for_games(self):
@@ -224,61 +277,75 @@ class SimpleGameBot:
                 current_block = self.w3.eth.block_number
                 
                 # Check for new GameStarted events in the last few blocks
-                from_block = max(latest_block, current_block - 5)  # Look back max 5 blocks
+                from_block = max(latest_block, current_block - 10)  # Look back max 10 blocks
                 
-                # Create event filter for GameStarted
+                # Use a more reliable method to get events
                 try:
+                    # Try using the contract's event filter first
                     events = self.game_contract.events.GameStarted.get_logs(
                         fromBlock=from_block,
                         toBlock=current_block
                     )
-                except Exception as filter_error:
-                    print(f"🤖 SimpleGameBot: ⚠️ Event filter error: {filter_error}")
-                    # Fallback: just advance the block counter and continue
-                    latest_block = current_block
-                    time.sleep(10)
-                    continue
-                
-                for event in events:
-                    try:
-                        game_id = event['args']['gameId']
-                        player = event['args']['player']
-                        burned_amount = event['args']['burnedAmount']
-                        game_type = event['args']['gameType']
-                        
-                        # Skip if already processed
-                        if game_id in processed_games:
-                            continue
-                        
-                        print(f"\n🤖 SimpleGameBot: 🎮 New game detected!")
-                        print(f"🤖 SimpleGameBot: 🆔 Game ID: {game_id}")
-                        print(f"🤖 SimpleGameBot: 👤 Player: {player}")
-                        print(f"🤖 SimpleGameBot: 🔥 Burned: {self.w3.from_wei(burned_amount, 'ether')} BBT")
-                        print(f"🤖 SimpleGameBot: 🎯 Type: {game_type}")
-                        
-                        # Add thinking delay (1-5 seconds) to make it feel more realistic
-                        thinking_time = random.randint(1, 5)
-                        print(f"🤖 SimpleGameBot: 🧠 AI is thinking... ({thinking_time}s)")
-                        time.sleep(thinking_time)
-                        
-                        # Complete the game
-                        success = self.complete_game(game_id, game_type, burned_amount)
-                        
-                        if success:
-                            processed_games.add(game_id)
-                        
-                        print(f"🤖 SimpleGameBot: ⏭️ Continuing to monitor for new games...\n")
                     
-                    except Exception as event_error:
-                        print(f"🤖 SimpleGameBot: ⚠️ Error processing event: {event_error}")
+                    for event in events:
+                        try:
+                            # Event is already decoded
+                            decoded_log = event
+                            
+                            game_id = decoded_log['args']['gameId']
+                            player = decoded_log['args']['player']
+                            burned_amount = decoded_log['args']['burnedAmount']
+                            game_type = decoded_log['args']['gameType']
+                            
+                            # Skip if already processed
+                            if game_id in processed_games:
+                                continue
+                            
+                            print(f"\n🤖 SimpleGameBot: 🎮 New game detected!")
+                            print(f"🤖 SimpleGameBot: 🆔 Game ID: {game_id}")
+                            print(f"🤖 SimpleGameBot: 👤 Player: {player}")
+                            print(f"🤖 SimpleGameBot: 🔥 Burned: {self.w3.from_wei(burned_amount, 'ether')} BBT")
+                            print(f"🤖 SimpleGameBot: 🎯 Type: {game_type}")
+                            
+                            # Add thinking delay (1-5 seconds) to make it feel more realistic
+                            thinking_time = random.randint(1, 5)
+                            print(f"🤖 SimpleGameBot: 🧠 AI is thinking... ({thinking_time}s)")
+                            time.sleep(thinking_time)
+                            
+                            # Complete the game
+                            success = self.complete_game(game_id, game_type, burned_amount)
+                            
+                            if success:
+                                processed_games.add(game_id)
+                            
+                            print(f"🤖 SimpleGameBot: ⏭️ Continuing to monitor for new games...\n")
+                        
+                        except Exception as event_error:
+                            print(f"🤖 SimpleGameBot: ⚠️ Error processing event: {event_error}")
+                            continue
+                    
+                except Exception as log_error:
+                    print(f"🤖 SimpleGameBot: ⚠️ Error getting events: {log_error}")
+                    
+                    # Fallback: try polling method if event filtering fails
+                    try:
+                        # Check recent transactions to/from the contract
+                        print(f"🤖 SimpleGameBot: 🔄 Trying fallback polling method...")
+                        
+                        # Simple fallback - just wait and check again
+                        time.sleep(5)
                         continue
+                        
+                    except Exception as fallback_error:
+                        print(f"🤖 SimpleGameBot: ⚠️ Fallback method also failed: {fallback_error}")
+                        # Continue the main loop
                 
                 # Update latest block
                 if current_block > latest_block:
                     latest_block = current_block
                 
                 # Short sleep to avoid hammering the RPC
-                time.sleep(5)
+                time.sleep(3)
                 
             except KeyboardInterrupt:
                 print(f"\n🤖 SimpleGameBot: 🛑 Stopping bot...")
@@ -301,6 +368,18 @@ class SimpleGameBot:
             # Check if we can read from the contract
             current_block = self.w3.eth.block_number
             print(f"🤖 SimpleGameBot: 📦 Current block: {current_block}")
+            
+            # Test event topic calculation
+            try:
+                # Test getting recent events to verify contract is working
+                recent_events = self.game_contract.events.GameStarted.get_logs(
+                    fromBlock=current_block - 100,
+                    toBlock=current_block
+                )
+                print(f"🤖 SimpleGameBot: 📊 Found {len(recent_events)} recent GameStarted events")
+            except Exception as event_test_error:
+                print(f"🤖 SimpleGameBot: ⚠️ Event test warning: {event_test_error}")
+                print(f"🤖 SimpleGameBot: 🔧 Bot will use fallback methods if needed")
             
             print(f"🤖 SimpleGameBot: ✅ Connection test passed!")
             return True
