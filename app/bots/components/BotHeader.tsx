@@ -168,15 +168,6 @@ const BotHeader: React.FC<BotHeaderProps> = ({
                   Config
                 </Button>
               )}
-              <Button
-                variant="outline"
-                size="sm"
-                className="border-gray-600 text-gray-300"
-                disabled
-              >
-                <Settings className="h-4 w-4 mr-1" />
-                Control
-              </Button>
             </div>
           </div>
         </CardContent>
