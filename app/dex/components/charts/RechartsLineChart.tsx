@@ -13,6 +13,11 @@ import { format, parseISO } from "date-fns";
 import { formatUnits, parseUnits } from "viem";
 import { Token, Trade } from "@/types";
 import { useFactoryContract } from "@/new-hooks/useFactoryContract";
+import {
+  formatTokenPrice,
+  formatChartPrice,
+  priceToNumber,
+} from "@/utils/tokenPriceFormatter";
 
 // This interface defines the shape of the data that our chart will use
 interface ChartPoint {
@@ -93,18 +98,19 @@ export default function RechartsLineChart({
     );
 
     // 4. Format the sorted points into the final shape for the chart
+    // NOW USING UNIFIED FORMATTING
     return allPoints.map((point) => ({
-      price: parseFloat(formatUnits(point.priceInWei, 18)),
-      formattedPrice: formatValue(point.priceInWei, 6),
+      price: priceToNumber(point.priceInWei), // Convert to number for chart calculations
+      formattedPrice: formatTokenPrice(formatUnits(point.priceInWei, 18)), // Use unified formatting
       timeLabel: format(point.timestamp, "MMM d, h:mm a"),
     }));
-  }, [trades, token, formatValue]);
+  }, [trades, token]);
 
-  // The price displayed in the header is always the most recent one
+  // The price displayed in the header uses the same unified formatting
   const displayPrice =
     chartData.length > 0
       ? chartData[chartData.length - 1].formattedPrice
-      : formatValue(parseUnits(token.initialPrice, 18), 6);
+      : formatTokenPrice(formatUnits(parseUnits(token.initialPrice, 18), 18));
 
   if (loading) {
     return (
@@ -122,8 +128,6 @@ export default function RechartsLineChart({
         </h3>
         <p className="text-2xl text-green-400">{displayPrice} AVAX</p>
       </div>
-      {/* --- MODIFICATION START --- */}
-      {/* Changed condition from chartData.length > 1 to chartData.length > 0 */}
       {chartData.length > 0 ? (
         <ResponsiveContainer width="100%" height="80%">
           <LineChart
@@ -143,7 +147,8 @@ export default function RechartsLineChart({
               fontSize={12}
               tickLine={false}
               axisLine={false}
-              tickFormatter={(value) => `${Number(value).toFixed(5)}`}
+              // NOW USING UNIFIED CHART FORMATTING FOR Y-AXIS
+              tickFormatter={(value) => formatChartPrice(Number(value))}
               domain={["dataMin", "dataMax"]}
             />
             <Tooltip content={<CustomTooltip />} />
@@ -152,18 +157,15 @@ export default function RechartsLineChart({
               dataKey="price"
               stroke="#4ade80"
               strokeWidth={2}
-              // This prop correctly shows a dot for the first point
               dot={chartData.length < 50}
             />
           </LineChart>
         </ResponsiveContainer>
       ) : (
-        // This message now only shows if there is truly no data
         <div className="flex items-center justify-center h-4/5">
           <p className="text-gray-500">No trade data available.</p>
         </div>
       )}
-      {/* --- MODIFICATION END --- */}
     </div>
   );
 }

@@ -6,6 +6,7 @@ import { AddressComponent } from "@/components/AddressComponent";
 import { Progress } from "@/components/ui/progress";
 import { useToken } from "@/contexts/TokenContext";
 import { useFactoryContract } from "@/new-hooks/useFactoryContract";
+import { formatTokenPrice } from "@/utils/tokenPriceFormatter";
 import { Address, formatEther } from "viem";
 
 interface TokenHeaderProps {
@@ -23,16 +24,23 @@ export const TokenHeaderStyled: React.FC<TokenHeaderProps> = ({ address }) => {
   // Get token metadata (name, symbol, image, etc.) from the TokenContext
   const { token, loading } = useToken(address);
 
-  // Get real-time, formatted contract data from our centralized hook
+  // Get real-time contract data from our centralized hook
   const { useTokenState, useCollateral, useCurrentPrice } =
     useFactoryContract();
   const { data: state } = useTokenState(address as Address);
 
-  // The hook now provides the raw bigint for calculations and a formatted string for display
-  const { data: rawCollateral, formatted: formattedCollateral } = useCollateral(
-    address as Address
-  ); //
-  const { formatted: currentPrice } = useCurrentPrice(address as Address); //
+  // Get raw bigint values for accurate calculations
+  const { data: rawCollateral } = useCollateral(address as Address);
+  const { data: rawCurrentPrice } = useCurrentPrice(address as Address);
+
+  // Format the values using our unified formatting system
+  const formattedCollateral = rawCollateral
+    ? formatTokenPrice(formatEther(rawCollateral))
+    : "0.000000";
+
+  const formattedCurrentPrice = rawCurrentPrice
+    ? formatTokenPrice(formatEther(rawCurrentPrice))
+    : "0.000000";
 
   // Update progress bar animation when collateral changes
   useEffect(() => {
@@ -63,7 +71,7 @@ export const TokenHeaderStyled: React.FC<TokenHeaderProps> = ({ address }) => {
 
       animateProgress(progress, Math.min(percentage, 100), 1000);
     }
-  }, [token?.fundingGoal, rawCollateral]); // Dependency on the raw value
+  }, [token?.fundingGoal, rawCollateral, progress]); // Dependency on the raw value
 
   // Loading state while fetching initial token metadata
   if (loading || !token) {
@@ -87,6 +95,11 @@ export const TokenHeaderStyled: React.FC<TokenHeaderProps> = ({ address }) => {
   };
 
   const stateDisplay = getStateDisplay(state as number | undefined);
+
+  // Format the funding goal with the same precision for consistency
+  const formattedFundingGoal = token.fundingGoal
+    ? formatTokenPrice(token.fundingGoal)
+    : "0.000000";
 
   return (
     <Card className="relative overflow-hidden min-h-[300px]">
@@ -131,9 +144,9 @@ export const TokenHeaderStyled: React.FC<TokenHeaderProps> = ({ address }) => {
             <div className="space-y-4">
               <div className="backdrop-blur-sm bg-white/10 p-4 rounded-lg">
                 <Label className="text-gray-200">Current Price</Label>
-                {/* Use the pre-formatted value directly from the hook */}
+                {/* Now using unified formatting for consistent precision */}
                 <p className="text-white text-lg font-semibold">
-                  {currentPrice || "0.000000"}{" "}
+                  {formattedCurrentPrice}{" "}
                   <span className="text-gray-300">AVAX</span>
                 </p>
               </div>
@@ -148,8 +161,8 @@ export const TokenHeaderStyled: React.FC<TokenHeaderProps> = ({ address }) => {
               </Label>
               <Progress value={progress} className="h-2 mb-2" />
               <p className="text-white text-sm font-semibold">
-                {progress.toFixed(2)}% - {formattedCollateral || "0.00"} /{" "}
-                {token.fundingGoal} AVAX
+                {progress.toFixed(2)}% - {formattedCollateral} /{" "}
+                {formattedFundingGoal} AVAX
               </p>
             </div>
           )}

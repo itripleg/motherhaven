@@ -4,6 +4,7 @@ import { useEffect } from "react";
 import { useReadContract, useWriteContract } from "wagmi";
 import { FACTORY_ADDRESS, FACTORY_ABI } from "@/types";
 import { type Address, formatEther, parseEther } from "viem";
+import { formatFactoryValue } from "@/utils/tokenPriceFormatter";
 
 // A custom hook that wraps useReadContract to add polling for live updates
 function useLiveReadContract(hookParameters: any) {
@@ -35,18 +36,12 @@ export function useFactoryContract() {
     ...writeRest
   } = useWriteContract();
 
-  // Centralized formatter for consistent display of values
+  // Centralized formatter using the unified formatting function
   const formatValue = (
     value: bigint | undefined,
     precision: number = 6
   ): string => {
-    if (value === undefined || value === null)
-      return parseFloat("0").toFixed(precision);
-    const formatted = formatEther(value);
-    return parseFloat(formatted).toLocaleString(undefined, {
-      minimumFractionDigits: precision,
-      maximumFractionDigits: precision,
-    });
+    return formatFactoryValue(value, precision);
   };
 
   // --- Read Operations now use the useLiveReadContract hook ---
