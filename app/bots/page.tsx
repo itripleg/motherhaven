@@ -82,17 +82,17 @@ const TVBPage = () => {
 
   if (isLoading && bots.length === 0) {
     return (
-      <div className="min-h-screen bg-gradient-to-br from-gray-900 via-gray-800 to-black flex items-center justify-center">
+      <div className="min-h-screen animated-bg floating-particles flex items-center justify-center">
         <div className="text-center">
-          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-purple-400 mx-auto mb-4"></div>
-          <p className="text-white">Loading TVB Fleet...</p>
+          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary mx-auto mb-4"></div>
+          <p className="text-foreground">Loading TVB Fleet...</p>
         </div>
       </div>
     );
   }
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-gray-900 via-gray-800 to-black">
+    <div className="min-h-screen animated-bg floating-particles">
       {/* Background Stars Effect */}
       <div className="fixed inset-0 z-0">
         {Array.from({ length: 50 }).map((_, i) => (
@@ -131,15 +131,13 @@ const TVBPage = () => {
             animate={{ opacity: 1, y: 0 }}
             className="mb-8"
           >
-            <Card className="bg-red-900/20 border-red-500/30">
+            <Card className="unified-card border-error/30 bg-error/10">
               <CardContent className="p-6">
                 <div className="flex items-center gap-3">
-                  <AlertCircle className="h-5 w-5 text-red-400" />
+                  <AlertCircle className="h-5 w-5 text-error" />
                   <div>
-                    <h3 className="text-red-400 font-medium">
-                      Connection Error
-                    </h3>
-                    <p className="text-red-300 text-sm">{error}</p>
+                    <h3 className="text-error font-medium">Connection Error</h3>
+                    <p className="text-error/80 text-sm">{error}</p>
                   </div>
                 </div>
               </CardContent>
@@ -153,11 +151,17 @@ const TVBPage = () => {
           onValueChange={setActiveTab}
           className="space-y-6"
         >
-          <TabsList className="bg-gray-800/50 border border-gray-700/50 rounded-xl p-1">
-            <TabsTrigger value="fleet" className="flex items-center gap-2">
+          <TabsList className="glass-card p-1 border border-border/50">
+            <TabsTrigger
+              value="fleet"
+              className="flex items-center gap-2 data-[state=active]:bg-primary/20 data-[state=active]:text-primary"
+            >
               🤖 Bot Fleet ({bots.length})
             </TabsTrigger>
-            <TabsTrigger value="activity" className="flex items-center gap-2">
+            <TabsTrigger
+              value="activity"
+              className="flex items-center gap-2 data-[state=active]:bg-primary/20 data-[state=active]:text-primary"
+            >
               📊 Live Activity
             </TabsTrigger>
           </TabsList>
