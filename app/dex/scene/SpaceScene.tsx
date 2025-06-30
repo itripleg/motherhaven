@@ -45,7 +45,7 @@ export const SpaceScene = ({ cameraRef, controlRef, lightRef }: any) => {
           autoRotateSpeed={0.01}
         />
         <PerspectiveCamera position={[0, 0, -7]} ref={cameraRef} makeDefault />
-        {/* <Moon scale={2} position={[0, 1.1, 0]} /> */}
+        <Moon scale={2} position={[0, 1.1, 0]} />
         <Stars radius={100} />
         {/* <Planet /> */}
         {/* <OuijaAndFlecha position={[666, 666, 666]} /> */}
