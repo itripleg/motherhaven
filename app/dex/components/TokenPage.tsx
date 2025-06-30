@@ -8,6 +8,7 @@ import { MobileChatModal } from "./MobileChatModal";
 import RecentTrades from "./RecentTrades";
 import { useToken } from "@/contexts/TokenContext";
 import { TradesProvider } from "@/contexts/TradesContext";
+import { DebugTokenLoading } from "./DebugTokenLoading";
 
 interface TokenPageProps {
   tokenAddress: string;
@@ -55,6 +56,7 @@ export default function TokenPage({ tokenAddress }: TokenPageProps) {
         <div className="grid grid-cols-1 lg:grid-cols-4 gap-6">
           {/* Main Content Area (3 columns on desktop) */}
           <div className="lg:col-span-3 space-y-6">
+            {/* <DebugTokenLoading tokenAddress={tokenAddress} /> */}
             <TokenHeader address={token.address} />
             <TokenPriceCharts address={token.address} />
             <TokenTradeCard

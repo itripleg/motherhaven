@@ -16,7 +16,8 @@ interface TransactionHashProps {
   type: "tx" | "address";
 }
 
-const SNOWTRACE_TESTNET_URL = "https://43113.testnet.snowtrace.dev";
+// Updated URL - use the correct testnet URL
+const SNOWTRACE_TESTNET_URL = "https://testnet.snowtrace.dev";
 
 export function AddressComponent({ hash, type }: TransactionHashProps) {
   const [copied, setCopied] = useState(false);
@@ -27,9 +28,24 @@ export function AddressComponent({ hash, type }: TransactionHashProps) {
     setMounted(true);
   }, []);
 
-  const explorerUrl = `${SNOWTRACE_TESTNET_URL}/${type}/${hash}`;
+  // Debug logging to see what hash we're getting
+  useEffect(() => {
+    console.log("AddressComponent received:", { hash, type });
+  }, [hash, type]);
+
+  // Validate hash before using it
+  const isValidHash =
+    hash &&
+    hash !== "0x0000000000000000000000000000000000000000" &&
+    hash.length > 0;
+
+  const explorerUrl = isValidHash
+    ? `${SNOWTRACE_TESTNET_URL}/${type}/${hash}`
+    : "#";
 
   const copyToClipboard = async () => {
+    if (!isValidHash) return;
+
     try {
       await navigator.clipboard.writeText(hash);
       setCopied(true);
@@ -40,7 +56,9 @@ export function AddressComponent({ hash, type }: TransactionHashProps) {
   };
 
   const truncateHash = (hash: string, isTx: boolean = true) => {
-    if (!hash) return "";
+    if (!hash || hash === "0x0000000000000000000000000000000000000000") {
+      return "Invalid address";
+    }
     if (isTx) {
       return `${hash.slice(0, 6)}...${hash.slice(-4)}`;
     }
@@ -50,6 +68,13 @@ export function AddressComponent({ hash, type }: TransactionHashProps) {
   const handleExternalClick = (e: React.MouseEvent) => {
     e.preventDefault();
     e.stopPropagation();
+
+    if (!isValidHash) {
+      console.warn("Cannot open explorer: invalid hash", hash);
+      return;
+    }
+
+    console.log("Opening explorer URL:", explorerUrl);
     window.open(explorerUrl, "_blank", "noopener,noreferrer");
   };
 
@@ -60,6 +85,15 @@ export function AddressComponent({ hash, type }: TransactionHashProps) {
         <span className="text-primary">{truncateHash(hash)}</span>
         <div className="h-8 w-8"></div>
         <div className="h-8 w-8"></div>
+      </div>
+    );
+  }
+
+  // If hash is invalid, show a warning
+  if (!isValidHash) {
+    return (
+      <div className="flex items-center space-x-2 p-2 rounded-md text-center justify-center">
+        <span className="text-red-400 text-sm">No address available</span>
       </div>
     );
   }

@@ -1,544 +1,629 @@
-import React, { useEffect, useState, useRef } from "react";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { Label } from "@/components/ui/label";
-import { Badge } from "@/components/ui/badge";
-import { Button } from "@/components/ui/button";
-import { Slider } from "@/components/ui/slider";
-import { AddressComponent } from "@/components/AddressComponent";
-import { Progress } from "@/components/ui/progress";
-import { useToken } from "@/contexts/TokenContext";
-import { useFactoryContract } from "@/new-hooks/useFactoryContract";
-import { formatTokenPrice } from "@/utils/tokenPriceFormatter";
-import { Address, formatEther } from "viem";
-import { useAccount } from "wagmi";
-import { doc, updateDoc } from "firebase/firestore";
-import { db } from "@/firebase";
-import { useToast } from "@/hooks/use-toast";
+// Fix for app/dex/factory/page.tsx
+
+"use client";
+
+import { useState, useEffect } from "react";
+import { storage } from "@/firebase";
+import { motion, AnimatePresence } from "framer-motion";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import {
-  Edit3,
-  Save,
-  X,
-  RotateCcw,
-  Move,
-  Settings,
-  User,
+  Card,
+  CardContent,
+  CardDescription,
+  CardHeader,
+  CardTitle,
+} from "@/components/ui/card";
+import { Container } from "@/components/craft";
+import { TokenInfoForm } from "./TokenInfoForm";
+import { TokenomicsForm } from "./TokenomicsForm";
+import { Button } from "@/components/ui/button";
+import { Badge } from "@/components/ui/badge";
+import { useWriteContract, useWaitForTransactionReceipt } from "wagmi";
+import { zeroAddress } from "viem";
+import { useToast } from "@/hooks/use-toast";
+import { AddressComponent } from "@/components/AddressComponent";
+import { ref, uploadBytes, getDownloadURL } from "firebase/storage";
+import { FACTORY_ADDRESS, FACTORY_ABI } from "@/types";
+
+import { TokenCreationInfo, DEFAULT_IMAGE_POSITION } from "@/types";
+import {
+  Rocket,
+  Sparkles,
+  Zap,
+  Star,
+  Upload,
+  CheckCircle,
+  ArrowRight,
+  Coins,
+  Flame,
+  Target,
+  Trophy,
+  Wand2,
+  Users,
+  TrendingUp,
+  Lightbulb,
+  Wand,
   Crown,
 } from "lucide-react";
-import { motion, AnimatePresence } from "framer-motion";
 
-interface TokenHeaderProps {
-  address: string;
-}
+function Page() {
+  const [mounted, setMounted] = useState(false);
 
-interface StateDisplay {
-  text: string;
-  color: string;
-}
-
-interface ImagePosition {
-  x: number; // -100 to 100 (percentage)
-  y: number; // -100 to 100 (percentage)
-  scale: number; // 0.5 to 3
-  rotation: number; // -180 to 180 degrees
-}
-
-export const TokenHeaderStyled: React.FC<TokenHeaderProps> = ({ address }) => {
-  const [progress, setProgress] = useState(0);
-  const [isEditing, setIsEditing] = useState(false);
-  const [editPosition, setEditPosition] = useState<ImagePosition>({
-    x: 0,
-    y: 0,
-    scale: 1,
-    rotation: 0,
+  // ✅ Use TokenCreationInfo instead of TokenInfo
+  const [tokenInfo, setTokenInfo] = useState<TokenCreationInfo>({
+    name: "",
+    ticker: "",
+    description: "",
+    image: null,
+    imagePosition: DEFAULT_IMAGE_POSITION, // Use the default from types
+    burnManager: undefined,
   });
-  const [isDragging, setIsDragging] = useState(false);
-  const [dragStart, setDragStart] = useState({ x: 0, y: 0 });
-  const [isSaving, setIsSaving] = useState(false);
-  const [showControls, setShowControls] = useState(false);
 
-  const headerRef = useRef<HTMLDivElement>(null);
-  const { address: userAddress } = useAccount();
+  const [tokenomics, setTokenomics] = useState({
+    fundingGoal: 5,
+    maxSupply: 1000000000,
+    initialSupply: 200000000,
+    bondingCurve: "linear",
+    liquidityPool: "uniswap",
+  });
+
+  const [backgroundImage, setBackgroundImage] = useState<string | null>(null);
+  const [uploadingImage, setUploadingImage] = useState(false);
+  const [activeStep, setActiveStep] = useState(0);
+  const [isCreating, setIsCreating] = useState(false);
   const { toast } = useToast();
 
-  // Get token metadata
-  const { token, loading } = useToken(address);
-
-  // Get real-time contract data
-  const { useTokenState, useCollateral, useCurrentPrice } =
-    useFactoryContract();
-  const { data: state } = useTokenState(address as Address);
-  const { data: rawCollateral } = useCollateral(address as Address);
-  const { data: rawCurrentPrice } = useCurrentPrice(address as Address);
-
-  // Format values
-  const formattedCollateral = rawCollateral
-    ? formatTokenPrice(formatEther(rawCollateral))
-    : "0.000000";
-
-  const formattedCurrentPrice = rawCurrentPrice
-    ? formatTokenPrice(formatEther(rawCurrentPrice))
-    : "0.000000";
-
-  // Initialize edit position when token loads
+  // Handle hydration
   useEffect(() => {
-    if (token?.imagePosition) {
-      setEditPosition(token.imagePosition);
-    }
-  }, [token?.imagePosition]);
+    setMounted(true);
+  }, []);
 
-  // Check if current user is the token creator
-  const isCreator =
-    userAddress &&
-    token?.creator &&
-    userAddress.toLowerCase() === token.creator.toLowerCase();
+  const {
+    data: transactionData,
+    error,
+    isPending,
+    writeContract,
+  } = useWriteContract();
 
-  // Update progress bar animation
+  const { isLoading: isConfirming, data: receipt } =
+    useWaitForTransactionReceipt({
+      hash: transactionData,
+    });
+
+  // Handle image preview
   useEffect(() => {
-    if (token?.fundingGoal && rawCollateral) {
-      const goalAmount = parseFloat(token.fundingGoal);
-      const collateralAmount = parseFloat(formatEther(rawCollateral));
-      const percentage =
-        goalAmount > 0 ? (collateralAmount / goalAmount) * 100 : 0;
-
-      const animateProgress = (
-        start: number,
-        end: number,
-        duration: number
-      ) => {
-        const startTime = performance.now();
-        const update = (currentTime: number) => {
-          const elapsedTime = currentTime - startTime;
-          const progress = Math.min(elapsedTime / duration, 1);
-          setProgress(start + progress * (end - start));
-          if (progress < 1) {
-            requestAnimationFrame(update);
-          }
-        };
-        requestAnimationFrame(update);
+    if (tokenInfo.image) {
+      const reader = new FileReader();
+      reader.onloadend = () => {
+        setBackgroundImage(reader.result as string);
       };
-
-      animateProgress(progress, Math.min(percentage, 100), 1000);
+      reader.readAsDataURL(tokenInfo.image);
+    } else {
+      setBackgroundImage(null);
     }
-  }, [token?.fundingGoal, rawCollateral, progress]);
+  }, [tokenInfo.image]);
 
-  // Handle drag start
-  const handleMouseDown = (e: React.MouseEvent) => {
-    if (!isEditing) return;
+  // Simple upload function that returns URL
+  const uploadImage = async (file: File): Promise<string> => {
+    const storageRef = ref(storage, `temp-uploads/${Date.now()}-${file.name}`);
+    const uploadTask = await uploadBytes(storageRef, file);
+    return await getDownloadURL(uploadTask.ref);
+  };
+
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    setIsDragging(true);
-    setDragStart({ x: e.clientX, y: e.clientY });
-  };
-
-  // Handle drag move
-  const handleMouseMove = (e: React.MouseEvent) => {
-    if (!isDragging || !headerRef.current) return;
-
-    const rect = headerRef.current.getBoundingClientRect();
-    const deltaX = ((e.clientX - dragStart.x) / rect.width) * 100;
-    const deltaY = ((e.clientY - dragStart.y) / rect.height) * 100;
-
-    setEditPosition((prev) => ({
-      ...prev,
-      x: Math.max(-100, Math.min(100, prev.x + deltaX)),
-      y: Math.max(-100, Math.min(100, prev.y + deltaY)),
-    }));
-
-    setDragStart({ x: e.clientX, y: e.clientY });
-  };
-
-  // Handle drag end
-  const handleMouseUp = () => {
-    setIsDragging(false);
-  };
-
-  // Handle wheel for scaling
-  const handleWheel = (e: React.WheelEvent) => {
-    if (!isEditing) return;
-    e.preventDefault();
-
-    const delta = e.deltaY * -0.001;
-    const newScale = Math.max(0.5, Math.min(3, editPosition.scale + delta));
-    setEditPosition((prev) => ({ ...prev, scale: newScale }));
-  };
-
-  // Save position to Firebase
-  const savePosition = async () => {
-    if (!token?.address) return;
+    if (!mounted) return;
 
     try {
-      setIsSaving(true);
-      const tokenDocRef = doc(db, "tokens", token.address);
+      setIsCreating(true);
+      setUploadingImage(true);
+      let imageUrl = "";
 
-      await updateDoc(tokenDocRef, {
-        imagePosition: editPosition,
-        lastUpdated: new Date().toISOString(),
-        updatedBy: userAddress,
-      });
+      if (tokenInfo.image) {
+        try {
+          imageUrl = await uploadImage(tokenInfo.image);
+          toast({
+            title: "📸 Image uploaded!",
+            description: "Your token image is ready for launch",
+          });
+        } catch (error) {
+          console.error("Error uploading image:", error);
+          toast({
+            title: "Upload Failed",
+            description: "Failed to upload image. Please try again.",
+            variant: "destructive",
+          });
+          return;
+        }
+      }
+
+      setUploadingImage(false);
 
       toast({
-        title: "✅ Position Saved!",
-        description: "Your token image positioning has been updated.",
+        title: "🚀 Launching Token...",
+        description: "Prepare for takeoff! Your token is being created.",
       });
 
-      setIsEditing(false);
-      setShowControls(false);
+      writeContract({
+        abi: FACTORY_ABI,
+        address: FACTORY_ADDRESS,
+        functionName: "createToken",
+        args: [
+          tokenInfo.name,
+          tokenInfo.ticker,
+          imageUrl,
+          tokenInfo.burnManager || zeroAddress,
+        ],
+      });
     } catch (error) {
-      console.error("Error saving position:", error);
+      console.error("Error:", error);
       toast({
-        title: "❌ Save Failed",
-        description: "Failed to save image position. Please try again.",
+        title: "Launch Failed",
+        description: "Failed to create token. Please try again.",
         variant: "destructive",
       });
     } finally {
-      setIsSaving(false);
+      setIsCreating(false);
+      setUploadingImage(false);
     }
   };
 
-  // Cancel editing
-  const cancelEdit = () => {
-    setEditPosition(
-      token?.imagePosition || { x: 0, y: 0, scale: 1, rotation: 0 }
-    );
-    setIsEditing(false);
-    setShowControls(false);
+  // Handle successful transaction
+  useEffect(() => {
+    if (receipt && !isConfirming) {
+      toast({
+        title: "🎉 Token Created Successfully!",
+        description: "Your token is now live and ready for trading!",
+      });
+    }
+  }, [receipt, isConfirming, toast]);
+
+  // Calculate completion percentage
+  const getCompletionPercentage = () => {
+    let completed = 0;
+    if (tokenInfo.name) completed += 25;
+    if (tokenInfo.ticker) completed += 25;
+    if (tokenInfo.description) completed += 25;
+    if (tokenInfo.image) completed += 25;
+    return completed;
   };
 
-  // Reset position
-  const resetPosition = () => {
-    setEditPosition({ x: 0, y: 0, scale: 1, rotation: 0 });
-  };
+  const isFormValid =
+    tokenInfo.name && tokenInfo.ticker && tokenInfo.description;
 
-  if (loading || !token) {
+  // Handle hydration
+  if (!mounted) {
     return (
-      <Card className="min-h-[300px] flex items-center justify-center">
-        <div className="p-8 text-gray-400">Loading token data...</div>
-      </Card>
+      <div className="min-h-screen animated-bg floating-particles">
+        <div className="relative z-10 container mx-auto p-6 pt-24">
+          <div className="flex items-center justify-center min-h-[50vh]">
+            <div className="text-center">
+              <Rocket className="h-12 w-12 text-purple-400 mx-auto mb-4 animate-pulse" />
+              <p className="text-white text-lg">Loading Token Factory...</p>
+            </div>
+          </div>
+        </div>
+      </div>
     );
   }
 
-  const getStateDisplay = (state: number | undefined): StateDisplay => {
-    const stateValue = state ?? 0;
-    const stateMap: Record<number, StateDisplay> = {
-      0: { text: "Not Created", color: "bg-red-500/80" },
-      1: { text: "Trading", color: "bg-green-600/70" },
-      2: { text: "Goal Reached", color: "bg-yellow-500/80" },
-      3: { text: "Halted", color: "bg-red-500/80" },
-      4: { text: "Resumed", color: "bg-green-600/70" },
-    };
-    return stateMap[stateValue] || { text: "Unknown", color: "bg-gray-500/80" };
-  };
-
-  const stateDisplay = getStateDisplay(state as number | undefined);
-  const formattedFundingGoal = token.fundingGoal
-    ? formatTokenPrice(token.fundingGoal)
-    : "0.000000";
-
-  // Get image positioning styles
-  const getImagePositionStyle = (position: ImagePosition) => ({
-    backgroundImage: `url(${token.imageUrl})`,
-    backgroundSize: `${100 * position.scale}% ${100 * position.scale}%`,
-    backgroundPosition: `${50 + position.x}% ${50 + position.y}%`,
-    backgroundRepeat: "no-repeat",
-    transform: `rotate(${position.rotation}deg)`,
-    transformOrigin: "center center",
-    transition: isDragging ? "none" : "all 0.2s ease-out",
-  });
-
-  const currentPosition = isEditing
-    ? editPosition
-    : token.imagePosition || { x: 0, y: 0, scale: 1, rotation: 0 };
-
   return (
-    <Card className="relative overflow-hidden min-h-[300px]">
-      {/* Background Image Layer */}
-      {token.imageUrl && (
-        <div
-          ref={headerRef}
-          className={`absolute inset-0 z-0 ${isEditing ? "cursor-move" : ""}`}
-          onMouseDown={handleMouseDown}
-          onMouseMove={handleMouseMove}
-          onMouseUp={handleMouseUp}
-          onMouseLeave={handleMouseUp}
-          onWheel={handleWheel}
-        >
+    <div className="min-h-screen animated-bg floating-particles">
+      {/* Dynamic Background */}
+      {backgroundImage && (
+        <div className="fixed inset-0 z-0">
           <div
-            className="absolute inset-0 bg-no-repeat"
-            style={getImagePositionStyle(currentPosition)}
+            className="absolute inset-0 bg-cover bg-center opacity-20"
+            style={{ backgroundImage: `url(${backgroundImage})` }}
           />
-          <div className="absolute inset-0 bg-gradient-to-b from-black/60 via-black/50 to-black/70" />
-
-          {/* Editing Overlay */}
-          {isEditing && (
-            <div className="absolute inset-0 z-5">
-              {/* Grid Overlay */}
-              <div className="absolute inset-0 opacity-30">
-                <div className="grid grid-cols-3 grid-rows-3 h-full">
-                  {[...Array(9)].map((_, i) => (
-                    <div key={i} className="border border-white/30" />
-                  ))}
-                </div>
-              </div>
-
-              {/* Center Point */}
-              <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
-                <div className="w-8 h-8 border-2 border-white/80 rounded-full bg-black/40 flex items-center justify-center">
-                  <div className="w-2 h-2 bg-white rounded-full" />
-                </div>
-              </div>
-
-              {/* Drag Indicator */}
-              {isDragging && (
-                <div className="absolute top-4 left-4 bg-black/80 text-white px-3 py-2 rounded-lg flex items-center gap-2">
-                  <Move className="h-4 w-4" />
-                  <span>Drag to reposition • Scroll to zoom</span>
-                </div>
-              )}
-            </div>
-          )}
+          <div className="absolute inset-0 bg-gradient-to-br from-purple-900/50 via-black/70 to-blue-900/50" />
         </div>
       )}
 
-      {/* Content Layer */}
       <div className="relative z-10">
-        {/* Header with Edit Controls */}
-        <div className="p-4 flex justify-between items-start">
-          <div className="space-y-2">
-            <AddressComponent hash={address} type="address" />
-            {token.creator && (
-              <div className="flex items-center gap-2 text-sm">
-                <div className="flex items-center gap-1 text-gray-300">
-                  {isCreator ? (
-                    <>
-                      <Crown className="h-3 w-3 text-yellow-400" />
-                      <span className="text-yellow-400">Creator (You)</span>
-                    </>
-                  ) : (
-                    <>
-                      <User className="h-3 w-3" />
-                      <span>Creator:</span>
-                    </>
-                  )}
+        <Container className="py-8">
+          {/* Hero Header */}
+          <motion.div
+            initial={{ opacity: 0, y: -20 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ duration: 0.6 }}
+            className="text-center mb-12"
+          >
+            <div className="space-y-6 hidden">
+              <motion.div
+                initial={{ scale: 0.9 }}
+                animate={{ scale: 1 }}
+                transition={{ duration: 0.8, type: "spring" }}
+                className="flex items-center justify-center gap-4"
+              >
+                <div className="p-4 bg-gradient-to-r from-purple-500/20 to-pink-500/20 rounded-2xl border border-purple-500/30">
+                  <Rocket className="h-12 w-12 text-purple-400" />
                 </div>
-                {!isCreator && (
-                  <AddressComponent hash={token.creator} type="address" />
-                )}
-              </div>
-            )}
-          </div>
-
-          <div className="flex items-center gap-2">
-            <Badge
-              className={`${stateDisplay.color} text-white px-3 py-1`}
-              variant="outline"
-            >
-              {stateDisplay.text}
-            </Badge>
-
-            {/* Edit Button - Only show for creator */}
-            {isCreator && token.imageUrl && (
-              <AnimatePresence>
-                {!isEditing ? (
-                  <motion.div
-                    initial={{ opacity: 0, scale: 0.8 }}
-                    animate={{ opacity: 1, scale: 1 }}
-                    exit={{ opacity: 0, scale: 0.8 }}
-                  >
-                    <Button
-                      variant="outline"
-                      size="sm"
-                      onClick={() => {
-                        setIsEditing(true);
-                        setShowControls(true);
-                      }}
-                      className="bg-black/50 border-white/30 text-white hover:bg-black/70"
-                    >
-                      <Edit3 className="h-4 w-4 mr-1" />
-                      Edit Image
-                    </Button>
-                  </motion.div>
-                ) : (
-                  <motion.div
-                    className="flex items-center gap-2"
-                    initial={{ opacity: 0, scale: 0.8 }}
-                    animate={{ opacity: 1, scale: 1 }}
-                    exit={{ opacity: 0, scale: 0.8 }}
-                  >
-                    <Button
-                      variant="outline"
-                      size="sm"
-                      onClick={cancelEdit}
-                      className="bg-red-500/80 border-red-400 text-white hover:bg-red-600"
-                    >
-                      <X className="h-4 w-4" />
-                    </Button>
-                    <Button
-                      variant="outline"
-                      size="sm"
-                      onClick={savePosition}
-                      disabled={isSaving}
-                      className="bg-green-500/80 border-green-400 text-white hover:bg-green-600"
-                    >
-                      {isSaving ? (
-                        <div className="h-4 w-4 border-2 border-white/30 border-t-white rounded-full animate-spin" />
-                      ) : (
-                        <Save className="h-4 w-4" />
-                      )}
-                    </Button>
-                  </motion.div>
-                )}
-              </AnimatePresence>
-            )}
-          </div>
-        </div>
-
-        {/* Fine-tune Controls */}
-        <AnimatePresence>
-          {showControls && isEditing && (
-            <motion.div
-              initial={{ opacity: 0, height: 0 }}
-              animate={{ opacity: 1, height: "auto" }}
-              exit={{ opacity: 0, height: 0 }}
-              className="absolute top-20 left-4 right-4 z-20 overflow-hidden"
-            >
-              <div className="bg-black/80 backdrop-blur-sm rounded-lg p-4 border border-white/20">
-                <div className="flex items-center justify-between mb-3">
-                  <div className="flex items-center gap-2 text-white text-sm font-medium">
-                    <Settings className="h-4 w-4" />
-                    Fine-tune Position
-                  </div>
-                  <Button
-                    variant="ghost"
-                    size="sm"
-                    onClick={resetPosition}
-                    className="text-white hover:bg-white/20"
-                  >
-                    <RotateCcw className="h-4 w-4 mr-1" />
-                    Reset
-                  </Button>
+                <h1 className="text-6xl font-bold text-gradient bg-gradient-to-r from-purple-400 via-pink-400 to-blue-400 bg-clip-text text-transparent">
+                  Token Factory
+                </h1>
+                <div className="p-4 bg-gradient-to-r from-blue-500/20 to-purple-500/20 rounded-2xl border border-blue-500/30">
+                  <Sparkles className="h-12 w-12 text-blue-400 animate-pulse" />
                 </div>
+              </motion.div>
 
-                <div className="grid grid-cols-2 gap-4 text-white">
-                  <div>
-                    <div className="flex justify-between text-xs mb-1">
-                      <span>Horizontal</span>
-                      <span>{editPosition.x.toFixed(0)}%</span>
-                    </div>
-                    <Slider
-                      value={[editPosition.x]}
-                      onValueChange={([value]) =>
-                        setEditPosition((prev) => ({ ...prev, x: value }))
-                      }
-                      min={-100}
-                      max={100}
-                      step={1}
-                      className="w-full"
-                    />
-                  </div>
-
-                  <div>
-                    <div className="flex justify-between text-xs mb-1">
-                      <span>Vertical</span>
-                      <span>{editPosition.y.toFixed(0)}%</span>
-                    </div>
-                    <Slider
-                      value={[editPosition.y]}
-                      onValueChange={([value]) =>
-                        setEditPosition((prev) => ({ ...prev, y: value }))
-                      }
-                      min={-100}
-                      max={100}
-                      step={1}
-                      className="w-full"
-                    />
-                  </div>
-
-                  <div>
-                    <div className="flex justify-between text-xs mb-1">
-                      <span>Scale</span>
-                      <span>{editPosition.scale.toFixed(1)}x</span>
-                    </div>
-                    <Slider
-                      value={[editPosition.scale]}
-                      onValueChange={([value]) =>
-                        setEditPosition((prev) => ({ ...prev, scale: value }))
-                      }
-                      min={0.5}
-                      max={3}
-                      step={0.1}
-                      className="w-full"
-                    />
-                  </div>
-
-                  <div>
-                    <div className="flex justify-between text-xs mb-1">
-                      <span>Rotation</span>
-                      <span>{editPosition.rotation.toFixed(0)}°</span>
-                    </div>
-                    <Slider
-                      value={[editPosition.rotation]}
-                      onValueChange={([value]) =>
-                        setEditPosition((prev) => ({
-                          ...prev,
-                          rotation: value,
-                        }))
-                      }
-                      min={-180}
-                      max={180}
-                      step={1}
-                      className="w-full"
-                    />
-                  </div>
-                </div>
-              </div>
-            </motion.div>
-          )}
-        </AnimatePresence>
-
-        {/* Token Info */}
-        <CardHeader>
-          <CardTitle className="text-white text-3xl font-bold flex items-center gap-4">
-            {token.name}
-            {token.symbol && (
-              <span className="text-2xl text-gray-300">({token.symbol})</span>
-            )}
-          </CardTitle>
-        </CardHeader>
-
-        <CardContent>
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-            <div className="space-y-4">
-              <div className="backdrop-blur-sm bg-white/10 p-4 rounded-lg">
-                <Label className="text-gray-200">Current Price</Label>
-                <p className="text-white text-lg font-semibold">
-                  {formattedCurrentPrice}{" "}
-                  <span className="text-gray-300">AVAX</span>
+              <motion.div
+                initial={{ opacity: 0 }}
+                animate={{ opacity: 1 }}
+                transition={{ delay: 0.3 }}
+                className="space-y-2"
+              >
+                <p className="text-2xl text-gray-300 font-medium">
+                  ✨ Create the next big thing in DeFi ✨
                 </p>
-              </div>
-            </div>
-          </div>
+                <p className="text-lg text-gray-400 max-w-2xl mx-auto">
+                  Launch your token with bonding curves, liquidity automation,
+                  and instant trading
+                </p>
+              </motion.div>
 
-          {/* Funding Progress */}
-          {token.fundingGoal && token.fundingGoal !== "0" && (
-            <div className="mt-6 backdrop-blur-sm bg-white/10 p-4 rounded-lg">
-              <Label className="text-gray-200 mb-2 block">
-                Funding Progress
-              </Label>
-              <Progress value={progress} className="h-2 mb-2" />
-              <p className="text-white text-sm font-semibold">
-                {progress.toFixed(2)}% - {formattedCollateral} /{" "}
-                {formattedFundingGoal} AVAX
-              </p>
+              {/* Stats Row */}
+              <motion.div
+                initial={{ opacity: 0, y: 20 }}
+                animate={{ opacity: 1, y: 0 }}
+                transition={{ delay: 0.5 }}
+                className="flex items-center justify-center gap-8 text-sm"
+              >
+                <div className="flex items-center gap-2 text-green-400">
+                  <CheckCircle className="h-4 w-4" />
+                  <span>Instant Launch</span>
+                </div>
+                <div className="flex items-center gap-2 text-blue-400">
+                  <Zap className="h-4 w-4" />
+                  <span>Auto Liquidity</span>
+                </div>
+                <div className="flex items-center gap-2 text-purple-400">
+                  <Crown className="h-4 w-4" />
+                  <span>No Code Required</span>
+                </div>
+              </motion.div>
             </div>
-          )}
-        </CardContent>
+          </motion.div>
+
+          {/* Progress Indicator */}
+          <motion.div
+            initial={{ opacity: 0, y: 20 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ delay: 0.2 }}
+            className="mb-8"
+          >
+            <Card className="unified-card border-purple-500/30 bg-gradient-to-r from-purple-500/10 to-pink-500/10">
+              <CardContent className="p-6">
+                <div className="flex items-center justify-between mb-4">
+                  <div className="flex items-center gap-2">
+                    <Target className="h-5 w-5 text-purple-400" />
+                    <span className="text-white font-medium text-4xl">
+                      Token Factory
+                    </span>
+                  </div>
+                  <Badge className="bg-purple-500/20 text-purple-400 border-purple-500/30">
+                    {getCompletionPercentage()}% Complete
+                  </Badge>
+                </div>
+                <div className="w-full bg-gray-800 rounded-full h-3 overflow-hidden">
+                  <motion.div
+                    className="h-full bg-gradient-to-r from-purple-500 to-pink-500"
+                    initial={{ width: 0 }}
+                    animate={{ width: `${getCompletionPercentage()}%` }}
+                    transition={{ duration: 0.8, ease: "easeOut" }}
+                  />
+                </div>
+              </CardContent>
+            </Card>
+          </motion.div>
+
+          {/* Main Content */}
+          <motion.div
+            initial={{ opacity: 0, y: 20 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ delay: 0.4 }}
+          >
+            <form onSubmit={handleSubmit}>
+              <Tabs defaultValue="token-info" className="space-y-8">
+                <TabsList className="glass-card p-2 border border-border/50 w-full">
+                  <TabsTrigger
+                    value="token-info"
+                    className="flex items-center gap-2 flex-1"
+                  >
+                    <Lightbulb className="h-4 w-4" />
+                    Token Details
+                  </TabsTrigger>
+                  <TabsTrigger
+                    value="tokenomics"
+                    className="flex items-center gap-2 flex-1"
+                  >
+                    <TrendingUp className="h-4 w-4" />
+                    Economics
+                  </TabsTrigger>
+                </TabsList>
+
+                <TabsContent value="token-info">
+                  <Card className="unified-card">
+                    <CardHeader className="text-center">
+                      <CardTitle className="flex items-center justify-center gap-2 text-2xl">
+                        <Wand2 className="h-6 w-6 text-purple-400" />
+                        Token Information
+                      </CardTitle>
+                      <CardDescription>
+                        Give your token personality and make it unforgettable
+                      </CardDescription>
+                    </CardHeader>
+                    <CardContent>
+                      {/* ✅ This will now work correctly with TokenCreationInfo */}
+                      <TokenInfoForm
+                        tokenInfo={tokenInfo}
+                        onTokenInfoChange={setTokenInfo}
+                      />
+                    </CardContent>
+                  </Card>
+                </TabsContent>
+
+                <TabsContent value="tokenomics">
+                  <Card className="unified-card">
+                    <CardHeader className="text-center">
+                      <CardTitle className="flex items-center justify-center gap-2 text-2xl">
+                        <Coins className="h-6 w-6 text-yellow-400" />
+                        Tokenomics
+                      </CardTitle>
+                      <CardDescription>
+                        Configure your token's economic foundation
+                      </CardDescription>
+                    </CardHeader>
+                    <CardContent>
+                      <TokenomicsForm tokenomics={tokenomics} />
+                    </CardContent>
+                  </Card>
+                </TabsContent>
+              </Tabs>
+
+              {/* Launch Section */}
+              <motion.div
+                initial={{ opacity: 0, y: 20 }}
+                animate={{ opacity: 1, y: 0 }}
+                transition={{ delay: 0.6 }}
+                className="mt-12"
+              >
+                <Card className="unified-card border-purple-500/20 bg-purple-500/5">
+                  <CardContent className="p-8 text-center space-y-6">
+                    <div className="space-y-3">
+                      <motion.div
+                        animate={{ rotate: isCreating ? 360 : 0 }}
+                        transition={{
+                          duration: 2,
+                          repeat: isCreating ? Infinity : 0,
+                        }}
+                      >
+                        <Rocket className="h-16 w-16 text-purple-400 mx-auto" />
+                      </motion.div>
+
+                      <h3 className="text-3xl font-bold text-gradient">
+                        {isCreating ? "🚀 Launching..." : "Ready for Launch?"}
+                      </h3>
+
+                      {!isFormValid ? (
+                        <p className="text-gray-400">
+                          Complete the form above to launch your token
+                        </p>
+                      ) : (
+                        <p className="text-green-400 flex items-center justify-center gap-2">
+                          <CheckCircle className="h-5 w-5" />
+                          All systems go! Ready to launch
+                        </p>
+                      )}
+                    </div>
+
+                    <Button
+                      type="submit"
+                      disabled={
+                        !isFormValid ||
+                        isPending ||
+                        uploadingImage ||
+                        isConfirming ||
+                        isCreating
+                      }
+                      className={`
+                        px-12 py-6 text-xl font-bold rounded-2xl transition-all duration-500 group
+                        ${
+                          isFormValid && !isCreating
+                            ? "bg-gradient-to-r from-purple-600 to-pink-600 hover:from-purple-500 hover:to-pink-500 text-white shadow-lg hover:shadow-purple-500/25 hover:scale-105 border-2 border-purple-500/30"
+                            : "bg-gray-700 text-gray-400 cursor-not-allowed"
+                        }
+                      `}
+                    >
+                      <AnimatePresence mode="wait">
+                        {uploadingImage ? (
+                          <motion.div
+                            key="uploading"
+                            initial={{ opacity: 0 }}
+                            animate={{ opacity: 1 }}
+                            exit={{ opacity: 0 }}
+                            className="flex items-center gap-3"
+                          >
+                            <Upload className="h-6 w-6 animate-bounce" />
+                            Uploading Image...
+                          </motion.div>
+                        ) : isPending || isCreating ? (
+                          <motion.div
+                            key="creating"
+                            initial={{ opacity: 0 }}
+                            animate={{ opacity: 1 }}
+                            exit={{ opacity: 0 }}
+                            className="flex items-center gap-3"
+                          >
+                            <Flame className="h-6 w-6 animate-pulse" />
+                            Creating Token...
+                          </motion.div>
+                        ) : isConfirming ? (
+                          <motion.div
+                            key="confirming"
+                            initial={{ opacity: 0 }}
+                            animate={{ opacity: 1 }}
+                            exit={{ opacity: 0 }}
+                            className="flex items-center gap-3"
+                          >
+                            <Zap className="h-6 w-6 animate-spin" />
+                            Confirming...
+                          </motion.div>
+                        ) : (
+                          <motion.div
+                            key="launch"
+                            initial={{ opacity: 0 }}
+                            animate={{ opacity: 1 }}
+                            exit={{ opacity: 0 }}
+                            className="flex items-center gap-3"
+                          >
+                            <Rocket className="h-6 w-6 group-hover:translate-y-[-4px] transition-transform duration-300" />
+                            Launch Token
+                            <ArrowRight className="h-6 w-6 group-hover:translate-x-1 transition-transform duration-300" />
+                          </motion.div>
+                        )}
+                      </AnimatePresence>
+                    </Button>
+
+                    {/* Status Messages */}
+                    <AnimatePresence>
+                      {error && (
+                        <motion.div
+                          initial={{ opacity: 0, y: 10 }}
+                          animate={{ opacity: 1, y: 0 }}
+                          exit={{ opacity: 0, y: -10 }}
+                          className="mt-4 p-4 bg-red-500/10 border border-red-500/30 rounded-lg"
+                        >
+                          <p className="text-red-400 text-sm">
+                            <strong>Launch Failed:</strong>{" "}
+                            {error.message || "An error occurred"}
+                          </p>
+                        </motion.div>
+                      )}
+
+                      {receipt && (
+                        <motion.div
+                          initial={{ opacity: 0, y: 10, scale: 0.95 }}
+                          animate={{ opacity: 1, y: 0, scale: 1 }}
+                          className="mt-6 p-6 bg-green-500/10 border border-green-500/30 rounded-xl"
+                        >
+                          <div className="space-y-4">
+                            <div className="flex items-center justify-center gap-2 text-green-400">
+                              <Trophy className="h-6 w-6" />
+                              <h3 className="text-xl font-bold">
+                                Token Created Successfully!
+                              </h3>
+                            </div>
+
+                            <div className="space-y-2 text-sm">
+                              <div className="flex justify-between">
+                                <span className="text-gray-400">Name:</span>
+                                <span className="text-white font-medium">
+                                  {tokenInfo.name}
+                                </span>
+                              </div>
+                              <div className="flex justify-between">
+                                <span className="text-gray-400">Symbol:</span>
+                                <span className="text-white font-medium">
+                                  {tokenInfo.ticker}
+                                </span>
+                              </div>
+                              <div className="flex justify-between">
+                                <span className="text-gray-400">
+                                  Funding Goal:
+                                </span>
+                                <span className="text-white font-medium">
+                                  {tokenomics.fundingGoal} AVAX
+                                </span>
+                              </div>
+                              {tokenInfo.burnManager && (
+                                <div className="flex justify-between">
+                                  <span className="text-gray-400">
+                                    Burn Manager:
+                                  </span>
+                                  <span className="text-white font-medium">
+                                    {tokenInfo.burnManager}
+                                  </span>
+                                </div>
+                              )}
+                            </div>
+
+                            <div className="flex items-center justify-center pt-2">
+                              <div className="flex items-center gap-2">
+                                <span className="text-gray-400 text-sm">
+                                  Transaction:
+                                </span>
+                                <AddressComponent
+                                  hash={`${transactionData}`}
+                                  type="tx"
+                                />
+                              </div>
+                            </div>
+                          </div>
+                        </motion.div>
+                      )}
+                    </AnimatePresence>
+                  </CardContent>
+                </Card>
+              </motion.div>
+            </form>
+          </motion.div>
+
+          {/* Features Grid */}
+          <motion.div
+            initial={{ opacity: 0, y: 20 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ delay: 0.8 }}
+            className="mt-16 grid grid-cols-1 md:grid-cols-3 gap-6"
+          >
+            <Card className="unified-card text-center">
+              <CardContent className="p-6 space-y-4">
+                <div className="p-3 bg-blue-500/20 rounded-xl border border-blue-500/30 w-fit mx-auto">
+                  <Zap className="h-8 w-8 text-blue-400" />
+                </div>
+                <h3 className="text-xl font-bold text-white">
+                  Instant Trading
+                </h3>
+                <p className="text-gray-400">
+                  Your token is immediately tradeable with built-in liquidity
+                </p>
+              </CardContent>
+            </Card>
+
+            <Card className="unified-card text-center">
+              <CardContent className="p-6 space-y-4">
+                <div className="p-3 bg-green-500/20 rounded-xl border border-green-500/30 w-fit mx-auto">
+                  <Users className="h-8 w-8 text-green-400" />
+                </div>
+                <h3 className="text-xl font-bold text-white">
+                  Community Driven
+                </h3>
+                <p className="text-gray-400">
+                  Bonding curves ensure fair price discovery for all
+                  participants
+                </p>
+              </CardContent>
+            </Card>
+
+            <Card className="unified-card text-center">
+              <CardContent className="p-6 space-y-4">
+                <div className="p-3 bg-purple-500/20 rounded-xl border border-purple-500/30 w-fit mx-auto">
+                  <Wand className="h-8 w-8 text-purple-400" />
+                </div>
+                <h3 className="text-xl font-bold text-white">
+                  Zero Complexity
+                </h3>
+                <p className="text-gray-400">
+                  No coding, no contracts to deploy. Just fill out the form and
+                  launch!
+                </p>
+              </CardContent>
+            </Card>
+          </motion.div>
+        </Container>
       </div>
-
-      {/* Fallback Background */}
-      {!token.imageUrl && (
-        <div className="absolute inset-0 bg-gradient-to-br from-gray-900 to-gray-800" />
-      )}
-    </Card>
+    </div>
   );
-};
+}
 
-export default TokenHeaderStyled;
+export default Page;

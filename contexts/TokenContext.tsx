@@ -1,3 +1,4 @@
+// /contexts/TokenContext.tsx
 "use client";
 import React, {
   createContext,
@@ -35,7 +36,8 @@ interface TokenContextState {
 
 const TokenContext = createContext<TokenContextState | null>(null);
 
-// (mapTokenData function remains the same)
+// /contexts/TokenContext.tsx - Updated mapTokenData function
+
 const mapTokenData = (
   address: string,
   data: any,
@@ -53,6 +55,18 @@ const mapTokenData = (
     createdAt: data.createdAt || new Date().toISOString(),
     blockNumber: data.blockNumber || 0,
     transactionHash: data.transactionHash || "",
+
+    // Image positioning support
+    imagePosition: data.imagePosition || {
+      x: 0,
+      y: 0,
+      scale: 1,
+      rotation: 0,
+      fit: "cover",
+    },
+    lastUpdated: data.lastUpdated,
+    updatedBy: data.updatedBy,
+
     ...factoryConfig,
     collateral: "0",
     virtualSupply: "0",

@@ -1,289 +1,519 @@
-import React, { useState } from "react";
-import { doc, updateDoc, getDoc, serverTimestamp } from "firebase/firestore";
-import { db } from "@/firebase";
-import { Button } from "@/components/ui/button";
+import React, { useEffect, useState, useRef, useCallback, FC } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { useAccount } from "wagmi";
+import { Label } from "@/components/ui/label";
 import { Badge } from "@/components/ui/badge";
+import { Button } from "@/components/ui/button";
+import { Slider } from "@/components/ui/slider";
+import {
+  Tooltip,
+  TooltipContent,
+  TooltipProvider,
+  TooltipTrigger,
+} from "@/components/ui/tooltip";
+import { AddressComponent } from "@/components/AddressComponent";
+import { Progress } from "@/components/ui/progress";
+import { useToken } from "@/contexts/TokenContext";
+import { useFactoryContract } from "@/new-hooks/useFactoryContract";
+import { formatTokenPrice } from "@/utils/tokenPriceFormatter";
+import { Address, formatEther } from "viem";
+import { useAccount } from "wagmi";
+import { useImagePosition } from "@/hooks/useImagePosition";
+import {
+  Edit3,
+  Save,
+  X,
+  RotateCcw,
+  Crown,
+  Maximize,
+  Minimize,
+  Square,
+} from "lucide-react";
+import { motion, AnimatePresence } from "framer-motion";
 
-interface FirebaseDebuggerProps {
-  tokenAddress: string;
+// --- Type Definitions ---
+interface TokenHeaderProps {
+  address: string;
 }
 
-export const FirebaseDebugger: React.FC<FirebaseDebuggerProps> = ({
-  tokenAddress,
-}) => {
-  const [isLoading, setIsLoading] = useState(false);
-  const [logs, setLogs] = useState<string[]>([]);
-  const [tokenData, setTokenData] = useState<any>(null);
+interface StateDisplay {
+  text: string;
+  color: string;
+}
+
+interface ImagePosition {
+  x: number;
+  y: number;
+  scale: number;
+  rotation: number;
+  fit?: "cover" | "contain" | "fill";
+}
+
+// --- Constants for better maintainability ---
+const FIT_MODES = {
+  cover: { icon: Maximize, label: "Cover" },
+  contain: { icon: Minimize, label: "Contain" },
+  fill: { icon: Square, label: "Fill" },
+} as const;
+
+const SLIDER_CONTROLS = [
+  { key: "x", label: "Horizontal", min: -100, max: 100, step: 1, suffix: "%" },
+  { key: "y", label: "Vertical", min: -100, max: 100, step: 1, suffix: "%" },
+  { key: "scale", label: "Scale", min: 0.5, max: 3, step: 0.1, suffix: "x" },
+  {
+    key: "rotation",
+    label: "Rotation",
+    min: -180,
+    max: 180,
+    step: 1,
+    suffix: "°",
+  },
+];
+
+// --- Main Component ---
+export const TokenHeaderStyled: FC<TokenHeaderProps> = ({ address }) => {
+  // --- State and Refs ---
+  const [isEditing, setIsEditing] = useState(false);
+  const [position, setPosition] = useState<ImagePosition>({
+    x: 0,
+    y: 0,
+    scale: 1,
+    rotation: 0,
+    fit: "cover",
+  });
+  const [isDragging, setIsDragging] = useState(false);
+  const [dragStart, setDragStart] = useState({ x: 0, y: 0 });
+  const imageContainerRef = useRef<HTMLDivElement>(null);
+
+  // --- Hooks ---
   const { address: userAddress } = useAccount();
+  const { updatePosition, isUpdating } = useImagePosition();
+  const { token, loading } = useToken(address);
+  const { useTokenState } = useFactoryContract();
+  const { data: state } = useTokenState(address as Address);
 
-  const addLog = (message: string) => {
-    const timestamp = new Date().toLocaleTimeString();
-    setLogs((prev) => [...prev, `[${timestamp}] ${message}`]);
-  };
+  const isCreator =
+    userAddress &&
+    token?.creator &&
+    userAddress.toLowerCase() === token.creator.toLowerCase();
 
-  const testFirebaseConnection = async () => {
-    setIsLoading(true);
-    addLog("🔄 Testing Firebase connection...");
+  // --- Effects ---
+  useEffect(() => {
+    if (token?.imagePosition) {
+      setPosition(token.imagePosition);
+    }
+  }, [token?.imagePosition]);
 
-    try {
-      // Test 1: Read token document
-      addLog(`📖 Reading token document: ${tokenAddress}`);
-      const tokenDocRef = doc(db, "tokens", tokenAddress);
-      const tokenDoc = await getDoc(tokenDocRef);
+  // --- Callbacks for Editing Actions ---
+  const savePosition = useCallback(async () => {
+    if (!token?.address || !userAddress) return;
+    const success = await updatePosition(token.address, position, userAddress);
+    if (success) {
+      setIsEditing(false);
+    }
+  }, [token?.address, userAddress, position, updatePosition]);
 
-      if (tokenDoc.exists()) {
-        const data = tokenDoc.data();
-        setTokenData(data);
-        addLog(`✅ Token document exists. Creator: ${data.creator}`);
-        addLog(
-          `📊 Current imagePosition: ${JSON.stringify(
-            data.imagePosition || "None"
-          )}`
-        );
-
-        // Check creator match
-        if (userAddress && data.creator) {
-          const isCreator =
-            userAddress.toLowerCase() === data.creator.toLowerCase();
-          addLog(`👤 User: ${userAddress}`);
-          addLog(`👑 Creator: ${data.creator}`);
-          addLog(`🔐 Is Creator: ${isCreator ? "✅ YES" : "❌ NO"}`);
-        } else {
-          addLog("⚠️ Missing user address or creator field");
-        }
-      } else {
-        addLog("❌ Token document does not exist");
-        return;
-      }
-
-      // Test 2: Try to update document
-      addLog("🔄 Testing document update...");
-      const testPosition = {
-        x: Math.random() * 10,
-        y: Math.random() * 10,
+  const cancelEdit = useCallback(() => {
+    setPosition(
+      token?.imagePosition || {
+        x: 0,
+        y: 0,
         scale: 1,
         rotation: 0,
         fit: "cover",
-      };
-
-      const updateData = {
-        imagePosition: testPosition,
-        lastUpdated: serverTimestamp(),
-        updatedBy: userAddress,
-        testUpdate: new Date().toISOString(),
-      };
-
-      await updateDoc(tokenDocRef, updateData);
-      addLog("✅ Document update successful!");
-
-      // Verify the update
-      const updatedDoc = await getDoc(tokenDocRef);
-      if (updatedDoc.exists()) {
-        const updatedData = updatedDoc.data();
-        addLog(
-          `✅ Verified update: ${JSON.stringify(updatedData.imagePosition)}`
-        );
       }
-    } catch (error) {
-      addLog(
-        `❌ Error: ${error instanceof Error ? error.message : "Unknown error"}`
-      );
-      console.error("Firebase test error:", error);
-    } finally {
-      setIsLoading(false);
-    }
-  };
+    );
+    setIsEditing(false);
+  }, [token?.imagePosition]);
 
-  const testSpecificUpdate = async () => {
-    setIsLoading(true);
-    addLog("🔄 Testing specific position update...");
+  const resetPosition = useCallback(() => {
+    setPosition({ x: 0, y: 0, scale: 1, rotation: 0, fit: "cover" });
+  }, []);
 
-    try {
-      const tokenDocRef = doc(db, "tokens", tokenAddress);
+  const setFitMode = useCallback((fit: keyof typeof FIT_MODES) => {
+    setPosition((prev) => ({ ...prev, fit }));
+  }, []);
 
-      // Specific update that mimics the real component
-      const updateData = {
-        imagePosition: {
-          x: 25.5,
-          y: -15.2,
-          scale: 1.3,
-          rotation: 5,
-          fit: "cover",
-        },
-        lastUpdated: serverTimestamp(),
-        updatedBy: userAddress,
+  // --- Callbacks for Interactive Positioning ---
+  const handleMouseDown = useCallback(
+    (e: React.MouseEvent) => {
+      if (position.fit !== "cover" || !isEditing) return;
+      e.preventDefault();
+      setIsDragging(true);
+      setDragStart({ x: e.clientX, y: e.clientY });
+    },
+    [position.fit, isEditing]
+  );
+
+  const handleMouseMove = useCallback(
+    (e: React.MouseEvent) => {
+      if (!isDragging || !imageContainerRef.current || position.fit !== "cover")
+        return;
+      e.preventDefault();
+      const rect = imageContainerRef.current.getBoundingClientRect();
+      const deltaX = ((e.clientX - dragStart.x) / rect.width) * 100;
+      const deltaY = ((e.clientY - dragStart.y) / rect.height) * 100;
+
+      setPosition((prev) => ({
+        ...prev,
+        x: Math.max(-100, Math.min(100, prev.x + deltaX)),
+        y: Math.max(-100, Math.min(100, prev.y + deltaY)),
+      }));
+      setDragStart({ x: e.clientX, y: e.clientY });
+    },
+    [isDragging, dragStart, position.fit]
+  );
+
+  const handleMouseUp = useCallback(() => {
+    setIsDragging(false);
+  }, []);
+
+  const handleWheel = useCallback(
+    (e: React.WheelEvent) => {
+      if (position.fit !== "cover" || !isEditing) return;
+      e.preventDefault();
+      const delta = e.deltaY * -0.001;
+      setPosition((prev) => ({
+        ...prev,
+        scale: Math.max(0.5, Math.min(3, prev.scale + delta)),
+      }));
+    },
+    [position.fit, isEditing]
+  );
+
+  // --- Style Generation ---
+  const getBackgroundStyle = useCallback(() => {
+    if (!token?.imageUrl) return {};
+    const { x, y, scale, rotation, fit = "cover" } = position;
+    const baseStyle = {
+      backgroundImage: `url(${token.imageUrl})`,
+      backgroundRepeat: "no-repeat",
+      transform: `rotate(${rotation}deg)`,
+      transformOrigin: "center center",
+      transition: isDragging
+        ? "none"
+        : "transform 0.2s ease-out, background-position 0.2s ease-out, background-size 0.2s ease-out",
+    };
+
+    if (fit === "fill")
+      return {
+        ...baseStyle,
+        backgroundSize: "100% 100%",
+        backgroundPosition: "center",
+      };
+    if (fit === "contain")
+      return {
+        ...baseStyle,
+        backgroundSize: "contain",
+        backgroundPosition: "center",
       };
 
-      addLog(`📤 Sending update: ${JSON.stringify(updateData.imagePosition)}`);
-      await updateDoc(tokenDocRef, updateData);
-      addLog("✅ Specific update successful!");
-    } catch (error) {
-      addLog(
-        `❌ Specific update failed: ${
-          error instanceof Error ? error.message : "Unknown error"
-        }`
-      );
-      console.error("Specific update error:", error);
-    } finally {
-      setIsLoading(false);
-    }
-  };
+    return {
+      ...baseStyle,
+      backgroundSize: `${100 * scale}%`,
+      backgroundPosition: `${50 + x}% ${50 + y}%`,
+    };
+  }, [token?.imageUrl, position, isDragging]);
 
-  const clearLogs = () => {
-    setLogs([]);
-    setTokenData(null);
-  };
-
-  const checkFirebaseRules = () => {
-    addLog("📋 Firebase Security Rules Check:");
-    addLog("1. ✅ Read access: should be allowed for all users");
-    addLog("2. ⚠️ Write access: only allowed for token creators");
-    addLog("3. 🔐 Required: user must be authenticated");
-    addLog(
-      "4. 🎯 Required: request.auth.token.address must match resource.data.creator"
+  // --- Render Logic ---
+  if (loading || !token) {
+    return (
+      <Card className="min-h-[300px] flex items-center justify-center">
+        <div className="p-8 text-gray-400">Loading token data...</div>
+      </Card>
     );
-    addLog("");
-    addLog("If updates fail, check:");
-    addLog("- Firebase Authentication is working");
-    addLog("- Custom claims include wallet address");
-    addLog("- Security rules allow imagePosition updates");
-  };
+  }
 
   return (
-    <Card className="w-full max-w-4xl mx-auto">
-      <CardHeader>
-        <CardTitle className="flex items-center justify-between">
-          Firebase Debugger
-          <Badge variant="outline">Token: {tokenAddress.slice(0, 8)}...</Badge>
-        </CardTitle>
-      </CardHeader>
-      <CardContent className="space-y-4">
-        {/* Control Buttons */}
-        <div className="flex flex-wrap gap-2">
-          <Button onClick={testFirebaseConnection} disabled={isLoading}>
-            Test Connection
-          </Button>
-          <Button
-            onClick={testSpecificUpdate}
-            disabled={isLoading}
-            variant="outline"
+    <TooltipProvider delayDuration={100}>
+      <Card className="relative overflow-hidden min-h-[300px]">
+        {/* --- EDITING MODE RENDER --- */}
+        {isEditing ? (
+          <div
+            ref={imageContainerRef}
+            className="absolute inset-0 z-10"
+            onMouseDown={handleMouseDown}
+            onMouseMove={handleMouseMove}
+            onMouseUp={handleMouseUp}
+            onMouseLeave={handleMouseUp}
+            onWheel={handleWheel}
+            style={{ cursor: position.fit === "cover" ? "move" : "default" }}
           >
-            Test Update
-          </Button>
-          <Button onClick={checkFirebaseRules} variant="outline">
-            Check Rules
-          </Button>
-          <Button onClick={clearLogs} variant="destructive" size="sm">
-            Clear Logs
-          </Button>
-        </div>
+            {/* Background Image */}
+            <div
+              className="absolute inset-0 bg-cover bg-center"
+              style={getBackgroundStyle()}
+            />
+            {/* Darkening Overlay */}
+            <div className="absolute inset-0 bg-black/50" />
+            {/* Centering Crosshair */}
+            <div className="absolute inset-0 flex items-center justify-center pointer-events-none opacity-50">
+              <div className="w-px h-8 bg-white" />
+              <div className="w-8 h-px bg-white absolute" />
+            </div>
 
-        {/* Current Token Data */}
-        {tokenData && (
-          <Card className="bg-gray-50">
-            <CardHeader>
-              <CardTitle className="text-sm">Current Token Data</CardTitle>
-            </CardHeader>
-            <CardContent>
-              <pre className="text-xs overflow-auto max-h-32 bg-white p-2 rounded border">
-                {JSON.stringify(tokenData, null, 2)}
-              </pre>
-            </CardContent>
-          </Card>
-        )}
+            {/* Top Right Save/Cancel Controls */}
+            <div className="absolute top-4 right-4 z-20 flex items-center gap-2">
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <Button
+                    variant="outline"
+                    size="icon"
+                    onClick={cancelEdit}
+                    className="bg-red-500/80 border-red-400 text-white hover:bg-red-600 h-8 w-8"
+                  >
+                    <X className="h-4 w-4" />
+                  </Button>
+                </TooltipTrigger>
+                <TooltipContent>
+                  <p>Cancel</p>
+                </TooltipContent>
+              </Tooltip>
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <Button
+                    variant="outline"
+                    size="icon"
+                    onClick={savePosition}
+                    disabled={isUpdating}
+                    className="bg-green-500/80 border-green-400 text-white hover:bg-green-600 h-8 w-8"
+                  >
+                    {isUpdating ? (
+                      <div className="h-4 w-4 border-2 border-white/30 border-t-white rounded-full animate-spin" />
+                    ) : (
+                      <Save className="h-4 w-4" />
+                    )}
+                  </Button>
+                </TooltipTrigger>
+                <TooltipContent>
+                  <p>Save Position</p>
+                </TooltipContent>
+              </Tooltip>
+            </div>
 
-        {/* Logs Display */}
-        <Card className="bg-gray-900 text-green-400">
-          <CardHeader>
-            <CardTitle className="text-sm text-white">Debug Logs</CardTitle>
-          </CardHeader>
-          <CardContent>
-            <div className="font-mono text-xs space-y-1 max-h-64 overflow-y-auto">
-              {logs.length === 0 ? (
-                <div className="text-gray-500">
-                  No logs yet. Click a test button to start.
+            {/* Bottom Floating Control Panel */}
+            <motion.div
+              initial={{ opacity: 0, y: 20 }}
+              animate={{ opacity: 1, y: 0 }}
+              exit={{ opacity: 0, y: 20 }}
+              transition={{ duration: 0.2 }}
+              className="absolute bottom-4 left-4 right-4 z-20"
+            >
+              <div className="bg-black/80 backdrop-blur-md rounded-lg p-4 border border-white/20 space-y-4 max-w-lg mx-auto">
+                <div className="flex items-center justify-between">
+                  <span className="text-white text-sm font-medium">
+                    Image Controls
+                  </span>
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    onClick={resetPosition}
+                    className="text-white hover:bg-white/20"
+                  >
+                    <RotateCcw className="h-4 w-4 mr-1" /> Reset
+                  </Button>
                 </div>
-              ) : (
-                logs.map((log, index) => (
-                  <div key={index} className="whitespace-pre-wrap">
-                    {log}
-                  </div>
-                ))
-              )}
+                <div className="grid grid-cols-3 gap-2">
+                  {Object.entries(FIT_MODES).map(
+                    ([mode, { icon: Icon, label }]) => (
+                      <Button
+                        key={mode}
+                        variant={
+                          (position.fit || "cover") === mode
+                            ? "secondary"
+                            : "outline"
+                        }
+                        size="sm"
+                        onClick={() =>
+                          setFitMode(mode as keyof typeof FIT_MODES)
+                        }
+                        className="text-xs"
+                      >
+                        <Icon className="h-3 w-3 mr-1" /> {label}
+                      </Button>
+                    )
+                  )}
+                </div>
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-x-4 gap-y-2">
+                  {SLIDER_CONTROLS.map(
+                    ({ key, label, min, max, step, suffix }) => {
+                      const disabled =
+                        position.fit !== "cover" && key !== "rotation";
+                      const value = position[
+                        key as keyof ImagePosition
+                      ] as number;
+                      return (
+                        <div key={key}>
+                          <div className="flex justify-between text-xs text-white mb-1">
+                            <span className={disabled ? "text-gray-500" : ""}>
+                              {label}
+                            </span>
+                            <span className={disabled ? "text-gray-500" : ""}>
+                              {key === "scale"
+                                ? value.toFixed(1)
+                                : value.toFixed(0)}
+                              {suffix}
+                            </span>
+                          </div>
+                          <Slider
+                            value={[value]}
+                            onValueChange={([val]) =>
+                              setPosition((p) => ({ ...p, [key]: val }))
+                            }
+                            min={min}
+                            max={max}
+                            step={step}
+                            disabled={disabled}
+                          />
+                        </div>
+                      );
+                    }
+                  )}
+                </div>
+              </div>
+            </motion.div>
+          </div>
+        ) : (
+          /* --- DISPLAY MODE RENDER --- */
+          <>
+            {/* Non-interactive background */}
+            <div className="absolute inset-0 z-0">
+              <div
+                className="absolute inset-0 bg-cover bg-center"
+                style={getBackgroundStyle()}
+              />
+              <div className="absolute inset-0 bg-gradient-to-b from-black/60 via-black/50 to-black/70" />
             </div>
-          </CardContent>
-        </Card>
 
-        {/* Quick Fixes */}
-        <Card className="bg-blue-50 border-blue-200">
-          <CardHeader>
-            <CardTitle className="text-sm text-blue-800">
-              Common Issues & Fixes
-            </CardTitle>
-          </CardHeader>
-          <CardContent className="text-sm space-y-2">
-            <div>
-              <strong>❌ Permission Denied:</strong>
-              <ul className="ml-4 mt-1 space-y-1 text-xs">
-                <li>• Check if user wallet address matches token creator</li>
-                <li>• Verify Firebase Auth is working</li>
-                <li>• Check security rules allow imagePosition updates</li>
-              </ul>
+            {/* Token Info Content */}
+            <div className="relative z-10 flex flex-col justify-between h-full min-h-[300px] p-4">
+              <div className="flex justify-between items-start">
+                <AddressComponent hash={address} type="address" />
+                <div className="flex items-center gap-2">
+                  <TokenStatusBadge state={state as number} />
+                  {isCreator && (
+                    <div className="flex items-center gap-2">
+                      {token?.imageUrl && (
+                        <Tooltip>
+                          <TooltipTrigger asChild>
+                            <Button
+                              variant="outline"
+                              size="icon"
+                              onClick={() => setIsEditing(true)}
+                              className="bg-black/50 border-white/30 text-white hover:bg-black/70 h-8 w-8"
+                            >
+                              <Edit3 className="h-4 w-4" />
+                            </Button>
+                          </TooltipTrigger>
+                          <TooltipContent>
+                            <p>Edit photo position</p>
+                          </TooltipContent>
+                        </Tooltip>
+                      )}
+                      <Tooltip>
+                        <TooltipTrigger asChild>
+                          <div className="p-1.5 bg-yellow-500/20 border border-yellow-400/30 rounded-md cursor-help">
+                            <Crown className="h-4 w-4 text-yellow-400" />
+                          </div>
+                        </TooltipTrigger>
+                        <TooltipContent>
+                          <p>You are the creator</p>
+                        </TooltipContent>
+                      </Tooltip>
+                    </div>
+                  )}
+                </div>
+              </div>
+              <TokenInfoDisplay token={token} />
             </div>
-            <div>
-              <strong>❌ Document Not Found:</strong>
-              <ul className="ml-4 mt-1 space-y-1 text-xs">
-                <li>• Verify token address is correct</li>
-                <li>• Check if token exists in Firestore</li>
-                <li>• Ensure 'tokens' collection exists</li>
-              </ul>
-            </div>
-            <div>
-              <strong>❌ Update Failed:</strong>
-              <ul className="ml-4 mt-1 space-y-1 text-xs">
-                <li>• Check network connection</li>
-                <li>• Verify Firestore rules</li>
-                <li>• Check browser console for errors</li>
-              </ul>
-            </div>
-          </CardContent>
-        </Card>
-
-        {/* Firebase Rules Template */}
-        <Card className="bg-yellow-50 border-yellow-200">
-          <CardHeader>
-            <CardTitle className="text-sm text-yellow-800">
-              Firebase Security Rules Template
-            </CardTitle>
-          </CardHeader>
-          <CardContent>
-            <pre className="text-xs bg-gray-800 text-green-400 p-3 rounded overflow-auto">
-              {`rules_version = '2';
-service cloud.firestore {
-  match /databases/{database}/documents {
-    match /tokens/{tokenId} {
-      // Allow read access to everyone
-      allow read: if true;
-      
-      // Allow create during token creation
-      allow create: if request.auth != null;
-      
-      // Allow updates only by token creator for imagePosition
-      allow update: if request.auth != null
-        && request.auth.uid != null
-        && resource.data.creator != null
-        && request.auth.token.address.lower() == resource.data.creator.lower()
-        && request.resource.data.diff(resource.data).affectedKeys()
-          .hasOnly(['imagePosition', 'lastUpdated', 'updatedBy']);
-    }
-  }
-}`}
-            </pre>
-          </CardContent>
-        </Card>
-      </CardContent>
-    </Card>
+          </>
+        )}
+      </Card>
+    </TooltipProvider>
   );
 };
+
+/* --- Sub-components for cleaner render logic --- */
+const TokenStatusBadge: FC<{ state: number | undefined }> = ({ state }) => {
+  const stateMap: Record<number, StateDisplay> = {
+    0: { text: "Not Created", color: "bg-red-500/80" },
+    1: { text: "Trading", color: "bg-green-600/70" },
+    2: { text: "Goal Reached", color: "bg-yellow-500/80" },
+    3: { text: "Halted", color: "bg-red-500/80" },
+    4: { text: "Resumed", color: "bg-green-600/70" },
+  };
+  const display = stateMap[state as number] || {
+    text: "Unknown",
+    color: "bg-gray-500/80",
+  };
+  return (
+    <Badge
+      className={`${display.color} text-white px-3 py-1`}
+      variant="outline"
+    >
+      {display.text}
+    </Badge>
+  );
+};
+
+const TokenInfoDisplay: FC<{ token: any }> = ({ token }) => {
+  const { useCollateral, useCurrentPrice } = useFactoryContract();
+  const { data: rawCollateral } = useCollateral(token.address as Address);
+  const { data: rawCurrentPrice } = useCurrentPrice(token.address as Address);
+  const [progress, setProgress] = useState(0);
+
+  const formattedCollateral = rawCollateral
+    ? formatTokenPrice(formatEther(rawCollateral))
+    : "0.000000";
+  const formattedCurrentPrice = rawCurrentPrice
+    ? formatTokenPrice(formatEther(rawCurrentPrice))
+    : "0.000000";
+  const formattedFundingGoal = token.fundingGoal
+    ? formatTokenPrice(token.fundingGoal)
+    : "0.000000";
+
+  useEffect(() => {
+    if (token.fundingGoal && rawCollateral) {
+      const goalAmount = parseFloat(token.fundingGoal);
+      const collateralAmount = parseFloat(formatEther(rawCollateral));
+      const percentage =
+        goalAmount > 0 ? (collateralAmount / goalAmount) * 100 : 0;
+      setProgress(Math.min(percentage, 100));
+    }
+  }, [token.fundingGoal, rawCollateral]);
+
+  return (
+    <div className="space-y-4">
+      <CardHeader className="p-0">
+        <CardTitle className="text-white text-3xl font-bold flex items-center gap-4">
+          {token.name}
+          {token.symbol && (
+            <span className="text-2xl text-gray-300">({token.symbol})</span>
+          )}
+        </CardTitle>
+      </CardHeader>
+      <CardContent className="p-0">
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+          <div className="backdrop-blur-sm bg-white/10 p-4 rounded-lg">
+            <Label className="text-gray-200">Current Price</Label>
+            <p className="text-white text-lg font-semibold">
+              {formattedCurrentPrice}{" "}
+              <span className="text-gray-300">AVAX</span>
+            </p>
+          </div>
+        </div>
+        {token.fundingGoal && token.fundingGoal !== "0" && (
+          <div className="mt-6 backdrop-blur-sm bg-white/10 p-4 rounded-lg">
+            <Label className="text-gray-200 mb-2 block">Funding Progress</Label>
+            <Progress value={progress} className="h-2 mb-2" />
+            <p className="text-white text-sm font-semibold">
+              {progress.toFixed(2)}% - {formattedCollateral} /{" "}
+              {formattedFundingGoal} AVAX
+            </p>
+          </div>
+        )}
+      </CardContent>
+    </div>
+  );
+};
+
+export default TokenHeaderStyled;
