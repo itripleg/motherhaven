@@ -376,8 +376,6 @@ export default function MyMenu() {
         </Menubar>
       </div>
 
-      {/* Mobile Fixed Top Menu - REMOVED DUPLICATE */}
-
       {/* Mobile Unified Menu */}
       <div className="md:hidden px-4 relative z-[90] mt-4">
         <div
@@ -398,6 +396,58 @@ export default function MyMenu() {
             {/* Theme Toggle */}
             <ModeToggle />
           </div>
+
+          {/* Navigation - Compact */}
+          <DropdownMenu>
+            <DropdownMenuTrigger asChild>
+              <Button
+                variant="outline"
+                className="w-full justify-between rounded-lg h-9 mb-2"
+              >
+                <div className="flex items-center gap-2">
+                  {getCurrentNavItem().icon}
+                  <span className="text-sm">{getCurrentNavItem().label}</span>
+                </div>
+                <ChevronDown className="h-3 w-3" />
+              </Button>
+            </DropdownMenuTrigger>
+
+            <DropdownMenuContent className="w-80 rounded-xl z-[110]">
+              <DropdownMenuLabel>Navigation</DropdownMenuLabel>
+              <DropdownMenuSeparator />
+
+              {navItems.map((item) => (
+                <DropdownMenuItem key={item.href}>
+                  <Link
+                    href={item.href}
+                    className={cn(
+                      "flex items-center gap-3 p-3 w-full",
+                      isActiveRoute(item.href) && "bg-primary/10 text-primary"
+                    )}
+                  >
+                    <div
+                      className={cn(
+                        "flex h-8 w-8 items-center justify-center rounded-lg",
+                        isActiveRoute(item.href)
+                          ? "bg-primary/20"
+                          : "bg-muted/50"
+                      )}
+                    >
+                      {item.icon}
+                    </div>
+                    <div>
+                      <div className="font-medium">{item.label}</div>
+                      {item.description && (
+                        <div className="text-xs text-muted-foreground">
+                          {item.description}
+                        </div>
+                      )}
+                    </div>
+                  </Link>
+                </DropdownMenuItem>
+              ))}
+            </DropdownMenuContent>
+          </DropdownMenu>
 
           {/* Factory Address - More compact version */}
           <div className="mb-3 px-3 py-1.5 bg-primary/5 rounded-lg border border-primary/10">
@@ -508,58 +558,6 @@ export default function MyMenu() {
               </div>
             </div>
           )}
-
-          {/* Navigation - Compact */}
-          <DropdownMenu>
-            <DropdownMenuTrigger asChild>
-              <Button
-                variant="outline"
-                className="w-full justify-between rounded-lg h-9"
-              >
-                <div className="flex items-center gap-2">
-                  {getCurrentNavItem().icon}
-                  <span className="text-sm">{getCurrentNavItem().label}</span>
-                </div>
-                <ChevronDown className="h-3 w-3" />
-              </Button>
-            </DropdownMenuTrigger>
-
-            <DropdownMenuContent className="w-80 rounded-xl z-[110]">
-              <DropdownMenuLabel>Navigation</DropdownMenuLabel>
-              <DropdownMenuSeparator />
-
-              {navItems.map((item) => (
-                <DropdownMenuItem key={item.href}>
-                  <Link
-                    href={item.href}
-                    className={cn(
-                      "flex items-center gap-3 p-3 w-full",
-                      isActiveRoute(item.href) && "bg-primary/10 text-primary"
-                    )}
-                  >
-                    <div
-                      className={cn(
-                        "flex h-8 w-8 items-center justify-center rounded-lg",
-                        isActiveRoute(item.href)
-                          ? "bg-primary/20"
-                          : "bg-muted/50"
-                      )}
-                    >
-                      {item.icon}
-                    </div>
-                    <div>
-                      <div className="font-medium">{item.label}</div>
-                      {item.description && (
-                        <div className="text-xs text-muted-foreground">
-                          {item.description}
-                        </div>
-                      )}
-                    </div>
-                  </Link>
-                </DropdownMenuItem>
-              ))}
-            </DropdownMenuContent>
-          </DropdownMenu>
         </div>
       </div>
     </>

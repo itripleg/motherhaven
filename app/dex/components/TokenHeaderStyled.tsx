@@ -27,6 +27,7 @@ import {
   Maximize,
   Minimize,
   Square,
+  User,
 } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
 
@@ -48,7 +49,7 @@ interface ImagePosition {
   fit?: "cover" | "contain" | "fill";
 }
 
-// --- Constants for better maintainability ---
+// --- Constants ---
 const FIT_MODES = {
   cover: { icon: Maximize, label: "Cover" },
   contain: { icon: Minimize, label: "Contain" },
@@ -126,17 +127,23 @@ export const TokenHeaderStyled: FC<TokenHeaderProps> = ({ address }) => {
   }, [token?.imagePosition]);
 
   const resetPosition = useCallback(() => {
-    setPosition({ x: 0, y: 0, scale: 1, rotation: 0, fit: "cover" });
+    setPosition((prev) => ({ ...prev, x: 0, y: 0, scale: 1, rotation: 0 }));
   }, []);
 
   const setFitMode = useCallback((fit: keyof typeof FIT_MODES) => {
-    setPosition((prev) => ({ ...prev, fit }));
+    setPosition((prev) => ({
+      ...prev,
+      fit,
+      x: 0,
+      y: 0,
+      scale: 1,
+    }));
   }, []);
 
   // --- Callbacks for Interactive Positioning ---
   const handleMouseDown = useCallback(
     (e: React.MouseEvent) => {
-      if (position.fit !== "cover" || !isEditing) return;
+      if (position.fit === "fill" || !isEditing) return;
       e.preventDefault();
       setIsDragging(true);
       setDragStart({ x: e.clientX, y: e.clientY });
@@ -146,13 +153,12 @@ export const TokenHeaderStyled: FC<TokenHeaderProps> = ({ address }) => {
 
   const handleMouseMove = useCallback(
     (e: React.MouseEvent) => {
-      if (!isDragging || !imageContainerRef.current || position.fit !== "cover")
+      if (!isDragging || !imageContainerRef.current || position.fit === "fill")
         return;
       e.preventDefault();
       const rect = imageContainerRef.current.getBoundingClientRect();
       const deltaX = ((e.clientX - dragStart.x) / rect.width) * 100;
       const deltaY = ((e.clientY - dragStart.y) / rect.height) * 100;
-
       setPosition((prev) => ({
         ...prev,
         x: Math.max(-100, Math.min(100, prev.x + deltaX)),
@@ -167,18 +173,27 @@ export const TokenHeaderStyled: FC<TokenHeaderProps> = ({ address }) => {
     setIsDragging(false);
   }, []);
 
-  const handleWheel = useCallback(
-    (e: React.WheelEvent) => {
-      if (position.fit !== "cover" || !isEditing) return;
+  // --- Scroll Lock Effect ---
+  useEffect(() => {
+    const container = imageContainerRef.current;
+
+    const handleWheel = (e: WheelEvent) => {
+      if (position.fit === "fill") return;
       e.preventDefault();
       const delta = e.deltaY * -0.001;
       setPosition((prev) => ({
         ...prev,
         scale: Math.max(0.5, Math.min(3, prev.scale + delta)),
       }));
-    },
-    [position.fit, isEditing]
-  );
+    };
+
+    if (isEditing && container) {
+      container.addEventListener("wheel", handleWheel, { passive: false });
+      return () => {
+        container.removeEventListener("wheel", handleWheel);
+      };
+    }
+  }, [isEditing, position.fit]); // Re-attach listener if fit mode changes while editing
 
   // --- Style Generation ---
   const getBackgroundStyle = useCallback(() => {
@@ -194,22 +209,17 @@ export const TokenHeaderStyled: FC<TokenHeaderProps> = ({ address }) => {
         : "transform 0.2s ease-out, background-position 0.2s ease-out, background-size 0.2s ease-out",
     };
 
-    if (fit === "fill")
+    if (fit === "fill") {
       return {
         ...baseStyle,
         backgroundSize: "100% 100%",
         backgroundPosition: "center",
       };
-    if (fit === "contain")
-      return {
-        ...baseStyle,
-        backgroundSize: "contain",
-        backgroundPosition: "center",
-      };
+    }
 
     return {
       ...baseStyle,
-      backgroundSize: `${100 * scale}%`,
+      backgroundSize: `${100 * scale}% auto`,
       backgroundPosition: `${50 + x}% ${50 + y}%`,
     };
   }, [token?.imageUrl, position, isDragging]);
@@ -226,8 +236,8 @@ export const TokenHeaderStyled: FC<TokenHeaderProps> = ({ address }) => {
   return (
     <TooltipProvider delayDuration={100}>
       <Card className="relative overflow-hidden min-h-[300px]">
-        {/* --- EDITING MODE RENDER --- */}
         {isEditing ? (
+          /* --- EDITING MODE RENDER --- */
           <div
             ref={imageContainerRef}
             className="absolute inset-0 z-10"
@@ -235,23 +245,17 @@ export const TokenHeaderStyled: FC<TokenHeaderProps> = ({ address }) => {
             onMouseMove={handleMouseMove}
             onMouseUp={handleMouseUp}
             onMouseLeave={handleMouseUp}
-            onWheel={handleWheel}
-            style={{ cursor: position.fit === "cover" ? "move" : "default" }}
+            style={{ cursor: position.fit !== "fill" ? "move" : "default" }}
           >
-            {/* Background Image */}
             <div
               className="absolute inset-0 bg-cover bg-center"
               style={getBackgroundStyle()}
             />
-            {/* Darkening Overlay */}
             <div className="absolute inset-0 bg-black/50" />
-            {/* Centering Crosshair */}
             <div className="absolute inset-0 flex items-center justify-center pointer-events-none opacity-50">
               <div className="w-px h-8 bg-white" />
               <div className="w-8 h-px bg-white absolute" />
             </div>
-
-            {/* Top Right Save/Cancel Controls */}
             <div className="absolute top-4 right-4 z-20 flex items-center gap-2">
               <Tooltip>
                 <TooltipTrigger asChild>
@@ -289,8 +293,6 @@ export const TokenHeaderStyled: FC<TokenHeaderProps> = ({ address }) => {
                 </TooltipContent>
               </Tooltip>
             </div>
-
-            {/* Bottom Floating Control Panel */}
             <motion.div
               initial={{ opacity: 0, y: 20 }}
               animate={{ opacity: 1, y: 0 }}
@@ -337,7 +339,7 @@ export const TokenHeaderStyled: FC<TokenHeaderProps> = ({ address }) => {
                   {SLIDER_CONTROLS.map(
                     ({ key, label, min, max, step, suffix }) => {
                       const disabled =
-                        position.fit !== "cover" && key !== "rotation";
+                        position.fit === "fill" && key !== "rotation";
                       const value = position[
                         key as keyof ImagePosition
                       ] as number;
@@ -375,7 +377,6 @@ export const TokenHeaderStyled: FC<TokenHeaderProps> = ({ address }) => {
         ) : (
           /* --- DISPLAY MODE RENDER --- */
           <>
-            {/* Non-interactive background */}
             <div className="absolute inset-0 z-0">
               <div
                 className="absolute inset-0 bg-cover bg-center"
@@ -383,14 +384,12 @@ export const TokenHeaderStyled: FC<TokenHeaderProps> = ({ address }) => {
               />
               <div className="absolute inset-0 bg-gradient-to-b from-black/60 via-black/50 to-black/70" />
             </div>
-
-            {/* Token Info Content */}
             <div className="relative z-10 flex flex-col justify-between h-full min-h-[300px] p-4">
               <div className="flex justify-between items-start">
                 <AddressComponent hash={address} type="address" />
                 <div className="flex items-center gap-2">
                   <TokenStatusBadge state={state as number} />
-                  {isCreator && (
+                  {isCreator ? (
                     <div className="flex items-center gap-2">
                       {token?.imageUrl && (
                         <Tooltip>
@@ -411,7 +410,7 @@ export const TokenHeaderStyled: FC<TokenHeaderProps> = ({ address }) => {
                       )}
                       <Tooltip>
                         <TooltipTrigger asChild>
-                          <div className="p-1.5 bg-yellow-500/20 border border-yellow-400/30 rounded-md cursor-help">
+                          <div className="p-1.5 bg-yellow-500/20 border border-yellow-400/30 rounded-md">
                             <Crown className="h-4 w-4 text-yellow-400" />
                           </div>
                         </TooltipTrigger>
@@ -420,6 +419,19 @@ export const TokenHeaderStyled: FC<TokenHeaderProps> = ({ address }) => {
                         </TooltipContent>
                       </Tooltip>
                     </div>
+                  ) : (
+                    token?.creator && (
+                      <Tooltip>
+                        <TooltipTrigger asChild>
+                          <div className="p-1.5 bg-gray-500/20 border border-gray-400/30 rounded-md">
+                            <User className="h-4 w-4 text-gray-300" />
+                          </div>
+                        </TooltipTrigger>
+                        <TooltipContent>
+                          <p>Created by: {token.creator}</p>
+                        </TooltipContent>
+                      </Tooltip>
+                    )
                   )}
                 </div>
               </div>
@@ -460,7 +472,6 @@ const TokenInfoDisplay: FC<{ token: any }> = ({ token }) => {
   const { data: rawCollateral } = useCollateral(token.address as Address);
   const { data: rawCurrentPrice } = useCurrentPrice(token.address as Address);
   const [progress, setProgress] = useState(0);
-
   const formattedCollateral = rawCollateral
     ? formatTokenPrice(formatEther(rawCollateral))
     : "0.000000";
