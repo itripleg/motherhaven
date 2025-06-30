@@ -1,67 +1,83 @@
 "use client";
-// TradingViewWidget.tsx
 import React, { useEffect, useRef, memo } from "react";
 
-function TradingViewWidget() {
-  // Typing the ref correctly to indicate it can be a HTMLDivElement or null
+interface TradingViewWidgetProps {
+  height?: number;
+}
+
+function TradingViewWidget({ height = 350 }: TradingViewWidgetProps) {
   const container = useRef<HTMLDivElement | null>(null);
-  const scriptRef = useRef<HTMLScriptElement | null>(null);
 
   useEffect(() => {
-    // Cleanup any previously appended script to avoid duplicates
-    if (
-      scriptRef.current &&
-      container.current &&
-      container.current.contains(scriptRef.current)
-    ) {
-      container.current.removeChild(scriptRef.current);
-    }
+    const script = document.createElement("script");
+    script.src =
+      "https://s3.tradingview.com/external-embedding/embed-widget-symbol-overview.js";
+    script.type = "text/javascript";
+    script.async = true;
+    script.innerHTML = `
+      {
+        "symbols": [
+          [
+            "AVAX",
+            "BINANCE:AVAXUSDT|1D"
+          ]
+        ],
+        "chartOnly": false,
+        "width": "100%",
+        "height": "${height}",
+        "locale": "en",
+        "colorTheme": "dark",
+        "autosize": false,
+        "showVolume": false,
+        "showMA": false,
+        "hideDateRanges": false,
+        "hideMarketStatus": false,
+        "hideSymbolLogo": false,
+        "scalePosition": "right",
+        "scaleMode": "Normal",
+        "fontFamily": "-apple-system, BlinkMacSystemFont, Trebuchet MS, Roboto, Ubuntu, sans-serif",
+        "fontSize": "10",
+        "noTimeScale": false,
+        "valuesTracking": "1",
+        "changeMode": "price-and-percent",
+        "chartType": "bars",
+        "dateRanges": [
+          "1d|5",
+          "1d|15",
+          "1d|30",
+          "1d|60"
+        ]
+      }`;
 
-    // Only append the script if container is available
     if (container.current) {
-      const script = document.createElement("script");
-      script.src =
-        "https://s3.tradingview.com/external-embedding/embed-widget-advanced-chart.js";
-      script.type = "text/javascript";
-      script.async = true;
-      script.innerHTML = `
-            {
-  "autosize": false,
-  "symbol": "BINANCE:AVAXUSDT",
-  "interval": "D",
-  "timezone": "Etc/UTC",
-  "theme": "light",
-  "style": "1",
-  "locale": "en",
-  "allow_symbol_change": true,
-  "calendar": false,
-  "support_host": "https://www.tradingview.com"
-}
-`;
-
-      // Store the script reference so we can remove it later if needed
       container.current.appendChild(script);
-      scriptRef.current = script;
     }
 
-    // Cleanup on component unmount
     return () => {
-      if (
-        scriptRef.current &&
-        container.current &&
-        container.current.contains(scriptRef.current)
-      ) {
-        container.current.removeChild(scriptRef.current);
+      if (container.current && script.parentNode) {
+        container.current.removeChild(script);
       }
     };
-  }, []);
+  }, [height]);
 
   return (
-    <div
-      className="tradingview-widget-container"
-      ref={container}
-      style={{ height: "100%", width: "100%" }}
-    ></div>
+    <div className="w-full">
+      <div className="mb-3 px-2">
+        <h3 className="text-lg font-bold text-foreground">AVAX Price</h3>
+        <p className="text-sm text-muted-foreground">Market reference</p>
+      </div>
+
+      <div
+        className="w-full border border-border rounded-lg overflow-hidden"
+        style={{ height: `${height}px` }}
+      >
+        <div ref={container} className="w-full h-full" />
+      </div>
+
+      <div className="mt-2 text-xs text-muted-foreground text-center">
+        Powered by TradingView
+      </div>
+    </div>
   );
 }
 
