@@ -15,6 +15,7 @@ import {
   WifiOff,
   RefreshCw,
   ExternalLink,
+  Sparkles,
 } from "lucide-react";
 
 // Import your game components
@@ -64,6 +65,9 @@ interface CompletedGame {
 }
 
 const GamePage: React.FC = () => {
+  // Hydration fix
+  const [mounted, setMounted] = useState(false);
+
   // Wallet connection
   const { address, isConnected } = useAccount();
   const { connect, connectors } = useConnect();
@@ -92,6 +96,11 @@ const GamePage: React.FC = () => {
   // Component state
   const [activeTab, setActiveTab] = useState<string>("dashboard");
   const [lastUpdate, setLastUpdate] = useState<Date | null>(null);
+
+  // Handle hydration
+  useEffect(() => {
+    setMounted(true);
+  }, []);
 
   // Memoize stable game stats to prevent unnecessary rerenders
   const gameStats = useMemo(
@@ -145,14 +154,14 @@ const GamePage: React.FC = () => {
 
   // Update last update timestamp when relevant data changes
   useEffect(() => {
-    if (isConnected && address) {
+    if (isConnected && address && mounted) {
       setLastUpdate(new Date());
     }
-  }, [isConnected, address, lastEventUpdate]);
+  }, [isConnected, address, lastEventUpdate, mounted]);
 
   // Refresh all data
   const refreshData = useCallback(async () => {
-    if (!isConnected) return;
+    if (!isConnected || !mounted) return;
 
     try {
       await refreshAllData();
@@ -170,7 +179,7 @@ const GamePage: React.FC = () => {
         variant: "destructive",
       });
     }
-  }, [isConnected, refreshAllData, toast]);
+  }, [isConnected, refreshAllData, toast, mounted]);
 
   // Start new battle
   const handleStartBattle = useCallback(
@@ -255,12 +264,13 @@ const GamePage: React.FC = () => {
 
   // Auto-refresh much less frequently (events handle most updates)
   useEffect(() => {
-    if (!isConnected || activeGames.length === 0) return;
+    if (!isConnected || !mounted || activeGames.length === 0) return;
 
     // Only poll as backup every 2 minutes (events should handle real-time updates)
     const interval = setInterval(refreshAllData, 120000);
+
     return () => clearInterval(interval);
-  }, [isConnected, activeGames.length, refreshAllData]);
+  }, [isConnected, activeGames.length, refreshAllData, mounted]);
 
   // Memoize loading state to prevent unnecessary recalculations
   const isLoading = useMemo(
@@ -272,126 +282,164 @@ const GamePage: React.FC = () => {
     [isBalanceLoading, isGameStatsLoading, isPlayerGamesLoading, isWritePending]
   );
 
+  // Handle hydration mismatch
+  if (!mounted) {
+    return (
+      <div className="min-h-screen animated-bg floating-particles">
+        <div className="fixed inset-0 z-0">
+          {Array.from({ length: 50 }).map((_, i) => (
+            <motion.div
+              key={i}
+              className="absolute w-1 h-1 bg-white rounded-full opacity-30"
+              style={{
+                left: `${Math.random() * 100}%`,
+                top: `${Math.random() * 100}%`,
+              }}
+              animate={{
+                opacity: [0.3, 0.8, 0.3],
+                scale: [1, 1.2, 1],
+              }}
+              transition={{
+                duration: 2 + Math.random() * 3,
+                repeat: Infinity,
+                delay: Math.random() * 5,
+              }}
+            />
+          ))}
+        </div>
+        <div className="relative z-10 container mx-auto p-6 pt-24">
+          <div className="flex items-center justify-center min-h-[50vh]">
+            <div className="text-center">
+              <Brain className="h-12 w-12 text-purple-400 mx-auto mb-4 animate-pulse" />
+              <p className="text-white text-lg">
+                Loading BigBrain Battle Arena...
+              </p>
+            </div>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
   return (
-    <div className="min-h-screen bg-gradient-to-br from-gray-900 via-gray-800 to-black">
-      {/* Animated background stars */}
+    <div className="min-h-screen animated-bg floating-particles">
+      {/* Background Stars Effect */}
       <div className="fixed inset-0 z-0">
-        {Array.from({ length: 50 }, (_, i) => (
+        {Array.from({ length: 50 }).map((_, i) => (
           <motion.div
-            key={`star-${i}`}
-            className="absolute w-1 h-1 bg-white rounded-full opacity-20"
+            key={i}
+            className="absolute w-1 h-1 bg-white rounded-full opacity-30"
             style={{
-              left: `${(i * 17) % 100}%`,
-              top: `${(i * 23) % 100}%`,
+              left: `${Math.random() * 100}%`,
+              top: `${Math.random() * 100}%`,
             }}
             animate={{
-              opacity: [0.2, 0.8, 0.2],
-              scale: [1, 1.5, 1],
+              opacity: [0.3, 0.8, 0.3],
+              scale: [1, 1.2, 1],
             }}
             transition={{
-              duration: 3 + (i % 3),
+              duration: 2 + Math.random() * 3,
               repeat: Infinity,
-              delay: i % 5,
-              ease: "easeInOut",
+              delay: Math.random() * 5,
             }}
           />
         ))}
       </div>
 
       <div className="relative z-10 container mx-auto p-6 pt-24">
-        {/* Header */}
+        {/* Page Header */}
         <motion.div
           initial={{ opacity: 0, y: -20 }}
           animate={{ opacity: 1, y: 0 }}
-          className="flex flex-col md:flex-row items-start md:items-center justify-between mb-8 gap-4"
+          transition={{ duration: 0.6 }}
+          className="mb-8"
         >
-          <div>
-            <h1 className="text-4xl font-bold text-white mb-2 flex items-center gap-3">
-              <div className="p-3 bg-purple-500/20 rounded-xl border border-purple-500/30">
-                <Brain className="h-8 w-8 text-purple-400" />
-              </div>
-              BigBrain Battle Arena
-              <Badge
-                className="bg-orange-500/20 text-orange-400 border-orange-500/30"
-                variant="outline"
-              >
-                🔥 LIVE
-              </Badge>
-            </h1>
-            <p className="text-gray-400 text-lg">
-              Burn BBT tokens to challenge the AI and prove your intelligence
-            </p>
-          </div>
-
-          <div className="flex items-center gap-3">
-            {/* Connection Status */}
-            <div className="flex items-center gap-2">
-              {isConnected ? (
-                <div className="flex items-center gap-2 px-3 py-2 bg-green-500/20 border border-green-500/30 rounded-lg">
-                  <Wifi className="h-4 w-4 text-green-400" />
-                  <span className="text-green-400 text-sm">Connected</span>
+          <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
+            <div>
+              <h1 className="text-4xl font-bold text-white mb-2 flex items-center gap-3">
+                <div className="p-3 bg-purple-500/20 rounded-xl border border-purple-500/30">
+                  <Brain className="h-8 w-8 text-purple-400" />
                 </div>
-              ) : (
-                <div className="flex items-center gap-2 px-3 py-2 bg-red-500/20 border border-red-500/30 rounded-lg">
-                  <WifiOff className="h-4 w-4 text-red-400" />
-                  <span className="text-red-400 text-sm">Disconnected</span>
-                </div>
-              )}
+                BigBrain Battle Arena
+                <Badge
+                  className="bg-orange-500/20 text-orange-400 border-orange-500/30"
+                  variant="outline"
+                >
+                  🔥 LIVE
+                </Badge>
+              </h1>
+              <p className="text-gray-400 text-lg">
+                Burn BBT tokens to challenge the AI and prove your intelligence
+              </p>
             </div>
 
-            {/* Last Update */}
-            {lastUpdate && (
-              <div className="text-sm text-gray-400 flex items-center gap-1">
-                <RefreshCw className="h-3 w-3" />
-                Updated {lastUpdate.toLocaleTimeString()}
+            <div className="flex items-center gap-3">
+              {/* Connection Status */}
+              <div className="flex items-center gap-2">
+                {isConnected ? (
+                  <div className="flex items-center gap-2 px-3 py-2 bg-green-500/20 border border-green-500/30 rounded-lg">
+                    <Wifi className="h-4 w-4 text-green-400" />
+                    <span className="text-green-400 text-sm">Connected</span>
+                  </div>
+                ) : (
+                  <div className="flex items-center gap-2 px-3 py-2 bg-red-500/20 border border-red-500/30 rounded-lg">
+                    <WifiOff className="h-4 w-4 text-red-400" />
+                    <span className="text-red-400 text-sm">Disconnected</span>
+                  </div>
+                )}
               </div>
-            )}
 
-            {/* Refresh Button */}
-            <Button
-              onClick={refreshData}
-              variant="outline"
-              size="sm"
-              disabled={!isConnected || isLoading}
-              className="border-gray-600 text-gray-300 hover:bg-gray-700"
-            >
-              <RefreshCw
-                className={`h-4 w-4 mr-1 ${isLoading ? "animate-spin" : ""}`}
-              />
-              Refresh
-            </Button>
+              {/* Last Update */}
+              {lastUpdate && (
+                <div className="text-sm text-gray-400 flex items-center gap-1">
+                  <RefreshCw className="h-3 w-3" />
+                  Updated {lastUpdate.toLocaleTimeString()}
+                </div>
+              )}
 
-            {/* Connect/Address */}
-            {isConnected ? (
-              <div className="flex items-center gap-2 px-3 py-2 bg-blue-500/20 border border-blue-500/30 rounded-lg">
-                <Wallet className="h-4 w-4 text-blue-400" />
-                <span className="text-blue-400 text-sm font-mono">
-                  {address?.slice(0, 6)}...{address?.slice(-4)}
-                </span>
-                <Button
-                  variant="ghost"
-                  size="sm"
-                  asChild
-                  className="p-1 h-auto"
-                >
-                  <a
-                    href={`https://testnet.snowtrace.io/address/${address}`}
-                    target="_blank"
-                    rel="noopener noreferrer"
-                  >
-                    <ExternalLink className="h-3 w-3" />
-                  </a>
-                </Button>
-              </div>
-            ) : (
+              {/* Refresh Button */}
               <Button
-                onClick={handleConnect}
-                className="bg-purple-600 hover:bg-purple-700 text-white"
+                onClick={refreshData}
+                variant="outline"
+                size="sm"
+                disabled={!isConnected || isLoading}
+                className="border-gray-600 text-gray-300"
               >
-                <Wallet className="h-4 w-4 mr-2" />
-                Connect Wallet
+                <RefreshCw
+                  className={`h-4 w-4 mr-1 ${isLoading ? "animate-spin" : ""}`}
+                />
+                Refresh
               </Button>
-            )}
+
+              {/* Connect/Address */}
+              {isConnected ? (
+                <div className="flex items-center gap-2 px-3 py-2 bg-blue-500/20 border border-blue-500/30 rounded-lg">
+                  <Wallet className="h-4 w-4 text-blue-400" />
+                  <span className="text-blue-400 text-sm font-mono">
+                    {address?.slice(0, 6)}...{address?.slice(-4)}
+                  </span>
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    asChild
+                    className="p-1 h-auto"
+                  >
+                    <a
+                      href={`https://testnet.snowtrace.io/address/${address}`}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                    >
+                      <ExternalLink className="h-3 w-3" />
+                    </a>
+                  </Button>
+                </div>
+              ) : (
+                <Button onClick={handleConnect} className="btn-primary">
+                  <Wallet className="h-4 w-4 mr-2" />
+                  Connect Wallet
+                </Button>
+              )}
+            </div>
           </div>
         </motion.div>
 
@@ -402,7 +450,7 @@ const GamePage: React.FC = () => {
             animate={{ opacity: 1, y: 0 }}
             className="mb-8"
           >
-            <Card className="bg-orange-900/20 border-orange-500/30">
+            <Card className="unified-card border-orange-500/30 bg-orange-500/10">
               <CardContent className="p-6">
                 <div className="flex items-center gap-3">
                   <AlertCircle className="h-5 w-5 text-orange-400 flex-shrink-0" />
@@ -434,7 +482,7 @@ const GamePage: React.FC = () => {
           onValueChange={setActiveTab}
           className="space-y-6"
         >
-          <TabsList className="bg-gray-800/50 border border-gray-700/50 rounded-xl p-1">
+          <TabsList className="glass-card p-1 border border-border/50">
             <TabsTrigger value="dashboard" className="flex items-center gap-2">
               📊 Dashboard
             </TabsTrigger>
@@ -519,16 +567,47 @@ const GamePage: React.FC = () => {
           </TabsContent>
         </Tabs>
 
-        {/* Footer */}
+        {/* Footer CTA */}
         <motion.div
-          initial={{ opacity: 0 }}
-          animate={{ opacity: 1 }}
-          transition={{ delay: 1 }}
-          className="mt-12 text-center"
+          initial={{ opacity: 0, y: 20 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ duration: 0.6, delay: 0.4 }}
+          className="text-center py-12"
         >
-          <p className="text-gray-500 text-sm">
-            BigBrain Battle Arena • Powered by BBT Token • Built on Avalanche
-          </p>
+          <Card className="unified-card max-w-2xl mx-auto">
+            <CardContent className="p-8 space-y-4">
+              <div className="space-y-2">
+                <h3 className="text-2xl font-bold text-gradient flex items-center justify-center gap-2">
+                  <Sparkles className="h-6 w-6 text-purple-400" />
+                  Ready to Battle?
+                </h3>
+                <p className="text-muted-foreground">
+                  Challenge the AI and test your strategic thinking skills
+                </p>
+              </div>
+
+              <div className="flex flex-col sm:flex-row gap-4 justify-center">
+                <Button
+                  size="lg"
+                  className="btn-primary group"
+                  onClick={() => setActiveTab("battle")}
+                  disabled={!isConnected}
+                >
+                  <Brain className="h-5 w-5 mr-2 group-hover:animate-pulse" />
+                  Start Battle
+                </Button>
+
+                <Button
+                  size="lg"
+                  variant="outline"
+                  className="btn-secondary"
+                  onClick={() => setActiveTab("dashboard")}
+                >
+                  View Stats
+                </Button>
+              </div>
+            </CardContent>
+          </Card>
         </motion.div>
       </div>
     </div>

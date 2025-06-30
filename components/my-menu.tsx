@@ -100,18 +100,6 @@ const userMenuItems: NavItem[] = [
     icon: <BarChart3 className="h-4 w-4" />,
     description: "Portfolio overview",
   },
-  {
-    href: "/portfolio",
-    label: "Portfolio",
-    icon: <TrendingUp className="h-4 w-4" />,
-    description: "Your holdings",
-  },
-  {
-    href: "/settings",
-    label: "Settings",
-    icon: <Settings className="h-4 w-4" />,
-    description: "Account preferences",
-  },
 ];
 
 export default function MyMenu() {
