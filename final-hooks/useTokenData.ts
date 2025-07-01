@@ -97,7 +97,7 @@ export function useTokenData(tokenAddress?: Address) {
 
       // Contract state (real-time)
       state: mapTokenState(contractState),
-      currentPrice: priceFormatted,
+      lastPrice: priceFormatted,
       collateral: collateralFormatted,
 
       // Factory constants
