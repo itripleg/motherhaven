@@ -36,8 +36,7 @@ interface TokenContextState {
 
 const TokenContext = createContext<TokenContextState | null>(null);
 
-// /contexts/TokenContext.tsx - Updated mapTokenData function
-
+// Updated mapTokenData function - REMOVED hardcoded currentPrice
 const mapTokenData = (
   address: string,
   data: any,
@@ -67,12 +66,18 @@ const mapTokenData = (
     lastUpdated: data.lastUpdated,
     updatedBy: data.updatedBy,
 
+    // Factory config constants
     ...factoryConfig,
-    collateral: "0",
-    virtualSupply: "0",
-    state: TokenState.NOT_CREATED,
-    currentPrice: "0",
-    totalSupply: "0",
+
+    // Contract state - these should be fetched from contract, not hardcoded
+    collateral: "0", // This should come from contract
+    virtualSupply: "0", // This should come from contract
+    state: TokenState.NOT_CREATED, // This should come from contract
+    totalSupply: "0", // This should come from contract
+
+    // REMOVED: currentPrice - this should be fetched using price hooks, not stored in context
+    // The Token interface still has currentPrice, but we don't populate it here
+    // Components should use useUnifiedTokenPrice or useFactoryContract.useCurrentPrice instead
   };
 };
 

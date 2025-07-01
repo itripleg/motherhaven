@@ -19,7 +19,7 @@ import {
   CheckCircle,
 } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
-import { DebugTestRunner } from "./components/DebugTestRunner";
+import { EnhancedDebugTestRunner } from "./components/EnhancedDebugTestRunner";
 
 const DEFAULT_TEST_TOKEN = "0x1193ccc14edf32ec3a785e0c62115f243d22bec3";
 
@@ -274,7 +274,7 @@ export default function DebugMainPage() {
       </Card>
 
       {/* Debug Test Runner */}
-      <DebugTestRunner
+      <EnhancedDebugTestRunner
         testToken={isValidAddress ? testTokenAddress : undefined}
       />
 
