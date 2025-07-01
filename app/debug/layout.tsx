@@ -1,4 +1,4 @@
-// This should be saved as: app/debug/layout.tsx
+// app/debug/layout.tsx
 
 "use client";
 
@@ -16,6 +16,7 @@ import {
   Database,
   Factory,
   Coins,
+  Calculator,
   AlertTriangle,
   CheckCircle,
 } from "lucide-react";
@@ -36,6 +37,7 @@ const DEBUG_PAGES = [
   { path: "/debug/contexts", title: "Contexts", icon: Database },
   { path: "/debug/factory", title: "Factory", icon: Factory },
   { path: "/debug/token", title: "Token", icon: Coins },
+  { path: "/debug/trade", title: "Trade", icon: Calculator },
 ];
 
 function DebugLayoutContent({ children }: DebugLayoutProps) {
@@ -140,7 +142,7 @@ function DebugLayoutContent({ children }: DebugLayoutProps) {
       {/* Navigation Tabs */}
       <div className="border-b">
         <div className="container mx-auto px-6">
-          <nav className="flex space-x-1">
+          <nav className="flex space-x-1 overflow-x-auto">
             {DEBUG_PAGES.map((page) => {
               const PageIcon = page.icon;
               const isActive = pathname === page.path;
@@ -153,7 +155,7 @@ function DebugLayoutContent({ children }: DebugLayoutProps) {
                   <Button
                     variant={isActive ? "secondary" : "ghost"}
                     size="sm"
-                    className={`gap-2 rounded-none border-b-2 ${
+                    className={`gap-2 rounded-none border-b-2 whitespace-nowrap ${
                       isActive
                         ? "border-primary bg-background"
                         : "border-transparent hover:border-muted-foreground/20"

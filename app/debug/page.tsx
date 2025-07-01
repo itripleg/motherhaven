@@ -13,6 +13,7 @@ import {
   Factory,
   Coins,
   Database,
+  Calculator,
   ArrowRight,
   Copy,
   CheckCircle,
@@ -60,6 +61,22 @@ const DEBUG_SECTIONS = [
       "useTokenStats",
       "useTokenTrades",
       "useRealtimeTokenPrice",
+    ],
+  },
+  {
+    id: "trade",
+    title: "Trade Debug",
+    description:
+      "Streamlined trading interface with price calculations and testing",
+    icon: Calculator,
+    color: "bg-orange-500/10 border-orange-500/20 hover:bg-orange-500/20",
+    iconColor: "text-orange-500",
+    path: "/debug/trade",
+    hooks: [
+      "useFactoryContract",
+      "Live Trading",
+      "Price Calculations",
+      "Chart Verification",
     ],
   },
 ];
@@ -259,7 +276,7 @@ export default function DebugMainPage() {
       <div className="grid gap-6">
         <h2 className="text-2xl font-bold text-center">Debug Sections</h2>
 
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
           {DEBUG_SECTIONS.map((section) => {
             const Icon = section.icon;
             const debugUrl = `${section.path}?token=${encodeURIComponent(
@@ -293,7 +310,7 @@ export default function DebugMainPage() {
 
                     <div className="space-y-2">
                       <h4 className="text-xs font-medium text-muted-foreground uppercase tracking-wide">
-                        Hooks Tested
+                        Features Tested
                       </h4>
                       <div className="flex flex-wrap gap-1">
                         {section.hooks.map((hook) => (
