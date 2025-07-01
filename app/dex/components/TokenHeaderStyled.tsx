@@ -14,6 +14,7 @@ import { AddressComponent } from "@/components/AddressComponent";
 import { Progress } from "@/components/ui/progress";
 import { useToken } from "@/contexts/TokenContext";
 import { useFactoryContract } from "@/new-hooks/useFactoryContract";
+import { useUnifiedTokenPrice } from "@/hooks/token/useUnifiedTokenPrice"; // FIXED: Use unified price hook
 import { formatTokenPrice } from "@/utils/tokenPriceFormatter";
 import { Address, formatEther } from "viem";
 import { useAccount } from "wagmi";
@@ -468,15 +469,16 @@ const TokenStatusBadge: FC<{ state: number | undefined }> = ({ state }) => {
 };
 
 const TokenInfoDisplay: FC<{ token: any }> = ({ token }) => {
-  const { useCollateral, useCurrentPrice } = useFactoryContract();
+  const { useCollateral } = useFactoryContract();
   const { data: rawCollateral } = useCollateral(token.address as Address);
-  const { data: rawCurrentPrice } = useCurrentPrice(token.address as Address);
+
+  // FIXED: Use unified token price hook instead of direct factory contract
+  const { formatted: formattedCurrentPrice, isLoading: priceLoading } =
+    useUnifiedTokenPrice(token.address as Address);
+
   const [progress, setProgress] = useState(0);
   const formattedCollateral = rawCollateral
     ? formatTokenPrice(formatEther(rawCollateral))
-    : "0.000000";
-  const formattedCurrentPrice = rawCurrentPrice
-    ? formatTokenPrice(formatEther(rawCurrentPrice))
     : "0.000000";
   const formattedFundingGoal = token.fundingGoal
     ? formatTokenPrice(token.fundingGoal)
@@ -507,8 +509,14 @@ const TokenInfoDisplay: FC<{ token: any }> = ({ token }) => {
           <div className="backdrop-blur-sm bg-white/10 p-4 rounded-lg">
             <Label className="text-gray-200">Current Price</Label>
             <p className="text-white text-lg font-semibold">
-              {formattedCurrentPrice}{" "}
-              <span className="text-gray-300">AVAX</span>
+              {priceLoading ? (
+                <span className="animate-pulse">Loading...</span>
+              ) : (
+                <>
+                  {formattedCurrentPrice}{" "}
+                  <span className="text-gray-300">AVAX</span>
+                </>
+              )}
             </p>
           </div>
         </div>

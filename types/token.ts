@@ -65,7 +65,7 @@ export interface Token {
 
   // Current state
   state: TokenState;
-  currentPrice: string; // Calculated from contract
+  lastPrice: string;
 
   // On-chain stats
   totalSupply: string;
@@ -116,6 +116,13 @@ export interface TokenUpdateLog {
   timestamp: string;
   userAgent?: string;
   ipAddress?: string; // Optional for analytics
+}
+
+// DEPRECATED: Interface for components that still expect currentPrice
+// This interface should be used temporarily during migration
+// Remove this once all components are updated to use price hooks
+export interface LegacyTokenWithPrice extends Token {
+  currentPrice?: string; // Optional for backwards compatibility during migration
 }
 
 // Type guards for runtime validation
@@ -179,7 +186,7 @@ export const clampImagePosition = (
   x: Math.max(-100, Math.min(100, position.x ?? 0)),
   y: Math.max(-100, Math.min(100, position.y ?? 0)),
   scale: Math.max(0.5, Math.min(3, position.scale ?? 1)),
-  rotation: Math.max(-180, Math.min(180, position.rotation ?? 0)),
+  rotation: Math.max(-180, Math.min(180, rotation ?? 0)),
 });
 
 // CSS style generator for image positioning
@@ -209,4 +216,20 @@ export const canEditToken = (token: Token, userAddress?: string): boolean => {
     token.creator &&
     userAddress.toLowerCase() === token.creator.toLowerCase()
   );
+};
+
+// Migration helper: Add currentPrice to token data for components that need it
+// This should be used temporarily during the migration process
+export const addCurrentPriceToToken = (
+  token: Token,
+  currentPrice: string
+): LegacyTokenWithPrice => ({
+  ...token,
+  currentPrice,
+});
+
+// Utility to check if a token has legacy price data
+export const hasLegacyPrice = (token: any): token is LegacyTokenWithPrice => {
+  // @ts-expect-error cehcking for legacy
+  return isValidToken(token) && typeof token.currentPrice === "string";
 };

@@ -6,7 +6,8 @@ import { FactoryConfigProvider } from "@/contexts/FactoryConfigProvider";
 export default function DexLayout({ children }: { children: React.ReactNode }) {
   return (
     <FactoryConfigProvider>
-      <TokenProvider>{children}</TokenProvider>
+      {/* <TokenProvider>{children}</TokenProvider> */}
+      {children}
     </FactoryConfigProvider>
   );
 }
