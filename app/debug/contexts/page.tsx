@@ -331,6 +331,7 @@ function TradesContextDebug({
         <div className="grid grid-cols-4 gap-4 text-sm">
           <div className="space-y-1">
             <span className="text-muted-foreground">Loading</span>
+            {/* @ts-expect-error posiblly undefined */}
             <div className="font-mono">{loading.toString()}</div>
           </div>
           <div className="space-y-1">

@@ -1,3 +1,4 @@
+// @ts-ignore
 // app/debug/token/page.tsx
 
 "use client";

@@ -20,8 +20,8 @@ import {
 } from "lucide-react";
 import { isAddress } from "viem";
 
-// Import factory contract hooks
-import { useFactoryContract } from "@/new-hooks/useFactoryContract";
+// FIXED: Import from final-hooks instead of new-hooks
+import { useFactoryContract } from "@/final-hooks/useFactoryContract";
 import { FACTORY_ADDRESS, FACTORY_ABI } from "@/types";
 
 export default function DebugFactoryPage() {
@@ -57,10 +57,11 @@ export default function DebugFactoryPage() {
         <div>
           <h1 className="text-3xl font-bold flex items-center gap-3">
             <Factory className="h-8 w-8 text-green-500" />
-            Factory Contract Debug
+            Factory Contract Debug (Final-Hooks)
           </h1>
           <p className="text-muted-foreground mt-2">
-            Test factory contract reads, writes, and formatting utilities
+            Test factory contract reads, writes, and formatting utilities using
+            final-hooks
           </p>
         </div>
 
@@ -103,6 +104,9 @@ export default function DebugFactoryPage() {
                   </>
                 )}
               </div>
+              <Badge variant="outline" className="text-green-600">
+                final-hooks ✓
+              </Badge>
             </div>
 
             {!isValidToken && (
@@ -157,30 +161,34 @@ function FactoryContractReads({
   token: string;
   refreshKey: number;
 }) {
-  const { useTokenState, useCollateral, useCurrentPrice, formatValue } =
+  // FIXED: Updated to use correct hook names from final-hooks
+  const { useTokenState, useCollateral, usePrice, formatValue } =
     useFactoryContract();
 
   // Only call hooks if we have a valid token
   const tokenAddress =
     token && isAddress(token) ? (token as `0x${string}`) : undefined;
 
+  // FIXED: Updated hook usage to match final-hooks implementation
   const {
-    data: tokenState,
+    state: tokenState,
     isLoading: stateLoading,
     error: stateError,
   } = useTokenState(tokenAddress);
+
   const {
-    data: collateralRaw,
-    formatted: collateralFormatted,
+    collateral: collateralRaw,
+    collateralFormatted,
     isLoading: collateralLoading,
     error: collateralError,
   } = useCollateral(tokenAddress);
+
   const {
-    data: priceRaw,
-    formatted: priceFormatted,
+    price: priceRaw,
+    priceFormatted,
     isLoading: priceLoading,
     error: priceError,
-  } = useCurrentPrice(tokenAddress);
+  } = usePrice(tokenAddress);
 
   const anyLoading = stateLoading || collateralLoading || priceLoading;
   const anyError = stateError || collateralError || priceError;
@@ -192,7 +200,7 @@ function FactoryContractReads({
         <CardHeader>
           <CardTitle className="flex items-center gap-2">
             <Activity className="h-5 w-5 text-blue-500" />
-            useFactoryContract Hook Overview
+            useFactoryContract Hook Overview (Final-Hooks)
             <Badge
               variant={
                 anyError ? "destructive" : anyLoading ? "secondary" : "default"
@@ -219,8 +227,8 @@ function FactoryContractReads({
               <div className="font-mono">{anyError ? "Yes" : "No"}</div>
             </div>
             <div className="space-y-1">
-              <span className="text-muted-foreground">Refresh #</span>
-              <div className="font-mono">{refreshKey}</div>
+              <span className="text-muted-foreground">Hook Source</span>
+              <div className="font-mono text-green-600">final-hooks</div>
             </div>
           </div>
         </CardContent>
@@ -371,7 +379,7 @@ function FactoryContractReads({
           <CardHeader>
             <CardTitle className="flex items-center gap-2 text-base">
               <Coins className="h-4 w-4 text-yellow-500" />
-              useCurrentPrice
+              usePrice
               <Badge
                 variant={
                   priceError
@@ -440,9 +448,9 @@ function FormattingUtilsDebug({ refreshKey }: { refreshKey: number }) {
   const testValues = [
     { label: "0 Wei", value: "0" },
     { label: "1 Wei", value: "1" },
-    { label: "1 ETH", value: "1000000000000000000" },
-    { label: "0.001 ETH", value: "1000000000000000" },
-    { label: "1000 ETH", value: "1000000000000000000000" },
+    { label: "1 AVAX", value: "1000000000000000000" },
+    { label: "0.001 AVAX", value: "1000000000000000" },
+    { label: "1000 AVAX", value: "1000000000000000000000" },
   ];
 
   return (
@@ -450,7 +458,7 @@ function FormattingUtilsDebug({ refreshKey }: { refreshKey: number }) {
       <CardHeader>
         <CardTitle className="flex items-center gap-2">
           <Activity className="h-5 w-5 text-orange-500" />
-          formatValue() Utility Testing
+          formatValue() Utility Testing (Final-Hooks)
         </CardTitle>
       </CardHeader>
       <CardContent className="space-y-6">
@@ -603,7 +611,7 @@ function ABIAnalysisDebug() {
     <div className="grid gap-6">
       <Card>
         <CardHeader>
-          <CardTitle>Factory ABI Analysis</CardTitle>
+          <CardTitle>Factory ABI Analysis (Final-Hooks Compatible)</CardTitle>
         </CardHeader>
         <CardContent>
           <div className="grid md:grid-cols-3 gap-6">
@@ -673,19 +681,28 @@ function WriteDebug({ token }: { token: string }) {
       <CardHeader>
         <CardTitle className="flex items-center gap-2">
           <Factory className="h-5 w-5 text-red-500" />
-          Write Functions (Coming Soon)
+          Write Functions (Final-Hooks Ready)
         </CardTitle>
       </CardHeader>
       <CardContent>
         <div className="text-center py-8 text-muted-foreground">
           <Factory className="h-12 w-12 mx-auto mb-4 opacity-50" />
           <p>
-            Write function testing will be implemented in the next iteration.
+            Write function testing will be implemented using final-hooks
+            architecture.
           </p>
           <p className="text-sm mt-2">
-            This will include createToken, buy, sell, and other state-changing
-            functions.
+            This will include createToken, buyTokens, sellTokens, and other
+            state-changing functions from useFactoryContract.
           </p>
+          <div className="mt-4 text-xs bg-muted p-3 rounded">
+            <p className="font-medium mb-1">Available write functions:</p>
+            <div className="text-left">
+              <div>• createToken(name, symbol, imageUrl, burnManager)</div>
+              <div>• buyTokens(tokenAddress, ethAmount)</div>
+              <div>• sellTokens(tokenAddress, tokenAmount)</div>
+            </div>
+          </div>
         </div>
       </CardContent>
     </Card>
