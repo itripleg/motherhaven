@@ -2,7 +2,7 @@
 
 "use client";
 
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, Suspense } from "react";
 import { useSearchParams } from "next/navigation";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
@@ -24,7 +24,20 @@ import { isAddress } from "viem";
 import { useFactoryContract } from "@/final-hooks/useFactoryContract";
 import { FACTORY_ADDRESS, FACTORY_ABI } from "@/types";
 
-export default function DebugFactoryPage() {
+// Loading component for Suspense fallback
+function FactoryDebugLoading() {
+  return (
+    <div className="space-y-6">
+      <div className="text-center py-12">
+        <Factory className="h-12 w-12 mx-auto text-muted-foreground animate-pulse mb-4" />
+        <p className="text-muted-foreground">Loading factory debugger...</p>
+      </div>
+    </div>
+  );
+}
+
+// Main content component that uses useSearchParams
+function FactoryDebugContent() {
   const [mounted, setMounted] = useState(false);
   const [refreshKey, setRefreshKey] = useState(0);
   const searchParams = useSearchParams();
@@ -40,14 +53,7 @@ export default function DebugFactoryPage() {
   };
 
   if (!mounted) {
-    return (
-      <div className="space-y-6">
-        <div className="text-center py-12">
-          <Factory className="h-12 w-12 mx-auto text-muted-foreground animate-pulse mb-4" />
-          <p className="text-muted-foreground">Loading factory debugger...</p>
-        </div>
-      </div>
-    );
+    return <FactoryDebugLoading />;
   }
 
   return (
@@ -150,6 +156,15 @@ export default function DebugFactoryPage() {
         </TabsContent>
       </Tabs>
     </div>
+  );
+}
+
+// Main page component with Suspense wrapper
+export default function DebugFactoryPage() {
+  return (
+    <Suspense fallback={<FactoryDebugLoading />}>
+      <FactoryDebugContent />
+    </Suspense>
   );
 }
 

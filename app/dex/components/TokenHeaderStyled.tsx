@@ -12,9 +12,10 @@ import {
 } from "@/components/ui/tooltip";
 import { AddressComponent } from "@/components/AddressComponent";
 import { Progress } from "@/components/ui/progress";
-import { useToken } from "@/contexts/TokenContext";
-import { useFactoryContract } from "@/new-hooks/useFactoryContract";
-import { useUnifiedTokenPrice } from "@/hooks/token/useUnifiedTokenPrice"; // FIXED: Use unified price hook
+// FINAL-HOOKS: Updated to use consolidated final-hooks
+import { useTokenData } from "@/final-hooks/useTokenData";
+import { useFactoryContract } from "@/final-hooks/useFactoryContract";
+import { useUnifiedTokenPrice } from "@/final-hooks/useUnifiedTokenPrice";
 import { formatTokenPrice } from "@/utils/tokenPriceFormatter";
 import { Address, formatEther } from "viem";
 import { useAccount } from "wagmi";
@@ -89,9 +90,13 @@ export const TokenHeaderStyled: FC<TokenHeaderProps> = ({ address }) => {
   // --- Hooks ---
   const { address: userAddress } = useAccount();
   const { updatePosition, isUpdating } = useImagePosition();
-  const { token, loading } = useToken(address);
+
+  // FINAL-HOOKS: Use unified token data hook that combines Firestore + contract data
+  const { token, isLoading: loading } = useTokenData(address as Address);
+
+  // FINAL-HOOKS: Use consolidated factory contract hook
   const { useTokenState } = useFactoryContract();
-  const { data: state } = useTokenState(address as Address);
+  const { state } = useTokenState(address as Address);
 
   const isCreator =
     userAddress &&
@@ -389,7 +394,7 @@ export const TokenHeaderStyled: FC<TokenHeaderProps> = ({ address }) => {
               <div className="flex justify-between items-start">
                 <AddressComponent hash={address} type="address" />
                 <div className="flex items-center gap-2">
-                  <TokenStatusBadge state={state as number} />
+                  <TokenStatusBadge state={state} />
                   {isCreator ? (
                     <div className="flex items-center gap-2">
                       {token?.imageUrl && (
@@ -469,10 +474,11 @@ const TokenStatusBadge: FC<{ state: number | undefined }> = ({ state }) => {
 };
 
 const TokenInfoDisplay: FC<{ token: any }> = ({ token }) => {
+  // FINAL-HOOKS: Use consolidated factory contract hook
   const { useCollateral } = useFactoryContract();
-  const { data: rawCollateral } = useCollateral(token.address as Address);
+  const { collateral: rawCollateral } = useCollateral(token.address as Address);
 
-  // FIXED: Use unified token price hook instead of direct factory contract
+  // FINAL-HOOKS: Use unified token price hook from final-hooks
   const { formatted: formattedCurrentPrice, isLoading: priceLoading } =
     useUnifiedTokenPrice(token.address as Address);
 
@@ -507,7 +513,7 @@ const TokenInfoDisplay: FC<{ token: any }> = ({ token }) => {
       <CardContent className="p-0">
         <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
           <div className="backdrop-blur-sm bg-white/10 p-4 rounded-lg">
-            <Label className="text-gray-200">Current Price</Label>
+            <Label className="text-gray-200">Current Price (Final-Hooks)</Label>
             <p className="text-white text-lg font-semibold">
               {priceLoading ? (
                 <span className="animate-pulse">Loading...</span>
@@ -518,6 +524,9 @@ const TokenInfoDisplay: FC<{ token: any }> = ({ token }) => {
                 </>
               )}
             </p>
+            <div className="text-xs text-gray-400 mt-1">
+              via useUnifiedTokenPrice
+            </div>
           </div>
         </div>
         {token.fundingGoal && token.fundingGoal !== "0" && (
@@ -528,6 +537,9 @@ const TokenInfoDisplay: FC<{ token: any }> = ({ token }) => {
               {progress.toFixed(2)}% - {formattedCollateral} /{" "}
               {formattedFundingGoal} AVAX
             </p>
+            <div className="text-xs text-gray-400 mt-1">
+              Collateral via final-hooks useCollateral
+            </div>
           </div>
         )}
       </CardContent>

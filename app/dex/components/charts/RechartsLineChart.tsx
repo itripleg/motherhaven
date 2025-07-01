@@ -12,7 +12,7 @@ import {
 import { format, parseISO } from "date-fns";
 import { formatUnits, parseUnits } from "viem";
 import { Token, Trade } from "@/types";
-import { useUnifiedTokenPrice } from "@/hooks/token/useUnifiedTokenPrice";
+import { useUnifiedTokenPrice } from "@/final-hooks/useUnifiedTokenPrice";
 import { Address } from "viem";
 import {
   formatTokenPrice,

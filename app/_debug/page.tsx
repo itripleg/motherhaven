@@ -1,6 +1,8 @@
+// app/debug/page.tsx
+
 "use client";
 
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, Suspense } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -82,7 +84,25 @@ const DEBUG_SECTIONS = [
   },
 ];
 
-export default function DebugMainPage() {
+// Loading component for Suspense fallback
+function DebugMainLoading() {
+  return (
+    <div className="container mx-auto p-6 space-y-8">
+      <div className="text-center space-y-4">
+        <div className="flex items-center justify-center gap-3">
+          <Settings className="h-8 w-8 text-primary animate-pulse" />
+          <h1 className="text-4xl font-bold">Hook Debug Center</h1>
+        </div>
+        <p className="text-muted-foreground max-w-2xl mx-auto">
+          Loading debug environment...
+        </p>
+      </div>
+    </div>
+  );
+}
+
+// Main content component
+function DebugMainContent() {
   const [testTokenAddress, setTestTokenAddress] = useState(DEFAULT_TEST_TOKEN);
   const [isValidAddress, setIsValidAddress] = useState(true);
   const [copiedAddress, setCopiedAddress] = useState(false);
@@ -117,19 +137,7 @@ export default function DebugMainPage() {
 
   // Don't render wallet-dependent content until mounted
   if (!mounted) {
-    return (
-      <div className="container mx-auto p-6 space-y-8">
-        <div className="text-center space-y-4">
-          <div className="flex items-center justify-center gap-3">
-            <Settings className="h-8 w-8 text-primary" />
-            <h1 className="text-4xl font-bold">Hook Debug Center</h1>
-          </div>
-          <p className="text-muted-foreground max-w-2xl mx-auto">
-            Loading debug environment...
-          </p>
-        </div>
-      </div>
-    );
+    return <DebugMainLoading />;
   }
 
   return (
@@ -406,5 +414,14 @@ export default function DebugMainPage() {
         </div>
       </div>
     </div>
+  );
+}
+
+// Main page component with Suspense wrapper
+export default function DebugMainPage() {
+  return (
+    <Suspense fallback={<DebugMainLoading />}>
+      <DebugMainContent />
+    </Suspense>
   );
 }

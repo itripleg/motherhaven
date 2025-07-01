@@ -2,14 +2,15 @@
 
 "use client";
 
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, Suspense } from "react";
 import { useSearchParams } from "next/navigation";
 import { Button } from "@/components/ui/button";
 import { Separator } from "@/components/ui/separator";
 import { RefreshCw, Calculator, ArrowRightLeft, BarChart3 } from "lucide-react";
-import { isAddress } from "viem";
+import { isAddress, Address } from "viem";
 import { useAccount } from "wagmi";
-import { useToken } from "@/contexts/TokenContext";
+// FINAL-HOOKS: Updated to use consolidated final-hooks
+import { useTokenData } from "@/final-hooks/useTokenData";
 
 // Import streamlined components
 import { StreamlinedStatusCard } from "./components/StreamlinedStatusCard";
@@ -17,7 +18,20 @@ import { StreamlinedTradingComponent } from "./components/StreamlinedTradingComp
 import { StreamlinedChartComponent } from "./components/StreamlinedChartComponent";
 import { DebugPriceComparison } from "./components/DebugPriceComparison";
 
-export default function DebugTradePage() {
+// Loading component for Suspense fallback
+function TradeDebugLoading() {
+  return (
+    <div className="space-y-6">
+      <div className="text-center py-12">
+        <Calculator className="h-12 w-12 mx-auto text-muted-foreground animate-pulse mb-4" />
+        <p className="text-muted-foreground">Loading trade debugger...</p>
+      </div>
+    </div>
+  );
+}
+
+// Main content component that uses useSearchParams
+function TradeDebugContent() {
   const [mounted, setMounted] = useState(false);
   const [refreshKey, setRefreshKey] = useState(0);
   const searchParams = useSearchParams();
@@ -25,12 +39,14 @@ export default function DebugTradePage() {
   const isValidToken = testToken && isAddress(testToken);
   const { address: userAddress, isConnected } = useAccount();
 
-  // Token data
+  // FINAL-HOOKS: Use unified token data hook that combines Firestore + contract data
   const {
     token: tokenData,
-    loading: tokenLoading,
+    isLoading: tokenLoading,
     error: tokenError,
-  } = useToken(testToken);
+    refetchContract,
+  } = useTokenData(isValidToken ? (testToken as Address) : undefined);
+
   const tokenExists = !!(isValidToken && tokenData && !tokenError);
 
   useEffect(() => {
@@ -39,17 +55,14 @@ export default function DebugTradePage() {
 
   const forceRefresh = () => {
     setRefreshKey((prev) => prev + 1);
+    // Also refresh contract data
+    if (isValidToken) {
+      refetchContract();
+    }
   };
 
   if (!mounted) {
-    return (
-      <div className="space-y-6">
-        <div className="text-center py-12">
-          <Calculator className="h-12 w-12 mx-auto text-muted-foreground animate-pulse mb-4" />
-          <p className="text-muted-foreground">Loading trade debugger...</p>
-        </div>
-      </div>
-    );
+    return <TradeDebugLoading />;
   }
 
   return (
@@ -63,7 +76,7 @@ export default function DebugTradePage() {
           </h1>
           <p className="text-muted-foreground mt-2">
             Streamlined interface for testing trade calculations and
-            functionality
+            functionality with Final-Hooks
           </p>
         </div>
 
@@ -81,6 +94,7 @@ export default function DebugTradePage() {
         isConnected={isConnected}
         tokenExists={tokenExists}
         refreshKey={refreshKey}
+        isLoading={tokenLoading}
       />
 
       {/* Main Content - Two Column Layout */}
@@ -131,5 +145,14 @@ export default function DebugTradePage() {
         />
       </div>
     </div>
+  );
+}
+
+// Main page component with Suspense wrapper
+export default function DebugTradePage() {
+  return (
+    <Suspense fallback={<TradeDebugLoading />}>
+      <TradeDebugContent />
+    </Suspense>
   );
 }

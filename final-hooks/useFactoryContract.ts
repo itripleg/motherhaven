@@ -28,6 +28,68 @@ export function useFactoryContract() {
   // --- READ OPERATIONS ---
 
   /**
+   * Calculate ETH cost for buying specific amount of tokens
+   */
+  const useCalculateBuyPrice = (
+    tokenAddress?: Address,
+    tokenAmount?: string
+  ) => {
+    const { data, isLoading, error } = useReadContract({
+      address: FACTORY_ADDRESS,
+      abi: FACTORY_ABI,
+      functionName: "calculateBuyPrice",
+      args:
+        tokenAddress && tokenAmount
+          ? [tokenAddress, parseEther(tokenAmount)]
+          : undefined,
+      query: {
+        enabled: Boolean(
+          tokenAddress && tokenAmount && parseFloat(tokenAmount) > 0
+        ),
+        staleTime: 5000,
+      },
+    });
+
+    return {
+      ethAmount: data as bigint | undefined,
+      ethAmountFormatted: formatValue(data as bigint | undefined),
+      isLoading,
+      error,
+    };
+  };
+
+  /**
+   * Calculate ETH received for selling tokens
+   */
+  const useCalculateSellPrice = (
+    tokenAddress?: Address,
+    tokenAmount?: string
+  ) => {
+    const { data, isLoading, error } = useReadContract({
+      address: FACTORY_ADDRESS,
+      abi: FACTORY_ABI,
+      functionName: "calculateSellPrice",
+      args:
+        tokenAddress && tokenAmount
+          ? [tokenAddress, parseEther(tokenAmount)]
+          : undefined,
+      query: {
+        enabled: Boolean(
+          tokenAddress && tokenAmount && parseFloat(tokenAmount) > 0
+        ),
+        staleTime: 5000,
+      },
+    });
+
+    return {
+      ethAmount: data as bigint | undefined,
+      ethAmountFormatted: formatValue(data as bigint | undefined),
+      isLoading,
+      error,
+    };
+  };
+
+  /**
    * Get current/last price for a token
    */
   const usePrice = (tokenAddress?: Address) => {
@@ -208,6 +270,8 @@ export function useFactoryContract() {
     useCollateral,
     useTokenState,
     useCalculateTokens,
+    useCalculateBuyPrice,
+    useCalculateSellPrice,
 
     // Combined hook
     useTokenDetails,

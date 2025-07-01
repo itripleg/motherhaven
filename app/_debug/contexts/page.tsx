@@ -2,7 +2,7 @@
 
 "use client";
 
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, Suspense } from "react";
 import { useSearchParams } from "next/navigation";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
@@ -17,14 +17,27 @@ import {
   Clock,
   Users,
 } from "lucide-react";
-import { isAddress } from "viem";
+import { isAddress, Address } from "viem";
 
-// Import context hooks
-import { useToken, useTokenContext } from "@/contexts/TokenContext";
-import { useTrades, useTradesContext } from "@/contexts/TradesContext";
+// FIXED: Import final-hooks instead of deleted context hooks
+import { useTokenData, useTokenInfo } from "@/final-hooks/useTokenData";
+import { useTrades } from "@/final-hooks/useTrades";
 import { useFactoryConfigContext } from "@/contexts/FactoryConfigProvider";
 
-export default function DebugContextsPage() {
+// Loading component for Suspense fallback
+function ContextsDebugLoading() {
+  return (
+    <div className="space-y-6">
+      <div className="text-center py-12">
+        <Database className="h-12 w-12 mx-auto text-muted-foreground animate-pulse mb-4" />
+        <p className="text-muted-foreground">Loading context debugger...</p>
+      </div>
+    </div>
+  );
+}
+
+// Main content component that uses useSearchParams
+function ContextsDebugContent() {
   const [mounted, setMounted] = useState(false);
   const [refreshKey, setRefreshKey] = useState(0);
   const searchParams = useSearchParams();
@@ -40,14 +53,7 @@ export default function DebugContextsPage() {
   };
 
   if (!mounted) {
-    return (
-      <div className="space-y-6">
-        <div className="text-center py-12">
-          <Database className="h-12 w-12 mx-auto text-muted-foreground animate-pulse mb-4" />
-          <p className="text-muted-foreground">Loading context debugger...</p>
-        </div>
-      </div>
-    );
+    return <ContextsDebugLoading />;
   }
 
   return (
@@ -57,10 +63,10 @@ export default function DebugContextsPage() {
         <div>
           <h1 className="text-3xl font-bold flex items-center gap-3">
             <Database className="h-8 w-8 text-blue-500" />
-            Context Hooks Debug
+            Final-Hooks Debug
           </h1>
           <p className="text-muted-foreground mt-2">
-            Test React Context providers and their associated hooks
+            Test the new final-hooks architecture (replacing old contexts)
           </p>
         </div>
 
@@ -98,33 +104,32 @@ export default function DebugContextsPage() {
 
           {!isValidToken && (
             <p className="text-sm text-muted-foreground mt-2">
-              💡 Add a valid token address in the URL (?token=0x...) or use the
-              input above to test context hooks
+              💡 Add a valid token address in the URL (?token=0x...) to test
+              final-hooks
             </p>
           )}
         </CardContent>
       </Card>
 
-      <Tabs defaultValue="token-context" className="w-full">
+      <Tabs defaultValue="token-data" className="w-full">
         <TabsList className="grid w-full grid-cols-3">
-          <TabsTrigger value="token-context">Token Context</TabsTrigger>
-          <TabsTrigger value="trades-context">Trades Context</TabsTrigger>
+          <TabsTrigger value="token-data">Token Data Hook</TabsTrigger>
+          <TabsTrigger value="trades-hook">Trades Hook</TabsTrigger>
           <TabsTrigger value="factory-config">Factory Config</TabsTrigger>
         </TabsList>
 
-        {/* Token Context Tab */}
-        <TabsContent value="token-context">
+        {/* Token Data Hook Tab */}
+        <TabsContent value="token-data">
           <div className="grid gap-6">
-            <TokenContextDebug token={testToken} refreshKey={refreshKey} />
-            <TokenContextRawDebug token={testToken} refreshKey={refreshKey} />
+            <TokenDataDebug token={testToken} refreshKey={refreshKey} />
+            <TokenInfoDebug token={testToken} refreshKey={refreshKey} />
           </div>
         </TabsContent>
 
-        {/* Trades Context Tab */}
-        <TabsContent value="trades-context">
+        {/* Trades Hook Tab */}
+        <TabsContent value="trades-hook">
           <div className="grid gap-6">
-            <TradesContextDebug token={testToken} refreshKey={refreshKey} />
-            <TradesContextRawDebug token={testToken} refreshKey={refreshKey} />
+            <TradesHookDebug token={testToken} refreshKey={refreshKey} />
           </div>
         </TabsContent>
 
@@ -137,19 +142,36 @@ export default function DebugContextsPage() {
   );
 }
 
-// Token Context Debug Component
-function TokenContextDebug({
+// Main page component with Suspense wrapper
+export default function DebugContextsPage() {
+  return (
+    <Suspense fallback={<ContextsDebugLoading />}>
+      <ContextsDebugContent />
+    </Suspense>
+  );
+}
+
+// FIXED: Token Data Hook Debug (using useTokenData from final-hooks)
+function TokenDataDebug({
   token,
   refreshKey,
 }: {
   token: string;
   refreshKey: number;
 }) {
-  const { token: tokenData, loading, error } = useToken(token);
+  const {
+    token: tokenData,
+    statistics,
+    isLoading,
+    error,
+    hasFirestoreData,
+    hasContractData,
+    refetchContract,
+  } = useTokenData(token && isAddress(token) ? (token as Address) : undefined);
 
   const getStatusBadge = () => {
     if (error) return <Badge variant="destructive">Error</Badge>;
-    if (loading) return <Badge variant="secondary">Loading</Badge>;
+    if (isLoading) return <Badge variant="secondary">Loading</Badge>;
     if (tokenData) return <Badge variant="default">Success</Badge>;
     return <Badge variant="outline">No Data</Badge>;
   };
@@ -159,7 +181,7 @@ function TokenContextDebug({
       <CardHeader>
         <CardTitle className="flex items-center gap-2">
           <Database className="h-5 w-5 text-blue-500" />
-          useToken Hook
+          useTokenData Hook (Final-Hooks)
           {getStatusBadge()}
         </CardTitle>
       </CardHeader>
@@ -168,26 +190,40 @@ function TokenContextDebug({
         <div className="grid grid-cols-4 gap-4 text-sm">
           <div className="space-y-1">
             <span className="text-muted-foreground">Loading</span>
-            <div className="font-mono">{loading.toString()}</div>
+            <div className="font-mono">{isLoading.toString()}</div>
           </div>
           <div className="space-y-1">
             <span className="text-muted-foreground">Error</span>
             <div className="font-mono text-red-500">{error || "None"}</div>
           </div>
           <div className="space-y-1">
-            <span className="text-muted-foreground">Has Token</span>
-            <div className="font-mono">{tokenData ? "✅ Yes" : "❌ No"}</div>
+            <span className="text-muted-foreground">Firestore Data</span>
+            <div className="font-mono">
+              {hasFirestoreData ? "✅ Yes" : "❌ No"}
+            </div>
           </div>
           <div className="space-y-1">
-            <span className="text-muted-foreground">Refresh #</span>
-            <div className="font-mono">{refreshKey}</div>
+            <span className="text-muted-foreground">Contract Data</span>
+            <div className="font-mono">
+              {hasContractData ? "✅ Yes" : "❌ No"}
+            </div>
           </div>
+        </div>
+
+        {/* Action Buttons */}
+        <div className="flex gap-2">
+          <Button onClick={refetchContract} variant="outline" size="sm">
+            <RefreshCw className="h-4 w-4 mr-1" />
+            Refetch Contract
+          </Button>
         </div>
 
         {/* Token Data Display */}
         {tokenData && (
           <div className="bg-muted p-4 rounded-lg space-y-3">
-            <h4 className="font-semibold text-sm">Token Data:</h4>
+            <h4 className="font-semibold text-sm">
+              Token Data (Combined Firestore + Contract):
+            </h4>
             <div className="grid grid-cols-2 gap-3 text-sm">
               <div>
                 <span className="text-muted-foreground">Name:</span>
@@ -202,31 +238,28 @@ function TokenContextDebug({
                 <div className="font-mono text-xs">{tokenData.creator}</div>
               </div>
               <div>
-                <span className="text-muted-foreground">Funding Goal:</span>
-                <div className="font-medium">{tokenData.fundingGoal} AVAX</div>
-              </div>
-              <div>
                 <span className="text-muted-foreground">State:</span>
                 <div className="font-medium">{tokenData.state}</div>
               </div>
               <div>
-                <span className="text-muted-foreground">Image Position:</span>
-                <div className="font-medium">
-                  {tokenData.imagePosition ? "✅ Yes" : "❌ No"}
-                </div>
+                <span className="text-muted-foreground">Last Price:</span>
+                <div className="font-medium">{tokenData.lastPrice} AVAX</div>
+              </div>
+              <div>
+                <span className="text-muted-foreground">Collateral:</span>
+                <div className="font-medium">{tokenData.collateral} AVAX</div>
               </div>
             </div>
 
-            {tokenData.imagePosition && (
+            {statistics && (
               <div className="mt-3 p-3 bg-background rounded border">
                 <h5 className="text-xs font-medium text-muted-foreground mb-2">
-                  Image Position:
+                  Statistics:
                 </h5>
-                <div className="grid grid-cols-4 gap-2 text-xs">
-                  <div>X: {tokenData.imagePosition.x}</div>
-                  <div>Y: {tokenData.imagePosition.y}</div>
-                  <div>Scale: {tokenData.imagePosition.scale}</div>
-                  <div>Rotation: {tokenData.imagePosition.rotation}°</div>
+                <div className="grid grid-cols-3 gap-2 text-xs">
+                  <div>Volume: {statistics.volumeETH} AVAX</div>
+                  <div>Trades: {statistics.tradeCount}</div>
+                  <div>Holders: {statistics.uniqueHolders}</div>
                 </div>
               </div>
             )}
@@ -246,69 +279,79 @@ function TokenContextDebug({
   );
 }
 
-// Token Context Raw Debug
-function TokenContextRawDebug({
+// FIXED: Token Info Hook Debug (lightweight version)
+function TokenInfoDebug({
   token,
   refreshKey,
 }: {
   token: string;
   refreshKey: number;
 }) {
-  const context = useTokenContext();
+  const { tokenInfo, loading } = useTokenInfo(
+    token && isAddress(token) ? (token as Address) : undefined
+  );
 
   return (
     <Card>
       <CardHeader>
         <CardTitle className="flex items-center gap-2">
           <Database className="h-5 w-5 text-purple-500" />
-          useTokenContext (Raw)
+          useTokenInfo Hook (Lightweight)
+          <Badge
+            variant={loading ? "secondary" : tokenInfo ? "default" : "outline"}
+          >
+            {loading ? "Loading" : tokenInfo ? "Success" : "No Data"}
+          </Badge>
         </CardTitle>
       </CardHeader>
       <CardContent>
         <div className="space-y-4">
           <div className="text-sm">
-            <span className="font-medium">Context Functions Available:</span>
-            <div className="mt-2 flex flex-wrap gap-2">
-              {Object.keys(context).map((key) => (
-                <Badge key={key} variant="outline" className="text-xs">
-                  {key}
-                </Badge>
-              ))}
-            </div>
+            <span className="font-medium">Purpose:</span>
+            <p className="text-muted-foreground mt-1">
+              Lightweight hook for basic token info (name, symbol, image)
+              without heavy contract data
+            </p>
           </div>
 
-          <div className="bg-muted p-4 rounded-lg">
-            <h4 className="font-semibold text-sm mb-2">Cached Tokens:</h4>
-            <div className="text-xs font-mono">
-              {Object.keys(context.tokens).length > 0 ? (
-                <div className="space-y-1">
-                  {Object.entries(context.tokens).map(([addr, tokenData]) => (
-                    <div key={addr} className="flex justify-between">
-                      <span>{addr.slice(0, 8)}...</span>
-                      <span>{tokenData ? "✅" : "❌"}</span>
-                    </div>
-                  ))}
+          {tokenInfo && (
+            <div className="bg-muted p-4 rounded-lg">
+              <h4 className="font-semibold text-sm mb-2">Token Info:</h4>
+              <div className="grid grid-cols-3 gap-3 text-sm">
+                <div>
+                  <span className="text-muted-foreground">Name:</span>
+                  <div className="font-medium">{tokenInfo.name}</div>
                 </div>
-              ) : (
-                <span className="text-muted-foreground">No tokens cached</span>
-              )}
+                <div>
+                  <span className="text-muted-foreground">Symbol:</span>
+                  <div className="font-medium">{tokenInfo.symbol}</div>
+                </div>
+                <div>
+                  <span className="text-muted-foreground">Has Image:</span>
+                  <div className="font-medium">
+                    {tokenInfo.imageUrl ? "✅ Yes" : "❌ No"}
+                  </div>
+                </div>
+              </div>
             </div>
-          </div>
+          )}
         </div>
       </CardContent>
     </Card>
   );
 }
 
-// Trades Context Debug
-function TradesContextDebug({
+// FIXED: Trades Hook Debug (using useTrades from final-hooks)
+function TradesHookDebug({
   token,
   refreshKey,
 }: {
   token: string;
   refreshKey: number;
 }) {
-  const { trades, loading, error } = useTrades(token);
+  const { trades, loading, error, analytics } = useTrades(
+    token && isAddress(token) ? (token as Address) : undefined
+  );
 
   const getStatusBadge = () => {
     if (error) return <Badge variant="destructive">Error</Badge>;
@@ -322,7 +365,7 @@ function TradesContextDebug({
       <CardHeader>
         <CardTitle className="flex items-center gap-2">
           <TrendingUp className="h-5 w-5 text-green-500" />
-          useTrades Hook
+          useTrades Hook (Final-Hooks)
           {getStatusBadge()}
         </CardTitle>
       </CardHeader>
@@ -331,7 +374,6 @@ function TradesContextDebug({
         <div className="grid grid-cols-4 gap-4 text-sm">
           <div className="space-y-1">
             <span className="text-muted-foreground">Loading</span>
-            {/* @ts-expect-error posiblly undefined */}
             <div className="font-mono">{loading.toString()}</div>
           </div>
           <div className="space-y-1">
@@ -343,10 +385,37 @@ function TradesContextDebug({
             <div className="font-mono">{trades.length}</div>
           </div>
           <div className="space-y-1">
-            <span className="text-muted-foreground">Refresh #</span>
-            <div className="font-mono">{refreshKey}</div>
+            <span className="text-muted-foreground">Has Analytics</span>
+            <div className="font-mono">{analytics ? "✅ Yes" : "❌ No"}</div>
           </div>
         </div>
+
+        {/* Analytics */}
+        {analytics && (
+          <div className="bg-muted p-4 rounded-lg">
+            <h4 className="font-semibold text-sm mb-3">Trade Analytics:</h4>
+            <div className="grid grid-cols-4 gap-3 text-sm">
+              <div>
+                <span className="text-muted-foreground">Total Volume:</span>
+                <div className="font-medium">{analytics.totalVolume} AVAX</div>
+              </div>
+              <div>
+                <span className="text-muted-foreground">Trade Count:</span>
+                <div className="font-medium">{analytics.tradeCount}</div>
+              </div>
+              <div>
+                <span className="text-muted-foreground">Buy Pressure:</span>
+                <div className="font-medium">
+                  {(analytics.buyPressure * 100).toFixed(1)}%
+                </div>
+              </div>
+              <div>
+                <span className="text-muted-foreground">Avg Trade Size:</span>
+                <div className="font-medium">{analytics.avgTradeSize} AVAX</div>
+              </div>
+            </div>
+          </div>
+        )}
 
         {/* Recent Trades */}
         {trades.length > 0 && (
@@ -368,10 +437,12 @@ function TradesContextDebug({
                     </Badge>
                     <span className="text-xs text-muted-foreground">
                       <Clock className="h-3 w-3 inline mr-1" />
-                      {trade.timestamp}
+                      {new Date(trade.timestamp).toLocaleString()}
                     </span>
                   </div>
                   <div className="grid grid-cols-2 gap-2 text-xs">
+                    <div>ETH: {trade.ethAmount}</div>
+                    <div>Tokens: {trade.tokenAmount}</div>
                     <div>Trader: {trade.trader.slice(0, 8)}...</div>
                     <div>Block: {trade.blockNumber}</div>
                   </div>
@@ -394,67 +465,7 @@ function TradesContextDebug({
   );
 }
 
-// Trades Context Raw Debug
-function TradesContextRawDebug({
-  token,
-  refreshKey,
-}: {
-  token: string;
-  refreshKey: number;
-}) {
-  const context = useTradesContext();
-
-  return (
-    <Card>
-      <CardHeader>
-        <CardTitle className="flex items-center gap-2">
-          <TrendingUp className="h-5 w-5 text-orange-500" />
-          useTradesContext (Raw)
-        </CardTitle>
-      </CardHeader>
-      <CardContent>
-        <div className="space-y-4">
-          <div className="text-sm">
-            <span className="font-medium">Context Functions Available:</span>
-            <div className="mt-2 flex flex-wrap gap-2">
-              {Object.keys(context).map((key) => (
-                <Badge key={key} variant="outline" className="text-xs">
-                  {key}
-                </Badge>
-              ))}
-            </div>
-          </div>
-
-          <div className="bg-muted p-4 rounded-lg">
-            <h4 className="font-semibold text-sm mb-2">
-              Cached Trades by Token:
-            </h4>
-            <div className="text-xs font-mono">
-              {Object.keys(context.trades).length > 0 ? (
-                <div className="space-y-1">
-                  {Object.entries(context.trades).map(([addr, tradesData]) => (
-                    <div key={addr} className="flex justify-between">
-                      <span>{addr.slice(0, 8)}...</span>
-                      <span>
-                        {tradesData
-                          ? `${tradesData.length} trades`
-                          : "❌ No data"}
-                      </span>
-                    </div>
-                  ))}
-                </div>
-              ) : (
-                <span className="text-muted-foreground">No trades cached</span>
-              )}
-            </div>
-          </div>
-        </div>
-      </CardContent>
-    </Card>
-  );
-}
-
-// Factory Config Debug
+// Factory Config Debug (unchanged - this context still exists)
 function FactoryConfigDebug({ refreshKey }: { refreshKey: number }) {
   const { config, isLoading } = useFactoryConfigContext();
 
@@ -469,7 +480,7 @@ function FactoryConfigDebug({ refreshKey }: { refreshKey: number }) {
       <CardHeader>
         <CardTitle className="flex items-center gap-2">
           <Users className="h-5 w-5 text-indigo-500" />
-          Factory Config Context
+          Factory Config Context (Still Valid)
           {getStatusBadge()}
         </CardTitle>
       </CardHeader>

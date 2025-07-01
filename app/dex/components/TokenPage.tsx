@@ -6,18 +6,24 @@ import { TokenTradeCard } from "./TokenTradeCard";
 import { ChatComponent } from "./ChatComponent";
 import { MobileChatModal } from "./MobileChatModal";
 import RecentTrades from "./RecentTrades";
-import { useToken } from "@/contexts/TokenContext";
+// FINAL-HOOKS: Updated to use consolidated final-hooks
+import { useTokenData } from "@/final-hooks/useTokenData";
 import { TradesProvider } from "@/contexts/TradesContext";
 import { DebugTokenLoading } from "./DebugTokenLoading";
+import { Address } from "viem";
+import { useAccount } from "wagmi";
 
 interface TokenPageProps {
   tokenAddress: string;
 }
 
 export default function TokenPage({ tokenAddress }: TokenPageProps) {
-  const { token, loading, error } = useToken(tokenAddress);
+  const { isConnected } = useAccount();
 
-  if (loading) {
+  // FINAL-HOOKS: Use unified token data hook that combines Firestore + contract data
+  const { token, isLoading, error } = useTokenData(tokenAddress as Address);
+
+  if (isLoading) {
     return (
       <div className="container mx-auto pt-20 p-4">
         <div className="animate-pulse space-y-6">
@@ -61,9 +67,8 @@ export default function TokenPage({ tokenAddress }: TokenPageProps) {
             <TokenPriceCharts address={token.address} />
             <TokenTradeCard
               address={tokenAddress}
-              // @ts-expect-error Adjust as needed for TokenTradeCard's props
               tokenData={token}
-              isConnected={false} // This should be dynamic based on wallet connection state
+              isConnected={isConnected}
             />
           </div>
 

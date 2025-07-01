@@ -14,6 +14,7 @@ export interface ImagePosition {
   y: number; // -100 to 100 (percentage)
   scale: number; // 0.5 to 3
   rotation: number; // -180 to 180 degrees
+  fit?: "cover" | "contain" | "fill"; // Image fit mode
 }
 
 export interface PositionHistoryEntry {
@@ -143,7 +144,8 @@ export const isValidImagePosition = (
     position.scale >= 0.5 &&
     position.scale <= 3 &&
     position.rotation >= -180 &&
-    position.rotation <= 180
+    position.rotation <= 180 &&
+    (!position.fit || ["cover", "contain", "fill"].includes(position.fit))
   );
 };
 
@@ -165,6 +167,7 @@ export const DEFAULT_IMAGE_POSITION: ImagePosition = {
   y: 0,
   scale: 1,
   rotation: 0,
+  fit: "cover",
 };
 
 // Utility functions
@@ -172,12 +175,14 @@ export const createImagePosition = (
   x: number = 0,
   y: number = 0,
   scale: number = 1,
-  rotation: number = 0
+  rotation: number = 0,
+  fit: "cover" | "contain" | "fill" = "cover"
 ): ImagePosition => ({
   x: Math.max(-100, Math.min(100, x)),
   y: Math.max(-100, Math.min(100, y)),
   scale: Math.max(0.5, Math.min(3, scale)),
   rotation: Math.max(-180, Math.min(180, rotation)),
+  fit,
 });
 
 export const clampImagePosition = (
@@ -186,7 +191,8 @@ export const clampImagePosition = (
   x: Math.max(-100, Math.min(100, position.x ?? 0)),
   y: Math.max(-100, Math.min(100, position.y ?? 0)),
   scale: Math.max(0.5, Math.min(3, position.scale ?? 1)),
-  rotation: Math.max(-180, Math.min(180, rotation ?? 0)),
+  rotation: Math.max(-180, Math.min(180, position.rotation ?? 0)),
+  fit: position.fit ?? "cover",
 });
 
 // CSS style generator for image positioning
@@ -199,13 +205,36 @@ export const getImagePositionStyle = (position?: ImagePosition) => {
     };
   }
 
-  return {
-    backgroundSize: `${100 * position.scale}% ${100 * position.scale}%`,
-    backgroundPosition: `${50 + position.x}% ${50 + position.y}%`,
+  const { x, y, scale, rotation, fit = "cover" } = position;
+
+  const baseStyle = {
     backgroundRepeat: "no-repeat" as const,
-    transform: `rotate(${position.rotation}deg)`,
+    transform: `rotate(${rotation}deg)`,
     transformOrigin: "center center" as const,
     transition: "all 0.2s ease-out" as const,
+  };
+
+  if (fit === "fill") {
+    return {
+      ...baseStyle,
+      backgroundSize: "100% 100%",
+      backgroundPosition: "center",
+    };
+  }
+
+  if (fit === "contain") {
+    return {
+      ...baseStyle,
+      backgroundSize: `${100 * scale}% auto`,
+      backgroundPosition: `${50 + x}% ${50 + y}%`,
+    };
+  }
+
+  // Default to "cover"
+  return {
+    ...baseStyle,
+    backgroundSize: `${100 * scale}% ${100 * scale}%`,
+    backgroundPosition: `${50 + x}% ${50 + y}%`,
   };
 };
 
@@ -230,6 +259,6 @@ export const addCurrentPriceToToken = (
 
 // Utility to check if a token has legacy price data
 export const hasLegacyPrice = (token: any): token is LegacyTokenWithPrice => {
-  // @ts-expect-error cehcking for legacy
+  // @ts-expect-error checking for legacy
   return isValidToken(token) && typeof token.currentPrice === "string";
 };

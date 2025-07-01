@@ -14,8 +14,8 @@ import { useFactoryConfigContext } from "@/contexts/FactoryConfigProvider";
 
 // Enums for better type safety
 export enum SortBy {
-  NEWEST = "createdAt",
-  OLDEST = "createdAt",
+  NEWEST = "createdAt_desc",
+  OLDEST = "createdAt_asc",
   NAME = "name",
   SYMBOL = "symbol",
   PRICE = "currentPrice",
@@ -99,6 +99,7 @@ export function useTokenList(options: UseTokenListOptions = {}) {
   const [tokens, setTokens] = useState<TokenListItem[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [totalCount, setTotalCount] = useState(0);
 
   // Build Firestore query constraints
   const queryConstraints = useMemo((): QueryConstraint[] => {
@@ -106,7 +107,7 @@ export function useTokenList(options: UseTokenListOptions = {}) {
 
     // Add filtering
     if (filterBy === FilterBy.TRADING) {
-      constraints.push(where("state", "==", 1)); // TokenState.TRADING
+      constraints.push(where("currentState", "==", 1)); // Use currentState instead of state
     } else if (filterBy === FilterBy.NEW) {
       const yesterday = new Date(
         Date.now() - 24 * 60 * 60 * 1000
@@ -115,13 +116,12 @@ export function useTokenList(options: UseTokenListOptions = {}) {
     } else if (filterBy === FilterBy.TRENDING) {
       constraints.push(where("statistics.tradeCount", ">=", 5));
     } else if (filterBy === FilterBy.GOAL_REACHED) {
-      // This might need to be computed client-side if we don't store this field
-      // For now, we'll filter this in the client-side processing
+      // This will be filtered client-side since it requires calculation
     }
 
-    // Add sorting - be careful with Firestore composite index requirements
+    // Add sorting - use the actual Firebase field names
     if (sortBy && sortBy !== SortBy.NAME && sortBy !== SortBy.SYMBOL) {
-      let firestoreField = sortBy;
+      let firestoreField: string = sortBy;
       if (sortBy === SortBy.PRICE) {
         firestoreField = "statistics.currentPrice";
       } else if (sortBy === SortBy.VOLUME) {
@@ -145,204 +145,153 @@ export function useTokenList(options: UseTokenListOptions = {}) {
     return constraints;
   }, [sortBy, sortDirection, filterBy, limitCount]);
 
-  // Fetch tokens from Firestore
+  // Effect for real-time data subscription
   useEffect(() => {
-    if (!factoryConfig) return;
+    if (!enableRealtime) return;
 
     setLoading(true);
     setError(null);
 
-    const tokensRef = collection(db, "tokens");
-    const q = query(tokensRef, ...queryConstraints);
+    try {
+      const tokensCollection = collection(db, "tokens");
+      const q = query(tokensCollection, ...queryConstraints);
 
-    const unsubscribe = onSnapshot(
-      q,
-      (snapshot) => {
-        console.log(`📊 Loaded ${snapshot.docs.length} tokens from Firestore`);
+      const unsubscribe = onSnapshot(
+        q,
+        (snapshot) => {
+          const tokenList: TokenListItem[] = [];
 
-        const tokenData: TokenListItem[] = snapshot.docs.map((doc) => {
-          const data = doc.data();
-          return {
-            address: doc.id,
-            name: data.name || "Unknown",
-            symbol: data.symbol || "UNKNOWN",
-            imageUrl: data.imageUrl || "",
-            creator: data.creator || "0x0",
-            createdAt: data.createdAt || new Date().toISOString(),
-            fundingGoal: data.fundingGoal || "0",
-            state: data.state || 0,
-            currentPrice: data.statistics?.currentPrice || "0",
-            statistics: {
-              volumeETH: data.statistics?.volumeETH || "0",
-              tradeCount: data.statistics?.tradeCount || 0,
-              uniqueHolders: data.statistics?.uniqueHolders || 0,
-              collateral: data.statistics?.collateral || "0",
-            },
-            imagePosition: data.imagePosition || undefined,
-          };
-        });
+          snapshot.forEach((doc) => {
+            const data = doc.data();
+            const token: TokenListItem = {
+              address: doc.id,
+              name: data.name || "Unknown",
+              symbol: data.symbol || "???",
+              imageUrl: data.imageUrl || "",
+              creator: data.creator || "",
+              createdAt: data.createdAt || "",
+              fundingGoal: data.fundingGoal || "0",
+              state: data.currentState || data.state || 0,
+              currentPrice:
+                data.statistics?.currentPrice || data.currentPrice || "0",
+              statistics: {
+                volumeETH: data.statistics?.volumeETH || "0",
+                tradeCount: data.statistics?.tradeCount || 0,
+                uniqueHolders: data.statistics?.uniqueHolders || 0,
+                collateral: data.statistics?.collateral || "0",
+              },
+              imagePosition: data.imagePosition,
+            };
+            tokenList.push(token);
+          });
 
-        setTokens(tokenData);
-        setLoading(false);
-      },
-      (err) => {
-        console.error("Error fetching tokens:", err);
-        setError(`Failed to load tokens: ${err.message}`);
-        setLoading(false);
-      }
-    );
+          // Apply client-side filtering if needed
+          let filteredTokens = tokenList;
 
-    return () => unsubscribe();
-  }, [factoryConfig, queryConstraints, enableRealtime]);
+          // Search filter
+          if (searchQuery && searchQuery.trim()) {
+            const query = searchQuery.toLowerCase().trim();
+            filteredTokens = filteredTokens.filter(
+              (token) =>
+                token.name.toLowerCase().includes(query) ||
+                token.symbol.toLowerCase().includes(query) ||
+                token.address.toLowerCase().includes(query)
+            );
+          }
 
-  // Apply client-side filtering and sorting
-  const filteredAndSortedTokens = useMemo(() => {
-    let result = [...tokens];
+          // Goal reached filter (requires calculation)
+          if (filterBy === FilterBy.GOAL_REACHED) {
+            filteredTokens = filteredTokens.filter((token) => {
+              const collateral = parseFloat(token.statistics.collateral);
+              const goal = parseFloat(token.fundingGoal);
+              return goal > 0 && collateral >= goal * 0.8; // 80% of goal
+            });
+          }
 
-    // Apply search filter
-    if (searchQuery.trim()) {
-      const query = searchQuery.toLowerCase().trim();
-      result = result.filter(
-        (token) =>
-          token.name.toLowerCase().includes(query) ||
-          token.symbol.toLowerCase().includes(query) ||
-          token.address.toLowerCase().includes(query) ||
-          token.creator.toLowerCase().includes(query)
+          // Client-side sorting if needed
+          if (
+            sortBy === SortBy.NAME ||
+            sortBy === SortBy.SYMBOL ||
+            (filterBy === FilterBy.NEW && sortBy !== SortBy.NEWEST)
+          ) {
+            filteredTokens.sort((a, b) => {
+              let aValue: string | number;
+              let bValue: string | number;
+
+              switch (sortBy) {
+                case SortBy.NAME:
+                  aValue = a.name.toLowerCase();
+                  bValue = b.name.toLowerCase();
+                  break;
+                case SortBy.SYMBOL:
+                  aValue = a.symbol.toLowerCase();
+                  bValue = b.symbol.toLowerCase();
+                  break;
+                case SortBy.PRICE:
+                  aValue = parseFloat(a.currentPrice);
+                  bValue = parseFloat(b.currentPrice);
+                  break;
+                case SortBy.VOLUME:
+                  aValue = parseFloat(a.statistics.volumeETH);
+                  bValue = parseFloat(b.statistics.volumeETH);
+                  break;
+                default:
+                  return 0;
+              }
+
+              if (typeof aValue === "string" && typeof bValue === "string") {
+                return sortDirection === SortDirection.ASC
+                  ? aValue.localeCompare(bValue)
+                  : bValue.localeCompare(aValue);
+              } else {
+                return sortDirection === SortDirection.ASC
+                  ? (aValue as number) - (bValue as number)
+                  : (bValue as number) - (aValue as number);
+              }
+            });
+          }
+
+          setTokens(filteredTokens);
+          setTotalCount(filteredTokens.length);
+          setLoading(false);
+        },
+        (err) => {
+          console.error("Error fetching tokens:", err);
+          setError(err.message || "Failed to fetch tokens");
+          setLoading(false);
+        }
       );
+
+      return unsubscribe;
+    } catch (err) {
+      console.error("Error setting up token subscription:", err);
+      setError(
+        err instanceof Error ? err.message : "Failed to setup subscription"
+      );
+      setLoading(false);
     }
+  }, [
+    queryConstraints,
+    searchQuery,
+    filterBy,
+    sortBy,
+    sortDirection,
+    enableRealtime,
+  ]);
 
-    // Apply goal reached filter (client-side)
-    if (filterBy === FilterBy.GOAL_REACHED) {
-      result = result.filter((token) => {
-        const collateral = parseFloat(token.statistics.collateral);
-        const goal = parseFloat(token.fundingGoal);
-        return goal > 0 && collateral / goal >= 0.8; // 80% or more
-      });
-    }
-
-    // Apply client-side sorting for fields not supported by Firestore ordering
-    if (sortBy === SortBy.NAME || sortBy === SortBy.SYMBOL) {
-      result.sort((a, b) => {
-        const aValue = sortBy === SortBy.NAME ? a.name : a.symbol;
-        const bValue = sortBy === SortBy.NAME ? b.name : b.symbol;
-        const comparison = aValue.localeCompare(bValue);
-        return sortDirection === SortDirection.ASC ? comparison : -comparison;
-      });
-    }
-
-    // Handle complex sorting that couldn't be done in Firestore
-    if (filterBy === FilterBy.NEW && sortBy !== SortBy.NEWEST) {
-      if (sortBy === SortBy.PRICE) {
-        result.sort((a, b) => {
-          const aPrice = parseFloat(a.currentPrice);
-          const bPrice = parseFloat(b.currentPrice);
-          return sortDirection === SortDirection.ASC
-            ? aPrice - bPrice
-            : bPrice - aPrice;
-        });
-      }
-    }
-
-    return result;
-  }, [tokens, searchQuery, sortBy, sortDirection, filterBy]);
-
-  // Helper functions for convenience
-  const getTrendingTokens = useMemo(() => {
-    return tokens
-      .filter((token) => token.statistics.tradeCount > 5)
-      .sort((a, b) => b.statistics.tradeCount - a.statistics.tradeCount)
-      .slice(0, 10);
-  }, [tokens]);
-
-  const getNewTokens = useMemo(() => {
-    const yesterday = Date.now() - 24 * 60 * 60 * 1000;
-    return tokens
-      .filter((token) => new Date(token.createdAt).getTime() > yesterday)
-      .slice(0, 10);
-  }, [tokens]);
-
-  const getTopVolumeTokens = useMemo(() => {
-    return tokens
-      .sort(
-        (a, b) =>
-          parseFloat(b.statistics.volumeETH) -
-          parseFloat(a.statistics.volumeETH)
-      )
-      .slice(0, 10);
-  }, [tokens]);
-
-  const getGoalCloseTokens = useMemo(() => {
-    return tokens
-      .filter((token) => {
-        const collateral = parseFloat(token.statistics.collateral);
-        const goal = parseFloat(token.fundingGoal);
-        return goal > 0 && collateral / goal >= 0.5; // 50% or more
-      })
-      .sort((a, b) => {
-        const aProgress =
-          parseFloat(a.statistics.collateral) / parseFloat(a.fundingGoal);
-        const bProgress =
-          parseFloat(b.statistics.collateral) / parseFloat(b.fundingGoal);
-        return bProgress - aProgress;
-      })
-      .slice(0, 10);
-  }, [tokens]);
-
-  // Manual refresh function
+  // Function to manually refresh tokens
   const refreshTokens = () => {
     setLoading(true);
-    // The onSnapshot will automatically refresh the data
+    setError(null);
+    // The effect will automatically re-run due to dependency changes
   };
 
+  // Return the hook interface
   return {
-    // Main data
-    tokens: filteredAndSortedTokens,
+    tokens,
     loading,
     error,
-
-    // Convenience getters
-    trendingTokens: getTrendingTokens,
-    newTokens: getNewTokens,
-    topVolumeTokens: getTopVolumeTokens,
-    goalCloseTokens: getGoalCloseTokens,
-
-    // Stats
-    totalCount: tokens.length,
-    filteredCount: filteredAndSortedTokens.length,
-
-    // Helper functions
+    totalCount,
     refreshTokens,
-
-    // Raw unfiltered data
-    allTokens: tokens,
-  };
-}
-
-// Lightweight hook for just getting recent tokens (no real-time updates)
-export function useRecentTokens(limit: number = 10) {
-  const { tokens, loading, error } = useTokenList({
-    limitCount: limit,
-    sortBy: SortBy.NEWEST,
-    enableRealtime: true,
-  });
-
-  return {
-    recentTokens: tokens,
-    loading,
-    error,
-  };
-}
-
-// Hook specifically for trending tokens
-export function useTrendingTokens(limit: number = 10) {
-  const { tokens, loading, error } = useTokenList({
-    filterBy: FilterBy.TRENDING,
-    limitCount: limit * 2, // Get more to account for filtering
-  });
-
-  return {
-    trendingTokens: tokens.slice(0, limit),
-    loading,
-    error,
   };
 }

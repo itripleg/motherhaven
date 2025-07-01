@@ -16,6 +16,7 @@ interface StreamlinedStatusCardProps {
   isConnected: boolean;
   tokenExists: boolean;
   refreshKey: number;
+  isLoading: boolean;
 }
 
 export function StreamlinedStatusCard({

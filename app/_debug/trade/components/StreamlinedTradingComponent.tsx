@@ -17,7 +17,10 @@ import {
 } from "lucide-react";
 import { parseEther, formatEther, Address } from "viem";
 import { useBalance, useReadContract, useWriteContract } from "wagmi";
-import { useFactoryContract } from "@/new-hooks/useFactoryContract";
+
+// FINAL-HOOKS: Updated to use consolidated final-hooks
+import { useFactoryContract } from "@/final-hooks/useFactoryContract";
+
 import { FACTORY_ADDRESS, FACTORY_ABI, TOKEN_ABI } from "@/types";
 import { formatTokenPrice } from "@/utils/tokenPriceFormatter";
 
@@ -39,9 +42,17 @@ export function StreamlinedTradingComponent({
   const [buyAmount, setBuyAmount] = useState("1.0");
   const [sellAmount, setSellAmount] = useState("1000");
 
-  const { useCurrentPrice, buyTokens, sellTokens, isWritePending } =
-    useFactoryContract();
+  // FINAL-HOOKS: Use consolidated factory contract hook
+  const {
+    usePrice,
+    buyTokens,
+    sellTokens,
+    isPending: isWritePending,
+  } = useFactoryContract();
   const tokenAddress = token as Address;
+
+  // Get current price using final-hooks
+  const { price: currentPrice, priceFormatted } = usePrice(tokenAddress);
 
   // Balances
   const { data: avaxBalance } = useBalance({
@@ -51,9 +62,6 @@ export function StreamlinedTradingComponent({
     address: userAddress as Address,
     token: tokenAddress,
   });
-
-  // Current price for reference
-  const { data: currentPrice } = useCurrentPrice(tokenAddress);
 
   // Buy calculations - tokens you'll receive
   const { data: tokensForEthData } = useReadContract({
@@ -96,7 +104,8 @@ export function StreamlinedTradingComponent({
   });
 
   const needsApproval = useMemo(() => {
-    if (!sellAmount || !allowance) return false;
+    if (!sellAmount || !allowance || typeof allowance !== "bigint")
+      return false;
     try {
       return parseEther(sellAmount) > allowance;
     } catch {
@@ -104,7 +113,7 @@ export function StreamlinedTradingComponent({
     }
   }, [sellAmount, allowance]);
 
-  // Trading functions
+  // FINAL-HOOKS: Updated trading functions to use final-hooks
   const handleBuy = () => buyTokens(tokenAddress, buyAmount);
   const handleSell = () => sellTokens(tokenAddress, sellAmount);
   const handleApprove = () => {
@@ -135,32 +144,33 @@ export function StreamlinedTradingComponent({
 
   return (
     <div className="space-y-6">
-      {/* Quick Stats */}
-      <Card>
+      {/* Quick Stats using final-hooks */}
+      <Card className="border-green-200 bg-green-50/30 dark:bg-green-950/20">
         <CardHeader>
           <CardTitle className="flex items-center gap-2">
             <Wallet className="h-5 w-5 text-blue-500" />
-            Current Status
+            Current Status (Final-Hooks)
+            <Badge variant="outline" className="text-green-600">
+              final-hooks ✓
+            </Badge>
           </CardTitle>
         </CardHeader>
         <CardContent>
           <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-            <div className="text-center p-3 bg-muted rounded">
+            <div className="text-center p-3 bg-background rounded border">
               <div className="text-sm text-muted-foreground">Current Price</div>
               <div className="text-lg font-mono">
-                {typeof currentPrice === "bigint"
-                  ? formatTokenPrice(formatEther(currentPrice))
-                  : "Loading..."}{" "}
-                AVAX
+                {priceFormatted || "Loading..."} AVAX
               </div>
+              <div className="text-xs text-green-600">via usePrice</div>
             </div>
-            <div className="text-center p-3 bg-muted rounded">
+            <div className="text-center p-3 bg-background rounded border">
               <div className="text-sm text-muted-foreground">Your AVAX</div>
               <div className="text-lg font-mono">
                 {formatEther(avaxBalance?.value ?? 0n)}
               </div>
             </div>
-            <div className="text-center p-3 bg-muted rounded">
+            <div className="text-center p-3 bg-background rounded border">
               <div className="text-sm text-muted-foreground">Your Tokens</div>
               <div className="text-lg font-mono">
                 {formatEther(tokenBalance?.value ?? 0n)}
@@ -178,6 +188,9 @@ export function StreamlinedTradingComponent({
             <CardTitle className="flex items-center gap-2 text-green-600">
               <TrendingUp className="h-5 w-5" />
               Buy Tokens
+              <Badge variant="outline" className="text-xs">
+                final-hooks
+              </Badge>
             </CardTitle>
           </CardHeader>
           <CardContent className="space-y-4">
@@ -253,6 +266,9 @@ export function StreamlinedTradingComponent({
             <CardTitle className="flex items-center gap-2 text-red-600">
               <TrendingDown className="h-5 w-5" />
               Sell Tokens
+              <Badge variant="outline" className="text-xs">
+                final-hooks
+              </Badge>
             </CardTitle>
           </CardHeader>
           <CardContent className="space-y-4">
@@ -357,10 +373,31 @@ export function StreamlinedTradingComponent({
                   ? "Approving tokens..."
                   : "Transaction in progress..."}
               </span>
+              <Badge variant="outline" className="text-blue-600">
+                final-hooks
+              </Badge>
             </div>
           </CardContent>
         </Card>
       )}
+
+      {/* Final-Hooks Benefits */}
+      <Card className="bg-green-50 dark:bg-green-950/20 border-green-200">
+        <CardContent className="p-4">
+          <h5 className="font-medium text-green-700 dark:text-green-400 mb-2">
+            ✅ Final-Hooks Trading Benefits:
+          </h5>
+          <div className="text-sm text-green-600 dark:text-green-300 space-y-1">
+            <div>• Single hook for all factory contract interactions</div>
+            <div>
+              • Consistent price formatting across buy/sell calculations
+            </div>
+            <div>• Consolidated write functions (buyTokens, sellTokens)</div>
+            <div>• Built-in transaction state management</div>
+            <div>• Reduced import complexity and better error handling</div>
+          </div>
+        </CardContent>
+      </Card>
     </div>
   );
 }

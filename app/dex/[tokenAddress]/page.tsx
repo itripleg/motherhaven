@@ -1,7 +1,6 @@
 "use client";
 import React from "react";
 import TokenPage from "../components/TokenPage";
-import { TokenProvider } from "@/contexts/TokenContext";
 import { useParams } from "next/navigation";
 import { useFactoryConfigContext } from "@/contexts/FactoryConfigProvider";
 
@@ -31,9 +30,7 @@ function PageWrapper({}: Props) {
 
   return (
     <div>
-      <TokenProvider>
-        <TokenPage tokenAddress={tokenAddress as string} />
-      </TokenProvider>
+      <TokenPage tokenAddress={tokenAddress as string} />
     </div>
   );
 }
