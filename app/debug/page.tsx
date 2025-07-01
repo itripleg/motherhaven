@@ -19,8 +19,9 @@ import {
   CheckCircle,
 } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
+import { DebugTestRunner } from "./components/DebugTestRunner";
 
-const DEFAULT_TEST_TOKEN = "0xcb29808987d58170d5b954e692e778799b54dd2d";
+const DEFAULT_TEST_TOKEN = "0x1193ccc14edf32ec3a785e0c62115f243d22bec3";
 
 const DEBUG_SECTIONS = [
   {
@@ -271,6 +272,11 @@ export default function DebugMainPage() {
           </div>
         </CardContent>
       </Card>
+
+      {/* Debug Test Runner */}
+      <DebugTestRunner
+        testToken={isValidAddress ? testTokenAddress : undefined}
+      />
 
       {/* Debug Sections */}
       <div className="grid gap-6">
