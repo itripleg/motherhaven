@@ -1,6 +1,6 @@
+// types/token.ts - Updated Token interface
 import { Address } from "viem";
 
-// /types/token.ts
 export enum TokenState {
   NOT_CREATED = 0,
   TRADING = 1,
@@ -42,7 +42,7 @@ export interface Token {
   name: string;
   symbol: string;
   imageUrl: string;
-  description: string;
+  description?: string; // ✅ NOW OPTIONAL - can be populated from frontend or left empty
 
   // Contract parameters from Token contract
   creator: `0x${string}`;
@@ -90,7 +90,7 @@ export interface Token {
 export interface TokenCreationInfo {
   name: string;
   ticker: string;
-  description: string;
+  description: string; // Keep required in form - will be stored when user creates via frontend
   image: File | null;
   imagePosition: ImagePosition;
   burnManager?: `0x${string}`;
@@ -119,14 +119,7 @@ export interface TokenUpdateLog {
   ipAddress?: string; // Optional for analytics
 }
 
-// DEPRECATED: Interface for components that still expect currentPrice
-// This interface should be used temporarily during migration
-// Remove this once all components are updated to use price hooks
-export interface LegacyTokenWithPrice extends Token {
-  currentPrice?: string; // Optional for backwards compatibility during migration
-}
-
-// Type guards for runtime validation
+// Type guards remain the same
 export const isValidImagePosition = (
   position: any
 ): position is ImagePosition => {
@@ -170,7 +163,6 @@ export const DEFAULT_IMAGE_POSITION: ImagePosition = {
   fit: "cover",
 };
 
-// Utility functions
 export const createImagePosition = (
   x: number = 0,
   y: number = 0,
@@ -245,20 +237,4 @@ export const canEditToken = (token: Token, userAddress?: string): boolean => {
     token.creator &&
     userAddress.toLowerCase() === token.creator.toLowerCase()
   );
-};
-
-// Migration helper: Add currentPrice to token data for components that need it
-// This should be used temporarily during the migration process
-export const addCurrentPriceToToken = (
-  token: Token,
-  currentPrice: string
-): LegacyTokenWithPrice => ({
-  ...token,
-  currentPrice,
-});
-
-// Utility to check if a token has legacy price data
-export const hasLegacyPrice = (token: any): token is LegacyTokenWithPrice => {
-  // @ts-expect-error checking for legacy
-  return isValidToken(token) && typeof token.currentPrice === "string";
 };

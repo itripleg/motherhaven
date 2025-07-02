@@ -14,7 +14,122 @@ import {
 } from "@/types";
 
 // Import from the updated contracts types
-import { FACTORY_ADDRESS, FACTORY_EVENTS } from "@/types/contracts";
+import {
+  FACTORY_ADDRESS,
+  FACTORY_EVENTS,
+  FACTORY_ABI,
+} from "@/types/contracts";
+import { createPublicClient, http } from "viem";
+import { avalancheFuji } from "viem/chains";
+
+// Create a public client to read contract constants
+const publicClient = createPublicClient({
+  chain: avalancheFuji, // Adjust based on your network
+  transport: http(
+    process.env.NEXT_PUBLIC_RPC_URL ||
+      "https://api.avax-test.network/ext/bc/C/rpc"
+  ),
+});
+
+// Cache for factory constants to avoid repeated contract calls
+let factoryConstants: any = null;
+
+async function getFactoryConstants() {
+  if (factoryConstants) return factoryConstants;
+
+  try {
+    console.log("📡 Reading factory constants from contract...");
+
+    // Read all constants from the contract
+    const [
+      decimals,
+      maxSupply,
+      initialMint,
+      initialPrice,
+      minPurchase,
+      maxPurchase,
+      maxWalletPercentage,
+      priceRate,
+      tradingFee,
+    ] = await Promise.all([
+      publicClient.readContract({
+        address: FACTORY_ADDRESS,
+        abi: FACTORY_ABI,
+        functionName: "DECIMALS",
+      }),
+      publicClient.readContract({
+        address: FACTORY_ADDRESS,
+        abi: FACTORY_ABI,
+        functionName: "MAX_SUPPLY",
+      }),
+      publicClient.readContract({
+        address: FACTORY_ADDRESS,
+        abi: FACTORY_ABI,
+        functionName: "INITIAL_MINT",
+      }),
+      publicClient.readContract({
+        address: FACTORY_ADDRESS,
+        abi: FACTORY_ABI,
+        functionName: "INITIAL_PRICE",
+      }),
+      publicClient.readContract({
+        address: FACTORY_ADDRESS,
+        abi: FACTORY_ABI,
+        functionName: "MIN_PURCHASE",
+      }),
+      publicClient.readContract({
+        address: FACTORY_ADDRESS,
+        abi: FACTORY_ABI,
+        functionName: "MAX_PURCHASE",
+      }),
+      publicClient.readContract({
+        address: FACTORY_ADDRESS,
+        abi: FACTORY_ABI,
+        functionName: "MAX_WALLET_PERCENTAGE",
+      }),
+      publicClient.readContract({
+        address: FACTORY_ADDRESS,
+        abi: FACTORY_ABI,
+        functionName: "PRICE_RATE",
+      }),
+      publicClient.readContract({
+        address: FACTORY_ADDRESS,
+        abi: FACTORY_ABI,
+        functionName: "TRADING_FEE",
+      }),
+    ]);
+
+    // Cache the constants (formatted as strings for consistency)
+    factoryConstants = {
+      decimals: (decimals as bigint).toString(),
+      maxSupply: (maxSupply as bigint).toString(),
+      initialMint: (initialMint as bigint).toString(),
+      initialPrice: formatEther(initialPrice as bigint),
+      minPurchase: formatEther(minPurchase as bigint),
+      maxPurchase: formatEther(maxPurchase as bigint),
+      maxWalletPercentage: Number(maxWalletPercentage as bigint),
+      priceRate: (priceRate as bigint).toString(),
+      tradingFee: Number(tradingFee as bigint),
+    };
+
+    console.log("✅ Factory constants loaded:", factoryConstants);
+    return factoryConstants;
+  } catch (error) {
+    console.error("❌ Failed to read factory constants:", error);
+    // Fallback to hardcoded values if contract read fails
+    return {
+      decimals: "1000000000000000000",
+      maxSupply: "1000000000000000000000000000",
+      initialMint: "200000000000000000000000000",
+      initialPrice: "0.00001",
+      minPurchase: "0.00001",
+      maxPurchase: "50",
+      maxWalletPercentage: 5,
+      priceRate: "2000",
+      tradingFee: 30,
+    };
+  }
+}
 
 // Collection names
 const COLLECTIONS = {
@@ -46,6 +161,9 @@ async function handleTokenCreated(
   console.log("Transaction Hash:", transactionHash);
 
   try {
+    // Get factory constants from contract
+    const constants = await getFactoryConstants();
+
     const tokenData = {
       address: tokenAddress,
       name: args.name,
@@ -57,12 +175,23 @@ async function handleTokenCreated(
       fundingGoal,
       createdAt: timestamp,
       currentState: TokenState.TRADING,
-      collateral: "0", // Keep as string for consistency
-      virtualSupply: "200000000000000000000000000", // INITIAL_MINT from contract (20% of 1B * 18 decimals)
-      totalSupply: "200000000000000000000000000", // Initially same as virtualSupply
-      lastPrice: "0.00001", // INITIAL_PRICE from contract
+      collateral: "0",
+      virtualSupply: constants.initialMint, // Use contract value
+      totalSupply: constants.initialMint, // Initially same as virtualSupply
+      lastPrice: constants.initialPrice, // Use contract INITIAL_PRICE
+
+      // Factory constants (from contract - matches your Token interface)
+      decimals: constants.decimals,
+      maxSupply: constants.maxSupply,
+      initialMint: constants.initialMint,
+      initialPrice: constants.initialPrice,
+      minPurchase: constants.minPurchase,
+      maxPurchase: constants.maxPurchase,
+      maxWalletPercentage: constants.maxWalletPercentage,
+      priceRate: constants.priceRate,
+      tradingFee: constants.tradingFee,
+
       statistics: {
-        totalSupply: "0",
         currentPrice: "0",
         volumeETH: "0",
         tradeCount: 0,
@@ -187,6 +316,18 @@ async function handleTokenTrade(
     const currentCollateral = parseFloat(currentData.collateral || "0");
     const currentVolume = parseFloat(currentData.statistics?.volumeETH || "0");
     const currentTradeCount = currentData.statistics?.tradeCount || 0;
+    const currentUniqueHolders = currentData.statistics?.uniqueHolders || 0;
+
+    // Track unique holders - simple approach: collect all unique trader addresses
+    const existingHolders = currentData.uniqueTraders || [];
+    const traderLower = trader.toLowerCase();
+    const isNewHolder = !existingHolders.includes(traderLower);
+    const newUniqueHolders = isNewHolder
+      ? currentUniqueHolders + 1
+      : currentUniqueHolders;
+    const updatedHolders = isNewHolder
+      ? [...existingHolders, traderLower]
+      : existingHolders;
 
     // Calculate new values
     const ethAmountNum = parseFloat(formattedEthAmount);
@@ -199,14 +340,14 @@ async function handleTokenTrade(
 
     // Update token with consistent data structure
     const tokenUpdateData = {
-      collateral: newCollateral.toString(), // Keep as string
-      lastPrice: pricePerToken, // Update lastPrice to match Token interface
+      collateral: newCollateral.toString(),
+      lastPrice: pricePerToken,
+      uniqueTraders: updatedHolders, // Track for uniqueHolders calculation
       statistics: {
-        totalSupply: currentData.statistics?.totalSupply || "0",
-        currentPrice: pricePerToken, // Update current price to latest trade price
-        volumeETH: newVolume.toString(), // Keep as string
+        currentPrice: pricePerToken,
+        volumeETH: newVolume.toString(),
         tradeCount: newTradeCount,
-        uniqueHolders: currentData.statistics?.uniqueHolders || 0,
+        uniqueHolders: newUniqueHolders,
       },
       lastTrade: {
         price: pricePerToken,
