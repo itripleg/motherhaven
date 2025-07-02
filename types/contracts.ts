@@ -17,7 +17,7 @@ export const ADDRESSES = {
     FACTORY: "0x0000000000000000000000000000000000000000" as Address,
   },
   TESTNET: {
-    FACTORY: process.env.NEXT_PUBLIC_TESTNET_FACTORY_ADDRESS as Address, // Fixed: was "Factory"
+    FACTORY: process.env.NEXT_PUBLIC_TESTNET_FACTORY_ADDRESS as Address,
   },
 } as const;
 
@@ -32,6 +32,31 @@ export const FAUCET_ADDRESS = "0x0B50C987D357a8000FCD88f7eC6D35A88775AfD2";
 // Network info
 export const CURRENT_NETWORK = process.env.NEXT_PUBLIC_NETWORK || "testnet";
 export const IS_TESTNET = CURRENT_NETWORK === "testnet";
+
+// =================================================================
+//                    FACTORY CONSTANTS
+// =================================================================
+// These are immutable constants from the TokenFactory contract
+// Keep these in sync with your contract if you ever redeploy
+
+export const FACTORY_CONSTANTS = {
+  // Core constants (match contract exactly)
+  DECIMALS: "1000000000000000000", // 10^18
+  MAX_SUPPLY: "1000000000000000000000000000", // 1 billion * 10^18
+  INITIAL_MINT: "200000000000000000000000000", // 20% of MAX_SUPPLY
+  INITIAL_PRICE: "0.00001", // 0.00001 ether
+  MIN_PURCHASE: "0.00001", // INITIAL_PRICE
+  MAX_PURCHASE: "50", // 50 ether
+  MAX_WALLET_PERCENTAGE: 5, // 5%
+  PRICE_RATE: "2000", // Bonding curve steepness
+  TRADING_FEE: 30, // 30 basis points (0.3%)
+
+  // Derived values for convenience
+  DEFAULT_FUNDING_GOAL: "25", // 25 ether (can be changed by owner)
+} as const;
+
+// Type for factory constants
+export type FactoryConstants = typeof FACTORY_CONSTANTS;
 
 // Helper functions
 export function getContractAddresses(): Record<string, Address> {

@@ -17,119 +17,8 @@ import {
 import {
   FACTORY_ADDRESS,
   FACTORY_EVENTS,
-  FACTORY_ABI,
+  FACTORY_CONSTANTS,
 } from "@/types/contracts";
-import { createPublicClient, http } from "viem";
-import { avalancheFuji } from "viem/chains";
-
-// Create a public client to read contract constants
-const publicClient = createPublicClient({
-  chain: avalancheFuji, // Adjust based on your network
-  transport: http(
-    process.env.NEXT_PUBLIC_RPC_URL ||
-      "https://api.avax-test.network/ext/bc/C/rpc"
-  ),
-});
-
-// Cache for factory constants to avoid repeated contract calls
-let factoryConstants: any = null;
-
-async function getFactoryConstants() {
-  if (factoryConstants) return factoryConstants;
-
-  try {
-    console.log("📡 Reading factory constants from contract...");
-
-    // Read all constants from the contract
-    const [
-      decimals,
-      maxSupply,
-      initialMint,
-      initialPrice,
-      minPurchase,
-      maxPurchase,
-      maxWalletPercentage,
-      priceRate,
-      tradingFee,
-    ] = await Promise.all([
-      publicClient.readContract({
-        address: FACTORY_ADDRESS,
-        abi: FACTORY_ABI,
-        functionName: "DECIMALS",
-      }),
-      publicClient.readContract({
-        address: FACTORY_ADDRESS,
-        abi: FACTORY_ABI,
-        functionName: "MAX_SUPPLY",
-      }),
-      publicClient.readContract({
-        address: FACTORY_ADDRESS,
-        abi: FACTORY_ABI,
-        functionName: "INITIAL_MINT",
-      }),
-      publicClient.readContract({
-        address: FACTORY_ADDRESS,
-        abi: FACTORY_ABI,
-        functionName: "INITIAL_PRICE",
-      }),
-      publicClient.readContract({
-        address: FACTORY_ADDRESS,
-        abi: FACTORY_ABI,
-        functionName: "MIN_PURCHASE",
-      }),
-      publicClient.readContract({
-        address: FACTORY_ADDRESS,
-        abi: FACTORY_ABI,
-        functionName: "MAX_PURCHASE",
-      }),
-      publicClient.readContract({
-        address: FACTORY_ADDRESS,
-        abi: FACTORY_ABI,
-        functionName: "MAX_WALLET_PERCENTAGE",
-      }),
-      publicClient.readContract({
-        address: FACTORY_ADDRESS,
-        abi: FACTORY_ABI,
-        functionName: "PRICE_RATE",
-      }),
-      publicClient.readContract({
-        address: FACTORY_ADDRESS,
-        abi: FACTORY_ABI,
-        functionName: "TRADING_FEE",
-      }),
-    ]);
-
-    // Cache the constants (formatted as strings for consistency)
-    factoryConstants = {
-      decimals: (decimals as bigint).toString(),
-      maxSupply: (maxSupply as bigint).toString(),
-      initialMint: (initialMint as bigint).toString(),
-      initialPrice: formatEther(initialPrice as bigint),
-      minPurchase: formatEther(minPurchase as bigint),
-      maxPurchase: formatEther(maxPurchase as bigint),
-      maxWalletPercentage: Number(maxWalletPercentage as bigint),
-      priceRate: (priceRate as bigint).toString(),
-      tradingFee: Number(tradingFee as bigint),
-    };
-
-    console.log("✅ Factory constants loaded:", factoryConstants);
-    return factoryConstants;
-  } catch (error) {
-    console.error("❌ Failed to read factory constants:", error);
-    // Fallback to hardcoded values if contract read fails
-    return {
-      decimals: "1000000000000000000",
-      maxSupply: "1000000000000000000000000000",
-      initialMint: "200000000000000000000000000",
-      initialPrice: "0.00001",
-      minPurchase: "0.00001",
-      maxPurchase: "50",
-      maxWalletPercentage: 5,
-      priceRate: "2000",
-      tradingFee: 30,
-    };
-  }
-}
 
 // Collection names
 const COLLECTIONS = {
@@ -161,38 +50,35 @@ async function handleTokenCreated(
   console.log("Transaction Hash:", transactionHash);
 
   try {
-    // Get factory constants from contract
-    const constants = await getFactoryConstants();
-
     const tokenData = {
       address: tokenAddress,
       name: args.name,
       symbol: args.symbol,
       imageUrl: args.imageUrl,
-      description: "", // Add missing field from Token interface
+      // description is now optional - don't set empty string
       creator: creatorAddress,
       burnManager: args.burnManager,
       fundingGoal,
       createdAt: timestamp,
       currentState: TokenState.TRADING,
       collateral: "0",
-      virtualSupply: constants.initialMint, // Use contract value
-      totalSupply: constants.initialMint, // Initially same as virtualSupply
-      lastPrice: constants.initialPrice, // Use contract INITIAL_PRICE
+      virtualSupply: FACTORY_CONSTANTS.INITIAL_MINT, // Use constants directly
+      totalSupply: FACTORY_CONSTANTS.INITIAL_MINT, // Initially same as virtualSupply
+      lastPrice: FACTORY_CONSTANTS.INITIAL_PRICE, // Use INITIAL_PRICE
 
-      // Factory constants (from contract - matches your Token interface)
-      decimals: constants.decimals,
-      maxSupply: constants.maxSupply,
-      initialMint: constants.initialMint,
-      initialPrice: constants.initialPrice,
-      minPurchase: constants.minPurchase,
-      maxPurchase: constants.maxPurchase,
-      maxWalletPercentage: constants.maxWalletPercentage,
-      priceRate: constants.priceRate,
-      tradingFee: constants.tradingFee,
+      // Factory constants (from types/contracts.ts - matches your Token interface)
+      decimals: FACTORY_CONSTANTS.DECIMALS,
+      maxSupply: FACTORY_CONSTANTS.MAX_SUPPLY,
+      initialMint: FACTORY_CONSTANTS.INITIAL_MINT,
+      initialPrice: FACTORY_CONSTANTS.INITIAL_PRICE,
+      minPurchase: FACTORY_CONSTANTS.MIN_PURCHASE,
+      maxPurchase: FACTORY_CONSTANTS.MAX_PURCHASE,
+      maxWalletPercentage: FACTORY_CONSTANTS.MAX_WALLET_PERCENTAGE,
+      priceRate: FACTORY_CONSTANTS.PRICE_RATE,
+      tradingFee: FACTORY_CONSTANTS.TRADING_FEE,
 
       statistics: {
-        currentPrice: "0",
+        currentPrice: FACTORY_CONSTANTS.INITIAL_PRICE, // Start with initial price, not "0"
         volumeETH: "0",
         tradeCount: 0,
         uniqueHolders: 0,
@@ -344,7 +230,7 @@ async function handleTokenTrade(
       lastPrice: pricePerToken,
       uniqueTraders: updatedHolders, // Track for uniqueHolders calculation
       statistics: {
-        currentPrice: pricePerToken,
+        currentPrice: pricePerToken, // Same as lastPrice - both represent the most recent trade average
         volumeETH: newVolume.toString(),
         tradeCount: newTradeCount,
         uniqueHolders: newUniqueHolders,
