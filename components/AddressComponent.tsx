@@ -29,9 +29,9 @@ export function AddressComponent({ hash, type }: TransactionHashProps) {
   }, []);
 
   // Debug logging to see what hash we're getting
-  useEffect(() => {
-    console.log("AddressComponent received:", { hash, type });
-  }, [hash, type]);
+  // useEffect(() => {
+  //   console.log("AddressComponent received:", { hash, type });
+  // }, [hash, type]);
 
   // Validate hash before using it
   const isValidHash =

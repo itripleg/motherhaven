@@ -33,7 +33,7 @@ export function useTrades(tokenAddress?: Address, limitCount = 100) {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
-  // Subscribe to Firestore trades
+  // Subscribe to Firestore trades - simple and clean
   useEffect(() => {
     if (!tokenAddress) {
       setLoading(false);
@@ -81,44 +81,6 @@ export function useTrades(tokenAddress?: Address, limitCount = 100) {
 
     return () => unsubscribe();
   }, [tokenAddress, limitCount]);
-
-  // Listen for optimistic updates from EventWatcher
-  useEffect(() => {
-    if (!tokenAddress) return;
-
-    const handleOptimisticUpdate = (event: any) => {
-      if (!["TokensPurchased", "TokensSold"].includes(event.eventName)) return;
-
-      // Create optimistic trade
-      const optimisticTrade: Trade = {
-        trader: event.data.trader,
-        token: tokenAddress,
-        type: event.eventName === "TokensPurchased" ? "buy" : "sell",
-        ethAmount: event.data.ethAmount?.toString() || "0",
-        tokenAmount: event.data.tokenAmount?.toString() || "0",
-        pricePerToken: event.data.price?.toString() || "0",
-        timestamp: new Date().toISOString(),
-        transactionHash:
-          event.data.transactionHash || `optimistic_${Date.now()}`,
-        blockNumber: 0,
-      };
-
-      // Add to top of trades list temporarily
-      setTrades((prev) => [optimisticTrade, ...prev]);
-    };
-
-    tokenEventEmitter.addEventListener(
-      tokenAddress.toLowerCase(),
-      handleOptimisticUpdate
-    );
-
-    return () => {
-      tokenEventEmitter.removeEventListener(
-        tokenAddress.toLowerCase(),
-        handleOptimisticUpdate
-      );
-    };
-  }, [tokenAddress]);
 
   // Calculate analytics
   const analytics = useMemo((): TradeAnalytics => {

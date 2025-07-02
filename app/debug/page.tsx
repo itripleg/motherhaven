@@ -3,6 +3,7 @@
 "use client";
 
 import React, { Suspense } from "react";
+import { useSearchParams } from "next/navigation";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -106,19 +107,49 @@ function DebugMainLoading() {
   );
 }
 
-// Main content component - no search params here
+// Main content component that uses search params
 function DebugMainContent() {
+  const searchParams = useSearchParams();
   const [testTokenAddress, setTestTokenAddress] =
     React.useState(DEFAULT_TEST_TOKEN);
   const [isValidAddress, setIsValidAddress] = React.useState(true);
   const [copiedAddress, setCopiedAddress] = React.useState(false);
+  const [mounted, setMounted] = React.useState(false);
   const { address: userAddress } = useAccount();
   const { toast } = useToast();
 
-  // Validate address on change
+  // Handle hydration and URL sync
+  React.useEffect(() => {
+    setMounted(true);
+
+    // Get token from URL params on mount
+    const tokenParam = searchParams.get("token");
+    if (tokenParam) {
+      setTestTokenAddress(tokenParam);
+      setIsValidAddress(isAddress(tokenParam));
+    } else {
+      // If no token in URL, set the default token in URL
+      const url = new URL(window.location.href);
+      url.searchParams.set("token", DEFAULT_TEST_TOKEN);
+      window.history.replaceState({}, "", url.toString());
+    }
+  }, [searchParams]);
+
+  // Validate address on change and update URL
   const handleAddressChange = (value: string) => {
     setTestTokenAddress(value);
     setIsValidAddress(!value || isAddress(value));
+
+    // Update URL without page reload
+    if (mounted) {
+      const url = new URL(window.location.href);
+      if (value && isAddress(value)) {
+        url.searchParams.set("token", value);
+      } else {
+        url.searchParams.delete("token");
+      }
+      window.history.replaceState({}, "", url.toString());
+    }
   };
 
   const copyToClipboard = async (text: string) => {

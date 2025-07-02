@@ -1,3 +1,4 @@
+// app/dex/components/charts/RechartsLineChart.tsx
 "use client";
 import React, { useMemo } from "react";
 import {
@@ -25,6 +26,7 @@ interface ChartPoint {
   price: number;
   formattedPrice: string;
   timeLabel: string;
+  timestamp: number; // Add timestamp for proper sorting
 }
 
 // Props for the main component
@@ -37,15 +39,19 @@ interface RechartsLineChartProps {
 // A custom tooltip component for the chart
 const CustomTooltip = ({ active, payload, label }: any) => {
   if (active && payload && payload.length) {
-    // Get the raw price value and re-format it with our unified formatter
-    const rawPrice = payload[0].value; // This is the numeric price value
-    const consistentFormattedPrice = formatChartPrice(rawPrice); // Use same formatter as Y-axis
+    // Get the formatted price that was already calculated for this data point
+    const dataPoint = payload[0].payload;
+    const formattedPrice = dataPoint.formattedPrice; // Use the pre-calculated formatted price
 
     return (
-      <div className="p-2 bg-gray-800/80 backdrop-blur-sm border border-gray-700 rounded-lg text-white">
-        <p className="label text-sm">{`Price: ${consistentFormattedPrice} AVAX`}</p>
-        <p className="intro text-xs text-gray-400">{`On: ${label}`}</p>
-        <p className="debug text-xs text-gray-500">{`Raw: ${payload[0].payload.formattedPrice}`}</p>
+      <div className="p-3 bg-gray-800/90 backdrop-blur-sm border border-gray-600 rounded-lg text-white shadow-lg">
+        <p className="text-sm font-medium text-gray-300 mb-1">{label}</p>
+        <p className="text-lg font-bold text-green-400">
+          {formattedPrice} AVAX
+        </p>
+        <p className="text-xs text-gray-400 mt-1">
+          📊 Trade avg price (from Firestore)
+        </p>
       </div>
     );
   }
@@ -71,11 +77,10 @@ export default function RechartsLineChart({
 
     const genesisPoint = {
       timestamp: genesisTimestamp,
-      priceInWei: parseUnits(token.initialPrice || "0.00001", 18), // Use initialPrice from token
+      priceInWei: parseUnits(token.initialPrice || "0.00001", 18),
     };
 
     // 2. Process the raw trade data from Firestore
-    // FIXED: Use pricePerToken from trade data instead of calculating our own
     const processedTrades = trades
       .map((trade) => {
         // Safeguard against bad data
@@ -85,8 +90,8 @@ export default function RechartsLineChart({
 
         const tradeTimestamp = parseISO(trade.timestamp).getTime();
 
-        // CRITICAL FIX: Use the pricePerToken that's already stored in the trade
-        // This matches what the factory contract stored in lastPrice mapping
+        // Use the pricePerToken that's already stored in the trade
+        // This should match what the factory contract stored in lastPrice mapping
         const priceInWei = parseUnits(trade.pricePerToken, 18);
 
         return {
@@ -105,13 +110,42 @@ export default function RechartsLineChart({
     );
 
     // 4. Format the sorted points into the final shape for the chart
-    // Using unified formatting for consistency
     return allPoints.map((point) => ({
       price: priceToNumber(point.priceInWei), // Convert to number for chart calculations
       formattedPrice: formatTokenPrice(formatUnits(point.priceInWei, 18)), // Use unified formatting
       timeLabel: format(point.timestamp, "MMM d, h:mm a"),
+      timestamp: point.timestamp, // Keep timestamp for proper sorting
     }));
   }, [trades, token.createdAt, token.initialPrice]);
+
+  // Calculate analytics with proper formatting
+  const analytics = useMemo(() => {
+    if (trades.length === 0) {
+      return {
+        tradeCount: 0,
+        totalVolume: "0.0000",
+        buyPressure: 0,
+      };
+    }
+
+    // Calculate volume in AVAX (not wei)
+    const totalVolumeWei = trades.reduce((sum, trade) => {
+      const ethAmount = parseFloat(trade.ethAmount) || 0;
+      return sum + ethAmount;
+    }, 0);
+
+    // Convert from wei to AVAX and format
+    const totalVolumeAVAX = totalVolumeWei / 1e18;
+
+    const buyTrades = trades.filter((t) => t.type === "buy");
+    const buyPressure = buyTrades.length / trades.length;
+
+    return {
+      tradeCount: trades.length,
+      totalVolume: totalVolumeAVAX.toFixed(4),
+      buyPressure,
+    };
+  }, [trades]);
 
   // The price displayed in the header uses the current live price from unified hook
   const displayPrice = priceLoading ? "Loading..." : currentPrice || "0.000000";
@@ -126,52 +160,97 @@ export default function RechartsLineChart({
 
   return (
     <div className="h-full w-full">
-      <div className="mb-4">
-        <h3 className="text-lg font-bold text-white">
-          {token.symbol} Price History
-        </h3>
-        <p className="text-2xl text-green-400">
-          {displayPrice} AVAX
-          {priceLoading && (
-            <span className="text-sm text-gray-400 ml-2">(Live Price)</span>
-          )}
-        </p>
+      {/* Chart Header */}
+      <div className="mb-3 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2">
+        {" "}
+        {/* Reduced margin bottom */}
+        <div>
+          <h3 className="text-base font-bold text-white">
+            {" "}
+            {/* Slightly smaller text */}
+            {token.symbol} Price History
+          </h3>
+          <p className="text-xl text-green-400">
+            {" "}
+            {/* Slightly smaller text */}
+            {displayPrice} AVAX
+            {priceLoading && (
+              <span className="text-xs text-gray-400 ml-2">
+                🔄 Loading contract.lastPrice...
+              </span>
+            )}
+            {!priceLoading && (
+              <span className="text-xs text-gray-400 ml-2">
+                🔗 contract.lastPrice (most recent trade avg)
+              </span>
+            )}
+          </p>
+        </div>
+        {/* Analytics - Responsive */}
+        <div className="flex flex-wrap items-center gap-4 text-sm text-muted-foreground">
+          <span className="whitespace-nowrap">
+            Trades: {analytics.tradeCount}
+          </span>
+          <span className="whitespace-nowrap">
+            Volume: {analytics.totalVolume} AVAX
+          </span>
+          <span className="whitespace-nowrap">
+            Buy Pressure: {(analytics.buyPressure * 100).toFixed(1)}%
+          </span>
+        </div>
       </div>
+
+      {/* Chart */}
       {chartData.length > 0 ? (
-        <ResponsiveContainer width="100%" height="80%">
-          <LineChart
-            data={chartData}
-            margin={{ top: 5, right: 20, left: -10, bottom: 5 }}
-          >
-            <CartesianGrid strokeDasharray="3 3" strokeOpacity={0.2} />
-            <XAxis
-              dataKey="timeLabel"
-              stroke="#9ca3af"
-              fontSize={12}
-              tickLine={false}
-              axisLine={false}
-            />
-            <YAxis
-              stroke="#9ca3af"
-              fontSize={12}
-              tickLine={false}
-              axisLine={false}
-              // Using unified chart formatting for Y-axis
-              tickFormatter={(value) => formatChartPrice(Number(value))}
-              domain={["dataMin", "dataMax"]}
-            />
-            <Tooltip content={<CustomTooltip />} />
-            <Line
-              type="monotone"
-              dataKey="price"
-              stroke="#4ade80"
-              strokeWidth={2}
-              dot={chartData.length < 50}
-            />
-          </LineChart>
-        </ResponsiveContainer>
+        <div className="h-72 sm:h-80 md:h-96 max-h-96">
+          {" "}
+          {/* Cap at 384px (96 * 4px) */}
+          <ResponsiveContainer width="100%" height="100%">
+            <LineChart
+              data={chartData}
+              margin={{
+                top: 5,
+                right: 10,
+                left: 0,
+                bottom: 5,
+              }}
+            >
+              <CartesianGrid strokeDasharray="3 3" strokeOpacity={0.2} />
+              <XAxis
+                dataKey="timeLabel"
+                stroke="#9ca3af"
+                fontSize={12}
+                tickLine={false}
+                axisLine={false}
+                interval="preserveStartEnd"
+                angle={-45}
+                textAnchor="end"
+                height={60}
+              />
+              <YAxis
+                stroke="#9ca3af"
+                fontSize={12}
+                tickLine={false}
+                axisLine={false}
+                // Use the same formatting as tooltip for consistency
+                tickFormatter={(value) => formatChartPrice(Number(value))}
+                domain={["dataMin", "dataMax"]}
+                width={80} // Fixed width to prevent overflow
+              />
+              <Tooltip content={<CustomTooltip />} />
+              <Line
+                type="monotone"
+                dataKey="price"
+                stroke="#4ade80"
+                strokeWidth={2}
+                dot={chartData.length < 50}
+                activeDot={{ r: 4, stroke: "#4ade80", strokeWidth: 2 }}
+              />
+            </LineChart>
+          </ResponsiveContainer>
+        </div>
       ) : (
-        <div className="flex items-center justify-center h-4/5">
+        <div className="flex items-center justify-center h-72 sm:h-80 md:h-96 max-h-96">
           <p className="text-gray-500">No trade data available.</p>
         </div>
       )}
