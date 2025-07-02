@@ -3,16 +3,24 @@ import React, { useState, useEffect } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Button } from "@/components/ui/button";
-import { Slider } from "@/components/ui/slider";
 import { AddressComponent } from "@/components/AddressComponent";
 import { BuyTokenForm } from "./BuyTokenForm";
 import { SellTokenForm } from "./SellTokenForm";
-import { TokenData, TokenState } from "@/types";
+import { Token, TokenState } from "@/types";
 import { useConnect, useBalance, useAccount } from "wagmi";
 import { tokenEventEmitter } from "@/components/EventWatcher";
+import { useUnifiedTokenPrice } from "@/final-hooks/useUnifiedTokenPrice";
+import { useFactoryContract } from "@/final-hooks/useFactoryContract";
+import { SlippageTolerance } from "./SlippageTolerance";
+import {
+  getPriceImpactColor,
+  getPriceImpactWarning,
+} from "@/utils/priceImpactCalculator";
+import { Address, parseEther, formatEther } from "viem";
 
 interface TokenTradeCardProps {
-  tokenData: TokenData;
+  address: string;
+  tokenData: Token;
   isConnected: boolean;
 }
 
@@ -22,32 +30,127 @@ interface TradeEstimation {
 }
 
 export function TokenTradeCard({
+  address,
   tokenData,
   isConnected: isConnectedProp,
 }: TokenTradeCardProps) {
   const { connect, connectors } = useConnect();
-  const { address, isConnected } = useAccount();
+  const { address: userAddress, isConnected } = useAccount();
+
+  // FINAL-HOOKS: Get live price data and contract calculation functions
+  const { formatted: currentPrice, isLoading: priceLoading } =
+    useUnifiedTokenPrice(tokenData?.address as Address);
+
+  const { useCalculateTokens, useCalculateBuyPrice, useCalculateSellPrice } =
+    useFactoryContract();
 
   const effectivelyConnected = isConnected || isConnectedProp;
 
   // State
   const [tradeEstimation, setTradeEstimation] = useState<TradeEstimation>({
     priceImpact: 0,
-    slippage: 10,
+    slippage: 0.5, // Default to 0.5%
   });
+
+  // State for trade calculations
   const [currentAmount, setCurrentAmount] = useState("0");
+  const [currentTradeType, setCurrentTradeType] = useState<"buy" | "sell">(
+    "buy"
+  );
   const [shouldRefresh, setShouldRefresh] = useState(0);
+
+  // Get contract calculations for current trade
+  const { tokenAmount: calculatedTokens, isLoading: buyCalculationLoading } =
+    useCalculateTokens(
+      tokenData?.address as Address,
+      currentTradeType === "buy" && currentAmount !== "0"
+        ? currentAmount
+        : undefined
+    );
+
+  const { ethAmount: calculatedBuyPrice, isLoading: buyPriceLoading } =
+    useCalculateBuyPrice(
+      tokenData?.address as Address,
+      currentTradeType === "buy" && currentAmount !== "0"
+        ? currentAmount
+        : undefined
+    );
+
+  const { ethAmount: calculatedEth, isLoading: sellCalculationLoading } =
+    useCalculateSellPrice(
+      tokenData?.address as Address,
+      currentTradeType === "sell" && currentAmount !== "0"
+        ? currentAmount
+        : undefined
+    );
 
   // AVAX Balance
   const { data: avaxBalance, refetch: refetchAvaxBalance } = useBalance({
-    address: address,
+    address: userAddress,
   });
 
   // Token Balance
   const { data: tokenBalance, refetch: refetchTokenBalance } = useBalance({
-    address: address,
+    address: userAddress,
     token: tokenData?.address as `0x${string}`,
   });
+
+  // Calculate price impact using actual contract functions
+  const calculateRealPriceImpact = (amount: string, isBuy: boolean): number => {
+    if (!amount || amount === "0" || !tokenData) return 0;
+
+    try {
+      const tradeAmount = parseFloat(amount);
+      if (isNaN(tradeAmount) || tradeAmount <= 0) return 0;
+      const currentPriceNum = parseFloat(currentPrice || "0");
+      if (currentPriceNum === 0) return 0;
+
+      if (isBuy) {
+        // For buys: use calculateBuyPrice to get exact ETH cost for the token amount
+        if (!calculatedBuyPrice) return 0;
+
+        const ethCostFromContract = parseFloat(formatEther(calculatedBuyPrice));
+
+        // What user SHOULD pay at current price vs what they ACTUALLY pay
+        const expectedEthCost = tradeAmount * currentPriceNum;
+        const priceImpact =
+          ((ethCostFromContract - expectedEthCost) / expectedEthCost) * 100;
+
+        console.log("Buy Price Impact (Contract calculateBuyPrice):", {
+          tokenAmount: `${tradeAmount} tokens`,
+          currentPrice: currentPriceNum,
+          expectedEthCost: `${expectedEthCost.toFixed(6)} AVAX`,
+          actualEthCost: `${ethCostFromContract} AVAX`,
+          priceImpact: `${priceImpact.toFixed(3)}%`,
+        });
+
+        return Math.max(0, Math.min(95, priceImpact));
+      } else {
+        // For sells: use calculateSellPrice to get exact ETH received
+        if (!calculatedEth) return 0;
+
+        const ethFromContract = parseFloat(formatEther(calculatedEth));
+
+        // What user SHOULD get at current price vs what they ACTUALLY get
+        const expectedEthReceived = tradeAmount * currentPriceNum;
+        const priceImpact =
+          ((expectedEthReceived - ethFromContract) / expectedEthReceived) * 100;
+
+        console.log("Sell Price Impact (Contract calculateSellPrice):", {
+          tradeAmount: `${tradeAmount} tokens`,
+          currentPrice: currentPriceNum,
+          expectedEthReceived: `${expectedEthReceived.toFixed(6)} AVAX`,
+          actualEthReceived: `${ethFromContract} AVAX`,
+          priceImpact: `${priceImpact.toFixed(3)}%`,
+        });
+
+        return Math.max(0, Math.min(95, priceImpact));
+      }
+    } catch (error) {
+      console.error("Error calculating real price impact:", error);
+      return 0;
+    }
+  };
 
   useEffect(() => {
     if (!tokenData?.address) return;
@@ -81,44 +184,38 @@ export function TokenTradeCard({
     }
   }, [shouldRefresh, refetchAvaxBalance, refetchTokenBalance]);
 
-  const slippageValues = [1, 5, 10, 20];
-
   useEffect(() => {
     if (currentAmount && currentAmount !== "0") {
-      const impact = calculatePriceImpact(currentAmount);
+      const impact = calculateRealPriceImpact(
+        currentAmount,
+        currentTradeType === "buy"
+      );
       setTradeEstimation((prev) => ({
         ...prev,
         priceImpact: impact,
       }));
     }
-  }, [tokenData, currentAmount]);
+  }, [
+    tokenData,
+    currentAmount,
+    currentTradeType,
+    calculatedTokens,
+    calculatedBuyPrice,
+    calculatedEth,
+    currentPrice,
+  ]);
 
-  const handleSlippageChange = (value: number[]) => {
-    const index = Math.round((value[0] / 100) * (slippageValues.length - 1));
+  const handleSlippageChange = (value: number) => {
     setTradeEstimation((prev) => ({
       ...prev,
-      slippage: slippageValues[index] || prev.slippage,
+      slippage: value,
     }));
-  };
-
-  const calculatePriceImpact = (amount: string, isBuy: boolean = true) => {
-    if (!amount || !tokenData) return 0;
-    try {
-      const tradeSize = parseFloat(amount);
-      if (isNaN(tradeSize)) return 0;
-
-      const liquidity = tokenData.liquidity || 1000000;
-      const impact = (tradeSize / liquidity) * 100;
-      return Math.min(impact, 100);
-    } catch (error) {
-      console.error("Error calculating price impact:", error);
-      return 0;
-    }
   };
 
   const handleAmountChange = (amount: string, isBuy: boolean) => {
     setCurrentAmount(amount);
-    const impact = calculatePriceImpact(amount, isBuy);
+    setCurrentTradeType(isBuy ? "buy" : "sell");
+    const impact = calculateRealPriceImpact(amount, isBuy);
     setTradeEstimation((prev) => ({
       ...prev,
       priceImpact: impact,
@@ -144,10 +241,10 @@ export function TokenTradeCard({
     balance: any,
     price: number = 0
   ): { amount: string; value: string } => {
-    if (!balance) return { amount: "0.00", value: "0.00" };
+    if (!balance?.formatted) return { amount: "0.00", value: "0.00" };
     try {
-      const amount = formatNumber(balance.formatted || "0");
-      const value = formatNumber(parseFloat(balance.formatted || "0") * price);
+      const amount = formatNumber(balance.formatted);
+      const value = formatNumber(parseFloat(balance.formatted) * price);
       return { amount, value };
     } catch (error) {
       console.error("Error formatting balance:", error);
@@ -155,8 +252,24 @@ export function TokenTradeCard({
     }
   };
 
-  const avaxFormatted = formatBalance(avaxBalance, tokenData?.price || 0);
-  const tokenFormatted = formatBalance(tokenBalance, tokenData?.price || 0);
+  // Safe price parsing with fallbacks
+  const safePrice = (() => {
+    try {
+      if (priceLoading) return 0;
+      if (currentPrice && currentPrice !== "0.000000") {
+        return parseFloat(currentPrice);
+      }
+      if (tokenData.lastPrice && tokenData.lastPrice !== "0") {
+        return parseFloat(tokenData.lastPrice);
+      }
+      return 0;
+    } catch {
+      return 0;
+    }
+  })();
+
+  const avaxFormatted = formatBalance(avaxBalance, 1); // AVAX = 1 AVAX
+  const tokenFormatted = formatBalance(tokenBalance, safePrice);
 
   const renderHaltedState = () => (
     <div className="text-center space-y-6">
@@ -166,7 +279,8 @@ export function TokenTradeCard({
         </h3>
         <p className="text-muted-foreground mb-4">
           This token has successfully reached its funding goal of{" "}
-          {tokenData.fundingGoal} ETH. Trading is now moved to Uniswap.
+          {formatNumber(tokenData.fundingGoal || "0")} AVAX. Trading is now
+          moved to Uniswap.
         </p>
         <div className="flex flex-col items-center gap-2">
           <p className="text-sm text-muted-foreground">
@@ -204,11 +318,17 @@ export function TokenTradeCard({
           <div className="space-y-2">
             <div className="flex justify-between">
               <span>Total Collateral Raised:</span>
-              <span className="font-medium">{tokenData.collateral} ETH</span>
+              <span className="font-medium">
+                {formatNumber(tokenData.collateral || "0")} AVAX
+              </span>
             </div>
             <div className="flex justify-between">
               <span>Final Price:</span>
-              <span className="font-medium">{tokenData.price} ETH</span>
+              <span className="font-medium">
+                {priceLoading
+                  ? "Loading..."
+                  : `${currentPrice || "0.000000"} AVAX`}
+              </span>
             </div>
           </div>
         </div>
@@ -217,10 +337,10 @@ export function TokenTradeCard({
           <div className="space-y-4">
             <div className="p-3 bg-secondary rounded-lg text-center">
               <p className="text-lg font-bold">
-                {tokenFormatted.amount} {tokenData?.symbol}
+                {tokenFormatted.amount} {tokenData?.symbol || "TOKEN"}
               </p>
               <p className="text-sm text-muted-foreground">
-                ≈ ${tokenFormatted.value}
+                ≈ {tokenFormatted.value} AVAX
               </p>
             </div>
           </div>
@@ -237,15 +357,15 @@ export function TokenTradeCard({
           <div className="p-3 bg-secondary rounded-lg text-center">
             <p className="text-lg font-bold">{avaxFormatted.amount} AVAX</p>
             <p className="text-sm text-muted-foreground">
-              ≈ ${avaxFormatted.value}
+              Balance: {avaxFormatted.amount} AVAX
             </p>
           </div>
           <div className="p-3 bg-secondary rounded-lg text-center">
             <p className="text-lg font-bold">
-              {tokenFormatted.amount} {tokenData?.symbol}
+              {tokenFormatted.amount} {tokenData?.symbol || "TOKEN"}
             </p>
             <p className="text-sm text-muted-foreground">
-              ≈ ${tokenFormatted.value}
+              ≈ {tokenFormatted.value} AVAX
             </p>
           </div>
         </div>
@@ -256,36 +376,49 @@ export function TokenTradeCard({
         <div className="space-y-4">
           <div className="p-3 bg-secondary rounded-lg">
             <div className="flex justify-between items-center">
+              <span>Current Price:</span>
+              <span className="font-medium">
+                {priceLoading
+                  ? "Loading..."
+                  : `${currentPrice || "0.000000"} AVAX`}
+              </span>
+            </div>
+          </div>
+
+          {/* Debug info */}
+          <div className="p-2 bg-muted rounded text-xs space-y-1">
+            <div>Collateral: {tokenData.collateral || "0"} AVAX</div>
+            <div>Virtual Supply: {tokenData.virtualSupply || "0"}</div>
+            <div>State: {tokenData.state}</div>
+          </div>
+
+          <div className="p-3 bg-secondary rounded-lg">
+            <div className="flex justify-between items-center">
               <span>Price Impact:</span>
               <span
-                className={
-                  tradeEstimation.priceImpact > 5
-                    ? "text-red-500"
-                    : "text-green-500"
-                }
+                className={getPriceImpactColor(tradeEstimation.priceImpact)}
               >
                 {formatNumber(tradeEstimation.priceImpact)}%
               </span>
             </div>
+            {getPriceImpactWarning(tradeEstimation.priceImpact) && (
+              <div className="text-xs text-yellow-500 mt-1">
+                {getPriceImpactWarning(tradeEstimation.priceImpact)}
+              </div>
+            )}
           </div>
           <div className="p-3 bg-secondary rounded-lg">
-            <div className="flex justify-between items-center mb-2">
+            <div className="flex justify-between items-center mb-3">
               <span>Slippage Tolerance:</span>
-              <span>{formatNumber(tradeEstimation.slippage)}%</span>
-            </div>
-            <div className="pt-2">
-              <Slider
-                defaultValue={[50]}
-                max={100}
-                step={1}
-                onValueChange={handleSlippageChange}
-                className="w-full"
+              <SlippageTolerance
+                value={tradeEstimation.slippage}
+                onChange={handleSlippageChange}
+                disabled={!effectivelyConnected}
               />
-              <div className="flex justify-between text-xs text-muted-foreground mt-1">
-                {slippageValues.map((value) => (
-                  <span key={value}>{value}%</span>
-                ))}
-              </div>
+            </div>
+            <div className="flex items-center gap-1 text-xs text-yellow-600">
+              <span>⚠️</span>
+              <span>UI only - contract protection not yet implemented</span>
             </div>
           </div>
         </div>
@@ -331,19 +464,25 @@ export function TokenTradeCard({
     </div>
   );
 
+  // Safe state checking
+  const isHalted =
+    tokenData?.state === TokenState.GOAL_REACHED ||
+    tokenData?.state === TokenState.HALTED;
+
   return (
     <Card className="w-full p-6">
       <CardHeader className="text-center pb-2 text-lg p-4">
         <CardTitle>
-          Trade {tokenData?.symbol} ({tokenData?.name})
+          Trade {tokenData?.symbol || "TOKEN"} (
+          {tokenData?.name || "Unknown Token"})
         </CardTitle>
       </CardHeader>
-      <AddressComponent hash={tokenData?.address || ""} type="address" />
+      <AddressComponent hash={tokenData?.address || address} type="address" />
 
       <CardContent className="mt-4">
-        {tokenData.currentState === TokenState.HALTED
+        {isHalted
           ? renderHaltedState()
-          : isConnected
+          : effectivelyConnected
           ? renderTradingInterface()
           : renderConnectWallet()}
       </CardContent>

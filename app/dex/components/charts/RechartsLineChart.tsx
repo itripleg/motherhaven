@@ -12,7 +12,8 @@ import {
 import { format, parseISO } from "date-fns";
 import { formatUnits, parseUnits } from "viem";
 import { Token, Trade } from "@/types";
-import { useFactoryContract } from "@/new-hooks/useFactoryContract";
+import { useUnifiedTokenPrice } from "@/final-hooks/useUnifiedTokenPrice";
+import { Address } from "viem";
 import {
   formatTokenPrice,
   formatChartPrice,
@@ -36,10 +37,15 @@ interface RechartsLineChartProps {
 // A custom tooltip component for the chart
 const CustomTooltip = ({ active, payload, label }: any) => {
   if (active && payload && payload.length) {
+    // Get the raw price value and re-format it with our unified formatter
+    const rawPrice = payload[0].value; // This is the numeric price value
+    const consistentFormattedPrice = formatChartPrice(rawPrice); // Use same formatter as Y-axis
+
     return (
       <div className="p-2 bg-gray-800/80 backdrop-blur-sm border border-gray-700 rounded-lg text-white">
-        <p className="label text-sm">{`Price: ${payload[0].payload.formattedPrice} AVAX`}</p>
+        <p className="label text-sm">{`Price: ${consistentFormattedPrice} AVAX`}</p>
         <p className="intro text-xs text-gray-400">{`On: ${label}`}</p>
+        <p className="debug text-xs text-gray-500">{`Raw: ${payload[0].payload.formattedPrice}`}</p>
       </div>
     );
   }
@@ -52,7 +58,9 @@ export default function RechartsLineChart({
   loading,
   token,
 }: RechartsLineChartProps) {
-  const { formatValue } = useFactoryContract();
+  // Get current price using unified price hook for consistency
+  const { formatted: currentPrice, isLoading: priceLoading } =
+    useUnifiedTokenPrice(token.address as Address);
 
   // useMemo will re-calculate the chart data only when its dependencies change
   const chartData: ChartPoint[] = useMemo(() => {
@@ -60,27 +68,26 @@ export default function RechartsLineChart({
     const genesisTimestamp = token.createdAt
       ? parseISO(token.createdAt).getTime()
       : Date.now();
+
     const genesisPoint = {
       timestamp: genesisTimestamp,
-      priceInWei: parseUnits(token.initialPrice, 18),
+      priceInWei: parseUnits(token.initialPrice || "0.00001", 18), // Use initialPrice from token
     };
 
     // 2. Process the raw trade data from Firestore
+    // FIXED: Use pricePerToken from trade data instead of calculating our own
     const processedTrades = trades
       .map((trade) => {
         // Safeguard against bad data
-        if (
-          !trade.tokenAmount ||
-          BigInt(trade.tokenAmount) === 0n ||
-          !trade.timestamp
-        ) {
+        if (!trade.pricePerToken || !trade.timestamp) {
           return null;
         }
 
         const tradeTimestamp = parseISO(trade.timestamp).getTime();
-        const priceInWei =
-          (BigInt(trade.ethAmount) * BigInt(10 ** 18)) /
-          BigInt(trade.tokenAmount);
+
+        // CRITICAL FIX: Use the pricePerToken that's already stored in the trade
+        // This matches what the factory contract stored in lastPrice mapping
+        const priceInWei = parseUnits(trade.pricePerToken, 18);
 
         return {
           timestamp: tradeTimestamp,
@@ -98,19 +105,16 @@ export default function RechartsLineChart({
     );
 
     // 4. Format the sorted points into the final shape for the chart
-    // NOW USING UNIFIED FORMATTING
+    // Using unified formatting for consistency
     return allPoints.map((point) => ({
       price: priceToNumber(point.priceInWei), // Convert to number for chart calculations
       formattedPrice: formatTokenPrice(formatUnits(point.priceInWei, 18)), // Use unified formatting
       timeLabel: format(point.timestamp, "MMM d, h:mm a"),
     }));
-  }, [trades, token]);
+  }, [trades, token.createdAt, token.initialPrice]);
 
-  // The price displayed in the header uses the same unified formatting
-  const displayPrice =
-    chartData.length > 0
-      ? chartData[chartData.length - 1].formattedPrice
-      : formatTokenPrice(formatUnits(parseUnits(token.initialPrice, 18), 18));
+  // The price displayed in the header uses the current live price from unified hook
+  const displayPrice = priceLoading ? "Loading..." : currentPrice || "0.000000";
 
   if (loading) {
     return (
@@ -126,7 +130,12 @@ export default function RechartsLineChart({
         <h3 className="text-lg font-bold text-white">
           {token.symbol} Price History
         </h3>
-        <p className="text-2xl text-green-400">{displayPrice} AVAX</p>
+        <p className="text-2xl text-green-400">
+          {displayPrice} AVAX
+          {priceLoading && (
+            <span className="text-sm text-gray-400 ml-2">(Live Price)</span>
+          )}
+        </p>
       </div>
       {chartData.length > 0 ? (
         <ResponsiveContainer width="100%" height="80%">
@@ -147,7 +156,7 @@ export default function RechartsLineChart({
               fontSize={12}
               tickLine={false}
               axisLine={false}
-              // NOW USING UNIFIED CHART FORMATTING FOR Y-AXIS
+              // Using unified chart formatting for Y-axis
               tickFormatter={(value) => formatChartPrice(Number(value))}
               domain={["dataMin", "dataMax"]}
             />

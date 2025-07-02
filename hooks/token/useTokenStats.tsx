@@ -63,7 +63,7 @@ export function useTokenStats({
       ? [
           {
             ...factoryContract,
-            functionName: "getCurrentPrice",
+            functionName: "lastPrice",
             args: [tokenAddress as `0x${string}`],
           },
           {

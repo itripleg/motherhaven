@@ -30,7 +30,7 @@ import {
   useGameContract,
   GameType,
   GameOutcome,
-} from "@/new-hooks/useGameContract";
+} from "@/final-hooks/useGameContract";
 
 // Types
 interface GameStats {

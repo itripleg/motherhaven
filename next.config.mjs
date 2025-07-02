@@ -10,6 +10,18 @@ const nextConfig = {
       },
     ],
   },
+  // Exclude debug pages from builds
+  async rewrites() {
+    if (process.env.NODE_ENV === "production") {
+      return [
+        {
+          source: "/debug/:path*",
+          destination: "/404",
+        },
+      ];
+    }
+    return [];
+  },
 };
 
 export default nextConfig;

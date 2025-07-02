@@ -14,6 +14,7 @@ export interface ImagePosition {
   y: number; // -100 to 100 (percentage)
   scale: number; // 0.5 to 3
   rotation: number; // -180 to 180 degrees
+  fit?: "cover" | "contain" | "fill"; // Image fit mode
 }
 
 export interface PositionHistoryEntry {
@@ -65,7 +66,7 @@ export interface Token {
 
   // Current state
   state: TokenState;
-  currentPrice: string; // Calculated from contract
+  lastPrice: string;
 
   // On-chain stats
   totalSupply: string;
@@ -118,6 +119,13 @@ export interface TokenUpdateLog {
   ipAddress?: string; // Optional for analytics
 }
 
+// DEPRECATED: Interface for components that still expect currentPrice
+// This interface should be used temporarily during migration
+// Remove this once all components are updated to use price hooks
+export interface LegacyTokenWithPrice extends Token {
+  currentPrice?: string; // Optional for backwards compatibility during migration
+}
+
 // Type guards for runtime validation
 export const isValidImagePosition = (
   position: any
@@ -136,7 +144,8 @@ export const isValidImagePosition = (
     position.scale >= 0.5 &&
     position.scale <= 3 &&
     position.rotation >= -180 &&
-    position.rotation <= 180
+    position.rotation <= 180 &&
+    (!position.fit || ["cover", "contain", "fill"].includes(position.fit))
   );
 };
 
@@ -158,6 +167,7 @@ export const DEFAULT_IMAGE_POSITION: ImagePosition = {
   y: 0,
   scale: 1,
   rotation: 0,
+  fit: "cover",
 };
 
 // Utility functions
@@ -165,12 +175,14 @@ export const createImagePosition = (
   x: number = 0,
   y: number = 0,
   scale: number = 1,
-  rotation: number = 0
+  rotation: number = 0,
+  fit: "cover" | "contain" | "fill" = "cover"
 ): ImagePosition => ({
   x: Math.max(-100, Math.min(100, x)),
   y: Math.max(-100, Math.min(100, y)),
   scale: Math.max(0.5, Math.min(3, scale)),
   rotation: Math.max(-180, Math.min(180, rotation)),
+  fit,
 });
 
 export const clampImagePosition = (
@@ -180,6 +192,7 @@ export const clampImagePosition = (
   y: Math.max(-100, Math.min(100, position.y ?? 0)),
   scale: Math.max(0.5, Math.min(3, position.scale ?? 1)),
   rotation: Math.max(-180, Math.min(180, position.rotation ?? 0)),
+  fit: position.fit ?? "cover",
 });
 
 // CSS style generator for image positioning
@@ -192,13 +205,36 @@ export const getImagePositionStyle = (position?: ImagePosition) => {
     };
   }
 
-  return {
-    backgroundSize: `${100 * position.scale}% ${100 * position.scale}%`,
-    backgroundPosition: `${50 + position.x}% ${50 + position.y}%`,
+  const { x, y, scale, rotation, fit = "cover" } = position;
+
+  const baseStyle = {
     backgroundRepeat: "no-repeat" as const,
-    transform: `rotate(${position.rotation}deg)`,
+    transform: `rotate(${rotation}deg)`,
     transformOrigin: "center center" as const,
     transition: "all 0.2s ease-out" as const,
+  };
+
+  if (fit === "fill") {
+    return {
+      ...baseStyle,
+      backgroundSize: "100% 100%",
+      backgroundPosition: "center",
+    };
+  }
+
+  if (fit === "contain") {
+    return {
+      ...baseStyle,
+      backgroundSize: `${100 * scale}% auto`,
+      backgroundPosition: `${50 + x}% ${50 + y}%`,
+    };
+  }
+
+  // Default to "cover"
+  return {
+    ...baseStyle,
+    backgroundSize: `${100 * scale}% ${100 * scale}%`,
+    backgroundPosition: `${50 + x}% ${50 + y}%`,
   };
 };
 
@@ -209,4 +245,20 @@ export const canEditToken = (token: Token, userAddress?: string): boolean => {
     token.creator &&
     userAddress.toLowerCase() === token.creator.toLowerCase()
   );
+};
+
+// Migration helper: Add currentPrice to token data for components that need it
+// This should be used temporarily during the migration process
+export const addCurrentPriceToToken = (
+  token: Token,
+  currentPrice: string
+): LegacyTokenWithPrice => ({
+  ...token,
+  currentPrice,
+});
+
+// Utility to check if a token has legacy price data
+export const hasLegacyPrice = (token: any): token is LegacyTokenWithPrice => {
+  // @ts-expect-error checking for legacy
+  return isValidToken(token) && typeof token.currentPrice === "string";
 };
