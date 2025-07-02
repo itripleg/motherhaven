@@ -1,7 +1,7 @@
 // /app/api/new-factory-monitor/route.ts
 
 import { NextResponse } from "next/server";
-import { collection, setDoc, doc, increment } from "firebase/firestore";
+import { collection, setDoc, doc, updateDoc, getDoc } from "firebase/firestore";
 import { db } from "@/firebase";
 import { decodeEventLog, formatEther } from "viem";
 import {
@@ -23,7 +23,6 @@ const COLLECTIONS = {
   TRADES: "trades",
 };
 
-// Your existing handler functions remain exactly the same...
 async function handleTokenCreated(
   args: TokenCreatedEvent,
   timestamp: string,
@@ -52,12 +51,16 @@ async function handleTokenCreated(
       name: args.name,
       symbol: args.symbol,
       imageUrl: args.imageUrl,
+      description: "", // Add missing field from Token interface
       creator: creatorAddress,
       burnManager: args.burnManager,
       fundingGoal,
       createdAt: timestamp,
       currentState: TokenState.TRADING,
-      collateral: "0",
+      collateral: "0", // Keep as string for consistency
+      virtualSupply: "200000000000000000000000000", // INITIAL_MINT from contract (20% of 1B * 18 decimals)
+      totalSupply: "200000000000000000000000000", // Initially same as virtualSupply
+      lastPrice: "0.00001", // INITIAL_PRICE from contract
       statistics: {
         totalSupply: "0",
         currentPrice: "0",
@@ -113,7 +116,7 @@ async function handleTokenTrade(
   let formattedTokenAmount: string;
   let formattedEthAmount: string;
   let formattedFee: string;
-  let pricePerToken: number;
+  let pricePerToken: string;
 
   try {
     formattedTokenAmount = formatEther(tokenAmount);
@@ -125,11 +128,14 @@ async function handleTokenTrade(
       throw new Error("Token amount cannot be zero");
     }
 
-    pricePerToken = Number(formattedEthAmount) / tokenAmountNum;
+    const pricePerTokenNum = Number(formattedEthAmount) / tokenAmountNum;
 
-    if (!Number.isFinite(pricePerToken)) {
+    if (!Number.isFinite(pricePerTokenNum)) {
       throw new Error("Invalid price calculation");
     }
+
+    // Keep price as string with full precision
+    pricePerToken = pricePerTokenNum.toString();
   } catch (error: any) {
     console.error("❌ Error processing amounts:", error);
     throw new Error(`Failed to process trade amounts: ${error.message}`);
@@ -145,6 +151,7 @@ async function handleTokenTrade(
   console.log("Price per Token:", pricePerToken);
 
   try {
+    // 1. Create trade document
     const tradeData = {
       type: eventType,
       token: token.toLowerCase(),
@@ -152,7 +159,7 @@ async function handleTokenTrade(
       tokenAmount: tokenAmount.toString(),
       ethAmount: ethAmount.toString(),
       fee: fee.toString(),
-      pricePerToken: pricePerToken.toString(),
+      pricePerToken: pricePerToken,
       blockNumber,
       transactionHash,
       timestamp,
@@ -167,27 +174,54 @@ async function handleTokenTrade(
       tradeRef.id
     );
 
-    const ethAmountNum = Number(formattedEthAmount);
+    // 2. Update token statistics - use proper atomic updates
+    const tokenDocRef = doc(db, COLLECTIONS.TOKENS, token.toLowerCase());
+    const tokenDoc = await getDoc(tokenDocRef);
 
+    if (!tokenDoc.exists()) {
+      console.error("❌ Token document not found:", token.toLowerCase());
+      return;
+    }
+
+    const currentData = tokenDoc.data();
+    const currentCollateral = parseFloat(currentData.collateral || "0");
+    const currentVolume = parseFloat(currentData.statistics?.volumeETH || "0");
+    const currentTradeCount = currentData.statistics?.tradeCount || 0;
+
+    // Calculate new values
+    const ethAmountNum = parseFloat(formattedEthAmount);
+    const newCollateral =
+      eventType === "buy"
+        ? currentCollateral + ethAmountNum
+        : currentCollateral - ethAmountNum;
+    const newVolume = currentVolume + ethAmountNum;
+    const newTradeCount = currentTradeCount + 1;
+
+    // Update token with consistent data structure
     const tokenUpdateData = {
-      collateral: increment(eventType === "buy" ? ethAmountNum : -ethAmountNum),
-      "statistics.volumeETH": increment(ethAmountNum),
-      "statistics.tradeCount": increment(1),
-      "statistics.currentPrice": pricePerToken.toString(),
+      collateral: newCollateral.toString(), // Keep as string
+      lastPrice: pricePerToken, // Update lastPrice to match Token interface
+      statistics: {
+        totalSupply: currentData.statistics?.totalSupply || "0",
+        currentPrice: pricePerToken, // Update current price to latest trade price
+        volumeETH: newVolume.toString(), // Keep as string
+        tradeCount: newTradeCount,
+        uniqueHolders: currentData.statistics?.uniqueHolders || 0,
+      },
       lastTrade: {
-        price: pricePerToken.toString(),
+        price: pricePerToken,
         timestamp,
         type: eventType,
         fee: formattedFee,
       },
     };
 
-    await setDoc(
-      doc(db, COLLECTIONS.TOKENS, token.toLowerCase()),
-      tokenUpdateData,
-      { merge: true }
-    );
+    await updateDoc(tokenDocRef, tokenUpdateData);
     console.log("✅ Token statistics updated in", COLLECTIONS.TOKENS);
+    console.log("📊 New collateral:", newCollateral.toString());
+    console.log("📊 New volume:", newVolume.toString());
+    console.log("📊 New trade count:", newTradeCount);
+    console.log("📊 New price:", pricePerToken);
   } catch (error) {
     console.error("❌ Database Error:", error);
     throw error;
@@ -209,7 +243,7 @@ async function handleTradingHalted(
 
   try {
     const tokenUpdateData = {
-      currentState: TokenState.HALTED,
+      currentState: TokenState.GOAL_REACHED, // Use GOAL_REACHED instead of HALTED
       finalCollateral: formattedCollateral,
       haltedAt: timestamp,
       haltBlock: blockNumber,
@@ -218,7 +252,10 @@ async function handleTradingHalted(
     await setDoc(doc(db, COLLECTIONS.TOKENS, tokenAddress), tokenUpdateData, {
       merge: true,
     });
-    console.log("✅ Token state updated to HALTED in", COLLECTIONS.TOKENS);
+    console.log(
+      "✅ Token state updated to GOAL_REACHED in",
+      COLLECTIONS.TOKENS
+    );
   } catch (error) {
     console.error("❌ Database Error:", error);
     throw error;
@@ -237,7 +274,7 @@ async function handleTradingResumed(
 
   try {
     const tokenUpdateData = {
-      currentState: TokenState.TRADING,
+      currentState: TokenState.RESUMED, // Use RESUMED instead of TRADING
       resumedAt: timestamp,
       resumeBlock: blockNumber,
     };
@@ -245,7 +282,7 @@ async function handleTradingResumed(
     await setDoc(doc(db, COLLECTIONS.TOKENS, tokenAddress), tokenUpdateData, {
       merge: true,
     });
-    console.log("✅ Token state updated to TRADING in", COLLECTIONS.TOKENS);
+    console.log("✅ Token state updated to RESUMED in", COLLECTIONS.TOKENS);
   } catch (error) {
     console.error("❌ Database Error:", error);
     throw error;
