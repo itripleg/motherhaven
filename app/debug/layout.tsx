@@ -1,8 +1,8 @@
-// app/debug/layout.tsx
+// app/_debug/layout.tsx
 
 "use client";
 
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, Suspense } from "react";
 import { useSearchParams, usePathname } from "next/navigation";
 import Link from "next/link";
 import { Button } from "@/components/ui/button";
@@ -34,12 +34,13 @@ interface DebugLayoutProps {
 
 const DEBUG_PAGES = [
   { path: "/debug", title: "Debug Home", icon: Home },
-  { path: "/debug/final-hooks", title: "Final-Hooks", icon: Zap }, // Updated from contexts
+  { path: "/debug/final-hooks", title: "Final-Hooks", icon: Zap },
   { path: "/debug/factory", title: "Factory", icon: Factory },
   { path: "/debug/token", title: "Token", icon: Coins },
   { path: "/debug/trade", title: "Trade", icon: Calculator },
 ];
 
+// Content component that uses search params
 function DebugLayoutContent({ children }: DebugLayoutProps) {
   const [mounted, setMounted] = useState(false);
   const [testToken, setTestToken] = useState("");
@@ -171,7 +172,7 @@ function DebugLayoutContent({ children }: DebugLayoutProps) {
                   >
                     <PageIcon className="h-4 w-4" />
                     {page.title}
-                    {/* Show indicator for modernized pages */}
+                    {/* Show indicator for final-hooks page */}
                     {page.path === "/debug/final-hooks" && (
                       <Badge variant="secondary" className="text-xs ml-1">
                         New
@@ -257,9 +258,7 @@ function DebugLayoutContent({ children }: DebugLayoutProps) {
       )}
 
       {/* Migration Notice for legacy pages */}
-      {(pathname === "/debug/contexts" ||
-        pathname === "/debug/token" ||
-        pathname === "/debug/trade") && (
+      {(pathname === "/debug/token" || pathname === "/debug/trade") && (
         <div className="border-b bg-yellow-50 dark:bg-yellow-950/20">
           <div className="container mx-auto px-6 py-2">
             <div className="flex items-center gap-2 text-yellow-700 dark:text-yellow-300 text-sm">
@@ -312,12 +311,28 @@ function DebugLayoutContent({ children }: DebugLayoutProps) {
   );
 }
 
-// FIXED: Main layout component with only necessary providers
+// Loading component for Suspense fallback
+function DebugLayoutLoading({ children }: DebugLayoutProps) {
+  return (
+    <div className="min-h-screen bg-background">
+      <div className="container mx-auto p-6">
+        <div className="flex items-center justify-center h-32">
+          <Settings className="h-8 w-8 animate-spin text-muted-foreground" />
+        </div>
+        {children}
+      </div>
+    </div>
+  );
+}
+
+// FIXED: Main layout component with only necessary providers and Suspense
 export default function DebugLayout({ children }: DebugLayoutProps) {
   return (
     <FactoryConfigProvider>
       {/* REMOVED: TokenProvider and TradesProvider - replaced by final-hooks */}
-      <DebugLayoutContent>{children}</DebugLayoutContent>
+      <Suspense fallback={<DebugLayoutLoading>{children}</DebugLayoutLoading>}>
+        <DebugLayoutContent>{children}</DebugLayoutContent>
+      </Suspense>
     </FactoryConfigProvider>
   );
 }

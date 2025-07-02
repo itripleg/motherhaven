@@ -1,8 +1,8 @@
-// app/debug/token/page.tsx
+// app/_debug/token/page.tsx
 
 "use client";
 
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, Suspense } from "react";
 import { useSearchParams } from "next/navigation";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
@@ -19,7 +19,7 @@ import {
   Info,
   ExternalLink,
 } from "lucide-react";
-import { isAddress } from "viem";
+import { isAddress, Address } from "viem";
 
 // FINAL-HOOKS: Import from consolidated final-hooks directory
 import { useTokenData } from "@/final-hooks/useTokenData";
@@ -31,7 +31,20 @@ import { PriceTesting } from "./components/PriceTesting";
 import { TokenDataDisplay } from "./components/TokenDataDisplay";
 import { TradingTesting } from "./components/TradingTesting";
 
-export default function DebugTokenPage() {
+// Loading component for Suspense fallback
+function TokenDebugLoading() {
+  return (
+    <div className="space-y-6">
+      <div className="text-center py-12">
+        <Coins className="h-12 w-12 mx-auto text-muted-foreground animate-pulse mb-4" />
+        <p className="text-muted-foreground">Loading token debugger...</p>
+      </div>
+    </div>
+  );
+}
+
+// Content component that uses search params
+function TokenDebugContent() {
   const [mounted, setMounted] = useState(false);
   const [refreshKey, setRefreshKey] = useState(0);
   const searchParams = useSearchParams();
@@ -58,14 +71,7 @@ export default function DebugTokenPage() {
   };
 
   if (!mounted) {
-    return (
-      <div className="space-y-6">
-        <div className="text-center py-12">
-          <Coins className="h-12 w-12 mx-auto text-muted-foreground animate-pulse mb-4" />
-          <p className="text-muted-foreground">Loading token debugger...</p>
-        </div>
-      </div>
-    );
+    return <TokenDebugLoading />;
   }
 
   return (
@@ -147,6 +153,15 @@ export default function DebugTokenPage() {
         </TabsContent>
       </Tabs>
     </div>
+  );
+}
+
+// Main page component with Suspense wrapper
+export default function DebugTokenPage() {
+  return (
+    <Suspense fallback={<TokenDebugLoading />}>
+      <TokenDebugContent />
+    </Suspense>
   );
 }
 
@@ -508,45 +523,6 @@ function FinalHooksOverview({
           </CardContent>
         </Card>
       </div>
-
-      {/* Component Testing Links */}
-      <Card>
-        <CardHeader>
-          <CardTitle>Component Testing</CardTitle>
-        </CardHeader>
-        <CardContent>
-          <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-            <div className="p-3 bg-muted rounded text-center">
-              <Activity className="h-6 w-6 mx-auto mb-2 text-blue-500" />
-              <div className="text-sm font-medium">Hook Comparison</div>
-              <div className="text-xs text-muted-foreground">
-                Compare final-hooks with legacy
-              </div>
-            </div>
-            <div className="p-3 bg-muted rounded text-center">
-              <DollarSign className="h-6 w-6 mx-auto mb-2 text-green-500" />
-              <div className="text-sm font-medium">Price Testing</div>
-              <div className="text-xs text-muted-foreground">
-                Test price consistency
-              </div>
-            </div>
-            <div className="p-3 bg-muted rounded text-center">
-              <BarChart3 className="h-6 w-6 mx-auto mb-2 text-purple-500" />
-              <div className="text-sm font-medium">Trading Testing</div>
-              <div className="text-xs text-muted-foreground">
-                Test calculations & trades
-              </div>
-            </div>
-            <div className="p-3 bg-muted rounded text-center">
-              <Info className="h-6 w-6 mx-auto mb-2 text-orange-500" />
-              <div className="text-sm font-medium">Data Display</div>
-              <div className="text-xs text-muted-foreground">
-                Context vs final-hooks data
-              </div>
-            </div>
-          </div>
-        </CardContent>
-      </Card>
 
       {/* Debug Information */}
       <Card className="bg-gray-50 dark:bg-gray-900/50">

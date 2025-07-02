@@ -1,8 +1,8 @@
-// app/debug/page.tsx
+// app/_debug/page.tsx
 
 "use client";
 
-import React, { useState, useEffect, Suspense } from "react";
+import React, { Suspense } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -27,14 +27,19 @@ const DEFAULT_TEST_TOKEN = "0x1193ccc14edf32ec3a785e0c62115f243d22bec3";
 
 const DEBUG_SECTIONS = [
   {
-    id: "contexts",
-    title: "Context Hooks",
-    description: "Test TokenContext, TradesContext, and other React contexts",
+    id: "final-hooks",
+    title: "Final-Hooks",
+    description: "Test final-hooks architecture with consolidated interfaces",
     icon: Database,
     color: "bg-blue-500/10 border-blue-500/20 hover:bg-blue-500/20",
     iconColor: "text-blue-500",
-    path: "/debug/contexts",
-    hooks: ["useToken", "useTrades", "useTokenContext", "useTradesContext"],
+    path: "/debug/final-hooks",
+    hooks: [
+      "useTokenData",
+      "useTrades",
+      "useFactoryContract",
+      "useUnifiedTokenPrice",
+    ],
   },
   {
     id: "factory",
@@ -101,19 +106,14 @@ function DebugMainLoading() {
   );
 }
 
-// Main content component
+// Main content component - no search params here
 function DebugMainContent() {
-  const [testTokenAddress, setTestTokenAddress] = useState(DEFAULT_TEST_TOKEN);
-  const [isValidAddress, setIsValidAddress] = useState(true);
-  const [copiedAddress, setCopiedAddress] = useState(false);
-  const [mounted, setMounted] = useState(false);
+  const [testTokenAddress, setTestTokenAddress] =
+    React.useState(DEFAULT_TEST_TOKEN);
+  const [isValidAddress, setIsValidAddress] = React.useState(true);
+  const [copiedAddress, setCopiedAddress] = React.useState(false);
   const { address: userAddress } = useAccount();
   const { toast } = useToast();
-
-  // Handle hydration
-  useEffect(() => {
-    setMounted(true);
-  }, []);
 
   // Validate address on change
   const handleAddressChange = (value: string) => {
@@ -134,11 +134,6 @@ function DebugMainContent() {
       console.error("Failed to copy:", err);
     }
   };
-
-  // Don't render wallet-dependent content until mounted
-  if (!mounted) {
-    return <DebugMainLoading />;
-  }
 
   return (
     <div className="container mx-auto p-6 space-y-8">
