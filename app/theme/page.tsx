@@ -14,7 +14,6 @@ import { useColorTheme } from "@/contexts/ColorThemeProvider";
 import {
   Palette,
   RotateCcw,
-  Copy,
   Sparkles,
   Eye,
   Monitor,
@@ -43,7 +42,6 @@ const ThemeCustomizer = () => {
   const [mounted, setMounted] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
   const [lastSaved, setLastSaved] = useState<Date | null>(null);
-  const [copiedCSS, setCopiedCSS] = useState(false);
   const [localColors, setLocalColors] = useState(colors);
 
   // Handle hydration
@@ -62,9 +60,9 @@ const ThemeCustomizer = () => {
       name: "Motherhaven Classic",
       description: "Original purple theme",
       colors: [
-        { hue: 263, saturation: 70, lightness: 50 },
+        { hue: 263, saturation: 60, lightness: 50 },
         { hue: 240, saturation: 5, lightness: 11 },
-        { hue: 200, saturation: 60, lightness: 50 },
+        { hue: 240, saturation: 6, lightness: 5 },
       ],
     },
     {
@@ -73,7 +71,7 @@ const ThemeCustomizer = () => {
       colors: [
         { hue: 200, saturation: 80, lightness: 55 },
         { hue: 210, saturation: 15, lightness: 12 },
-        { hue: 180, saturation: 70, lightness: 60 },
+        { hue: 180, saturation: 70, lightness: 10 },
       ],
     },
     {
@@ -82,7 +80,7 @@ const ThemeCustomizer = () => {
       colors: [
         { hue: 140, saturation: 60, lightness: 45 },
         { hue: 150, saturation: 10, lightness: 10 },
-        { hue: 120, saturation: 50, lightness: 55 },
+        { hue: 120, saturation: 50, lightness: 15 },
       ],
     },
     {
@@ -104,17 +102,6 @@ const ThemeCustomizer = () => {
       ],
     },
   ];
-
-  // Auto-save theme changes (debounced)
-  useEffect(() => {
-    if (!address || !isConnected || !mounted) return;
-
-    const timeoutId = setTimeout(() => {
-      saveTheme();
-    }, 2000);
-
-    return () => clearTimeout(timeoutId);
-  }, [localColors]);
 
   const updateColor = (
     index: number,
@@ -140,24 +127,6 @@ const ThemeCustomizer = () => {
 
   const resetToDefaults = () => {
     resetToDefault();
-  };
-
-  const generateCSS = () => {
-    const cssVars = localColors
-      .map(
-        (color) =>
-          `    ${color.cssVar}: ${color.hue} ${color.saturation}% ${color.lightness}%;`
-      )
-      .join("\n");
-
-    return `:root {\n${cssVars}\n}`;
-  };
-
-  const copyCSS = async () => {
-    const css = generateCSS();
-    await navigator.clipboard.writeText(css);
-    setCopiedCSS(true);
-    setTimeout(() => setCopiedCSS(false), 2000);
   };
 
   // Save theme to Firebase
@@ -314,16 +283,6 @@ const ThemeCustomizer = () => {
             >
               <RotateCcw className="h-4 w-4" />
               Reset
-            </Button>
-
-            <Button
-              onClick={copyCSS}
-              variant="outline"
-              size="sm"
-              className="flex items-center gap-2"
-            >
-              <Copy className="h-4 w-4" />
-              {copiedCSS ? "Copied!" : "Copy CSS"}
             </Button>
           </div>
         </motion.div>
@@ -532,72 +491,8 @@ const ThemeCustomizer = () => {
                 </Badge>
               </CardContent>
             </Card>
-
-            {/* CSS Output */}
-            <Card className="unified-card">
-              <CardHeader>
-                <CardTitle className="text-sm">Generated CSS</CardTitle>
-              </CardHeader>
-              <CardContent>
-                <pre className="text-xs bg-muted/50 p-3 rounded-lg overflow-x-auto font-mono">
-                  {generateCSS()}
-                </pre>
-              </CardContent>
-            </Card>
           </motion.div>
         </div>
-
-        {/* Info Section */}
-        <motion.div
-          initial={{ opacity: 0, y: 20 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ delay: 0.5 }}
-        >
-          <Card className="unified-card">
-            <CardContent className="p-6">
-              <div className="flex items-start gap-4">
-                <div className="p-2 bg-blue-500/20 rounded-lg border border-blue-500/30">
-                  <Sparkles className="h-5 w-5 text-blue-400" />
-                </div>
-                <div>
-                  <h3 className="font-semibold mb-2">
-                    Theme Persistence & Auto-Save
-                  </h3>
-                  <div className="text-sm text-muted-foreground space-y-1">
-                    <p>
-                      • <strong>Auto-Save:</strong> Changes are automatically
-                      saved to your account after 2 seconds
-                    </p>
-                    <p>
-                      • <strong>Wallet-Based:</strong> Your theme is tied to
-                      your wallet address
-                    </p>
-                    <p>
-                      • <strong>Cross-Device:</strong> Access your theme from
-                      any device when connected
-                    </p>
-                    <p>
-                      • <strong>Manual Save:</strong> Click &quot;Save
-                      Theme&quot; to save immediately
-                    </p>
-                    <p>
-                      • <strong>Primary:</strong> Main brand color for buttons,
-                      links, and highlights
-                    </p>
-                    <p>
-                      • <strong>Secondary:</strong> Background color for cards,
-                      sections, and containers
-                    </p>
-                    <p>
-                      • <strong>Accent:</strong> Special highlights,
-                      call-to-actions, and emphasis
-                    </p>
-                  </div>
-                </div>
-              </div>
-            </CardContent>
-          </Card>
-        </motion.div>
       </Container>
     </div>
   );

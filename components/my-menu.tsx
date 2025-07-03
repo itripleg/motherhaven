@@ -40,6 +40,7 @@ import {
   Bot,
   House,
   GamepadIcon,
+  Palette,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useAccount, useDisconnect } from "wagmi";
@@ -99,6 +100,12 @@ const userMenuItems: NavItem[] = [
     label: "Dashboard",
     icon: <BarChart3 className="h-4 w-4" />,
     description: "Portfolio overview",
+  },
+  {
+    href: "/theme",
+    label: "Theme",
+    icon: <Palette className="h-4 w-4" />,
+    description: "Customize appearance",
   },
 ];
 
@@ -278,9 +285,6 @@ export default function MyMenu() {
                 </>
               )}
             </MenubarTrigger>
-            {/* <Link href={"/"}>
-              <House className="h-5 " />
-            </Link> */}
             <MenubarContent className="rounded-xl border-border/50 bg-background/95 backdrop-blur-md shadow-xl z-[110]">
               {isConnected && address ? (
                 <>
@@ -326,6 +330,24 @@ export default function MyMenu() {
                   ))}
 
                   <MenubarSeparator />
+
+                  {/* Theme Toggle */}
+                  <MenubarItem>
+                    <Link
+                      href="/theme"
+                      className="flex items-center gap-3 cursor-pointer rounded-lg px-3 py-2 w-full transition-colors duration-200 hover:bg-accent"
+                    >
+                      <Palette className="h-4 w-4" />
+                      <div className="flex-1">
+                        <div className="font-medium">Theme</div>
+                        <div className="text-xs text-muted-foreground">
+                          Customize appearance
+                        </div>
+                      </div>
+                    </Link>
+                  </MenubarItem>
+
+                  <MenubarSeparator />
                   <MenubarItem onClick={copyAddress} className="gap-3">
                     <Copy className="h-4 w-4" />
                     <span>{copied ? "Copied!" : "Copy Address"}</span>
@@ -368,11 +390,6 @@ export default function MyMenu() {
               )}
             </MenubarContent>
           </MenubarMenu>
-
-          {/* Theme Toggle */}
-          <div className="ml-2">
-            <ModeToggle />
-          </div>
         </Menubar>
       </div>
 
@@ -392,9 +409,6 @@ export default function MyMenu() {
               <Sparkles className="h-4 w-4" />
               <span className="text-base uppercase">Motherhaven</span>
             </div>
-
-            {/* Theme Toggle */}
-            <ModeToggle />
           </div>
 
           {/* Navigation - Compact */}
@@ -508,6 +522,24 @@ export default function MyMenu() {
                         </Link>
                       </DropdownMenuItem>
                     ))}
+
+                    <DropdownMenuSeparator />
+
+                    {/* Theme Toggle for Mobile */}
+                    <DropdownMenuItem asChild>
+                      <Link
+                        href="/theme"
+                        className="flex items-center gap-3 w-full"
+                      >
+                        <Palette className="h-4 w-4" />
+                        <div>
+                          <div className="font-medium">Theme</div>
+                          <div className="text-xs text-muted-foreground">
+                            Customize appearance
+                          </div>
+                        </div>
+                      </Link>
+                    </DropdownMenuItem>
 
                     <DropdownMenuSeparator />
                     <DropdownMenuItem onClick={copyAddress} className="gap-3">

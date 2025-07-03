@@ -44,12 +44,12 @@ const CustomTooltip = ({ active, payload, label }: any) => {
     const formattedPrice = dataPoint.formattedPrice; // Use the pre-calculated formatted price
 
     return (
-      <div className="p-3 bg-gray-800/90 backdrop-blur-sm border border-gray-600 rounded-lg text-white shadow-lg">
-        <p className="text-sm font-medium text-gray-300 mb-1">{label}</p>
-        <p className="text-lg font-bold text-green-400">
-          {formattedPrice} AVAX
+      <div className="p-3 bg-background/90 backdrop-blur-sm border border-border rounded-lg shadow-lg">
+        <p className="text-sm font-medium text-muted-foreground mb-1">
+          {label}
         </p>
-        <p className="text-xs text-gray-400 mt-1">
+        <p className="text-lg font-bold text-primary">{formattedPrice} AVAX</p>
+        <p className="text-xs text-muted-foreground mt-1">
           📊 Trade avg price (from Firestore)
         </p>
       </div>
@@ -67,6 +67,18 @@ export default function RechartsLineChart({
   // Get current price using unified price hook for consistency
   const { formatted: currentPrice, isLoading: priceLoading } =
     useUnifiedTokenPrice(token.address as Address);
+
+  // Get the primary color from CSS custom properties
+  const primaryColor = useMemo(() => {
+    if (typeof window !== "undefined") {
+      const root = document.documentElement;
+      const hsl = getComputedStyle(root).getPropertyValue("--primary").trim();
+      if (hsl) {
+        return `hsl(${hsl})`;
+      }
+    }
+    return "#8b5cf6"; // Fallback color
+  }, []);
 
   // useMemo will re-calculate the chart data only when its dependencies change
   const chartData: ChartPoint[] = useMemo(() => {
@@ -152,7 +164,7 @@ export default function RechartsLineChart({
 
   if (loading) {
     return (
-      <div className="text-center text-gray-400 animate-pulse">
+      <div className="text-center text-muted-foreground animate-pulse">
         Loading Chart Data...
       </div>
     );
@@ -165,22 +177,22 @@ export default function RechartsLineChart({
         {" "}
         {/* Reduced margin bottom */}
         <div>
-          <h3 className="text-base font-bold text-white">
+          <h3 className="text-base font-bold text-foreground">
             {" "}
             {/* Slightly smaller text */}
             {token.symbol} Price History
           </h3>
-          <p className="text-xl text-green-400">
+          <p className="text-xl text-primary">
             {" "}
-            {/* Slightly smaller text */}
+            {/* Use primary color */}
             {displayPrice} AVAX
             {priceLoading && (
-              <span className="text-xs text-gray-400 ml-2">
+              <span className="text-xs text-muted-foreground ml-2">
                 🔄 Loading contract.lastPrice...
               </span>
             )}
             {!priceLoading && (
-              <span className="text-xs text-gray-400 ml-2">
+              <span className="text-xs text-muted-foreground ml-2">
                 🔗 contract.lastPrice (most recent trade avg)
               </span>
             )}
@@ -215,10 +227,14 @@ export default function RechartsLineChart({
                 bottom: 5,
               }}
             >
-              <CartesianGrid strokeDasharray="3 3" strokeOpacity={0.2} />
+              <CartesianGrid
+                strokeDasharray="3 3"
+                stroke="hsl(var(--border))"
+                strokeOpacity={0.3}
+              />
               <XAxis
                 dataKey="timeLabel"
-                stroke="#9ca3af"
+                stroke="hsl(var(--muted-foreground))"
                 fontSize={12}
                 tickLine={false}
                 axisLine={false}
@@ -228,7 +244,7 @@ export default function RechartsLineChart({
                 height={60}
               />
               <YAxis
-                stroke="#9ca3af"
+                stroke="hsl(var(--muted-foreground))"
                 fontSize={12}
                 tickLine={false}
                 axisLine={false}
@@ -241,17 +257,22 @@ export default function RechartsLineChart({
               <Line
                 type="monotone"
                 dataKey="price"
-                stroke="#4ade80"
+                stroke={primaryColor}
                 strokeWidth={2}
                 dot={chartData.length < 50}
-                activeDot={{ r: 4, stroke: "#4ade80", strokeWidth: 2 }}
+                activeDot={{
+                  r: 4,
+                  stroke: primaryColor,
+                  strokeWidth: 2,
+                  fill: primaryColor,
+                }}
               />
             </LineChart>
           </ResponsiveContainer>
         </div>
       ) : (
         <div className="flex items-center justify-center h-72 sm:h-80 md:h-96 max-h-96">
-          <p className="text-gray-500">No trade data available.</p>
+          <p className="text-muted-foreground">No trade data available.</p>
         </div>
       )}
     </div>

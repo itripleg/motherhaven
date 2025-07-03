@@ -17,7 +17,7 @@
     --secondary-foreground: 0 0% 98%;
     --muted: 240 5% 19%; /* Between card and secondary */
     --muted-foreground: 217.9 8% 70%; /* Brighter muted text */
-    --accent: 240 5% 22%; /* Match secondary */
+    --accent: 240 5% 22%; /* Match secondary - subtle gray */
     --accent-foreground: 0 0% 98%;
     --destructive: 0 84.2% 60.2%; /* Keep vibrant */
     --destructive-foreground: 210 20% 98%;
@@ -48,7 +48,7 @@
     --secondary-foreground: 0 0% 98%;
     --muted: 240 10% 9.8%;
     --muted-foreground: 217.9 10.6% 64.9%;
-    --accent: 240 10% 10.9%;
+    --accent: 240 10% 10.9%; /* Match secondary - subtle gray */
     --accent-foreground: 0 0% 98%;
     --destructive: 0 62.8% 30.6%;
     --destructive-foreground: 210 20% 98%;
