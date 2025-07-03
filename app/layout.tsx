@@ -9,6 +9,7 @@ import { EventWatcher } from "../components/EventWatcher";
 import { UserSection } from "@/components/UserSection";
 import { Header } from "./Header";
 import { FactoryConfigProvider } from "@/contexts/FactoryConfigProvider";
+import { ColorThemeProvider } from "@/contexts/ColorThemeProvider";
 // import { FactoryGuard } from "@/components/FactoryGuard";
 
 const geistSans = localFont({
@@ -49,18 +50,20 @@ export default function RootLayout({
           enableSystem
           disableTransitionOnChange
         >
-          {/* <FactoryGuard> */}
           <WagmiContext>
-            <MyMenu />
-            {/* <div className="p-0 md:p-20" /> */}
-            <FactoryConfigProvider>
-              <EventWatcher />
-              {/* <Header /> */}
-              {children}
-              <Toaster />
-            </FactoryConfigProvider>
+            <ColorThemeProvider>
+              {/* <FactoryGuard> */}
+              <MyMenu />
+              {/* <div className="p-0 md:p-20" /> */}
+              <FactoryConfigProvider>
+                <EventWatcher />
+                {/* <Header /> */}
+                {children}
+                <Toaster />
+              </FactoryConfigProvider>
+              {/* </FactoryGuard> */}
+            </ColorThemeProvider>
           </WagmiContext>
-          {/* </FactoryGuard> */}
         </ThemeProvider>
       </body>
     </html>
