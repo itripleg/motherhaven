@@ -70,34 +70,6 @@ export const TokenGrid = ({ tokens }: TokenGridProps) => {
 
   return (
     <div className="space-y-4">
-      {/* Status bar */}
-      <div className="flex items-center justify-between text-sm text-gray-400">
-        <span>
-          {tokens.length} token{tokens.length !== 1 ? "s" : ""} found
-        </span>
-        <div className="flex items-center gap-2">
-          {isLoading && (
-            <div className="flex items-center gap-1">
-              <Loader2 className="w-3 h-3 animate-spin" />
-              <span>Updating...</span>
-            </div>
-          )}
-          {lastUpdate > 0 && (
-            <span className="text-xs">
-              Last update: {new Date(lastUpdate).toLocaleTimeString()}
-            </span>
-          )}
-          <Button
-            variant="ghost"
-            size="sm"
-            onClick={refreshPrices}
-            className="h-6 px-2 text-xs"
-          >
-            <RefreshCw className="w-3 h-3" />
-          </Button>
-        </div>
-      </div>
-
       {/* Token grid */}
       <motion.div
         className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 max-h-screen overflow-y-auto scrollbar-thin p-2"

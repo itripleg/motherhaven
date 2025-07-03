@@ -8,21 +8,10 @@ import { getAddressGreeting } from "@/hooks/addressGreetings";
 import { motion, AnimatePresence } from "framer-motion";
 import { SearchContainer } from "./components/SearchContainer";
 import { TokenContainer } from "./components/tokens/TokenContainer";
-import { useTokenList } from "@/hooks/token/useTokenList";
 import { SpaceScene } from "./scene/SpaceScene";
 import { Button } from "@/components/ui/button";
-import { Badge } from "@/components/ui/badge";
 import { Card, CardContent } from "@/components/ui/card";
-import {
-  Rocket,
-  TrendingUp,
-  Coins,
-  Sparkles,
-  Plus,
-  BarChart3,
-  Users,
-  Activity,
-} from "lucide-react";
+import { Rocket } from "lucide-react";
 
 export default function DexPage() {
   const account = useAccount();
@@ -31,16 +20,7 @@ export default function DexPage() {
   const [showSecret, setShowSecret] = useState(false);
   const [greeting, setGreeting] = useState("");
   const [searchMode, setSearchMode] = useState("token");
-
-  const {
-    filteredTokens,
-    searchQuery,
-    setSearchQuery,
-    activeCategory,
-    setCategory,
-    isLoading,
-    error,
-  } = useTokenList();
+  const [searchQuery, setSearchQuery] = useState("");
 
   const handleSecretFound = () => {
     setShowSecret(true);
@@ -51,7 +31,16 @@ export default function DexPage() {
     setGreeting(getAddressGreeting(account?.address));
   }, [account?.address]);
 
-  // Remove stats data since we're not using the large cards anymore
+  // Handle search query changes
+  const handleSearchQueryChange = (query: string) => {
+    setSearchQuery(query);
+  };
+
+  // Handle category changes (for compatibility with SearchContainer)
+  const handleCategoryChange = (category: string) => {
+    // This is now handled by TokenContainer internally via tabs
+    console.log("Category change:", category);
+  };
 
   return (
     <div className="min-h-screen animated-bg floating-particles relative">
@@ -63,14 +52,13 @@ export default function DexPage() {
       {/* Main Content */}
       <div className="relative z-10">
         <Container className="py-8 space-y-8">
-          {/* Hero Section - Compact like original */}
+          {/* Hero Section */}
           <motion.div
             initial={{ opacity: 0, y: 20 }}
             animate={{ opacity: 1, y: 0 }}
             transition={{ duration: 0.6 }}
             className="text-center space-y-6 pt-8"
           >
-            {/* Main Heading - "Catch the flow!" style */}
             <AnimatePresence mode="wait">
               {!showSecret && (
                 <motion.div
@@ -83,16 +71,12 @@ export default function DexPage() {
                   <h1 className="text-5xl md:text-7xl font-bold text-white leading-tight text-left">
                     {greeting || "Catch the flow!"}
                   </h1>
-                  {/* <p className="text-lg text-muted-foreground max-w-2xl mx-auto">
-                    Discover, trade, and create tokens on the most advanced
-                    bonding curve DEX
-                  </p> */}
                 </motion.div>
               )}
             </AnimatePresence>
           </motion.div>
 
-          {/* Search Section - More prominent like original */}
+          {/* Search Section */}
           <motion.div
             initial={{ opacity: 0, y: 20 }}
             animate={{ opacity: 1, y: 0 }}
@@ -105,25 +89,21 @@ export default function DexPage() {
               cameraRef={cameraRef}
               controlRef={controlRef}
               searchQuery={searchQuery}
-              setSearchQuery={setSearchQuery}
-              setActiveCategory={setCategory}
+              setSearchQuery={handleSearchQueryChange}
+              setActiveCategory={handleCategoryChange}
               onSecretFound={handleSecretFound}
               showSecret={showSecret}
             />
           </motion.div>
 
-          {/* Token Grid - Main focus like original */}
+          {/* Token Grid with Working Filters */}
           {!showSecret && (
             <motion.div
               initial={{ opacity: 0 }}
               animate={{ opacity: 1 }}
               transition={{ duration: 0.6, delay: 0.4 }}
             >
-              <TokenContainer
-                tokens={filteredTokens}
-                isLoading={isLoading}
-                error={error}
-              />
+              <TokenContainer searchQuery={searchQuery} />
             </motion.div>
           )}
 
@@ -140,10 +120,6 @@ export default function DexPage() {
                   <h3 className="text-2xl font-bold text-gradient">
                     🚀 Ready to Launch?
                   </h3>
-                  {/* <p className="text-muted-foreground">
-                    Join thousands of creators building the future of
-                    decentralized finance
-                  </p> */}
                 </div>
 
                 <div className="flex flex-col sm:flex-row gap-4 justify-center">
