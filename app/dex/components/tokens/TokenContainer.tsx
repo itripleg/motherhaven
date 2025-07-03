@@ -1,4 +1,4 @@
-// components/tokens/TokenContainer.tsx - Fixed filtering and sorting logic
+// components/tokens/TokenContainer.tsx - With localStorage support
 import { useState, useEffect } from "react";
 import React from "react";
 import { TokenTabs } from "./TokenTabs";
@@ -68,6 +68,32 @@ interface TokenListItem {
   };
 }
 
+// localStorage keys
+const STORAGE_KEYS = {
+  FILTER: "token-container-filter",
+  SORT_BY: "token-container-sort-by",
+  SORT_DIRECTION: "token-container-sort-direction",
+} as const;
+
+// Helper functions for localStorage
+const saveToStorage = (key: string, value: string) => {
+  try {
+    localStorage.setItem(key, value);
+  } catch (error) {
+    console.warn("Failed to save to localStorage:", error);
+  }
+};
+
+const loadFromStorage = (key: string, defaultValue: string) => {
+  try {
+    const saved = localStorage.getItem(key);
+    return saved !== null ? saved : defaultValue;
+  } catch (error) {
+    console.warn("Failed to load from localStorage:", error);
+    return defaultValue;
+  }
+};
+
 // Convert TokenListItem to Token
 const convertToToken = (item: TokenListItem): Token => {
   return {
@@ -103,15 +129,48 @@ const convertToToken = (item: TokenListItem): Token => {
 export const TokenContainer: React.FC<TokenContainerProps> = ({
   searchQuery = "",
 }) => {
-  const [filter, setFilter] = useState<FilterBy>(FilterBy.ALL);
-  const [sortBy, setSortBy] = useState<SortBy>(SortBy.NEWEST);
-  const [sortDirection, setSortDirection] = useState<SortDirection>(
-    SortDirection.DESC
-  );
+  // Initialize state with localStorage values
+  const [filter, setFilter] = useState<FilterBy>(() => {
+    const saved = loadFromStorage(STORAGE_KEYS.FILTER, FilterBy.ALL);
+    return Object.values(FilterBy).includes(saved as FilterBy)
+      ? (saved as FilterBy)
+      : FilterBy.ALL;
+  });
+
+  const [sortBy, setSortBy] = useState<SortBy>(() => {
+    const saved = loadFromStorage(STORAGE_KEYS.SORT_BY, SortBy.NEWEST);
+    return Object.values(SortBy).includes(saved as SortBy)
+      ? (saved as SortBy)
+      : SortBy.NEWEST;
+  });
+
+  const [sortDirection, setSortDirection] = useState<SortDirection>(() => {
+    const saved = loadFromStorage(
+      STORAGE_KEYS.SORT_DIRECTION,
+      SortDirection.DESC
+    );
+    return Object.values(SortDirection).includes(saved as SortDirection)
+      ? (saved as SortDirection)
+      : SortDirection.DESC;
+  });
+
   const [tokens, setTokens] = useState<Token[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [lastRefresh, setLastRefresh] = useState(Date.now());
+
+  // Save to localStorage when state changes
+  useEffect(() => {
+    saveToStorage(STORAGE_KEYS.FILTER, filter);
+  }, [filter]);
+
+  useEffect(() => {
+    saveToStorage(STORAGE_KEYS.SORT_BY, sortBy);
+  }, [sortBy]);
+
+  useEffect(() => {
+    saveToStorage(STORAGE_KEYS.SORT_DIRECTION, sortDirection);
+  }, [sortDirection]);
 
   // Enhanced trending calculation
   const calculateTrendingScore = React.useCallback((item: TokenListItem) => {
@@ -140,10 +199,9 @@ export const TokenContainer: React.FC<TokenContainerProps> = ({
     return score;
   }, []);
 
-  // FIXED: Separate sorting function that respects both filter and sort preferences
+  // Separate sorting function that respects both filter and sort preferences
   const applySorting = React.useCallback(
     (items: TokenListItem[], includeTrendingScore = false) => {
-      // Add trending scores if needed
       const itemsWithScores = items.map((item) => ({
         ...item,
         trendingScore: includeTrendingScore ? calculateTrendingScore(item) : 0,
@@ -181,7 +239,6 @@ export const TokenContainer: React.FC<TokenContainerProps> = ({
             break;
         }
 
-        // FIXED: Handle string vs number comparison properly
         if (typeof aValue === "string" && typeof bValue === "string") {
           return sortDirection === SortDirection.ASC
             ? aValue.localeCompare(bValue)
@@ -196,12 +253,11 @@ export const TokenContainer: React.FC<TokenContainerProps> = ({
     [sortBy, sortDirection, calculateTrendingScore]
   );
 
-  // FIXED: Filter application that doesn't interfere with sorting
+  // Filter application that doesn't interfere with sorting
   const applyFilters = React.useCallback(
     (items: TokenListItem[]) => {
       let filteredItems = items;
 
-      // Apply category filters first
       if (filter === FilterBy.TRADING) {
         filteredItems = filteredItems.filter((item) => item.state === 1);
       } else if (filter === FilterBy.NEW) {
@@ -211,7 +267,6 @@ export const TokenContainer: React.FC<TokenContainerProps> = ({
           return createdTime > oneDayAgo;
         });
       } else if (filter === FilterBy.TRENDING) {
-        // FIXED: For trending, filter by score but still allow user sorting
         const tokensWithScores = filteredItems.map((item) => ({
           ...item,
           trendingScore: calculateTrendingScore(item),
@@ -242,7 +297,6 @@ export const TokenContainer: React.FC<TokenContainerProps> = ({
       const tokensRef = collection(db, "tokens");
       const constraints: QueryConstraint[] = [];
 
-      // Simple queries to avoid index issues
       if (filter === FilterBy.ALL) {
         constraints.push(orderBy("createdAt", "desc"));
         constraints.push(limit(100));
@@ -320,7 +374,6 @@ export const TokenContainer: React.FC<TokenContainerProps> = ({
             tokenListItems.push(item);
           });
 
-          // FIXED: Apply search filter
           let filteredItems = tokenListItems;
           if (searchQuery && searchQuery.trim()) {
             const query = searchQuery.toLowerCase().trim();
@@ -332,14 +385,10 @@ export const TokenContainer: React.FC<TokenContainerProps> = ({
             );
           }
 
-          // FIXED: Apply category filters
           filteredItems = applyFilters(filteredItems);
-
-          // FIXED: Apply sorting (always applied, regardless of filter)
           const includeTrendingScore = filter === FilterBy.TRENDING;
           filteredItems = applySorting(filteredItems, includeTrendingScore);
 
-          // Convert to Token format
           const convertedTokens = filteredItems.map(convertToToken);
           setTokens(convertedTokens);
           setLoading(false);
@@ -398,7 +447,7 @@ export const TokenContainer: React.FC<TokenContainerProps> = ({
     }
   };
 
-  // FIXED: Updated getSortLabel to include all valid SortBy enum values
+  // Get sort label with direction
   const getSortLabel = React.useCallback(() => {
     const baseLabel = {
       [SortBy.NEWEST]: "Newest",
@@ -412,6 +461,22 @@ export const TokenContainer: React.FC<TokenContainerProps> = ({
     const direction = sortDirection === SortDirection.ASC ? "↑" : "↓";
     return `${baseLabel} ${direction}`;
   }, [sortBy, sortDirection]);
+
+  // Clear all saved preferences
+  const clearSavedPreferences = () => {
+    try {
+      localStorage.removeItem(STORAGE_KEYS.FILTER);
+      localStorage.removeItem(STORAGE_KEYS.SORT_BY);
+      localStorage.removeItem(STORAGE_KEYS.SORT_DIRECTION);
+
+      // Reset to defaults
+      setFilter(FilterBy.ALL);
+      setSortBy(SortBy.NEWEST);
+      setSortDirection(SortDirection.DESC);
+    } catch (error) {
+      console.warn("Failed to clear localStorage:", error);
+    }
+  };
 
   return (
     <div className="space-y-6">
@@ -429,6 +494,15 @@ export const TokenContainer: React.FC<TokenContainerProps> = ({
           {filter !== FilterBy.ALL && (
             <Badge variant="outline" className="gap-1">
               📊 {filter.toLowerCase().replace("_", " ")}
+            </Badge>
+          )}
+
+          {/* Show if using saved preferences */}
+          {(filter !== FilterBy.ALL ||
+            sortBy !== SortBy.NEWEST ||
+            sortDirection !== SortDirection.DESC) && (
+            <Badge variant="secondary" className="gap-1 text-xs">
+              💾 Saved
             </Badge>
           )}
 
@@ -475,8 +549,18 @@ export const TokenContainer: React.FC<TokenContainerProps> = ({
             ) : (
               <SortDesc className="h-4 w-4" />
             )}
-            {/* Visual indicator */}
             <span className="absolute -top-1 -right-1 w-2 h-2 bg-blue-500 rounded-full animate-pulse" />
+          </Button>
+
+          {/* Clear preferences button */}
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={clearSavedPreferences}
+            className="text-xs"
+            title="Reset to defaults"
+          >
+            Reset
           </Button>
 
           {/* Refresh */}
