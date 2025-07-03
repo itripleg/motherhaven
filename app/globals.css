@@ -2,6 +2,10 @@
 @tailwind components;
 @tailwind utilities;
 
+html {
+  overflow-y: scroll; /* Always show vertical scrollbar */
+}
+
 @layer base {
   :root {
     /* Light mode - Dark gray theme with much better contrast for UI elements */
