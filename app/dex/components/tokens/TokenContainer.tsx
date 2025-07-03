@@ -485,25 +485,7 @@ export const TokenContainer: React.FC<TokenContainerProps> = ({
         <div className="flex items-center gap-3">
           {/* Show active search */}
           {searchQuery && (
-            <Badge variant="secondary" className="gap-1">
-              🔍 &quot;{searchQuery}&quot;
-            </Badge>
-          )}
-
-          {/* Show active filter */}
-          {filter !== FilterBy.ALL && (
-            <Badge variant="outline" className="gap-1">
-              📊 {filter.toLowerCase().replace("_", " ")}
-            </Badge>
-          )}
-
-          {/* Show if using saved preferences */}
-          {(filter !== FilterBy.ALL ||
-            sortBy !== SortBy.NEWEST ||
-            sortDirection !== SortDirection.DESC) && (
-            <Badge variant="secondary" className="gap-1 text-xs">
-              💾 Saved
-            </Badge>
+            <Badge variant="secondary">&quot;{searchQuery}&quot;</Badge>
           )}
 
           {/* Show token count */}
@@ -531,7 +513,7 @@ export const TokenContainer: React.FC<TokenContainerProps> = ({
             </SelectContent>
           </Select>
 
-          {/* Enhanced Sort Direction with visual feedback */}
+          {/* Enhanced Sort Direction */}
           <Button
             variant="outline"
             size="sm"
@@ -542,14 +524,12 @@ export const TokenContainer: React.FC<TokenContainerProps> = ({
                   : SortDirection.ASC
               )
             }
-            className="relative"
           >
             {sortDirection === SortDirection.ASC ? (
               <SortAsc className="h-4 w-4" />
             ) : (
               <SortDesc className="h-4 w-4" />
             )}
-            <span className="absolute -top-1 -right-1 w-2 h-2 bg-blue-500 rounded-full animate-pulse" />
           </Button>
 
           {/* Clear preferences button */}
@@ -571,7 +551,7 @@ export const TokenContainer: React.FC<TokenContainerProps> = ({
       </div>
 
       {/* Category Tabs */}
-      <TokenTabs onCategoryChange={handleTabChange} />
+      <TokenTabs onCategoryChange={handleTabChange} activeCategory={filter} />
 
       {/* Results */}
       {loading ? (
