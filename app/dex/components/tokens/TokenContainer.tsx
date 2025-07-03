@@ -1,4 +1,4 @@
-// components/tokens/TokenContainer.tsx - With localStorage support
+// app/dex/components/tokens/TokenContainer.tsx
 import { useState, useEffect } from "react";
 import React from "react";
 import { TokenTabs } from "./TokenTabs";
@@ -20,14 +20,13 @@ import {
 import { db } from "@/firebase";
 import { Button } from "@/components/ui/button";
 import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select";
+  Popover,
+  PopoverContent,
+  PopoverTrigger,
+} from "@/components/ui/popover";
 import { Badge } from "@/components/ui/badge";
-import { SortAsc, SortDesc, RefreshCw } from "lucide-react";
+import { SortAsc, SortDesc, RefreshCw, ChevronDown, Check } from "lucide-react";
+import { cn } from "@/lib/utils";
 
 interface TokenContainerProps {
   searchQuery?: string;
@@ -68,6 +67,11 @@ interface TokenListItem {
   };
 }
 
+interface DropdownOption {
+  value: string;
+  label: string;
+}
+
 // localStorage keys
 const STORAGE_KEYS = {
   FILTER: "token-container-filter",
@@ -92,6 +96,72 @@ const loadFromStorage = (key: string, defaultValue: string) => {
     console.warn("Failed to load from localStorage:", error);
     return defaultValue;
   }
+};
+
+// Popover Dropdown Component
+const PopoverDropdown = ({
+  value,
+  onChange,
+  options,
+  placeholder = "Select...",
+  className = "",
+}: {
+  value: string;
+  onChange: (value: string) => void;
+  options: DropdownOption[];
+  placeholder?: string;
+  className?: string;
+}) => {
+  const [open, setOpen] = useState(false);
+  const selectedOption = options.find((option) => option.value === value);
+
+  return (
+    <Popover open={open} onOpenChange={setOpen}>
+      <PopoverTrigger asChild>
+        <Button
+          variant="outline"
+          role="combobox"
+          aria-expanded={open}
+          className={cn(
+            "w-full justify-between h-9 px-3 font-normal",
+            className
+          )}
+        >
+          <span className="truncate">
+            {selectedOption?.label || placeholder}
+          </span>
+          <ChevronDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
+        </Button>
+      </PopoverTrigger>
+      <PopoverContent
+        className="w-[var(--radix-popover-trigger-width)] p-0"
+        align="start"
+        side="bottom"
+        sideOffset={4}
+      >
+        <div className="max-h-60 overflow-y-auto">
+          {options.map((option) => (
+            <button
+              key={option.value}
+              onClick={() => {
+                onChange(option.value);
+                setOpen(false);
+              }}
+              className={cn(
+                "w-full px-3 py-2 text-sm text-left hover:bg-accent hover:text-accent-foreground transition-colors flex items-center justify-between",
+                value === option.value && "bg-accent text-accent-foreground"
+              )}
+            >
+              <span>{option.label}</span>
+              {value === option.value && (
+                <Check className="h-4 w-4 text-primary" />
+              )}
+            </button>
+          ))}
+        </div>
+      </PopoverContent>
+    </Popover>
+  );
 };
 
 // Convert TokenListItem to Token
@@ -158,6 +228,16 @@ export const TokenContainer: React.FC<TokenContainerProps> = ({
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [lastRefresh, setLastRefresh] = useState(Date.now());
+
+  // Sort options for the dropdown
+  const sortOptions: DropdownOption[] = [
+    { value: SortBy.NEWEST, label: "Newest First" },
+    { value: SortBy.OLDEST, label: "Oldest First" },
+    { value: SortBy.NAME, label: "Name A-Z" },
+    { value: SortBy.SYMBOL, label: "Symbol A-Z" },
+    { value: SortBy.PRICE, label: "Price" },
+    { value: SortBy.VOLUME, label: "Volume" },
+  ];
 
   // Save to localStorage when state changes
   useEffect(() => {
@@ -288,7 +368,10 @@ export const TokenContainer: React.FC<TokenContainerProps> = ({
     [filter, calculateTrendingScore]
   );
 
-  // Firestore data fetching
+  // Raw token data from Firestore (no sorting applied here)
+  const [rawTokens, setRawTokens] = useState<TokenListItem[]>([]);
+
+  // Firestore data fetching - ONLY re-runs when filter, search, or refresh changes
   useEffect(() => {
     setLoading(true);
     setError(null);
@@ -374,23 +457,8 @@ export const TokenContainer: React.FC<TokenContainerProps> = ({
             tokenListItems.push(item);
           });
 
-          let filteredItems = tokenListItems;
-          if (searchQuery && searchQuery.trim()) {
-            const query = searchQuery.toLowerCase().trim();
-            filteredItems = filteredItems.filter(
-              (token) =>
-                token.name.toLowerCase().includes(query) ||
-                token.symbol.toLowerCase().includes(query) ||
-                token.address.toLowerCase().includes(query)
-            );
-          }
-
-          filteredItems = applyFilters(filteredItems);
-          const includeTrendingScore = filter === FilterBy.TRENDING;
-          filteredItems = applySorting(filteredItems, includeTrendingScore);
-
-          const convertedTokens = filteredItems.map(convertToToken);
-          setTokens(convertedTokens);
+          // Store raw data without sorting
+          setRawTokens(tokenListItems);
           setLoading(false);
         },
         (firestoreError: any) => {
@@ -410,12 +478,39 @@ export const TokenContainer: React.FC<TokenContainerProps> = ({
       );
       setLoading(false);
     }
+  }, [filter, searchQuery, lastRefresh]); // Removed sortBy and sortDirection from dependencies
+
+  // Separate effect for client-side sorting and filtering - this doesn't scroll to top
+  useEffect(() => {
+    let filteredItems = [...rawTokens];
+
+    // Apply search filter
+    if (searchQuery && searchQuery.trim()) {
+      const query = searchQuery.toLowerCase().trim();
+      filteredItems = filteredItems.filter(
+        (token) =>
+          token.name.toLowerCase().includes(query) ||
+          token.symbol.toLowerCase().includes(query) ||
+          token.address.toLowerCase().includes(query)
+      );
+    }
+
+    // Apply category filters
+    filteredItems = applyFilters(filteredItems);
+
+    // Apply sorting
+    const includeTrendingScore = filter === FilterBy.TRENDING;
+    filteredItems = applySorting(filteredItems, includeTrendingScore);
+
+    // Convert to Token format
+    const convertedTokens = filteredItems.map(convertToToken);
+    setTokens(convertedTokens);
   }, [
-    filter,
+    rawTokens,
     sortBy,
     sortDirection,
     searchQuery,
-    lastRefresh,
+    filter,
     applyFilters,
     applySorting,
   ]);
@@ -447,113 +542,75 @@ export const TokenContainer: React.FC<TokenContainerProps> = ({
     }
   };
 
-  // Get sort label with direction
-  const getSortLabel = React.useCallback(() => {
-    const baseLabel = {
-      [SortBy.NEWEST]: "Newest",
-      [SortBy.OLDEST]: "Oldest",
-      [SortBy.NAME]: "Name",
-      [SortBy.SYMBOL]: "Symbol",
-      [SortBy.PRICE]: "Price",
-      [SortBy.VOLUME]: "Volume",
-    }[sortBy];
-
-    const direction = sortDirection === SortDirection.ASC ? "↑" : "↓";
-    return `${baseLabel} ${direction}`;
-  }, [sortBy, sortDirection]);
-
-  // Clear all saved preferences
-  const clearSavedPreferences = () => {
-    try {
-      localStorage.removeItem(STORAGE_KEYS.FILTER);
-      localStorage.removeItem(STORAGE_KEYS.SORT_BY);
-      localStorage.removeItem(STORAGE_KEYS.SORT_DIRECTION);
-
-      // Reset to defaults
-      setFilter(FilterBy.ALL);
-      setSortBy(SortBy.NEWEST);
-      setSortDirection(SortDirection.DESC);
-    } catch (error) {
-      console.warn("Failed to clear localStorage:", error);
-    }
-  };
-
   return (
     <div className="space-y-6">
-      {/* Enhanced controls bar */}
-      <div className="flex items-center justify-between">
-        <div className="flex items-center gap-3">
+      {/* Controls bar with Popover dropdown */}
+      <div className="flex items-center justify-between gap-4 min-h-[40px]">
+        <div className="flex items-center gap-3 flex-shrink-0">
           {/* Show active search */}
           {searchQuery && (
-            <Badge variant="secondary">&quot;{searchQuery}&quot;</Badge>
+            <Badge variant="secondary" className="flex-shrink-0">
+              &quot;{searchQuery}&quot;
+            </Badge>
           )}
 
           {/* Show token count */}
-          <div className="text-sm text-muted-foreground">
+          <div className="text-sm text-muted-foreground whitespace-nowrap">
             {tokens.length} token{tokens.length !== 1 ? "s" : ""} found
           </div>
         </div>
 
-        <div className="flex items-center gap-2">
-          {/* Enhanced Sort */}
-          <Select
-            value={sortBy}
-            onValueChange={(value) => setSortBy(value as SortBy)}
-          >
-            <SelectTrigger className="w-[140px] h-9">
-              <SelectValue placeholder={getSortLabel()} />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value={SortBy.NEWEST}>Newest First</SelectItem>
-              <SelectItem value={SortBy.OLDEST}>Oldest First</SelectItem>
-              <SelectItem value={SortBy.NAME}>Name A-Z</SelectItem>
-              <SelectItem value={SortBy.SYMBOL}>Symbol A-Z</SelectItem>
-              <SelectItem value={SortBy.PRICE}>Price</SelectItem>
-              <SelectItem value={SortBy.VOLUME}>Volume</SelectItem>
-            </SelectContent>
-          </Select>
+        <div className="flex items-center gap-2 flex-shrink-0">
+          {/* Popover Sort Dropdown */}
+          <div className="w-[140px]">
+            <PopoverDropdown
+              value={sortBy}
+              onChange={(value) => setSortBy(value as SortBy)}
+              options={sortOptions}
+              className="w-full"
+            />
+          </div>
 
-          {/* Enhanced Sort Direction */}
-          <Button
-            variant="outline"
-            size="sm"
-            onClick={() =>
-              setSortDirection(
-                sortDirection === SortDirection.ASC
-                  ? SortDirection.DESC
-                  : SortDirection.ASC
-              )
-            }
-          >
-            {sortDirection === SortDirection.ASC ? (
-              <SortAsc className="h-4 w-4" />
-            ) : (
-              <SortDesc className="h-4 w-4" />
-            )}
-          </Button>
-
-          {/* Clear preferences button */}
-          <Button
-            variant="outline"
-            size="sm"
-            onClick={clearSavedPreferences}
-            className="text-xs"
-            title="Reset to defaults"
-          >
-            Reset
-          </Button>
+          {/* Sort Direction */}
+          <div className="w-[40px]">
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() =>
+                setSortDirection(
+                  sortDirection === SortDirection.ASC
+                    ? SortDirection.DESC
+                    : SortDirection.ASC
+                )
+              }
+              className="w-full h-9"
+            >
+              {sortDirection === SortDirection.ASC ? (
+                <SortAsc className="h-4 w-4" />
+              ) : (
+                <SortDesc className="h-4 w-4" />
+              )}
+            </Button>
+          </div>
 
           {/* Refresh */}
-          <Button variant="outline" size="sm" onClick={handleRefresh}>
-            <RefreshCw className="h-4 w-4" />
-          </Button>
+          <div className="w-[40px]">
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={handleRefresh}
+              className="w-full h-9"
+            >
+              <RefreshCw className="h-4 w-4" />
+            </Button>
+          </div>
         </div>
       </div>
 
       {/* Category Tabs */}
       <TokenTabs onCategoryChange={handleTabChange} activeCategory={filter} />
 
-      {/* Results */}
+      {/* Results with Fade-out Effect */}
       {loading ? (
         <div className="flex justify-center items-center min-h-[200px]">
           <div className="animate-pulse flex items-center gap-2">
@@ -569,7 +626,20 @@ export const TokenContainer: React.FC<TokenContainerProps> = ({
           </Button>
         </div>
       ) : (
-        <TokenGrid tokens={tokens} />
+        <div className="relative">
+          {/* Token Grid with Fade-out Effect */}
+          <div
+            className="token-grid-container"
+            style={{
+              maskImage:
+                "linear-gradient(to bottom, rgb(0, 0, 0) 0%, rgb(0, 0, 0) 85%, transparent 100%)",
+              WebkitMaskImage:
+                "linear-gradient(to bottom, rgb(0, 0, 0) 0%, rgb(0, 0, 0) 85%, transparent 100%)",
+            }}
+          >
+            <TokenGrid tokens={tokens} />
+          </div>
+        </div>
       )}
     </div>
   );

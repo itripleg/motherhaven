@@ -89,7 +89,7 @@ const ThemeCustomizer = () => {
       colors: [
         { hue: 25, saturation: 85, lightness: 55 },
         { hue: 30, saturation: 8, lightness: 12 },
-        { hue: 45, saturation: 75, lightness: 60 },
+        { hue: 45, saturation: 75, lightness: 20 },
       ],
     },
     {
@@ -98,7 +98,7 @@ const ThemeCustomizer = () => {
       colors: [
         { hue: 280, saturation: 75, lightness: 50 },
         { hue: 270, saturation: 8, lightness: 9 },
-        { hue: 290, saturation: 65, lightness: 55 },
+        { hue: 290, saturation: 65, lightness: 35 },
       ],
     },
   ];
@@ -203,7 +203,7 @@ const ThemeCustomizer = () => {
   }
 
   return (
-    <div className="min-h-screen animated-bg floating-particles">
+    <div className="min-h-screen animated-bg floating-particles md:pt-20">
       <Container className="py-8 space-y-8">
         {/* Header */}
         <motion.div
