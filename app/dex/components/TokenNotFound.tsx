@@ -29,9 +29,9 @@ export function TokenNotFound({ address }: { address: string }) {
       />
       <div className="mt-4">
         <TokenContainer
-          tokens={filteredTokens}
-          isLoading={isLoading}
-          error={error}
+        // tokens={filteredTokens}
+        // isLoading={isLoading}
+        // error={error}
         />
       </div>
     </div>

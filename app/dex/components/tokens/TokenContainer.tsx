@@ -1,5 +1,6 @@
-// components/tokens/TokenContainer.tsx - Simplified, clean interface
+// components/tokens/TokenContainer.tsx - Fixed filtering and sorting logic
 import { useState, useEffect } from "react";
+import React from "react";
 import { TokenTabs } from "./TokenTabs";
 import { TokenGrid } from "./TokenGrid";
 import { FilterBy, SortBy, SortDirection } from "@/final-hooks/useTokenList";
@@ -29,7 +30,7 @@ import { Badge } from "@/components/ui/badge";
 import { SortAsc, SortDesc, RefreshCw } from "lucide-react";
 
 interface TokenContainerProps {
-  searchQuery?: string; // Use the external search from main page
+  searchQuery?: string;
 }
 
 interface TokenListItem {
@@ -100,7 +101,7 @@ const convertToToken = (item: TokenListItem): Token => {
 };
 
 export const TokenContainer: React.FC<TokenContainerProps> = ({
-  searchQuery = "", // Only use external search
+  searchQuery = "",
 }) => {
   const [filter, setFilter] = useState<FilterBy>(FilterBy.ALL);
   const [sortBy, setSortBy] = useState<SortBy>(SortBy.NEWEST);
@@ -112,8 +113,8 @@ export const TokenContainer: React.FC<TokenContainerProps> = ({
   const [error, setError] = useState<string | null>(null);
   const [lastRefresh, setLastRefresh] = useState(Date.now());
 
-  // Trending calculation
-  const calculateTrendingScore = (item: TokenListItem) => {
+  // Enhanced trending calculation
+  const calculateTrendingScore = React.useCallback((item: TokenListItem) => {
     const volume = parseFloat(item.statistics.volumeETH || "0");
     const trades = item.statistics.tradeCount || 0;
     const holders = item.statistics.uniqueHolders || 0;
@@ -137,7 +138,100 @@ export const TokenContainer: React.FC<TokenContainerProps> = ({
     if (holders > 0 && trades / holders > 2) score += 10;
 
     return score;
-  };
+  }, []);
+
+  // FIXED: Separate sorting function that respects both filter and sort preferences
+  const applySorting = React.useCallback(
+    (items: TokenListItem[], includeTrendingScore = false) => {
+      // Add trending scores if needed
+      const itemsWithScores = items.map((item) => ({
+        ...item,
+        trendingScore: includeTrendingScore ? calculateTrendingScore(item) : 0,
+      })) as (TokenListItem & { trendingScore: number })[];
+
+      return itemsWithScores.sort((a, b) => {
+        let aValue: string | number;
+        let bValue: string | number;
+
+        switch (sortBy) {
+          case SortBy.NAME:
+            aValue = a.name.toLowerCase();
+            bValue = b.name.toLowerCase();
+            break;
+          case SortBy.SYMBOL:
+            aValue = a.symbol.toLowerCase();
+            bValue = b.symbol.toLowerCase();
+            break;
+          case SortBy.PRICE:
+            aValue = parseFloat(a.currentPrice);
+            bValue = parseFloat(b.currentPrice);
+            break;
+          case SortBy.VOLUME:
+            aValue = parseFloat(a.statistics.volumeETH);
+            bValue = parseFloat(b.statistics.volumeETH);
+            break;
+          case SortBy.OLDEST:
+            aValue = new Date(a.createdAt).getTime();
+            bValue = new Date(b.createdAt).getTime();
+            break;
+          case SortBy.NEWEST:
+          default:
+            aValue = new Date(a.createdAt).getTime();
+            bValue = new Date(b.createdAt).getTime();
+            break;
+        }
+
+        // FIXED: Handle string vs number comparison properly
+        if (typeof aValue === "string" && typeof bValue === "string") {
+          return sortDirection === SortDirection.ASC
+            ? aValue.localeCompare(bValue)
+            : bValue.localeCompare(aValue);
+        } else {
+          return sortDirection === SortDirection.ASC
+            ? (aValue as number) - (bValue as number)
+            : (bValue as number) - (aValue as number);
+        }
+      });
+    },
+    [sortBy, sortDirection, calculateTrendingScore]
+  );
+
+  // FIXED: Filter application that doesn't interfere with sorting
+  const applyFilters = React.useCallback(
+    (items: TokenListItem[]) => {
+      let filteredItems = items;
+
+      // Apply category filters first
+      if (filter === FilterBy.TRADING) {
+        filteredItems = filteredItems.filter((item) => item.state === 1);
+      } else if (filter === FilterBy.NEW) {
+        const oneDayAgo = Date.now() - 24 * 60 * 60 * 1000;
+        filteredItems = filteredItems.filter((item) => {
+          const createdTime = new Date(item.createdAt).getTime();
+          return createdTime > oneDayAgo;
+        });
+      } else if (filter === FilterBy.TRENDING) {
+        // FIXED: For trending, filter by score but still allow user sorting
+        const tokensWithScores = filteredItems.map((item) => ({
+          ...item,
+          trendingScore: calculateTrendingScore(item),
+        }));
+
+        filteredItems = tokensWithScores
+          .filter((item) => item.trendingScore >= 25)
+          .slice(0, 50);
+      } else if (filter === FilterBy.GOAL_REACHED) {
+        filteredItems = filteredItems.filter((item) => {
+          const collateral = parseFloat(item.collateral || "0");
+          const goal = parseFloat(item.fundingGoal);
+          return goal > 0 && collateral >= goal * 0.8;
+        });
+      }
+
+      return filteredItems;
+    },
+    [filter, calculateTrendingScore]
+  );
 
   // Firestore data fetching
   useEffect(() => {
@@ -226,10 +320,8 @@ export const TokenContainer: React.FC<TokenContainerProps> = ({
             tokenListItems.push(item);
           });
 
-          // Apply client-side filtering
+          // FIXED: Apply search filter
           let filteredItems = tokenListItems;
-
-          // Search filter (only use external search)
           if (searchQuery && searchQuery.trim()) {
             const query = searchQuery.toLowerCase().trim();
             filteredItems = filteredItems.filter(
@@ -240,86 +332,12 @@ export const TokenContainer: React.FC<TokenContainerProps> = ({
             );
           }
 
-          // Category filters
-          if (filter === FilterBy.TRADING) {
-            filteredItems = filteredItems.filter((item) => item.state === 1);
-          } else if (filter === FilterBy.NEW) {
-            const oneDayAgo = Date.now() - 24 * 60 * 60 * 1000;
-            filteredItems = filteredItems.filter((item) => {
-              const createdTime = new Date(item.createdAt).getTime();
-              return createdTime > oneDayAgo;
-            });
-          } else if (filter === FilterBy.TRENDING) {
-            const tokensWithScores = filteredItems.map((item) => ({
-              ...item,
-              trendingScore: calculateTrendingScore(item),
-            }));
+          // FIXED: Apply category filters
+          filteredItems = applyFilters(filteredItems);
 
-            filteredItems = tokensWithScores
-              .filter(
-                (item) =>
-                  (item as typeof item & { trendingScore: number })
-                    .trendingScore >= 25
-              )
-              .sort(
-                (a, b) =>
-                  (b as typeof b & { trendingScore: number }).trendingScore -
-                  (a as typeof a & { trendingScore: number }).trendingScore
-              )
-              .slice(0, 50);
-          } else if (filter === FilterBy.GOAL_REACHED) {
-            filteredItems = filteredItems.filter((item) => {
-              const collateral = parseFloat(item.collateral || "0");
-              const goal = parseFloat(item.fundingGoal);
-              return goal > 0 && collateral >= goal * 0.8;
-            });
-          }
-
-          // Apply sorting (if not trending)
-          if (filter !== FilterBy.TRENDING) {
-            filteredItems.sort((a, b) => {
-              let aValue: string | number;
-              let bValue: string | number;
-
-              switch (sortBy) {
-                case SortBy.NAME:
-                  aValue = a.name.toLowerCase();
-                  bValue = b.name.toLowerCase();
-                  break;
-                case SortBy.SYMBOL:
-                  aValue = a.symbol.toLowerCase();
-                  bValue = b.symbol.toLowerCase();
-                  break;
-                case SortBy.PRICE:
-                  aValue = parseFloat(a.currentPrice);
-                  bValue = parseFloat(b.currentPrice);
-                  break;
-                case SortBy.VOLUME:
-                  aValue = parseFloat(a.statistics.volumeETH);
-                  bValue = parseFloat(b.statistics.volumeETH);
-                  break;
-                case SortBy.OLDEST:
-                  aValue = new Date(a.createdAt).getTime();
-                  bValue = new Date(b.createdAt).getTime();
-                  break;
-                case SortBy.NEWEST:
-                default:
-                  aValue = new Date(b.createdAt).getTime();
-                  bValue = new Date(a.createdAt).getTime();
-                  break;
-              }
-
-              if (typeof aValue === "string" && typeof bValue === "string") {
-                return sortDirection === SortDirection.ASC
-                  ? aValue.localeCompare(bValue)
-                  : bValue.localeCompare(aValue);
-              } else {
-                return sortDirection === SortDirection.ASC
-                  ? (aValue as number) - (bValue as number)
-                  : (bValue as number) - (aValue as number);
-              }
-            });
-          }
+          // FIXED: Apply sorting (always applied, regardless of filter)
+          const includeTrendingScore = filter === FilterBy.TRENDING;
+          filteredItems = applySorting(filteredItems, includeTrendingScore);
 
           // Convert to Token format
           const convertedTokens = filteredItems.map(convertToToken);
@@ -343,7 +361,15 @@ export const TokenContainer: React.FC<TokenContainerProps> = ({
       );
       setLoading(false);
     }
-  }, [filter, sortBy, sortDirection, searchQuery, lastRefresh]);
+  }, [
+    filter,
+    sortBy,
+    sortDirection,
+    searchQuery,
+    lastRefresh,
+    applyFilters,
+    applySorting,
+  ]);
 
   const handleRefresh = () => {
     setLastRefresh(Date.now());
@@ -372,15 +398,37 @@ export const TokenContainer: React.FC<TokenContainerProps> = ({
     }
   };
 
+  // FIXED: Updated getSortLabel to include all valid SortBy enum values
+  const getSortLabel = React.useCallback(() => {
+    const baseLabel = {
+      [SortBy.NEWEST]: "Newest",
+      [SortBy.OLDEST]: "Oldest",
+      [SortBy.NAME]: "Name",
+      [SortBy.SYMBOL]: "Symbol",
+      [SortBy.PRICE]: "Price",
+      [SortBy.VOLUME]: "Volume",
+    }[sortBy];
+
+    const direction = sortDirection === SortDirection.ASC ? "↑" : "↓";
+    return `${baseLabel} ${direction}`;
+  }, [sortBy, sortDirection]);
+
   return (
     <div className="space-y-6">
-      {/* Simple controls bar - only sort and refresh */}
+      {/* Enhanced controls bar */}
       <div className="flex items-center justify-between">
         <div className="flex items-center gap-3">
           {/* Show active search */}
           {searchQuery && (
             <Badge variant="secondary" className="gap-1">
               🔍 &quot;{searchQuery}&quot;
+            </Badge>
+          )}
+
+          {/* Show active filter */}
+          {filter !== FilterBy.ALL && (
+            <Badge variant="outline" className="gap-1">
+              📊 {filter.toLowerCase().replace("_", " ")}
             </Badge>
           )}
 
@@ -391,24 +439,25 @@ export const TokenContainer: React.FC<TokenContainerProps> = ({
         </div>
 
         <div className="flex items-center gap-2">
-          {/* Sort */}
+          {/* Enhanced Sort */}
           <Select
             value={sortBy}
             onValueChange={(value) => setSortBy(value as SortBy)}
           >
             <SelectTrigger className="w-[140px] h-9">
-              <SelectValue />
+              <SelectValue placeholder={getSortLabel()} />
             </SelectTrigger>
             <SelectContent>
               <SelectItem value={SortBy.NEWEST}>Newest First</SelectItem>
               <SelectItem value={SortBy.OLDEST}>Oldest First</SelectItem>
               <SelectItem value={SortBy.NAME}>Name A-Z</SelectItem>
+              <SelectItem value={SortBy.SYMBOL}>Symbol A-Z</SelectItem>
               <SelectItem value={SortBy.PRICE}>Price</SelectItem>
               <SelectItem value={SortBy.VOLUME}>Volume</SelectItem>
             </SelectContent>
           </Select>
 
-          {/* Sort Direction */}
+          {/* Enhanced Sort Direction with visual feedback */}
           <Button
             variant="outline"
             size="sm"
@@ -419,12 +468,15 @@ export const TokenContainer: React.FC<TokenContainerProps> = ({
                   : SortDirection.ASC
               )
             }
+            className="relative"
           >
             {sortDirection === SortDirection.ASC ? (
               <SortAsc className="h-4 w-4" />
             ) : (
               <SortDesc className="h-4 w-4" />
             )}
+            {/* Visual indicator */}
+            <span className="absolute -top-1 -right-1 w-2 h-2 bg-blue-500 rounded-full animate-pulse" />
           </Button>
 
           {/* Refresh */}
