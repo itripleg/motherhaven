@@ -270,12 +270,12 @@ export default function FactoryPage() {
   }
 
   return (
-    <div className="min-h-screen animated-bg floating-particles">
+    <div className="min-h-screen animated-bg floating-particles md:pt-20">
       {/* Dynamic Background Image */}
       {backgroundImage && (
         <div className="fixed inset-0 z-0">
           <div
-            className="absolute inset-0 bg-cover bg-center opacity-20"
+            className="absolute inset-0 bg-cover bg-center opacity-50"
             style={{ backgroundImage: `url(${backgroundImage})` }}
           />
           <div className="absolute inset-0 bg-gradient-to-br from-background/80 via-background/90 to-background/80" />

@@ -7,10 +7,7 @@
     "dev": "next dev --turbopack",
     "build": "next build",
     "start": "next start",
-    "lint": "next lint",
-    "extract-abis": "tsx scripts/extract-abis.ts",
-    "contracts:update": "npm run extract-abis && echo '✅ Contract ABIs updated successfully!'",
-    "contracts:watch": "nodemon --watch 'contracts/nu-nu/artifacts/**/*.json' --exec 'npm run extract-abis'"
+    "lint": "next lint"
   },
   "dependencies": {
     "@hookform/resolvers": "^3.9.0",

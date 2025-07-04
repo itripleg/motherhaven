@@ -1,3 +1,4 @@
+// components/my-menu.tsx
 "use client";
 
 import { useState, useEffect } from "react";
@@ -217,22 +218,6 @@ export default function MyMenu() {
               Motherhaven
             </MenubarTrigger>
             <MenubarContent className="rounded-xl border-border/50 bg-background/95 backdrop-blur-md shadow-xl z-[110]">
-              {/* Factory Address */}
-              <MenubarItem>
-                <Link
-                  href="/dex/factory"
-                  className="flex items-center gap-3 cursor-pointer rounded-lg px-3 py-2 transition-colors duration-200 hover:bg-accent w-full"
-                >
-                  <Factory className="h-4 w-4 text-primary" />
-                  <div className="flex-1">
-                    <div className="text-xs">
-                      <AddressComponent hash={FACTORY_ADDRESS} type="address" />
-                    </div>
-                  </div>
-                </Link>
-              </MenubarItem>
-              <MenubarSeparator />
-
               {navItems.map((item) => (
                 <MenubarItem key={item.href}>
                   <Link
@@ -257,6 +242,23 @@ export default function MyMenu() {
                   </Link>
                 </MenubarItem>
               ))}
+
+              <MenubarSeparator />
+
+              {/* Factory Address - Moved to bottom */}
+              <MenubarItem>
+                <div className="flex items-center gap-3 px-3 py-2 w-full">
+                  <Factory className="h-4 w-4 text-primary" />
+                  <div className="flex-1">
+                    <div className="text-xs font-medium text-muted-foreground">
+                      Factory Address
+                    </div>
+                    <div className="text-xs">
+                      <AddressComponent hash={FACTORY_ADDRESS} type="address" />
+                    </div>
+                  </div>
+                </div>
+              </MenubarItem>
             </MenubarContent>
           </MenubarMenu>
 
@@ -463,17 +465,6 @@ export default function MyMenu() {
             </DropdownMenuContent>
           </DropdownMenu>
 
-          {/* Factory Address - More compact version */}
-          <div className="mb-3 px-3 py-1.5 bg-primary/5 rounded-lg border border-primary/10">
-            <div className="flex items-center justify-between">
-              <div className="flex items-center gap-2 text-xs text-primary">
-                <Factory className="h-3 w-3" />
-                <span className="font-medium">Factory:</span>
-              </div>
-              <AddressComponent hash={FACTORY_ADDRESS} type="address" />
-            </div>
-          </div>
-
           {/* User Status - More compact */}
           {isConnected && address ? (
             <div className="mb-3 px-3 py-1.5 bg-primary/5 rounded-lg border border-primary/10">
@@ -590,6 +581,17 @@ export default function MyMenu() {
               </div>
             </div>
           )}
+
+          {/* Factory Address - Moved to bottom for mobile too */}
+          <div className="px-3 py-1.5 bg-primary/5 rounded-lg border border-primary/10">
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-2 text-xs text-primary">
+                <Factory className="h-3 w-3" />
+                <span className="font-medium">Factory:</span>
+              </div>
+              <AddressComponent hash={FACTORY_ADDRESS} type="address" />
+            </div>
+          </div>
         </div>
       </div>
     </>

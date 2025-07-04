@@ -1,3 +1,4 @@
+// components/AddressComponent.tsx
 "use client";
 
 import { useState, useEffect } from "react";
@@ -106,14 +107,13 @@ export function AddressComponent({ hash, type }: TransactionHashProps) {
         animate={{ opacity: 1, y: 0 }}
         transition={{ duration: 0.5 }}
       >
-        <motion.button
-          onClick={handleExternalClick}
-          className="text-primary hover:text-white/80 transition-colors duration-200 cursor-pointer"
+        {/* Address text - no longer clickable */}
+        <motion.span
+          className="text-primary transition-colors duration-200 font-mono text-sm"
           whileHover={{ scale: 1.05 }}
-          whileTap={{ scale: 0.95 }}
         >
           {truncateHash(hash)}
-        </motion.button>
+        </motion.span>
 
         <Tooltip>
           <TooltipTrigger asChild>

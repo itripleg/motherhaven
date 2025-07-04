@@ -21,7 +21,7 @@ import { Container } from "@/components/craft";
 import { useToast } from "@/hooks/use-toast";
 import { Settings } from "lucide-react";
 
-import FAUCET_ABI from "@/contracts/nu-nu/Faucet_abi.json";
+import FAUCET_ABI from "@/contracts/final/Faucet_abi.json";
 const FAUCET_ADDRESS = "0x0B50C987D357a8000FCD88f7eC6D35A88775AfD2";
 
 const FaucetAdmin = () => {

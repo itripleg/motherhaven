@@ -30,9 +30,8 @@ import {
   ExternalLink,
   Sparkles,
 } from "lucide-react";
-import FAUCET_ABI from "@/contracts/nu-nu/Faucet_abi.json"; // Make sure this path is correct
-
-const FAUCET_ADDRESS = "0x0B50C987D357a8000FCD88f7eC6D35A88775AfD2";
+import FAUCET_ABI from "@/contracts/final/Faucet_abi.json"; // Make sure this path is correct
+import { FAUCET_ADDRESS } from "@/types";
 
 // Define a clear type for the button's state
 type ButtonState = {

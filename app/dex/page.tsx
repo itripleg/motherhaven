@@ -114,7 +114,7 @@ export default function DexPage() {
             transition={{ duration: 0.6, delay: 0.6 }}
             className="text-center py-12"
           >
-            <Card className="unified-card max-w-2xl mx-auto opacity-80">
+            <Card className="unified-card max-w-2xl mx-auto opacity-60">
               <CardContent className="p-8 space-y-4">
                 <div className="space-y-2">
                   <h3 className="text-2xl font-bold text-gradient">

@@ -2,9 +2,9 @@
 import { Abi, Address } from "viem";
 
 // Import directly from Remix-generated metadata files
-import TokenFactoryMetadata from "@/contracts/nu-nu/artifacts/TokenFactory_metadata.json";
-import TokenMetadata from "@/contracts/nu-nu/artifacts/Token_metadata.json";
-import YmirMetadata from "@/contracts/nu-nu/artifacts/Ymir_metadata.json";
+import TokenFactoryMetadata from "@/contracts/artifacts/GrandFactory_metadata.json";
+import TokenMetadata from "@/contracts/artifacts/BurnToken_metadata.json";
+import YmirMetadata from "@/contracts/artifacts/Ymir_metadata.json";
 
 // Extract ABIs from metadata
 export const FACTORY_ABI = TokenFactoryMetadata.output.abi as Abi;

@@ -4,7 +4,7 @@ import { Button } from "@/components/ui/button";
 import { moveCamPosition } from "@/hooks/CamTools";
 import { TokenSearch } from "./tokens/TokenSearch";
 import { CameraSearch } from "./CameraSearch";
-import { OuijaSearch } from "./OuijaSearch";
+// import { OuijaSearch } from "./OuijaSearch"; // Commented out - may restore later
 import { TokenPriceCategory } from "@/hooks/token/useTokenList";
 import { motion } from "framer-motion";
 
@@ -35,7 +35,13 @@ export const SearchContainer = ({
     if (searchMode === "token") {
       setSearchMode("camera");
     } else if (searchMode === "camera") {
-      setSearchMode("ouija");
+      // Skip ouija mode for now
+      // setSearchMode("ouija");
+      setSearchMode("token");
+      moveCamPosition({ cameraRef, x: 0, y: 0, z: -7, scale: 1 });
+      if (controlRef?.current) {
+        controlRef.current.autoRotateSpeed = 1;
+      }
     } else {
       setSearchMode("token");
       moveCamPosition({ cameraRef, x: 0, y: 0, z: -7, scale: 1 });
@@ -45,17 +51,18 @@ export const SearchContainer = ({
     }
   };
 
-  const handleOuijaInput = (key: string) => {
-    if (key === "submit") {
-      // Handle submission
-      return;
-    }
-    if (key === "clear") {
-      // Handle clear
-      return;
-    }
-    console.log("Ouija key pressed:", key);
-  };
+  // Commented out - may restore later
+  // const handleOuijaInput = (key: string) => {
+  //   if (key === "submit") {
+  //     // Handle submission
+  //     return;
+  //   }
+  //   if (key === "clear") {
+  //     // Handle clear
+  //     return;
+  //   }
+  //   console.log("Ouija key pressed:", key);
+  // };
 
   return (
     <div>
@@ -70,7 +77,7 @@ export const SearchContainer = ({
           {searchMode === "token"
             ? "👀"
             : searchMode === "camera"
-            ? "🔮"
+            ? "🔎" // Removed crystal ball emoji since ouija is disabled
             : "🔎"}
         </Button>
         {searchMode === "camera" && (
@@ -94,13 +101,12 @@ export const SearchContainer = ({
           onSecretFound={onSecretFound}
           showSecret={showSecret}
         />
-      ) : searchMode === "ouija" ? (
+      ) : (
+        /* searchMode === "ouija" ? (
         <div className="">
           <OuijaSearch onOuijaInput={handleOuijaInput} />
         </div>
-      ) : (
-        // <div>Token Search</div>
-        <TokenSearch
+      ) : */ <TokenSearch
           searchQuery={searchQuery}
           setSearchQuery={setSearchQuery}
           setActiveCategory={setActiveCategory}

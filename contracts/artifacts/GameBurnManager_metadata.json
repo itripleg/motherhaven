@@ -1,0 +1,1005 @@
+{
+	"compiler": {
+		"version": "0.8.30+commit.73712a01"
+	},
+	"language": "Solidity",
+	"output": {
+		"abi": [
+			{
+				"inputs": [],
+				"stateMutability": "nonpayable",
+				"type": "constructor"
+			},
+			{
+				"inputs": [
+					{
+						"internalType": "address",
+						"name": "owner",
+						"type": "address"
+					}
+				],
+				"name": "OwnableInvalidOwner",
+				"type": "error"
+			},
+			{
+				"inputs": [
+					{
+						"internalType": "address",
+						"name": "account",
+						"type": "address"
+					}
+				],
+				"name": "OwnableUnauthorizedAccount",
+				"type": "error"
+			},
+			{
+				"inputs": [],
+				"name": "ReentrancyGuardReentrantCall",
+				"type": "error"
+			},
+			{
+				"anonymous": false,
+				"inputs": [
+					{
+						"indexed": true,
+						"internalType": "address",
+						"name": "depositor",
+						"type": "address"
+					},
+					{
+						"indexed": false,
+						"internalType": "uint256",
+						"name": "amount",
+						"type": "uint256"
+					}
+				],
+				"name": "AvaxDeposited",
+				"type": "event"
+			},
+			{
+				"anonymous": false,
+				"inputs": [
+					{
+						"indexed": true,
+						"internalType": "address",
+						"name": "recipient",
+						"type": "address"
+					},
+					{
+						"indexed": false,
+						"internalType": "uint256",
+						"name": "amount",
+						"type": "uint256"
+					}
+				],
+				"name": "AvaxWithdrawn",
+				"type": "event"
+			},
+			{
+				"anonymous": false,
+				"inputs": [
+					{
+						"indexed": true,
+						"internalType": "uint256",
+						"name": "gameId",
+						"type": "uint256"
+					},
+					{
+						"indexed": true,
+						"internalType": "address",
+						"name": "player",
+						"type": "address"
+					},
+					{
+						"indexed": false,
+						"internalType": "enum GameBurnManager.GameOutcome",
+						"name": "outcome",
+						"type": "uint8"
+					},
+					{
+						"indexed": false,
+						"internalType": "uint256",
+						"name": "rewardAmount",
+						"type": "uint256"
+					},
+					{
+						"indexed": false,
+						"internalType": "string",
+						"name": "aiMessage",
+						"type": "string"
+					},
+					{
+						"indexed": false,
+						"internalType": "uint256",
+						"name": "timestamp",
+						"type": "uint256"
+					}
+				],
+				"name": "GameCompleted",
+				"type": "event"
+			},
+			{
+				"anonymous": false,
+				"inputs": [
+					{
+						"indexed": false,
+						"internalType": "enum GameBurnManager.GameType",
+						"name": "gameType",
+						"type": "uint8"
+					},
+					{
+						"indexed": false,
+						"internalType": "uint256",
+						"name": "minBurn",
+						"type": "uint256"
+					},
+					{
+						"indexed": false,
+						"internalType": "uint256",
+						"name": "rewardMultiplier",
+						"type": "uint256"
+					}
+				],
+				"name": "GameConfigUpdated",
+				"type": "event"
+			},
+			{
+				"anonymous": false,
+				"inputs": [
+					{
+						"indexed": true,
+						"internalType": "uint256",
+						"name": "gameId",
+						"type": "uint256"
+					},
+					{
+						"indexed": true,
+						"internalType": "address",
+						"name": "player",
+						"type": "address"
+					},
+					{
+						"indexed": true,
+						"internalType": "address",
+						"name": "token",
+						"type": "address"
+					},
+					{
+						"indexed": false,
+						"internalType": "uint256",
+						"name": "burnedAmount",
+						"type": "uint256"
+					},
+					{
+						"indexed": false,
+						"internalType": "enum GameBurnManager.GameType",
+						"name": "gameType",
+						"type": "uint8"
+					},
+					{
+						"indexed": false,
+						"internalType": "uint256",
+						"name": "timestamp",
+						"type": "uint256"
+					}
+				],
+				"name": "GameStarted",
+				"type": "event"
+			},
+			{
+				"anonymous": false,
+				"inputs": [
+					{
+						"indexed": true,
+						"internalType": "address",
+						"name": "previousOwner",
+						"type": "address"
+					},
+					{
+						"indexed": true,
+						"internalType": "address",
+						"name": "newOwner",
+						"type": "address"
+					}
+				],
+				"name": "OwnershipTransferred",
+				"type": "event"
+			},
+			{
+				"anonymous": false,
+				"inputs": [
+					{
+						"indexed": true,
+						"internalType": "address",
+						"name": "token",
+						"type": "address"
+					},
+					{
+						"indexed": false,
+						"internalType": "bool",
+						"name": "supported",
+						"type": "bool"
+					}
+				],
+				"name": "TokenSupported",
+				"type": "event"
+			},
+			{
+				"inputs": [],
+				"name": "avaxRewardPool",
+				"outputs": [
+					{
+						"internalType": "uint256",
+						"name": "",
+						"type": "uint256"
+					}
+				],
+				"stateMutability": "view",
+				"type": "function"
+			},
+			{
+				"inputs": [
+					{
+						"internalType": "uint256",
+						"name": "burnAmount",
+						"type": "uint256"
+					},
+					{
+						"internalType": "enum GameBurnManager.GameType",
+						"name": "gameType",
+						"type": "uint8"
+					},
+					{
+						"internalType": "enum GameBurnManager.GameOutcome",
+						"name": "outcome",
+						"type": "uint8"
+					}
+				],
+				"name": "calculatePotentialReward",
+				"outputs": [
+					{
+						"internalType": "uint256",
+						"name": "",
+						"type": "uint256"
+					}
+				],
+				"stateMutability": "view",
+				"type": "function"
+			},
+			{
+				"inputs": [
+					{
+						"internalType": "uint256",
+						"name": "gameId",
+						"type": "uint256"
+					},
+					{
+						"internalType": "enum GameBurnManager.GameOutcome",
+						"name": "outcome",
+						"type": "uint8"
+					},
+					{
+						"internalType": "string",
+						"name": "aiMessage",
+						"type": "string"
+					}
+				],
+				"name": "completeGame",
+				"outputs": [],
+				"stateMutability": "nonpayable",
+				"type": "function"
+			},
+			{
+				"inputs": [],
+				"name": "depositAvax",
+				"outputs": [],
+				"stateMutability": "payable",
+				"type": "function"
+			},
+			{
+				"inputs": [],
+				"name": "emergencyWithdrawAvax",
+				"outputs": [],
+				"stateMutability": "nonpayable",
+				"type": "function"
+			},
+			{
+				"inputs": [
+					{
+						"internalType": "enum GameBurnManager.GameType",
+						"name": "",
+						"type": "uint8"
+					}
+				],
+				"name": "gameConfigs",
+				"outputs": [
+					{
+						"internalType": "uint256",
+						"name": "minBurnAmount",
+						"type": "uint256"
+					},
+					{
+						"internalType": "uint256",
+						"name": "baseRewardWei",
+						"type": "uint256"
+					},
+					{
+						"internalType": "uint256",
+						"name": "rewardPerToken",
+						"type": "uint256"
+					},
+					{
+						"internalType": "uint256",
+						"name": "winProbability",
+						"type": "uint256"
+					},
+					{
+						"internalType": "bool",
+						"name": "enabled",
+						"type": "bool"
+					}
+				],
+				"stateMutability": "view",
+				"type": "function"
+			},
+			{
+				"inputs": [
+					{
+						"internalType": "uint256",
+						"name": "",
+						"type": "uint256"
+					}
+				],
+				"name": "gameSessions",
+				"outputs": [
+					{
+						"internalType": "uint256",
+						"name": "gameId",
+						"type": "uint256"
+					},
+					{
+						"internalType": "address",
+						"name": "player",
+						"type": "address"
+					},
+					{
+						"internalType": "address",
+						"name": "token",
+						"type": "address"
+					},
+					{
+						"internalType": "uint256",
+						"name": "burnedAmount",
+						"type": "uint256"
+					},
+					{
+						"internalType": "enum GameBurnManager.GameType",
+						"name": "gameType",
+						"type": "uint8"
+					},
+					{
+						"internalType": "enum GameBurnManager.GameOutcome",
+						"name": "outcome",
+						"type": "uint8"
+					},
+					{
+						"internalType": "uint256",
+						"name": "rewardAmount",
+						"type": "uint256"
+					},
+					{
+						"internalType": "string",
+						"name": "aiMessage",
+						"type": "string"
+					},
+					{
+						"internalType": "uint256",
+						"name": "startTime",
+						"type": "uint256"
+					},
+					{
+						"internalType": "uint256",
+						"name": "endTime",
+						"type": "uint256"
+					},
+					{
+						"internalType": "bool",
+						"name": "completed",
+						"type": "bool"
+					}
+				],
+				"stateMutability": "view",
+				"type": "function"
+			},
+			{
+				"inputs": [],
+				"name": "getAvaxRewardPool",
+				"outputs": [
+					{
+						"internalType": "uint256",
+						"name": "",
+						"type": "uint256"
+					}
+				],
+				"stateMutability": "view",
+				"type": "function"
+			},
+			{
+				"inputs": [
+					{
+						"internalType": "uint256",
+						"name": "gameId",
+						"type": "uint256"
+					}
+				],
+				"name": "getGame",
+				"outputs": [
+					{
+						"components": [
+							{
+								"internalType": "uint256",
+								"name": "gameId",
+								"type": "uint256"
+							},
+							{
+								"internalType": "address",
+								"name": "player",
+								"type": "address"
+							},
+							{
+								"internalType": "address",
+								"name": "token",
+								"type": "address"
+							},
+							{
+								"internalType": "uint256",
+								"name": "burnedAmount",
+								"type": "uint256"
+							},
+							{
+								"internalType": "enum GameBurnManager.GameType",
+								"name": "gameType",
+								"type": "uint8"
+							},
+							{
+								"internalType": "enum GameBurnManager.GameOutcome",
+								"name": "outcome",
+								"type": "uint8"
+							},
+							{
+								"internalType": "uint256",
+								"name": "rewardAmount",
+								"type": "uint256"
+							},
+							{
+								"internalType": "string",
+								"name": "aiMessage",
+								"type": "string"
+							},
+							{
+								"internalType": "uint256",
+								"name": "startTime",
+								"type": "uint256"
+							},
+							{
+								"internalType": "uint256",
+								"name": "endTime",
+								"type": "uint256"
+							},
+							{
+								"internalType": "bool",
+								"name": "completed",
+								"type": "bool"
+							}
+						],
+						"internalType": "struct GameBurnManager.GameSession",
+						"name": "",
+						"type": "tuple"
+					}
+				],
+				"stateMutability": "view",
+				"type": "function"
+			},
+			{
+				"inputs": [
+					{
+						"internalType": "enum GameBurnManager.GameType",
+						"name": "gameType",
+						"type": "uint8"
+					}
+				],
+				"name": "getGameConfig",
+				"outputs": [
+					{
+						"components": [
+							{
+								"internalType": "uint256",
+								"name": "minBurnAmount",
+								"type": "uint256"
+							},
+							{
+								"internalType": "uint256",
+								"name": "baseRewardWei",
+								"type": "uint256"
+							},
+							{
+								"internalType": "uint256",
+								"name": "rewardPerToken",
+								"type": "uint256"
+							},
+							{
+								"internalType": "uint256",
+								"name": "winProbability",
+								"type": "uint256"
+							},
+							{
+								"internalType": "bool",
+								"name": "enabled",
+								"type": "bool"
+							}
+						],
+						"internalType": "struct GameBurnManager.GameConfig",
+						"name": "",
+						"type": "tuple"
+					}
+				],
+				"stateMutability": "view",
+				"type": "function"
+			},
+			{
+				"inputs": [],
+				"name": "getGameStats",
+				"outputs": [
+					{
+						"internalType": "uint256",
+						"name": "totalGames",
+						"type": "uint256"
+					},
+					{
+						"internalType": "uint256",
+						"name": "completedGames",
+						"type": "uint256"
+					},
+					{
+						"internalType": "uint256",
+						"name": "activeGames",
+						"type": "uint256"
+					}
+				],
+				"stateMutability": "view",
+				"type": "function"
+			},
+			{
+				"inputs": [
+					{
+						"internalType": "address",
+						"name": "player",
+						"type": "address"
+					}
+				],
+				"name": "getPlayerActiveGames",
+				"outputs": [
+					{
+						"internalType": "uint256[]",
+						"name": "",
+						"type": "uint256[]"
+					}
+				],
+				"stateMutability": "view",
+				"type": "function"
+			},
+			{
+				"inputs": [
+					{
+						"internalType": "address",
+						"name": "player",
+						"type": "address"
+					}
+				],
+				"name": "getPlayerGames",
+				"outputs": [
+					{
+						"internalType": "uint256[]",
+						"name": "",
+						"type": "uint256[]"
+					}
+				],
+				"stateMutability": "view",
+				"type": "function"
+			},
+			{
+				"inputs": [],
+				"name": "nextGameId",
+				"outputs": [
+					{
+						"internalType": "uint256",
+						"name": "",
+						"type": "uint256"
+					}
+				],
+				"stateMutability": "view",
+				"type": "function"
+			},
+			{
+				"inputs": [
+					{
+						"internalType": "address",
+						"name": "burner",
+						"type": "address"
+					},
+					{
+						"internalType": "uint256",
+						"name": "amount",
+						"type": "uint256"
+					}
+				],
+				"name": "notifyBurn",
+				"outputs": [],
+				"stateMutability": "nonpayable",
+				"type": "function"
+			},
+			{
+				"inputs": [],
+				"name": "owner",
+				"outputs": [
+					{
+						"internalType": "address",
+						"name": "",
+						"type": "address"
+					}
+				],
+				"stateMutability": "view",
+				"type": "function"
+			},
+			{
+				"inputs": [],
+				"name": "paused",
+				"outputs": [
+					{
+						"internalType": "bool",
+						"name": "",
+						"type": "bool"
+					}
+				],
+				"stateMutability": "view",
+				"type": "function"
+			},
+			{
+				"inputs": [
+					{
+						"internalType": "address",
+						"name": "",
+						"type": "address"
+					},
+					{
+						"internalType": "uint256",
+						"name": "",
+						"type": "uint256"
+					}
+				],
+				"name": "playerGames",
+				"outputs": [
+					{
+						"internalType": "uint256",
+						"name": "",
+						"type": "uint256"
+					}
+				],
+				"stateMutability": "view",
+				"type": "function"
+			},
+			{
+				"inputs": [],
+				"name": "renounceOwnership",
+				"outputs": [],
+				"stateMutability": "nonpayable",
+				"type": "function"
+			},
+			{
+				"inputs": [
+					{
+						"internalType": "enum GameBurnManager.GameType",
+						"name": "gameType",
+						"type": "uint8"
+					},
+					{
+						"internalType": "uint256",
+						"name": "minBurnAmount",
+						"type": "uint256"
+					},
+					{
+						"internalType": "uint256",
+						"name": "baseRewardWei",
+						"type": "uint256"
+					},
+					{
+						"internalType": "uint256",
+						"name": "rewardPerToken",
+						"type": "uint256"
+					},
+					{
+						"internalType": "uint256",
+						"name": "winProbability",
+						"type": "uint256"
+					},
+					{
+						"internalType": "bool",
+						"name": "enabled",
+						"type": "bool"
+					}
+				],
+				"name": "setGameConfig",
+				"outputs": [],
+				"stateMutability": "nonpayable",
+				"type": "function"
+			},
+			{
+				"inputs": [
+					{
+						"internalType": "bool",
+						"name": "_paused",
+						"type": "bool"
+					}
+				],
+				"name": "setPaused",
+				"outputs": [],
+				"stateMutability": "nonpayable",
+				"type": "function"
+			},
+			{
+				"inputs": [
+					{
+						"internalType": "address",
+						"name": "token",
+						"type": "address"
+					},
+					{
+						"internalType": "bool",
+						"name": "supported",
+						"type": "bool"
+					}
+				],
+				"name": "setSupportedToken",
+				"outputs": [],
+				"stateMutability": "nonpayable",
+				"type": "function"
+			},
+			{
+				"inputs": [
+					{
+						"internalType": "address",
+						"name": "",
+						"type": "address"
+					}
+				],
+				"name": "supportedTokens",
+				"outputs": [
+					{
+						"internalType": "bool",
+						"name": "",
+						"type": "bool"
+					}
+				],
+				"stateMutability": "view",
+				"type": "function"
+			},
+			{
+				"inputs": [
+					{
+						"internalType": "address",
+						"name": "token",
+						"type": "address"
+					}
+				],
+				"name": "supportsToken",
+				"outputs": [
+					{
+						"internalType": "bool",
+						"name": "",
+						"type": "bool"
+					}
+				],
+				"stateMutability": "view",
+				"type": "function"
+			},
+			{
+				"inputs": [
+					{
+						"internalType": "address",
+						"name": "newOwner",
+						"type": "address"
+					}
+				],
+				"name": "transferOwnership",
+				"outputs": [],
+				"stateMutability": "nonpayable",
+				"type": "function"
+			},
+			{
+				"inputs": [
+					{
+						"internalType": "uint256",
+						"name": "amount",
+						"type": "uint256"
+					}
+				],
+				"name": "withdrawAvax",
+				"outputs": [],
+				"stateMutability": "nonpayable",
+				"type": "function"
+			},
+			{
+				"stateMutability": "payable",
+				"type": "receive"
+			}
+		],
+		"devdoc": {
+			"details": "A burn manager that creates game sessions where players burn tokens to battle an AI adversary. Players burn tokens to start games, and rewards are paid out in AVAX.",
+			"errors": {
+				"OwnableInvalidOwner(address)": [
+					{
+						"details": "The owner is not a valid owner account. (eg. `address(0)`)"
+					}
+				],
+				"OwnableUnauthorizedAccount(address)": [
+					{
+						"details": "The caller account is not authorized to perform an operation."
+					}
+				],
+				"ReentrancyGuardReentrantCall()": [
+					{
+						"details": "Unauthorized reentrant call."
+					}
+				]
+			},
+			"kind": "dev",
+			"methods": {
+				"calculatePotentialReward(uint256,uint8,uint8)": {
+					"details": "Calculate potential AVAX reward for a burn amount and game type"
+				},
+				"completeGame(uint256,uint8,string)": {
+					"details": "Owner completes a game with outcome and message (AI bot functionality)"
+				},
+				"depositAvax()": {
+					"details": "Deposit AVAX to fund rewards (anyone can call)"
+				},
+				"emergencyWithdrawAvax()": {
+					"details": "Emergency withdraw all AVAX (owner only)"
+				},
+				"getAvaxRewardPool()": {
+					"details": "Get AVAX reward pool balance"
+				},
+				"getGame(uint256)": {
+					"details": "Get game information"
+				},
+				"getGameConfig(uint8)": {
+					"details": "Get game configuration"
+				},
+				"getGameStats()": {
+					"details": "Get game statistics"
+				},
+				"getPlayerActiveGames(address)": {
+					"details": "Get active (uncompleted) games for a player"
+				},
+				"getPlayerGames(address)": {
+					"details": "Get player's game history"
+				},
+				"notifyBurn(address,uint256)": {
+					"details": "Called when tokens are burned, automatically starts a game"
+				},
+				"owner()": {
+					"details": "Returns the address of the current owner."
+				},
+				"renounceOwnership()": {
+					"details": "Leaves the contract without owner. It will not be possible to call `onlyOwner` functions. Can only be called by the current owner. NOTE: Renouncing ownership will leave the contract without an owner, thereby disabling any functionality that is only available to the owner."
+				},
+				"setGameConfig(uint8,uint256,uint256,uint256,uint256,bool)": {
+					"details": "Update game configuration"
+				},
+				"setPaused(bool)": {
+					"details": "Pause/unpause the contract"
+				},
+				"setSupportedToken(address,bool)": {
+					"details": "Add or remove token support"
+				},
+				"supportsToken(address)": {
+					"details": "Check if this manager supports a specific token"
+				},
+				"transferOwnership(address)": {
+					"details": "Transfers ownership of the contract to a new account (`newOwner`). Can only be called by the current owner."
+				},
+				"withdrawAvax(uint256)": {
+					"details": "Withdraw AVAX from reward pool (owner only)"
+				}
+			},
+			"stateVariables": {
+				"avaxRewardPool": {
+					"details": "Total AVAX available for rewards"
+				},
+				"gameConfigs": {
+					"details": "Game configurations for each game type"
+				},
+				"gameSessions": {
+					"details": "All game sessions"
+				},
+				"nextGameId": {
+					"details": "Counter for unique game IDs"
+				},
+				"paused": {
+					"details": "Emergency pause mechanism"
+				},
+				"playerGames": {
+					"details": "Player's active games"
+				},
+				"supportedTokens": {
+					"details": "Supported tokens for burning"
+				}
+			},
+			"title": "GameBurnManager",
+			"version": 1
+		},
+		"userdoc": {
+			"kind": "user",
+			"methods": {},
+			"version": 1
+		}
+	},
+	"settings": {
+		"compilationTarget": {
+			"final/GameBurnManager.sol": "GameBurnManager"
+		},
+		"evmVersion": "prague",
+		"libraries": {},
+		"metadata": {
+			"bytecodeHash": "ipfs"
+		},
+		"optimizer": {
+			"enabled": true,
+			"runs": 200
+		},
+		"remappings": []
+	},
+	"sources": {
+		"@openzeppelin/contracts/access/Ownable.sol": {
+			"keccak256": "0xff6d0bb2e285473e5311d9d3caacb525ae3538a80758c10649a4d61029b017bb",
+			"license": "MIT",
+			"urls": [
+				"bzz-raw://8ed324d3920bb545059d66ab97d43e43ee85fd3bd52e03e401f020afb0b120f6",
+				"dweb:/ipfs/QmfEckWLmZkDDcoWrkEvMWhms66xwTLff9DDhegYpvHo1a"
+			]
+		},
+		"@openzeppelin/contracts/token/ERC20/IERC20.sol": {
+			"keccak256": "0xe06a3f08a987af6ad2e1c1e774405d4fe08f1694b67517438b467cecf0da0ef7",
+			"license": "MIT",
+			"urls": [
+				"bzz-raw://df6f0c459663c9858b6cba2cda1d14a7d05a985bed6d2de72bd8e78c25ee79db",
+				"dweb:/ipfs/QmeTTxZ7qVk9rjEv2R4CpCwdf8UMCcRqDNMvzNxHc3Fnn9"
+			]
+		},
+		"@openzeppelin/contracts/utils/Context.sol": {
+			"keccak256": "0x493033a8d1b176a037b2cc6a04dad01a5c157722049bbecf632ca876224dd4b2",
+			"license": "MIT",
+			"urls": [
+				"bzz-raw://6a708e8a5bdb1011c2c381c9a5cfd8a9a956d7d0a9dc1bd8bcdaf52f76ef2f12",
+				"dweb:/ipfs/Qmax9WHBnVsZP46ZxEMNRQpLQnrdE4dK8LehML1Py8FowF"
+			]
+		},
+		"@openzeppelin/contracts/utils/ReentrancyGuard.sol": {
+			"keccak256": "0x11a5a79827df29e915a12740caf62fe21ebe27c08c9ae3e09abe9ee3ba3866d3",
+			"license": "MIT",
+			"urls": [
+				"bzz-raw://3cf0c69ab827e3251db9ee6a50647d62c90ba580a4d7bbff21f2bea39e7b2f4a",
+				"dweb:/ipfs/QmZiKwtKU1SBX4RGfQtY7PZfiapbbu6SZ9vizGQD9UHjRA"
+			]
+		},
+		"final/GameBurnManager.sol": {
+			"keccak256": "0x631ba5e5269846815b99cf97c7a84eb93cb58a15125356d9e48469c39086eaa3",
+			"license": "MIT",
+			"urls": [
+				"bzz-raw://18c1a571ff83b1fd4bf5264f40688ec3d1501f43052cca07ca45dd02d62fa3ba",
+				"dweb:/ipfs/QmPEWzM38CYMt7YcfBd8743VS96KN7Lbu6vvNgJmJ4ykyH"
+			]
+		}
+	},
+	"version": 1
+}
