@@ -38,16 +38,18 @@ export function TokenomicsForm({
       </div>
       <div className="grid w-full items-center gap-1.5">
         <Label htmlFor="maxSupply">Max Supply</Label>
-        <Input id="maxSupply" value={tokenomics.maxSupply || ""} disabled />
+        {/* <Input id="maxSupply" value={tokenomics.maxSupply || ""} disabled /> not formatted properly */}
+        <Input id="maxSupply" value={"1 Billion"} disabled />
       </div>
-      <div className="grid w-full items-center gap-1.5">
+      {/* No more initial mint, will update this dynamically if creator elects to buy tokens on creation. */}
+      {/* <div className="grid w-full items-center gap-1.5">
         <Label htmlFor="initialSupply">Initial Supply</Label>
         <Input
           id="initialSupply"
           value={tokenomics.initialSupply || ""}
           disabled
         />
-      </div>
+      </div> */}
       <div className="grid w-full items-center gap-1.5">
         <Label htmlFor="bondingCurve">Bonding Curve Type</Label>
         <Select

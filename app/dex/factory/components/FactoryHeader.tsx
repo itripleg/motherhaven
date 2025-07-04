@@ -84,7 +84,7 @@ export function FactoryHeader({ platformStats }: FactoryHeaderProps) {
             className="inline-flex items-center justify-center gap-6 mb-8"
           >
             {/* Left Icon */}
-            <motion.div
+            {/* <motion.div
               animate={{ rotate: [0, 5, -5, 0] }}
               transition={{
                 duration: 3,
@@ -94,7 +94,7 @@ export function FactoryHeader({ platformStats }: FactoryHeaderProps) {
               className="p-4 unified-card border-primary/30 bg-primary/10"
             >
               <Rocket className="h-12 w-12 text-primary" />
-            </motion.div>
+            </motion.div> */}
 
             {/* Title */}
             <div className="text-center">
@@ -106,18 +106,18 @@ export function FactoryHeader({ platformStats }: FactoryHeaderProps) {
               >
                 Token Factory
               </motion.h1>
-              <motion.p
+              {/* <motion.p
                 initial={{ y: 20, opacity: 0 }}
                 animate={{ y: 0, opacity: 1 }}
                 transition={{ delay: 0.4, duration: 0.8 }}
                 className="text-xl md:text-2xl text-muted-foreground mt-3 font-medium"
               >
                 Create the next big thing in DeFi
-              </motion.p>
+              </motion.p> */}
             </div>
 
             {/* Right Icon */}
-            <motion.div
+            {/* <motion.div
               animate={{
                 scale: [1, 1.1, 1],
                 rotate: [0, 10, -10, 0],
@@ -130,7 +130,7 @@ export function FactoryHeader({ platformStats }: FactoryHeaderProps) {
               className="p-4 unified-card border-primary/30 bg-primary/10"
             >
               <Sparkles className="h-12 w-12 text-primary" />
-            </motion.div>
+            </motion.div> */}
           </motion.div>
 
           {/* Subtitle with Glow Effect */}

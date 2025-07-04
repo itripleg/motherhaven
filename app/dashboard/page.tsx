@@ -44,8 +44,8 @@ import TokenBalanceLookup from "./TokenBalanceLookup";
 // We'll create these new components in the next steps
 import { UserPortfolioOverview } from "./components/UserPortfolioOverview";
 import { UserTokensCreated } from "./components/UserTokensCreated";
-// import { UserTradingActivity } from "./components/UserTradingActivity";
-// import { UserWatchlist } from "./components/UserWatchlist";
+import { UserTradingActivity } from "./components/UserTradingActivity";
+import { UserWatchlist } from "./components/UserWatchlist";
 import { QuickActions } from "./components/QuickActions";
 import { MarketInsights } from "./components/MarketInsights";
 
@@ -174,7 +174,7 @@ export default function Dashboard() {
 
   return (
     <AuthWrapper>
-      <div className="min-h-screen animated-bg floating-particles">
+      <div className="min-h-screen animated-bg floating-particles pt-20">
         <Container className="py-8 pt-24 space-y-8">
           {/* Header Section */}
           <motion.div
@@ -340,13 +340,13 @@ export default function Dashboard() {
                   <TabsContent value="tokens" className="mt-0">
                     <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
                       <UserTokensCreated />
-                      {/* <UserWatchlist /> */}
+                      <UserWatchlist />
                     </div>
                   </TabsContent>
 
                   {/* Trading Tab */}
                   <TabsContent value="trading" className="mt-0">
-                    {/* <UserTradingActivity /> */}
+                    <UserTradingActivity />
                   </TabsContent>
 
                   {/* Tools Tab */}

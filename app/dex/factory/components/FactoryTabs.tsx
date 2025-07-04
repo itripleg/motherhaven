@@ -203,7 +203,9 @@ export function FactoryTabs({
                       </div>
                       <div className="text-center p-4 bg-secondary/30 rounded-lg">
                         <div className="text-2xl font-bold text-primary">
-                          {(tokenomics.maxSupply / 1e9).toFixed(0)}B
+                          {/* {(tokenomics.maxSupply / 1e9).toFixed(0)}B */}
+                          {/* formatting issue */}
+                          1,000,000,000
                         </div>
                         <div className="text-xs text-muted-foreground">
                           Max Supply
@@ -211,7 +213,8 @@ export function FactoryTabs({
                       </div>
                       <div className="text-center p-4 bg-secondary/30 rounded-lg">
                         <div className="text-2xl font-bold text-primary">
-                          {tokenomics.initialPrice.toFixed(8)}
+                          {/* {tokenomics.initialPrice.toFixed(8)} fix formatting */}
+                          0.00001
                         </div>
                         <div className="text-xs text-muted-foreground">
                           Initial Price
@@ -234,7 +237,9 @@ export function FactoryTabs({
                           Initial Price:
                         </span>
                         <span className="font-medium">
-                          {tokenomics.initialPrice.toFixed(8)} AVAX
+                          {/* formatting issue */}
+                          {/* {tokenomics.initialPrice.toFixed(8)} AVAX */}
+                          0.00001 AVAX
                         </span>
                       </div>
                       <div className="flex justify-between p-3 bg-secondary/20 rounded">
