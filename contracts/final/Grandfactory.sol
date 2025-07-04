@@ -1,30 +1,17 @@
+// contracts/GrandFactory.sol
 // SPDX-License-Identifier: UNLICENSED
 pragma solidity ^0.8.22;
-
-import "./VettedToken.sol";
+import "./BurnToken.sol";
 import "@openzeppelin/contracts/access/Ownable.sol";
 import "@openzeppelin/contracts/utils/ReentrancyGuard.sol";
 
 /**
- * @title TokenFactory
+ * @title GrandFactory
  * @author Josh Bell
  * @notice This contract is UNLICENSED and proprietary.
  * @dev A factory for creating tokens that trade on a linear bonding curve.
- *
- * --- CORE TOKENOMIC CONCEPTS ---
- *
- * 1.  **Dual Supply System:** This factory utilizes a 'virtualSupply' for its pricing calculations, which is intentionally distinct from the token's actual 'totalSupply()'.
- * - **virtualSupply:** The supply figure used exclusively by the bonding curve to determine buy/sell prices. It ONLY decreases when tokens are sold back to the factory.
- * - **Token.totalSupply():** The true circulating supply of the token. It decreases on BOTH factory sales and self-burns.
- *
- * 2.  **Two Burn Mechanisms:**
- * - **Factory Sells (`factoryBurn`):** When a user sells tokens to the factory, the factory burns the tokens, `virtualSupply` decreases, and ETH collateral is returned to the user.
- * - **Self-Burns (`burn`):** When a user self-burns their tokens, the `totalSupply()` decreases, and a `burnManager` contract is notified.  This action DOES NOT affect the `virtualSupply` or the price on the bonding curve.
- *
- * 3.  **Passive Value Accrual:** Because self-burns reduce the `totalSupply()` without removing the underlying ETH collateral from the factory, the remaining tokens become backed by more ETH. This is a key feature, not a bug. Users who self-burn forfeit their claim to the collateral in exchange for the reward offered by the `burnManager` contract (e.g., the Ymir NFT).
  */
-
-contract TokenFactory is Ownable, ReentrancyGuard {
+contract GrandFactory is Ownable, ReentrancyGuard {
     enum TokenState {
         NOT_CREATED,
         TRADING,
@@ -36,13 +23,10 @@ contract TokenFactory is Ownable, ReentrancyGuard {
     // =================================================================
     //                           Constants
     // =================================================================
-
     /// @dev The number of decimal places for the tokens (18).
     uint256 public immutable DECIMALS;
     /// @dev The absolute maximum supply a token can have.
     uint256 public immutable MAX_SUPPLY;
-    /// @dev The initial amount of tokens minted to the creator when a token is created (20% of MAX_SUPPLY).
-    uint256 public immutable INITIAL_MINT;
     /// @dev The starting price for the very first token sold on the bonding curve.
     uint256 public immutable INITIAL_PRICE;
     /// @dev The minimum ETH value required for a single purchase.
@@ -59,12 +43,12 @@ contract TokenFactory is Ownable, ReentrancyGuard {
     // =================================================================
     //                         State Variables
     // =================================================================
-
     /// @dev The default funding goal in ETH (wei) for newly created tokens.
     uint256 public defaultFundingGoal;
     /// @dev The address that receives all trading fees.
     address public feeRecipient;
-
+    /// @dev The default IPFS gateway URL.
+    string public defaultIpfsGateway;
     /// @dev An array of all token contract addresses created by this factory.
     address[] private allTokens;
     /// @dev Maps a token address to its current trading state.
@@ -77,13 +61,12 @@ contract TokenFactory is Ownable, ReentrancyGuard {
     mapping(address => uint256) public lastPrice;
     /// @dev Maps a token address to its specific funding goal.
     mapping(address => uint256) private fundingGoals;
-    /// @dev Maps a token address to its current total supply, including the initial mint.
+    /// @dev Maps a token address to its current total supply.
     mapping(address => uint256) public virtualSupply;
 
     // =================================================================
     //                              Events
     // =================================================================
-
     event TokenCreated(
         address indexed tokenAddress,
         string name,
@@ -91,7 +74,9 @@ contract TokenFactory is Ownable, ReentrancyGuard {
         string imageUrl,
         address creator,
         uint256 fundingGoal,
-        address burnManager
+        address burnManager,
+        uint256 creatorTokens,
+        uint256 ethSpent
     );
     event TokensPurchased(
         address indexed token,
@@ -120,14 +105,11 @@ contract TokenFactory is Ownable, ReentrancyGuard {
         uint256 newGoal
     );
     event EmergencyWithdrawal(address indexed owner, uint256 amount);
+    event IpfsGatewayUpdated(string oldGateway, string newGateway);
 
     // =================================================================
     //                            Modifiers
     // =================================================================
-
-    /**
-     * @dev Ensures that the given address is a valid token created by this factory.
-     */
     modifier validToken(address tokenAddress) {
         require(
             tokens[tokenAddress] != TokenState.NOT_CREATED,
@@ -139,13 +121,13 @@ contract TokenFactory is Ownable, ReentrancyGuard {
     // =================================================================
     //                           Constructor
     // =================================================================
-
     constructor(address initialOwner) Ownable(initialOwner) {
         require(initialOwner != address(0), "Can't be zero address");
         feeRecipient = initialOwner;
+        defaultIpfsGateway = "https://ipfs.io/ipfs/";
+
         DECIMALS = 10 ** 18;
         MAX_SUPPLY = (10 ** 9) * DECIMALS; // 1 Billion tokens
-        INITIAL_MINT = (MAX_SUPPLY * 20) / 100; // 20%
         defaultFundingGoal = 25 ether;
         INITIAL_PRICE = 0.00001 ether;
         PRICE_RATE = 2000;
@@ -157,11 +139,6 @@ contract TokenFactory is Ownable, ReentrancyGuard {
     // =================================================================
     //                      Owner-Only Functions
     // =================================================================
-
-    /**
-     * @dev Updates the address that receives trading fees.
-     * @param newRecipient The address of the new fee recipient.
-     */
     function setFeeRecipient(address newRecipient) external onlyOwner {
         require(newRecipient != address(0), "Invalid address");
         address oldRecipient = feeRecipient;
@@ -169,10 +146,15 @@ contract TokenFactory is Ownable, ReentrancyGuard {
         emit FeeRecipientUpdated(oldRecipient, newRecipient);
     }
 
-    /**
-     * @dev Sets the default funding goal for all new tokens.
-     * @param newGoal The new funding goal in wei.
-     */
+    function setDefaultIpfsGateway(
+        string calldata newGateway
+    ) external onlyOwner {
+        require(bytes(newGateway).length > 0, "Invalid gateway");
+        string memory oldGateway = defaultIpfsGateway;
+        defaultIpfsGateway = newGateway;
+        emit IpfsGatewayUpdated(oldGateway, newGateway);
+    }
+
     function setDefaultFundingGoal(uint256 newGoal) external onlyOwner {
         require(newGoal > 0, "Invalid funding goal");
         uint256 oldGoal = defaultFundingGoal;
@@ -180,11 +162,6 @@ contract TokenFactory is Ownable, ReentrancyGuard {
         emit DefaultFundingGoalUpdated(oldGoal, newGoal);
     }
 
-    /**
-     * @dev Updates the funding goal for a specific, existing token.
-     * @param tokenAddress The address of the token to update.
-     * @param newGoal The new funding goal in wei.
-     */
     function setTokenFundingGoal(
         address tokenAddress,
         uint256 newGoal
@@ -208,14 +185,6 @@ contract TokenFactory is Ownable, ReentrancyGuard {
         }
     }
 
-    /**
-     * @dev Allows the owner to withdraw the entire ETH balance of this contract.
-     * @notice This is an emergency function and should be used with extreme caution.
-     * **This includes the collateral ETH backing all existing tokens, which is essential
-     * for users to sell their tokens back to the factory.**
-     * **After this withdrawal, users will be unable to sell their tokens, effectively
-     * breaking the core trading (selling) functionality of the application.**
-     */
     function withdrawAll() external onlyOwner {
         uint256 balance = address(this).balance;
         require(balance > 0, "No balance to withdraw");
@@ -227,79 +196,46 @@ contract TokenFactory is Ownable, ReentrancyGuard {
     // =================================================================
     //                    Price Calculation Logic
     // =================================================================
-
-    /**
-     * @dev Calculates the trading fee for a given ETH amount.
-     * @param amount The ETH amount in wei.
-     * @return The calculated fee in wei.
-     */
     function calculateFee(uint256 amount) public pure returns (uint256) {
         return (amount * TRADING_FEE) / 10000;
     }
 
-    /**
-     * @dev Internal function to calculate the integral of the bonding curve with corrected scaling.
-     * This is the core mathematical engine for pricing.
-     * @param effectiveSupplyStart The starting supply point (current supply - initial mint).
-     * @param effectiveSupplyEnd The ending supply point.
-     * @return The cost in ETH (wei) for the change in supply.
-     */
     function _calculatePrice(
         uint256 effectiveSupplyStart,
         uint256 effectiveSupplyEnd
     ) internal view returns (uint256) {
-        uint256 supplyRange = MAX_SUPPLY - INITIAL_MINT;
+        uint256 supplyRange = MAX_SUPPLY;
         require(supplyRange > 0, "Supply range cannot be zero");
-
         uint256 tokenAmount;
         if (effectiveSupplyEnd > effectiveSupplyStart) {
             tokenAmount = effectiveSupplyEnd - effectiveSupplyStart;
         } else {
             tokenAmount = effectiveSupplyStart - effectiveSupplyEnd;
         }
-
         uint256 sumOfSupplies = effectiveSupplyEnd + effectiveSupplyStart;
         uint256 scaledSum = PRICE_RATE * sumOfSupplies;
-
         uint256 costNumerator = INITIAL_PRICE *
             tokenAmount *
             (2 * supplyRange + scaledSum);
-
-        // Denominator must be scaled by DECIMALS to correct for INITIAL_PRICE being 'per token' while supplies are in 'base units'.
         uint256 costDenominator = 2 * supplyRange * DECIMALS;
-
         require(costDenominator > 0, "Denominator cannot be zero");
         return costNumerator / costDenominator;
     }
 
-    /**
-     * @dev Calculates the ETH cost to purchase a given amount of tokens.
-     * @param tokenAddress The address of the token.
-     * @param tokenAmount The amount of tokens to buy (in base units).
-     * @return The cost in ETH (wei).
-     */
     function calculateBuyPrice(
         address tokenAddress,
         uint256 tokenAmount
     ) public view returns (uint256) {
-        uint256 effectiveSupplyStart = virtualSupply[tokenAddress] -
-            INITIAL_MINT;
+        uint256 effectiveSupplyStart = virtualSupply[tokenAddress];
         uint256 effectiveSupplyEnd = effectiveSupplyStart + tokenAmount;
         return _calculatePrice(effectiveSupplyStart, effectiveSupplyEnd);
     }
 
-    /**
-     * @dev Calculates the ETH received for selling a given amount of tokens.
-     * @param tokenAddress The address of the token.
-     * @param tokenAmount The amount of tokens to sell (in base units).
-     * @return The ETH value in wei.
-     */
     function calculateSellPrice(
         address tokenAddress,
         uint256 tokenAmount
     ) public view returns (uint256) {
-        uint256 effectiveSupplyStart = virtualSupply[tokenAddress] -
-            INITIAL_MINT;
+        uint256 effectiveSupplyStart = virtualSupply[tokenAddress];
         require(
             effectiveSupplyStart >= tokenAmount,
             "Cannot sell more than effective supply"
@@ -308,28 +244,17 @@ contract TokenFactory is Ownable, ReentrancyGuard {
         return _calculatePrice(effectiveSupplyStart, effectiveSupplyEnd);
     }
 
-    /**
-     * @dev Internal function to find how many tokens can be bought for a given ETH amount.
-     * Uses a binary search for efficiency.
-     * @param tokenAddress The address of the token.
-     * @param ethAmount The amount of ETH to spend (in wei).
-     * @return The amount of tokens that can be purchased (in base units).
-     */
     function calculateTokensForETH(
         address tokenAddress,
         uint256 ethAmount
     ) internal view returns (uint256) {
         uint256 low = 0;
         uint256 high = MAX_SUPPLY - virtualSupply[tokenAddress];
-
-        // A fixed-iteration binary search is gas-predictable and robust.
         for (uint i = 0; i < 100; i++) {
             if (low >= high) break;
             uint256 mid = (low + high + 1) / 2;
             if (mid == 0) break;
-
             uint256 cost = calculateBuyPrice(tokenAddress, mid);
-
             if (cost <= ethAmount) {
                 low = mid;
             } else {
@@ -339,12 +264,6 @@ contract TokenFactory is Ownable, ReentrancyGuard {
         return low;
     }
 
-    /**
-     * @dev Public view function to get a quote for how many tokens a given ETH amount can buy.
-     * @param tokenAddress The address of the token.
-     * @param ethAmount The amount of ETH to spend (in wei).
-     * @return The amount of tokens that can be purchased (in base units).
-     */
     function calculateTokenAmount(
         address tokenAddress,
         uint256 ethAmount
@@ -357,19 +276,21 @@ contract TokenFactory is Ownable, ReentrancyGuard {
     // =================================================================
 
     /**
-     * @dev Creates a new token, registers it, and sets initial parameters.
+     * @dev Creates a new token. Supports both traditional URLs and IPFS.
      * @param name The name of the new token.
      * @param symbol The symbol of the new token.
-     * @param imageUrl A URL pointing to the token's image.
+     * @param imageUrl A URL pointing to the token's image OR an IPFS hash (optional).
      * @param burnManager An address with special burn privileges on the token contract.
+     * @param minTokensOut Minimum tokens expected if ETH is sent (pass 0 to disable slippage protection).
      * @return The address of the newly created token contract.
      */
     function createToken(
         string calldata name,
         string calldata symbol,
         string calldata imageUrl,
-        address burnManager
-    ) external returns (address) {
+        address burnManager,
+        uint256 minTokensOut
+    ) external payable returns (address) {
         require(
             bytes(name).length > 0 && bytes(name).length <= 32,
             "Invalid name"
@@ -378,46 +299,142 @@ contract TokenFactory is Ownable, ReentrancyGuard {
             bytes(symbol).length > 0 && bytes(symbol).length <= 8,
             "Invalid symbol"
         );
-        require(bytes(imageUrl).length > 0, "Invalid image URL");
 
-        Token token = new Token(
-            address(this),
-            msg.sender,
-            name,
-            symbol,
-            imageUrl,
-            burnManager
-        );
-        address tokenAddress = address(token);
-        
-        #who gets the initial mint?
-        token.mint(msg.sender, INITIAL_MINT);
+        // If ETH is sent, validate the amount
+        if (msg.value > 0) {
+            require(
+                msg.value >= MIN_PURCHASE && msg.value <= MAX_PURCHASE,
+                "Invalid creation amount"
+            );
+        }
 
+        string memory finalImageUrl;
+        address tokenAddress;
+
+        // Block scope to avoid stack too deep
+        {
+            finalImageUrl = bytes(imageUrl).length > 0
+                ? _processImageUrl(imageUrl)
+                : "";
+            BurnToken token = new BurnToken(
+                address(this),
+                msg.sender,
+                name,
+                symbol,
+                finalImageUrl,
+                burnManager
+            );
+            tokenAddress = address(token);
+        }
+
+        // Initialize token state
         tokens[tokenAddress] = TokenState.TRADING;
         allTokens.push(tokenAddress);
         tokenCreators[tokenAddress] = msg.sender;
-        lastPrice[tokenAddress] = INITIAL_PRICE;
         fundingGoals[tokenAddress] = defaultFundingGoal;
-        virtualSupply[tokenAddress] = INITIAL_MINT;
+        virtualSupply[tokenAddress] = 0;
+        lastPrice[tokenAddress] = INITIAL_PRICE;
+
+        uint256 tokensToMint = 0;
+
+        // Process optional purchase in block scope
+        if (msg.value > 0) {
+            uint256 fee;
+            uint256 purchaseAmount;
+            {
+                fee = calculateFee(msg.value);
+                purchaseAmount = msg.value - fee;
+                tokensToMint = calculateTokenAmount(
+                    tokenAddress,
+                    purchaseAmount
+                );
+
+                require(
+                    tokensToMint > 0,
+                    "ETH amount too low to buy any tokens"
+                );
+                require(
+                    tokensToMint >= minTokensOut,
+                    "Insufficient output amount"
+                );
+                require(tokensToMint <= MAX_SUPPLY, "Exceeds max supply");
+                require(
+                    tokensToMint <= (MAX_SUPPLY * MAX_WALLET_PERCENTAGE) / 100,
+                    "Exceeds max wallet"
+                );
+            }
+
+            // Transfer fee and mint tokens
+            (bool feeSuccess, ) = payable(feeRecipient).call{value: fee}("");
+            require(feeSuccess, "Fee transfer failed");
+
+            BurnToken(tokenAddress).mint(msg.sender, tokensToMint);
+            virtualSupply[tokenAddress] = tokensToMint;
+            collateral[tokenAddress] = purchaseAmount;
+            lastPrice[tokenAddress] =
+                (purchaseAmount * DECIMALS) /
+                tokensToMint;
+
+            if (collateral[tokenAddress] >= fundingGoals[tokenAddress]) {
+                tokens[tokenAddress] = TokenState.GOAL_REACHED;
+                emit TradingHalted(tokenAddress, fundingGoals[tokenAddress]);
+            }
+        }
 
         emit TokenCreated(
             tokenAddress,
             name,
             symbol,
-            imageUrl,
+            finalImageUrl,
             msg.sender,
             defaultFundingGoal,
-            burnManager
+            burnManager,
+            tokensToMint,
+            msg.value
         );
+
         return tokenAddress;
     }
 
     /**
-     * @dev Allows a user to purchase tokens by sending ETH.
-     * @param tokenAddress The address of the token to buy.
+     * @dev Processes image URL - converts IPFS hash to full URL if needed.
+     * @param imageUrl The input URL or IPFS hash.
+     * @return The processed URL.
+     */
+    function _processImageUrl(
+        string memory imageUrl
+    ) internal view returns (string memory) {
+        bytes memory urlBytes = bytes(imageUrl);
+
+        // Check if it's an IPFS hash (starts with "Qm" and is 46 chars, or starts with "baf" and is 59 chars)
+        if (
+            urlBytes.length == 46 && urlBytes[0] == 0x51 && urlBytes[1] == 0x6D
+        ) {
+            // "Qm"
+            return string(abi.encodePacked(defaultIpfsGateway, imageUrl));
+        }
+        if (
+            urlBytes.length == 59 &&
+            urlBytes[0] == 0x62 &&
+            urlBytes[1] == 0x61 &&
+            urlBytes[2] == 0x66
+        ) {
+            // "baf"
+            return string(abi.encodePacked(defaultIpfsGateway, imageUrl));
+        }
+
+        // Return as-is if it's a regular URL
+        return imageUrl;
+    }
+
+    /**
+     * @dev Buy tokens with ETH using the bonding curve price.
+     * @param tokenAddress The address of the token to purchase.
+     * @param minTokensOut Minimum tokens expected (pass 0 to disable slippage protection).
      */
     function buy(
-        address tokenAddress
+        address tokenAddress,
+        uint256 minTokensOut
     ) external payable nonReentrant validToken(tokenAddress) {
         require(
             tokens[tokenAddress] == TokenState.TRADING ||
@@ -428,36 +445,31 @@ contract TokenFactory is Ownable, ReentrancyGuard {
             msg.value >= MIN_PURCHASE && msg.value <= MAX_PURCHASE,
             "Invalid amount"
         );
-
         uint256 fee = calculateFee(msg.value);
         uint256 purchaseAmount = msg.value - fee;
-
         uint256 tokensToMint = calculateTokenAmount(
             tokenAddress,
             purchaseAmount
         );
         require(tokensToMint > 0, "ETH amount too low to buy any tokens");
+        require(tokensToMint >= minTokensOut, "Insufficient output amount");
 
-        Token token = Token(tokenAddress);
+        BurnToken token = BurnToken(tokenAddress);
         require(
             virtualSupply[tokenAddress] + tokensToMint <= MAX_SUPPLY,
             "Max supply"
         );
-
         uint256 newBalance = token.balanceOf(msg.sender) + tokensToMint;
         require(
             newBalance <= (MAX_SUPPLY * MAX_WALLET_PERCENTAGE) / 100,
             "Exceeds max wallet"
         );
-
         (bool feeSuccess, ) = payable(feeRecipient).call{value: fee}("");
         require(feeSuccess, "Fee transfer failed");
-
         virtualSupply[tokenAddress] += tokensToMint;
         token.mint(msg.sender, tokensToMint);
         collateral[tokenAddress] += purchaseAmount;
-        lastPrice[tokenAddress] = (purchaseAmount * DECIMALS) / tokensToMint; // Store average price of this trade
-
+        lastPrice[tokenAddress] = (purchaseAmount * DECIMALS) / tokensToMint;
         emit TokensPurchased(
             tokenAddress,
             msg.sender,
@@ -465,18 +477,12 @@ contract TokenFactory is Ownable, ReentrancyGuard {
             msg.value,
             fee
         );
-
         if (collateral[tokenAddress] >= fundingGoals[tokenAddress]) {
             tokens[tokenAddress] = TokenState.GOAL_REACHED;
             emit TradingHalted(tokenAddress, fundingGoals[tokenAddress]);
         }
     }
 
-    /**
-     * @dev Allows a user to sell tokens back to the contract for ETH.
-     * @param tokenAddress The address of the token to sell.
-     * @param tokenAmount The amount of tokens to sell (in base units).
-     */
     function sell(
         address tokenAddress,
         uint256 tokenAmount
@@ -487,42 +493,28 @@ contract TokenFactory is Ownable, ReentrancyGuard {
             "Not trading"
         );
         require(tokenAmount > 0, "Amount must be > 0");
-
-        Token token = Token(tokenAddress);
+        BurnToken token = BurnToken(tokenAddress);
         require(
             token.balanceOf(msg.sender) >= tokenAmount,
             "Insufficient balance"
         );
-
-        // grossAmount is the total ETH value of the tokens before fees.
         uint256 grossAmount = calculateSellPrice(tokenAddress, tokenAmount);
         uint256 fee = calculateFee(grossAmount);
         uint256 netAmountToReceive = grossAmount - fee;
-
-        // CORRECT: The collateral must be sufficient to cover the ENTIRE gross amount.
         require(
             collateral[tokenAddress] >= grossAmount,
             "Insufficient token collateral"
         );
-
         token.factoryBurn(msg.sender, tokenAmount);
         virtualSupply[tokenAddress] -= tokenAmount;
-
-        // CORRECT: The collateral is reduced by the ENTIRE gross amount paid out.
         collateral[tokenAddress] -= grossAmount;
-
-        lastPrice[tokenAddress] = (grossAmount * DECIMALS) / tokenAmount; // Store average price of this trade
-
-        // Send fee to recipient
+        lastPrice[tokenAddress] = (grossAmount * DECIMALS) / tokenAmount;
         (bool feeSuccess, ) = payable(feeRecipient).call{value: fee}("");
         require(feeSuccess, "Fee transfer failed");
-
-        // Send net amount to seller
         (bool success, ) = payable(msg.sender).call{value: netAmountToReceive}(
             ""
         );
         require(success, "Transfer failed");
-
         emit TokensSold(
             tokenAddress,
             msg.sender,
@@ -532,10 +524,6 @@ contract TokenFactory is Ownable, ReentrancyGuard {
         );
     }
 
-    /**
-     * @dev Allows the token creator to resume trading after a funding goal has been reached.
-     * @param tokenAddress The address of the token to resume.
-     */
     function resumeTrading(address tokenAddress) external {
         require(msg.sender == tokenCreators[tokenAddress], "Not token creator");
         require(
@@ -549,24 +537,14 @@ contract TokenFactory is Ownable, ReentrancyGuard {
     // =================================================================
     //                       Public View Functions
     // =================================================================
-
-    /**
-     * @dev Retrieves the current state of a token.
-     */
     function getTokenState(address token) external view returns (TokenState) {
         return tokens[token];
     }
 
-    /**
-     * @dev Retrieves the list of all tokens created by this factory.
-     */
     function getAllTokens() external view returns (address[] memory) {
         return allTokens;
     }
 
-    /**
-     * @dev Retrieves the specific funding goal for a given token.
-     */
     function getFundingGoal(address token) external view returns (uint256) {
         return fundingGoals[token];
     }
