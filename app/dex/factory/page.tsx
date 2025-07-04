@@ -11,14 +11,40 @@ import { storage, db } from "@/firebase";
 import { ref, uploadBytes, getDownloadURL } from "firebase/storage";
 import { collection, getDocs, getCountFromServer } from "firebase/firestore";
 import { FACTORY_ADDRESS, FACTORY_ABI, FACTORY_CONSTANTS } from "@/types";
-import { TokenCreationInfo, DEFAULT_IMAGE_POSITION } from "@/types";
 import { useFactoryConfigContext } from "@/contexts/FactoryConfigProvider";
 
-// Import our new components (to be created)
+// Import our components
 import { FactoryHeader } from "./components/FactoryHeader";
 import { FactoryProgress } from "./components/FactoryProgress";
 import { FactoryTabs } from "./components/FactoryTabs";
 import { FactoryLaunchSection } from "./components/FactoryLaunchSection";
+
+interface PurchaseOption {
+  enabled: boolean;
+  amount: string;
+  minTokensOut: string;
+}
+
+interface TokenCreationInfo {
+  name: string;
+  ticker: string;
+  image: File | null;
+  burnManager?: `0x${string}`;
+  purchase: PurchaseOption;
+}
+
+// Default values
+const DEFAULT_TOKEN_INFO: TokenCreationInfo = {
+  name: "",
+  ticker: "",
+  image: null,
+  burnManager: undefined,
+  purchase: {
+    enabled: false,
+    amount: "",
+    minTokensOut: "0",
+  },
+};
 
 export default function FactoryPage() {
   const [mounted, setMounted] = useState(false);
@@ -35,24 +61,17 @@ export default function FactoryPage() {
   });
 
   // Token creation state
-  const [tokenInfo, setTokenInfo] = useState<TokenCreationInfo>({
-    name: "",
-    ticker: "",
-    description: "",
-    image: null,
-    imagePosition: DEFAULT_IMAGE_POSITION,
-    burnManager: undefined,
-  });
+  const [tokenInfo, setTokenInfo] =
+    useState<TokenCreationInfo>(DEFAULT_TOKEN_INFO);
 
   // Real tokenomics from factory config and constants
   const tokenomics = factoryConfig
     ? {
-        fundingGoal: parseFloat(FACTORY_CONSTANTS.DEFAULT_FUNDING_GOAL), // Use real default from contract
+        fundingGoal: parseFloat(factoryConfig.defaultFundingGoal),
         maxSupply: parseFloat(factoryConfig.maxSupply),
-        initialSupply: parseFloat(factoryConfig.initialMint),
         initialPrice: parseFloat(factoryConfig.initialPrice),
         maxWalletPercentage: factoryConfig.maxWalletPercentage,
-        tradingFee: factoryConfig.tradingFee / 100, // Convert from basis points
+        tradingFee: factoryConfig.tradingFee / 100, // Convert from basis points to percentage
         minPurchase: parseFloat(factoryConfig.minPurchase),
         maxPurchase: parseFloat(factoryConfig.maxPurchase),
         priceRate: factoryConfig.priceRate,
@@ -63,7 +82,6 @@ export default function FactoryPage() {
         // Fallback to constants if config not loaded
         fundingGoal: parseFloat(FACTORY_CONSTANTS.DEFAULT_FUNDING_GOAL),
         maxSupply: parseFloat(FACTORY_CONSTANTS.MAX_SUPPLY) / 1e18,
-        initialSupply: parseFloat(FACTORY_CONSTANTS.INITIAL_MINT) / 1e18,
         initialPrice: parseFloat(FACTORY_CONSTANTS.INITIAL_PRICE),
         maxWalletPercentage: FACTORY_CONSTANTS.MAX_WALLET_PERCENTAGE,
         tradingFee: FACTORY_CONSTANTS.TRADING_FEE / 100, // Convert from basis points
@@ -80,7 +98,7 @@ export default function FactoryPage() {
   const [uploadingImage, setUploadingImage] = useState(false);
   const [isCreating, setIsCreating] = useState(false);
 
-  // Contract interaction - Updated to match new contract signature
+  // Contract interaction
   const {
     data: transactionData,
     error,
@@ -97,12 +115,10 @@ export default function FactoryPage() {
   useEffect(() => {
     const fetchPlatformStats = async () => {
       try {
-        // Get total number of tokens
         const tokensCollection = collection(db, "tokens");
         const tokensSnapshot = await getCountFromServer(tokensCollection);
         const totalTokens = tokensSnapshot.data().count;
 
-        // Get unique traders from trades collection
         const tradesCollection = collection(db, "trades");
         const tradesSnapshot = await getDocs(tradesCollection);
 
@@ -113,7 +129,7 @@ export default function FactoryPage() {
           const data = doc.data();
           uniqueTraders.add(data.trader?.toLowerCase());
           if (data.ethAmount) {
-            totalVolumeWei += parseFloat(data.ethAmount) / 1e18; // Convert from wei to AVAX
+            totalVolumeWei += parseFloat(data.ethAmount) / 1e18;
           }
         });
 
@@ -125,7 +141,6 @@ export default function FactoryPage() {
         });
       } catch (error) {
         console.error("Error fetching platform stats:", error);
-        // Fallback to estimated values
         setPlatformStats({
           totalTokens: 1200,
           activeTraders: 450,
@@ -145,7 +160,7 @@ export default function FactoryPage() {
     setMounted(true);
   }, []);
 
-  // Handle image preview
+  // Handle image preview for background effect
   useEffect(() => {
     if (tokenInfo.image) {
       const reader = new FileReader();
@@ -170,7 +185,7 @@ export default function FactoryPage() {
 
   // Upload image to Firebase Storage
   const uploadImage = async (file: File): Promise<string> => {
-    const storageRef = ref(storage, `temp-uploads/${Date.now()}-${file.name}`);
+    const storageRef = ref(storage, `token-images/${Date.now()}-${file.name}`);
     const uploadTask = await uploadBytes(storageRef, file);
     return await getDownloadURL(uploadTask.ref);
   };
@@ -178,31 +193,26 @@ export default function FactoryPage() {
   // Calculate completion percentage
   const getCompletionPercentage = () => {
     let completed = 0;
-    if (tokenInfo.name) completed += 25;
-    if (tokenInfo.ticker) completed += 25;
-    if (tokenInfo.description) completed += 25;
-    if (tokenInfo.image) completed += 25;
+    if (tokenInfo.name) completed += 40;
+    if (tokenInfo.ticker) completed += 40;
+    if (tokenInfo.image) completed += 20; // Image is optional, so lower weight
     return completed;
   };
 
   // Check if form is valid for submission
-  const isFormValid = !!(
-    tokenInfo.name &&
-    tokenInfo.ticker &&
-    tokenInfo.description
-  );
+  const isFormValid = !!(tokenInfo.name && tokenInfo.ticker);
 
-  // Handle token creation - Updated to match new contract signature
+  // Handle token creation
   const handleTokenCreation = async () => {
     if (!mounted || !isFormValid) return;
 
     try {
       setIsCreating(true);
-      setUploadingImage(true);
       let imageUrl = "";
 
       // Upload image if present
       if (tokenInfo.image) {
+        setUploadingImage(true);
         try {
           imageUrl = await uploadImage(tokenInfo.image);
           toast({
@@ -213,32 +223,42 @@ export default function FactoryPage() {
           console.error("Error uploading image:", error);
           toast({
             title: "Upload Failed",
-            description: "Failed to upload image. Please try again.",
+            description: "Failed to upload image. Proceeding without image.",
             variant: "destructive",
           });
-          return;
+          // Continue without image rather than failing
         }
+        setUploadingImage(false);
       }
-
-      setUploadingImage(false);
 
       toast({
         title: "🚀 Launching Token...",
         description: "Prepare for takeoff! Your token is being created.",
       });
 
-      // Create token on blockchain with new signature
+      // Prepare transaction parameters
+      const createTokenArgs = [
+        tokenInfo.name,
+        tokenInfo.ticker.toUpperCase(), // Ensure uppercase
+        imageUrl,
+        tokenInfo.burnManager || zeroAddress,
+        tokenInfo.purchase.enabled && tokenInfo.purchase.minTokensOut
+          ? parseEther(tokenInfo.purchase.minTokensOut)
+          : parseEther("0"),
+      ];
+
+      const transactionValue =
+        tokenInfo.purchase.enabled && tokenInfo.purchase.amount
+          ? parseEther(tokenInfo.purchase.amount)
+          : undefined;
+
+      // Create token on blockchain
       writeContract({
         abi: FACTORY_ABI,
         address: FACTORY_ADDRESS,
         functionName: "createToken",
-        args: [
-          tokenInfo.name,
-          tokenInfo.ticker,
-          imageUrl,
-          tokenInfo.burnManager || zeroAddress,
-          parseEther("0"), // minTokensOut - set to 0 for basic creation
-        ],
+        args: createTokenArgs,
+        value: transactionValue,
       });
     } catch (error) {
       console.error("Error:", error);
@@ -277,10 +297,13 @@ export default function FactoryPage() {
       {backgroundImage && (
         <div className="fixed inset-0 z-0">
           <div
-            className="absolute inset-0 bg-cover bg-center opacity-50"
-            style={{ backgroundImage: `url(${backgroundImage})` }}
+            className="absolute inset-0 bg-cover bg-center opacity-30"
+            style={{
+              backgroundImage: `url(${backgroundImage})`,
+              filter: "blur(2px)",
+            }}
           />
-          <div className="absolute inset-0 bg-gradient-to-br from-background/80 via-background/90 to-background/80" />
+          <div className="absolute inset-0 bg-gradient-to-br from-background/90 via-background/95 to-background/90" />
         </div>
       )}
 

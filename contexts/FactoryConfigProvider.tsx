@@ -1,20 +1,21 @@
+// contexts/FactoryConfigProvider.tsx
 "use client";
 
 import { createContext, useContext, useMemo } from "react";
 import { useReadContracts } from "wagmi";
-import { FACTORY_ABI, FACTORY_ADDRESS } from "@/types";
+import { FACTORY_ABI, FACTORY_ADDRESS, FACTORY_CONSTANTS } from "@/types";
 import { formatUnits } from "viem";
 
 export interface FactoryConfig {
   decimals: string;
   initialPrice: string;
   maxSupply: string;
-  initialMint: string;
   minPurchase: string;
   maxPurchase: string;
   maxWalletPercentage: number;
   priceRate: string;
   tradingFee: number;
+  defaultFundingGoal: string; // This should be a regular string, not a literal type
 }
 
 const safeFormatUnits = (value: bigint, decimals: number): string => {
@@ -40,16 +41,10 @@ const safeFormatUnits = (value: bigint, decimals: number): string => {
 };
 
 function useFactoryConfig() {
+  // Only read the dynamic values from the contract
+  // Static constants will come from FACTORY_CONSTANTS
   const factoryContractCalls = [
-    { functionName: "DECIMALS" },
-    { functionName: "INITIAL_PRICE" },
-    { functionName: "MAX_SUPPLY" },
-    { functionName: "INITIAL_MINT" },
-    { functionName: "MIN_PURCHASE" },
-    { functionName: "MAX_PURCHASE" },
-    { functionName: "MAX_WALLET_PERCENTAGE" },
-    { functionName: "PRICE_RATE" },
-    { functionName: "TRADING_FEE" },
+    { functionName: "defaultFundingGoal" }, // This can be changed by owner
   ] as const;
 
   const { data, isLoading, error } = useReadContracts({
@@ -62,50 +57,61 @@ function useFactoryConfig() {
 
   const config = useMemo((): FactoryConfig | null => {
     try {
-      if (!data || data.some((d) => d.status === "failure")) {
-        return null;
+      // If contract call fails, we can still use the static constants
+      // Only defaultFundingGoal needs to be read from contract
+      let defaultFundingGoal: string = FACTORY_CONSTANTS.DEFAULT_FUNDING_GOAL;
+
+      if (data && data[0]?.status === "success" && data[0]?.result) {
+        defaultFundingGoal = safeFormatUnits(data[0].result as bigint, 18);
+      } else if (data && data[0]?.status === "failure") {
+        console.warn(
+          "Failed to read defaultFundingGoal from contract, using fallback:",
+          FACTORY_CONSTANTS.DEFAULT_FUNDING_GOAL
+        );
       }
 
-      const results = data.map((d) => d.result);
-      if (results.some((r) => r === undefined || r === null)) {
-        return null;
-      }
-
-      const rawDecimals = results[0] as bigint;
-      let decimalsNumber: number;
-
-      if (rawDecimals === 1000000000000000000n) {
-        decimalsNumber = 18;
-      } else if (rawDecimals <= 30n) {
-        decimalsNumber = Number(rawDecimals);
-      } else {
-        console.error("Unexpected decimals value:", rawDecimals.toString());
-        return null;
-      }
-
+      // Use the exported FACTORY_CONSTANTS for consistency
       return {
-        decimals: decimalsNumber.toString(),
-        initialPrice: safeFormatUnits(results[1] as bigint, decimalsNumber),
-        maxSupply: safeFormatUnits(results[2] as bigint, decimalsNumber),
-        initialMint: safeFormatUnits(results[3] as bigint, decimalsNumber),
-        minPurchase: safeFormatUnits(results[4] as bigint, decimalsNumber),
-        maxPurchase: safeFormatUnits(results[5] as bigint, decimalsNumber),
-        maxWalletPercentage: Number(results[6] as bigint),
-        priceRate: (results[7] as bigint).toString(),
-        tradingFee: Number(results[8] as bigint),
+        decimals: "18", // Always 18 for our tokens
+        initialPrice: FACTORY_CONSTANTS.INITIAL_PRICE,
+        maxSupply: FACTORY_CONSTANTS.MAX_SUPPLY,
+        minPurchase: FACTORY_CONSTANTS.MIN_PURCHASE,
+        maxPurchase: FACTORY_CONSTANTS.MAX_PURCHASE,
+        maxWalletPercentage: FACTORY_CONSTANTS.MAX_WALLET_PERCENTAGE,
+        priceRate: FACTORY_CONSTANTS.PRICE_RATE,
+        tradingFee: FACTORY_CONSTANTS.TRADING_FEE,
+        defaultFundingGoal: defaultFundingGoal,
       };
     } catch (error) {
       console.error("Error processing factory config:", error);
-      return null;
+
+      // Even if there's an error, return the static constants
+      // This ensures the app still works even if contract calls fail
+      return {
+        decimals: "18",
+        initialPrice: FACTORY_CONSTANTS.INITIAL_PRICE,
+        maxSupply: FACTORY_CONSTANTS.MAX_SUPPLY,
+        minPurchase: FACTORY_CONSTANTS.MIN_PURCHASE,
+        maxPurchase: FACTORY_CONSTANTS.MAX_PURCHASE,
+        maxWalletPercentage: FACTORY_CONSTANTS.MAX_WALLET_PERCENTAGE,
+        priceRate: FACTORY_CONSTANTS.PRICE_RATE,
+        tradingFee: FACTORY_CONSTANTS.TRADING_FEE,
+        defaultFundingGoal: FACTORY_CONSTANTS.DEFAULT_FUNDING_GOAL,
+      };
     }
   }, [data]);
 
-  return { config, isLoading, error: error?.message || null };
+  return {
+    config,
+    isLoading,
+    error: error ? "Failed to read dynamic factory configuration" : null,
+  };
 }
 
 interface FactoryConfigContextState {
   config: FactoryConfig | null;
   isLoading: boolean;
+  error: string | null;
 }
 
 const FactoryConfigContext = createContext<FactoryConfigContextState | null>(
@@ -117,10 +123,10 @@ export function FactoryConfigProvider({
 }: {
   children: React.ReactNode;
 }) {
-  const { config, isLoading } = useFactoryConfig();
+  const { config, isLoading, error } = useFactoryConfig();
 
   return (
-    <FactoryConfigContext.Provider value={{ config, isLoading }}>
+    <FactoryConfigContext.Provider value={{ config, isLoading, error }}>
       {children}
     </FactoryConfigContext.Provider>
   );

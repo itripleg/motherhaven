@@ -34,7 +34,12 @@ interface FactoryLaunchSectionProps {
   tokenomics: {
     fundingGoal: number;
     maxSupply: number;
-    initialSupply: number;
+    initialPrice: number;
+    maxWalletPercentage: number;
+    tradingFee: number;
+    minPurchase: number;
+    maxPurchase: number;
+    priceRate: string;
     bondingCurve: string;
     liquidityPool: string;
   };
@@ -167,14 +172,10 @@ export function FactoryLaunchSection({
                   <AlertTriangle className="h-5 w-5 text-yellow-400" />
                   Required Fields
                 </h4>
-                <div className="grid grid-cols-2 md:grid-cols-4 gap-3 text-sm">
+                <div className="grid grid-cols-2 md:grid-cols-3 gap-3 text-sm">
                   {[
                     { label: "Token Name", completed: !!tokenInfo.name },
                     { label: "Symbol", completed: !!tokenInfo.ticker },
-                    {
-                      label: "Description",
-                      completed: !!tokenInfo.description,
-                    },
                     {
                       label: "Image",
                       completed: !!tokenInfo.image,
@@ -349,6 +350,16 @@ export function FactoryLaunchSection({
                             {tokenInfo.image ? "✅ Included" : "❌ None"}
                           </span>
                         </div>
+                        {tokenInfo.purchase.enabled && (
+                          <div className="flex justify-between">
+                            <span className="text-muted-foreground">
+                              Initial Purchase:
+                            </span>
+                            <span className="font-medium text-foreground">
+                              {tokenInfo.purchase.amount} AVAX
+                            </span>
+                          </div>
+                        )}
                       </div>
                     </div>
 
@@ -371,6 +382,14 @@ export function FactoryLaunchSection({
                           </span>
                           <span className="font-medium text-foreground">
                             {tokenomics.maxSupply.toLocaleString()}
+                          </span>
+                        </div>
+                        <div className="flex justify-between">
+                          <span className="text-muted-foreground">
+                            Initial Price:
+                          </span>
+                          <span className="font-medium text-foreground">
+                            {tokenomics.initialPrice.toFixed(8)} AVAX
                           </span>
                         </div>
                         <div className="flex justify-between">

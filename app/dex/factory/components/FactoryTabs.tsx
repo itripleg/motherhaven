@@ -36,7 +36,6 @@ interface FactoryTabsProps {
   tokenomics: {
     fundingGoal: number;
     maxSupply: number;
-    initialSupply: number;
     initialPrice: number;
     maxWalletPercentage: number;
     tradingFee: number;
@@ -65,27 +64,16 @@ export function FactoryTabs({
   const getTabStatus = (tabId: string) => {
     switch (tabId) {
       case "info":
-        if (
-          tokenInfo.name &&
-          tokenInfo.ticker &&
-          tokenInfo.description &&
-          tokenInfo.image
-        ) {
+        if (tokenInfo.name && tokenInfo.ticker && tokenInfo.image) {
           return "complete";
-        } else if (
-          tokenInfo.name ||
-          tokenInfo.ticker ||
-          tokenInfo.description
-        ) {
+        } else if (tokenInfo.name || tokenInfo.ticker) {
           return "partial";
         }
         return "empty";
       case "tokenomics":
         return "complete"; // Tokenomics are pre-configured
       case "preview":
-        return tokenInfo.name && tokenInfo.ticker && tokenInfo.description
-          ? "complete"
-          : "disabled";
+        return tokenInfo.name && tokenInfo.ticker ? "complete" : "disabled";
       default:
         return "empty";
     }
@@ -314,10 +302,10 @@ export function FactoryTabs({
                         </div>
                         <div className="text-center p-4 bg-secondary/30 rounded-lg">
                           <div className="text-2xl font-bold text-primary">
-                            {(tokenomics.initialSupply / 1e6).toFixed(0)}M
+                            {tokenomics.initialPrice.toFixed(8)}
                           </div>
                           <div className="text-xs text-muted-foreground">
-                            Initial Supply
+                            Initial Price
                           </div>
                         </div>
                         <div className="text-center p-4 bg-secondary/30 rounded-lg">
@@ -414,14 +402,8 @@ export function FactoryTabs({
                           className="absolute inset-0 bg-cover bg-center"
                           style={{
                             backgroundImage: `url(${backgroundImage})`,
-                            transform: `scale(${
-                              tokenInfo.imagePosition?.scale || 1
-                            }) rotate(${
-                              tokenInfo.imagePosition?.rotation || 0
-                            }deg)`,
-                            backgroundPosition: `${
-                              50 + (tokenInfo.imagePosition?.x || 0)
-                            }% ${50 + (tokenInfo.imagePosition?.y || 0)}%`,
+                            filter: "blur(1px)",
+                            transform: "scale(1.1)",
                           }}
                         />
                         <div className="absolute inset-0 bg-gradient-to-b from-background/60 via-background/50 to-background/70" />
@@ -456,13 +438,6 @@ export function FactoryTabs({
                           <span className="text-muted-foreground">AVAX</span>
                         </p>
                       </div>
-                      {tokenInfo.description && (
-                        <div className="glass-card p-4 max-w-md">
-                          <p className="text-foreground/90 text-sm leading-relaxed">
-                            {tokenInfo.description}
-                          </p>
-                        </div>
-                      )}
                     </div>
                   </div>
                 </div>
@@ -488,16 +463,18 @@ export function FactoryTabs({
                           status: !!tokenInfo.ticker,
                         },
                         {
-                          label: "Description",
-                          value: tokenInfo.description ? "✓ Added" : "Not set",
-                          status: !!tokenInfo.description,
-                        },
-                        {
                           label: "Image",
                           value: tokenInfo.image
                             ? "✓ Uploaded"
                             : "Not uploaded",
                           status: !!tokenInfo.image,
+                        },
+                        {
+                          label: "Purchase Option",
+                          value: tokenInfo.purchase.enabled
+                            ? `${tokenInfo.purchase.amount} AVAX`
+                            : "Not enabled",
+                          status: tokenInfo.purchase.enabled,
                         },
                       ].map((item) => (
                         <div
@@ -545,8 +522,8 @@ export function FactoryTabs({
                           value: tokenomics.maxSupply.toLocaleString(),
                         },
                         {
-                          label: "Initial Supply",
-                          value: tokenomics.initialSupply.toLocaleString(),
+                          label: "Initial Price",
+                          value: `${tokenomics.initialPrice.toFixed(8)} AVAX`,
                         },
                         {
                           label: "Bonding Curve",
@@ -597,12 +574,12 @@ export function FactoryTabs({
                           <span>Symbol configured</span>
                         </div>
                         <div className="flex items-center gap-2">
-                          {tokenInfo.description ? (
+                          {tokenInfo.image ? (
                             <CheckCircle className="h-4 w-4 text-green-400" />
                           ) : (
                             <AlertCircle className="h-4 w-4 text-yellow-400" />
                           )}
-                          <span>Description added</span>
+                          <span>Image uploaded (optional)</span>
                         </div>
                         <div className="flex items-center gap-2">
                           <CheckCircle className="h-4 w-4 text-green-400" />

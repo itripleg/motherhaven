@@ -3,7 +3,7 @@ import { useState, useEffect, useMemo } from "react";
 import { doc, onSnapshot } from "firebase/firestore";
 import { db } from "@/firebase";
 import { Address } from "viem";
-import { Token, TokenState } from "@/types";
+import { Token, TokenState, FACTORY_CONSTANTS } from "@/types";
 import { useFactoryConfigContext } from "@/contexts/FactoryConfigProvider";
 import { useFactoryContract } from "./useFactoryContract";
 
@@ -63,7 +63,7 @@ export function useTokenData(tokenAddress?: Address) {
 
   // Combine and format all data
   const token = useMemo((): Token | null => {
-    if (!tokenAddress || !factoryConfig || !firestoreData) {
+    if (!tokenAddress || !firestoreData) {
       return null;
     }
 
@@ -85,6 +85,19 @@ export function useTokenData(tokenAddress?: Address) {
       }
     };
 
+    // Use factory config if available, otherwise fall back to constants
+    const useConfig = factoryConfig || {
+      decimals: "18",
+      initialPrice: FACTORY_CONSTANTS.INITIAL_PRICE,
+      maxSupply: FACTORY_CONSTANTS.MAX_SUPPLY,
+      minPurchase: FACTORY_CONSTANTS.MIN_PURCHASE,
+      maxPurchase: FACTORY_CONSTANTS.MAX_PURCHASE,
+      maxWalletPercentage: FACTORY_CONSTANTS.MAX_WALLET_PERCENTAGE,
+      priceRate: FACTORY_CONSTANTS.PRICE_RATE,
+      tradingFee: FACTORY_CONSTANTS.TRADING_FEE,
+      defaultFundingGoal: FACTORY_CONSTANTS.DEFAULT_FUNDING_GOAL,
+    };
+
     return {
       // Basic info from Firestore
       address: tokenAddress,
@@ -92,36 +105,46 @@ export function useTokenData(tokenAddress?: Address) {
       symbol: firestoreData.symbol || "UNKNOWN",
       imageUrl: firestoreData.imageUrl || "",
       description: firestoreData.description || "",
-      creator: firestoreData.creator || "0x0",
-      burnManager: firestoreData.burnManager || "0x0",
+      creator: (firestoreData.creator || "0x0") as `0x${string}`,
+      burnManager: (firestoreData.burnManager || "0x0") as `0x${string}`,
 
       // Contract state (real-time)
       state: mapTokenState(contractState),
-      lastPrice: priceFormatted,
-      collateral: collateralFormatted,
+      lastPrice: priceFormatted || "0",
+      collateral: collateralFormatted || "0",
 
-      // Factory constants
-      ...factoryConfig,
+      // Factory constants (properly mapped to Token interface)
+      decimals: useConfig.decimals,
+      maxSupply: useConfig.maxSupply,
+      initialMint: FACTORY_CONSTANTS.INITIAL_MINT, // Keep this constant
+      initialPrice: useConfig.initialPrice,
+      minPurchase: useConfig.minPurchase,
+      maxPurchase: useConfig.maxPurchase,
+      maxWalletPercentage: useConfig.maxWalletPercentage,
+      priceRate: useConfig.priceRate,
+      tradingFee: useConfig.tradingFee,
 
-      // Metadata
+      // Metadata from Firestore
       createdAt: firestoreData.createdAt || new Date().toISOString(),
       blockNumber: firestoreData.blockNumber || 0,
       transactionHash: firestoreData.transactionHash || "",
-      fundingGoal: firestoreData.fundingGoal || "0",
 
-      // Contract data that should be fetched from contract (not stored values)
-      virtualSupply: "0", // TODO: Add to contract reads if needed
-      totalSupply: "0", // TODO: Add to contract reads if needed
+      // Contract/Firestore hybrid data
+      fundingGoal:
+        firestoreData.fundingGoal ||
+        useConfig.defaultFundingGoal ||
+        FACTORY_CONSTANTS.DEFAULT_FUNDING_GOAL,
+      virtualSupply: firestoreData.virtualSupply || "0",
+      totalSupply: firestoreData.totalSupply || "0",
 
-      // Image positioning
-      imagePosition: firestoreData.imagePosition || {
-        x: 0,
-        y: 0,
-        scale: 1,
-        rotation: 0,
-      },
+      // Image positioning (optional)
+      imagePosition: firestoreData.imagePosition,
       lastUpdated: firestoreData.lastUpdated,
       updatedBy: firestoreData.updatedBy,
+      positionHistory: firestoreData.positionHistory,
+
+      // Last trade info
+      lastTrade: firestoreData.lastTrade,
     };
   }, [
     tokenAddress,
@@ -137,7 +160,7 @@ export function useTokenData(tokenAddress?: Address) {
     if (!firestoreData?.statistics) {
       return {
         totalSupply: "0",
-        currentPrice: priceFormatted,
+        currentPrice: priceFormatted || "0",
         volumeETH: "0",
         tradeCount: 0,
         uniqueHolders: 0,
@@ -146,7 +169,8 @@ export function useTokenData(tokenAddress?: Address) {
 
     return {
       ...firestoreData.statistics,
-      currentPrice: priceFormatted, // Always use real-time price
+      currentPrice:
+        priceFormatted || firestoreData.statistics.currentPrice || "0", // Always use real-time price if available
     };
   }, [firestoreData?.statistics, priceFormatted]);
 

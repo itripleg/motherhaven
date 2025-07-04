@@ -86,14 +86,22 @@ export interface Token {
   lastTrade?: Trade;
 }
 
-// Interface for token creation form
+// Interface for purchase option in token creation
+export interface PurchaseOption {
+  enabled: boolean;
+  amount: string; // ETH amount
+  minTokensOut: string; // Minimum tokens expected
+}
+
+// Interface for token creation form - UPDATED to make fields optional
 export interface TokenCreationInfo {
   name: string;
   ticker: string;
-  description: string; // Keep required in form - will be stored when user creates via frontend
+  description?: string; // ✅ NOW OPTIONAL - can be added later from token page
   image: File | null;
-  imagePosition: ImagePosition;
+  imagePosition?: ImagePosition; // ✅ NOW OPTIONAL - can be configured later from token page
   burnManager?: `0x${string}`;
+  purchase: PurchaseOption; // Purchase option for creation
 }
 
 // Interface for image metadata stored in Firebase
@@ -161,6 +169,12 @@ export const DEFAULT_IMAGE_POSITION: ImagePosition = {
   scale: 1,
   rotation: 0,
   fit: "cover",
+};
+
+export const DEFAULT_PURCHASE_OPTION: PurchaseOption = {
+  enabled: false,
+  amount: "",
+  minTokensOut: "0",
 };
 
 export const createImagePosition = (
