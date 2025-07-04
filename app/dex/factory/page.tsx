@@ -190,13 +190,13 @@ export default function FactoryPage() {
     return await getDownloadURL(uploadTask.ref);
   };
 
-  // Calculate completion percentage
+  // Calculate completion percentage - tokenomics always adds 25% since it's pre-configured
   const getCompletionPercentage = () => {
-    let completed = 0;
-    if (tokenInfo.name) completed += 40;
-    if (tokenInfo.ticker) completed += 40;
-    if (tokenInfo.image) completed += 20; // Image is optional, so lower weight
-    return completed;
+    let completed = 25; // Tokenomics is always complete (25%)
+    if (tokenInfo.name) completed += 40; // Name adds 40%
+    if (tokenInfo.ticker) completed += 35; // Ticker adds 35%
+    // Note: We don't count image since it's optional
+    return Math.min(completed, 100);
   };
 
   // Check if form is valid for submission
@@ -297,7 +297,7 @@ export default function FactoryPage() {
       {backgroundImage && (
         <div className="fixed inset-0 z-0">
           <div
-            className="absolute inset-0 bg-cover bg-center opacity-30"
+            className="absolute inset-0 bg-cover bg-center opacity-80"
             style={{
               backgroundImage: `url(${backgroundImage})`,
               filter: "blur(2px)",
@@ -318,16 +318,21 @@ export default function FactoryPage() {
             <FactoryHeader platformStats={platformStats} />
           </motion.div>
 
-          {/* Progress Section */}
+          {/* Progress Section - Now with navigation */}
           <motion.div
             initial={{ opacity: 0, y: 20 }}
             animate={{ opacity: 1, y: 0 }}
             transition={{ delay: 0.2 }}
           >
-            <FactoryProgress completionPercentage={getCompletionPercentage()} />
+            <FactoryProgress
+              completionPercentage={getCompletionPercentage()}
+              activeTab={activeTab}
+              onTabChange={setActiveTab}
+              isFormValid={isFormValid}
+            />
           </motion.div>
 
-          {/* Main Content Tabs */}
+          {/* Main Content Tabs - Now just content */}
           <motion.div
             initial={{ opacity: 0, y: 20 }}
             animate={{ opacity: 1, y: 0 }}
@@ -335,7 +340,6 @@ export default function FactoryPage() {
           >
             <FactoryTabs
               activeTab={activeTab}
-              onTabChange={setActiveTab}
               tokenInfo={tokenInfo}
               onTokenInfoChange={setTokenInfo}
               tokenomics={tokenomics}

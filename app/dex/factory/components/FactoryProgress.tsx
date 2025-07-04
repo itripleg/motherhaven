@@ -1,3 +1,4 @@
+// app/dex/factory/components/FactoryProgress.tsx
 import { motion } from "framer-motion";
 import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
@@ -13,6 +14,9 @@ import {
 
 interface FactoryProgressProps {
   completionPercentage: number;
+  activeTab: string;
+  onTabChange: (tab: string) => void;
+  isFormValid: boolean;
 }
 
 const progressSteps = [
@@ -37,17 +41,13 @@ const progressSteps = [
     description: "Review & verify",
     threshold: 75,
   },
-  {
-    id: "launch",
-    label: "Launch",
-    icon: Rocket,
-    description: "Deploy to blockchain",
-    threshold: 100,
-  },
 ];
 
 export function FactoryProgress({
   completionPercentage,
+  activeTab,
+  onTabChange,
+  isFormValid,
 }: FactoryProgressProps) {
   const getStepStatus = (threshold: number) => {
     if (completionPercentage >= threshold) return "completed";
@@ -69,6 +69,13 @@ export function FactoryProgress({
     if (completionPercentage >= 50) return "💰 Configure tokenomics";
     if (completionPercentage >= 25) return "✨ Add more details";
     return "🏗️ Start building your token";
+  };
+
+  const canAccessTab = (tabId: string) => {
+    if (tabId === "info") return true;
+    if (tabId === "tokenomics") return true;
+    if (tabId === "preview") return isFormValid;
+    return false;
   };
 
   return (
@@ -129,11 +136,15 @@ export function FactoryProgress({
               {completionPercentage > 0 && (
                 <motion.div
                   className="absolute inset-0 bg-gradient-to-r from-transparent via-white/30 to-transparent"
-                  animate={{ x: ["-100%", "100%"] }}
+                  animate={{
+                    x: ["-120%", "120%"],
+                    opacity: [0, 1, 1, 0],
+                  }}
                   transition={{
-                    duration: 2,
+                    duration: 2.5,
                     repeat: Infinity,
-                    ease: "linear",
+                    ease: "easeInOut",
+                    times: [0, 0.2, 0.8, 1],
                   }}
                 />
               )}
@@ -157,26 +168,34 @@ export function FactoryProgress({
           </div>
         </div>
 
-        {/* Step Indicators */}
-        <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
+        {/* Clickable Step Indicators */}
+        <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
           {progressSteps.map((step, index) => {
             const status = getStepStatus(step.threshold);
             const StepIcon = step.icon;
+            const isActive = activeTab === step.id;
+            const canAccess = canAccessTab(step.id);
 
             return (
-              <motion.div
+              <motion.button
                 key={step.id}
+                onClick={() => canAccess && onTabChange(step.id)}
+                disabled={!canAccess}
                 initial={{ opacity: 0, y: 20 }}
                 animate={{ opacity: 1, y: 0 }}
                 transition={{ delay: index * 0.1, duration: 0.5 }}
                 className={`
-                  relative p-4 rounded-lg border-2 transition-all duration-300
+                  relative p-4 rounded-lg border-2 transition-all duration-300 text-left
                   ${
-                    status === "completed"
-                      ? "bg-primary/10 border-primary/50 shadow-primary/20 shadow-sm"
+                    isActive
+                      ? "bg-primary/20 border-primary/60 shadow-primary/20 shadow-lg"
+                      : status === "completed"
+                      ? "bg-primary/10 border-primary/50 shadow-primary/20 shadow-sm hover:bg-primary/15"
                       : status === "current"
-                      ? "bg-primary/5 border-primary/30 shadow-primary/10 shadow-sm"
-                      : "bg-secondary/30 border-border/30"
+                      ? "bg-primary/5 border-primary/30 shadow-primary/10 shadow-sm hover:bg-primary/10"
+                      : !canAccess
+                      ? "bg-secondary/30 border-border/30 opacity-50 cursor-not-allowed"
+                      : "bg-secondary/30 border-border/30 hover:bg-secondary/50"
                   }
                 `}
               >
@@ -186,7 +205,9 @@ export function FactoryProgress({
                     className={`
                     p-2 rounded-lg border transition-all duration-300
                     ${
-                      status === "completed"
+                      isActive
+                        ? "bg-primary/30 border-primary/50"
+                        : status === "completed"
                         ? "bg-primary/20 border-primary/40"
                         : status === "current"
                         ? "bg-primary/10 border-primary/30"
@@ -198,7 +219,9 @@ export function FactoryProgress({
                       className={`
                       h-4 w-4 transition-colors duration-300
                       ${
-                        status === "completed" || status === "current"
+                        isActive ||
+                        status === "completed" ||
+                        status === "current"
                           ? "text-primary"
                           : "text-muted-foreground"
                       }
@@ -220,7 +243,7 @@ export function FactoryProgress({
                         className={`
                         h-4 w-4 
                         ${
-                          status === "current"
+                          status === "current" || isActive
                             ? "text-primary"
                             : "text-muted-foreground"
                         }
@@ -234,9 +257,9 @@ export function FactoryProgress({
                 <div>
                   <h4
                     className={`
-                    font-semibold text-sm transition-colors duration-300
+                    font-semibold text-sm transition-colors duration-300 mb-1
                     ${
-                      status === "completed" || status === "current"
+                      isActive || status === "completed" || status === "current"
                         ? "text-foreground"
                         : "text-muted-foreground"
                     }
@@ -246,9 +269,9 @@ export function FactoryProgress({
                   </h4>
                   <p
                     className={`
-                    text-xs mt-1 transition-colors duration-300
+                    text-xs transition-colors duration-300
                     ${
-                      status === "completed" || status === "current"
+                      isActive || status === "completed" || status === "current"
                         ? "text-muted-foreground"
                         : "text-muted-foreground/70"
                     }
@@ -258,8 +281,17 @@ export function FactoryProgress({
                   </p>
                 </div>
 
+                {/* Active Tab Indicator */}
+                {isActive && (
+                  <motion.div
+                    layoutId="activeTabIndicator"
+                    className="absolute -inset-1 bg-primary/20 rounded-lg border border-primary/40"
+                    transition={{ type: "spring", stiffness: 300, damping: 30 }}
+                  />
+                )}
+
                 {/* Current Step Pulse */}
-                {status === "current" && (
+                {status === "current" && !isActive && (
                   <motion.div
                     className="absolute -inset-1 bg-primary/20 rounded-lg border border-primary/40"
                     animate={{ opacity: [0.5, 1, 0.5] }}
@@ -291,7 +323,7 @@ export function FactoryProgress({
                       </div>
                     </motion.div>
                   )}
-              </motion.div>
+              </motion.button>
             );
           })}
         </div>
