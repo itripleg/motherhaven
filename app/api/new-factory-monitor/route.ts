@@ -47,6 +47,8 @@ async function handleTokenCreated(
   console.log("Block Number:", blockNumber);
   console.log("Funding Goal:", fundingGoal, "ETH");
   console.log("Burn Manager:", args.burnManager);
+  console.log("Creator Tokens:", formatEther(args.creatorTokens));
+  console.log("ETH Spent:", formatEther(args.ethSpent));
   console.log("Transaction Hash:", transactionHash);
 
   try {
@@ -61,15 +63,20 @@ async function handleTokenCreated(
       fundingGoal,
       createdAt: timestamp,
       currentState: TokenState.TRADING,
-      collateral: "0",
-      virtualSupply: FACTORY_CONSTANTS.INITIAL_MINT, // Use constants directly
-      totalSupply: FACTORY_CONSTANTS.INITIAL_MINT, // Initially same as virtualSupply
-      lastPrice: FACTORY_CONSTANTS.INITIAL_PRICE, // Use INITIAL_PRICE
+      collateral: formatEther(args.ethSpent), // Initialize with ETH spent during creation
+      virtualSupply: formatEther(args.creatorTokens), // Start with tokens created (could be 0)
+      totalSupply: formatEther(args.creatorTokens), // Initially same as virtualSupply
+      lastPrice:
+        args.creatorTokens > 0n
+          ? (
+              Number(formatEther(args.ethSpent)) /
+              Number(formatEther(args.creatorTokens))
+            ).toString()
+          : FACTORY_CONSTANTS.INITIAL_PRICE, // Calculate initial price or use default
 
       // Factory constants (from types/contracts.ts - matches your Token interface)
       decimals: FACTORY_CONSTANTS.DECIMALS,
       maxSupply: FACTORY_CONSTANTS.MAX_SUPPLY,
-      initialMint: FACTORY_CONSTANTS.INITIAL_MINT,
       initialPrice: FACTORY_CONSTANTS.INITIAL_PRICE,
       minPurchase: FACTORY_CONSTANTS.MIN_PURCHASE,
       maxPurchase: FACTORY_CONSTANTS.MAX_PURCHASE,
@@ -78,10 +85,16 @@ async function handleTokenCreated(
       tradingFee: FACTORY_CONSTANTS.TRADING_FEE,
 
       statistics: {
-        currentPrice: FACTORY_CONSTANTS.INITIAL_PRICE, // Start with initial price, not "0"
-        volumeETH: "0",
-        tradeCount: 0,
-        uniqueHolders: 0,
+        currentPrice:
+          args.creatorTokens > 0n
+            ? (
+                Number(formatEther(args.ethSpent)) /
+                Number(formatEther(args.creatorTokens))
+              ).toString()
+            : FACTORY_CONSTANTS.INITIAL_PRICE,
+        volumeETH: formatEther(args.ethSpent), // Start with creation volume
+        tradeCount: args.ethSpent > 0n ? 1 : 0, // Count creation as trade if ETH was spent
+        uniqueHolders: args.creatorTokens > 0n ? 1 : 0, // Creator is only a holder if they got tokens
       },
       blockNumber,
       transactionHash,
@@ -92,6 +105,7 @@ async function handleTokenCreated(
     });
     console.log("✅ Token document created/updated in", COLLECTIONS.TOKENS);
 
+    // Update user data with created token info
     const userData = {
       address: creatorAddress,
       lastActive: timestamp,
@@ -111,6 +125,29 @@ async function handleTokenCreated(
       merge: true,
     });
     console.log("✅ User document updated in", COLLECTIONS.USERS);
+
+    // If ETH was spent during creation, record it as the first trade
+    if (args.ethSpent > 0n && args.creatorTokens > 0n) {
+      const tradeData = {
+        type: "buy",
+        token: tokenAddress,
+        trader: creatorAddress,
+        tokenAmount: args.creatorTokens.toString(),
+        ethAmount: args.ethSpent.toString(),
+        fee: "0", // No fee for creator
+        pricePerToken: (
+          Number(formatEther(args.ethSpent)) /
+          Number(formatEther(args.creatorTokens))
+        ).toString(),
+        blockNumber,
+        transactionHash,
+        timestamp,
+      };
+
+      const tradeRef = doc(collection(db, COLLECTIONS.TRADES));
+      await setDoc(tradeRef, tradeData);
+      console.log("✅ Creation trade recorded in", COLLECTIONS.TRADES);
+    }
   } catch (error) {
     console.error("❌ Database Error:", error);
     throw error;
@@ -368,7 +405,7 @@ export async function POST(req: Request) {
         const eventName = decoded.eventName;
         console.log(`🎯 Processing ${eventName} event`);
 
-        // Handle each event type
+        // Handle each event type - UPDATED FOR NEW CONTRACT EVENTS
         switch (eventName) {
           case "TokenCreated": {
             const args = decoded.args as unknown as TokenCreatedEvent;

@@ -2,6 +2,7 @@
 
 import { Address } from "viem";
 
+// Updated to match GrandFactory.sol TokenCreated event
 export type TokenCreatedEvent = {
   tokenAddress: Address;
   name: string;
@@ -10,8 +11,11 @@ export type TokenCreatedEvent = {
   creator: Address;
   fundingGoal: bigint;
   burnManager: Address;
+  creatorTokens: bigint; // NEW: tokens minted to creator
+  ethSpent: bigint; // NEW: ETH spent during creation
 };
 
+// Updated to match GrandFactory.sol TokensPurchased event
 export type TokensPurchasedEvent = {
   token: Address;
   buyer: Address;
@@ -20,6 +24,7 @@ export type TokensPurchasedEvent = {
   fee: bigint;
 };
 
+// Updated to match GrandFactory.sol TokensSold event
 export type TokensSoldEvent = {
   token: Address;
   seller: Address;
@@ -28,11 +33,13 @@ export type TokensSoldEvent = {
   fee: bigint;
 };
 
+// Updated to match GrandFactory.sol TradingHalted event
 export type TradingHaltedEvent = {
   token: Address;
   collateral: bigint;
 };
 
+// Updated to match GrandFactory.sol TradingResumed event
 export type TradingResumedEvent = {
   token: Address;
 };

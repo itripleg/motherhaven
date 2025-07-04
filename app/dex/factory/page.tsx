@@ -1,3 +1,4 @@
+// app/dex/factory/page.tsx
 "use client";
 
 import { useState, useEffect } from "react";
@@ -5,7 +6,7 @@ import { motion } from "framer-motion";
 import { Container } from "@/components/craft";
 import { useToast } from "@/hooks/use-toast";
 import { useWriteContract, useWaitForTransactionReceipt } from "wagmi";
-import { zeroAddress } from "viem";
+import { zeroAddress, parseEther } from "viem";
 import { storage, db } from "@/firebase";
 import { ref, uploadBytes, getDownloadURL } from "firebase/storage";
 import { collection, getDocs, getCountFromServer } from "firebase/firestore";
@@ -69,7 +70,7 @@ export default function FactoryPage() {
         minPurchase: parseFloat(FACTORY_CONSTANTS.MIN_PURCHASE),
         maxPurchase: parseFloat(FACTORY_CONSTANTS.MAX_PURCHASE),
         priceRate: FACTORY_CONSTANTS.PRICE_RATE,
-        bondingCurve: "exponential",
+        bondingCurve: "linear",
         liquidityPool: "uniswap",
       };
 
@@ -79,7 +80,7 @@ export default function FactoryPage() {
   const [uploadingImage, setUploadingImage] = useState(false);
   const [isCreating, setIsCreating] = useState(false);
 
-  // Contract interaction
+  // Contract interaction - Updated to match new contract signature
   const {
     data: transactionData,
     error,
@@ -191,7 +192,7 @@ export default function FactoryPage() {
     tokenInfo.description
   );
 
-  // Handle token creation
+  // Handle token creation - Updated to match new contract signature
   const handleTokenCreation = async () => {
     if (!mounted || !isFormValid) return;
 
@@ -226,7 +227,7 @@ export default function FactoryPage() {
         description: "Prepare for takeoff! Your token is being created.",
       });
 
-      // Create token on blockchain
+      // Create token on blockchain with new signature
       writeContract({
         abi: FACTORY_ABI,
         address: FACTORY_ADDRESS,
@@ -236,6 +237,7 @@ export default function FactoryPage() {
           tokenInfo.ticker,
           imageUrl,
           tokenInfo.burnManager || zeroAddress,
+          parseEther("0"), // minTokensOut - set to 0 for basic creation
         ],
       });
     } catch (error) {

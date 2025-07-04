@@ -1,3 +1,4 @@
+// app/dex/components/CreateTokenForm.tsx
 "use client";
 
 import React, { useState, useEffect } from "react";
@@ -10,22 +11,22 @@ import { db } from "@/firebase";
 import { doc, setDoc } from "firebase/firestore";
 import { EventWatcher } from "@/components/EventWatcher";
 import { FACTORY_ABI, FACTORY_ADDRESS } from "@/types";
-// import tokenFactoryMetadata from "@/contracts/token-factory/artifacts/TokenFactory_metadata.json";
-// const FACTORY_ADDRESS = "0x7713A39875A5335dc4Fc4f9359908afb55984b1F";
-// const FACTORY_ABI = tokenFactoryMetadata.output.abi;
+import { zeroAddress, parseEther } from "viem";
 
 type TokenDetails = {
   name: string;
   symbol: string;
+  imageUrl: string;
+  burnManager: string;
+  minTokensOut: string;
   address?: string;
   blockNumber?: number;
   timestamp?: string;
   transactionHash?: string;
-  creator?: string; // Added creator field
+  creator?: string;
 };
 
 export function CreateTokenForm() {
-  // <EventWatcher />;
   const { toast } = useToast();
 
   // Manage writeContract interaction
@@ -38,13 +39,22 @@ export function CreateTokenForm() {
     });
 
   // Local state for token details
-  const [tokenDetails, setTokenDetails] = useState<TokenDetails | null>(null);
+  const [tokenDetails, setTokenDetails] = useState<TokenDetails>({
+    name: "",
+    symbol: "",
+    imageUrl: "",
+    burnManager: "",
+    minTokensOut: "0",
+  });
 
   async function handleSubmit(e: React.FormEvent<HTMLFormElement>) {
     e.preventDefault();
     const formData = new FormData(e.target as HTMLFormElement);
     const name = formData.get("name") as string;
     const symbol = formData.get("symbol") as string;
+    const imageUrl = formData.get("imageUrl") as string;
+    const burnManager = formData.get("burnManager") as string;
+    const minTokensOut = formData.get("minTokensOut") as string;
 
     if (!name || !symbol) {
       toast({
@@ -56,14 +66,35 @@ export function CreateTokenForm() {
     }
 
     // Set initial token details
-    setTokenDetails({ name, symbol: symbol });
-
-    writeContract({
-      address: FACTORY_ADDRESS,
-      abi: FACTORY_ABI,
-      functionName: "createToken",
-      args: [name, symbol],
+    setTokenDetails({
+      name,
+      symbol,
+      imageUrl: imageUrl || "",
+      burnManager: burnManager || zeroAddress,
+      minTokensOut: minTokensOut || "0",
     });
+
+    try {
+      writeContract({
+        address: FACTORY_ADDRESS,
+        abi: FACTORY_ABI,
+        functionName: "createToken",
+        args: [
+          name,
+          symbol,
+          imageUrl || "",
+          (burnManager || zeroAddress) as `0x${string}`,
+          parseEther(minTokensOut || "0"),
+        ],
+      });
+    } catch (error) {
+      console.error("Error creating token:", error);
+      toast({
+        title: "Error",
+        description: "Failed to create token. Please try again.",
+        variant: "destructive",
+      });
+    }
   }
 
   useEffect(() => {
@@ -72,22 +103,30 @@ export function CreateTokenForm() {
   }, []);
 
   useEffect(() => {
-    if (receipt && tokenDetails && !tokenDetails.address) {
-      const tokenCreatedEvent = receipt.logs?.find((log: any) => log.address);
+    if (receipt && tokenDetails.name && !tokenDetails.address) {
+      // Look for TokenCreated event in the logs
+      const tokenCreatedEvent = receipt.logs?.find((log: any) => {
+        // Check if this is a TokenCreated event by looking for the right topic signature
+        return (
+          log.topics && log.topics[0] === "0x..." // You'll need the actual event signature here
+        );
+      });
 
       if (!tokenCreatedEvent) {
         toast({
           title: "Error",
-          description: "Failed to retrieve token address.",
+          description: "Failed to retrieve token address from transaction.",
           variant: "destructive",
         });
         return;
       }
 
+      // For now, we'll get the token address from the event data
+      // You may need to decode this properly based on your event structure
       const address = tokenCreatedEvent.address;
       const blockNumber = Number(receipt.blockNumber);
       const transactionHash = receipt.transactionHash;
-      const creator = receipt.from; // Get creator address from receipt
+      const creator = receipt.from;
       const timestamp = new Date().toISOString();
 
       // Update state with token details including creator
@@ -105,12 +144,27 @@ export function CreateTokenForm() {
       setDoc(tokenDocRef, {
         name: tokenDetails.name,
         symbol: tokenDetails.symbol,
+        imageUrl: tokenDetails.imageUrl,
+        burnManager: tokenDetails.burnManager,
         address,
         blockNumber,
         timestamp,
         transactionHash,
-        creator, // Add creator to Firestore document
+        creator,
         createdAt: new Date().toISOString(),
+        // Add initial state
+        currentState: 1, // TRADING state
+        state: 1,
+        fundingGoal: "25", // Default funding goal
+        collateral: "0",
+        virtualSupply: "0",
+        lastPrice: "0.00001", // Initial price
+        statistics: {
+          currentPrice: "0.00001",
+          volumeETH: "0",
+          tradeCount: 0,
+          uniqueHolders: 0,
+        },
       })
         .then(() => {
           toast({
@@ -127,7 +181,7 @@ export function CreateTokenForm() {
           });
         });
     }
-  }, [receipt, toast]);
+  }, [receipt, toast, tokenDetails]);
 
   return (
     <form onSubmit={handleSubmit} className="space-y-6">
@@ -142,13 +196,44 @@ export function CreateTokenForm() {
           />
         </div>
         <div>
-          <Label htmlFor="symbol">Token Ticker</Label>
+          <Label htmlFor="symbol">Token Symbol</Label>
           <Input id="symbol" name="symbol" placeholder="MAT" required />
         </div>
+        <div>
+          <Label htmlFor="imageUrl">Image URL (Optional)</Label>
+          <Input
+            id="imageUrl"
+            name="imageUrl"
+            placeholder="https://example.com/image.jpg or IPFS hash"
+          />
+        </div>
+        <div>
+          <Label htmlFor="burnManager">Burn Manager Address (Optional)</Label>
+          <Input
+            id="burnManager"
+            name="burnManager"
+            placeholder="0x... (leave empty for none)"
+          />
+        </div>
+        <div>
+          <Label htmlFor="minTokensOut">
+            Minimum Tokens Out (if sending ETH)
+          </Label>
+          <Input
+            id="minTokensOut"
+            name="minTokensOut"
+            type="number"
+            step="0.000001"
+            placeholder="0"
+            defaultValue="0"
+          />
+        </div>
       </div>
+
       <Button type="submit" className="w-full" disabled={isPending}>
-        {isPending ? "Confirming..." : "Create Token"}
+        {isPending ? "Creating..." : "Create Token"}
       </Button>
+
       {hash && <div>Transaction Hash: {hash}</div>}
       {isConfirming && <div>Waiting for confirmation...</div>}
 
@@ -158,11 +243,12 @@ export function CreateTokenForm() {
           <div>Token Name: {tokenDetails.name}</div>
           <div>Token Symbol: {tokenDetails.symbol}</div>
           <div>Token Address: {tokenDetails.address}</div>
+          <div>Image URL: {tokenDetails.imageUrl || "None"}</div>
+          <div>Burn Manager: {tokenDetails.burnManager}</div>
           <div>Block Number: {tokenDetails.blockNumber}</div>
           <div>Timestamp: {tokenDetails.timestamp}</div>
           <div>Transaction Hash: {tokenDetails.transactionHash}</div>
-          <div>Creator: {tokenDetails.creator}</div>{" "}
-          {/* Display creator address */}
+          <div>Creator: {tokenDetails.creator}</div>
         </div>
       )}
       {error && <div>Error: {error.message}</div>}

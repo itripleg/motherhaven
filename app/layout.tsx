@@ -6,8 +6,6 @@ import MyMenu from "@/components/my-menu";
 import WagmiContext from "@/contexts/WagmiContext";
 import { Toaster } from "@/components/ui/toaster";
 import { EventWatcher } from "../components/EventWatcher";
-import { UserSection } from "@/components/UserSection";
-import { Header } from "./Header";
 import { FactoryConfigProvider } from "@/contexts/FactoryConfigProvider";
 import { ColorThemeProvider } from "@/contexts/ColorThemeProvider";
 // import { FactoryGuard } from "@/components/FactoryGuard";

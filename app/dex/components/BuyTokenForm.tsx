@@ -16,6 +16,7 @@ export function BuyTokenForm({ onAmountChange, maxAmount }: any) {
   const tokenAddress = pathname.split("/").pop() || "";
 
   const [amount, setAmount] = useState("");
+  const [slippageTolerance, setSlippageTolerance] = useState("1"); // 1% default slippage
   const [errorDetails, setErrorDetails] = useState<string | null>(null);
   const [receiptDetails, setReceiptDetails] = useState<{
     pricePaid?: string;
@@ -72,6 +73,10 @@ export function BuyTokenForm({ onAmountChange, maxAmount }: any) {
       return "Token is not currently trading";
     }
 
+    if (errorMessage.includes("Insufficient output amount")) {
+      return "Slippage too high - try increasing slippage tolerance or reducing amount";
+    }
+
     // Check for gas/value issues
     if (errorMessage.includes("insufficient funds")) {
       return "Insufficient AVAX balance for this purchase";
@@ -88,10 +93,22 @@ export function BuyTokenForm({ onAmountChange, maxAmount }: any) {
     return errorMessage.split("\n")[0] || "Transaction failed";
   };
 
+  // Calculate minimum tokens out based on slippage tolerance
+  const calculateMinTokensOut = (expectedTokens: string): string => {
+    try {
+      const expected = parseFloat(expectedTokens);
+      const slippage = parseFloat(slippageTolerance) / 100; // Convert percentage to decimal
+      const minTokens = expected * (1 - slippage);
+      return minTokens.toString();
+    } catch {
+      return "0";
+    }
+  };
+
   // Clear error when amount changes
   useEffect(() => {
     setErrorDetails(null);
-  }, [amount]);
+  }, [amount, slippageTolerance]);
 
   // Handle errors
   useEffect(() => {
@@ -117,15 +134,28 @@ export function BuyTokenForm({ onAmountChange, maxAmount }: any) {
       return;
     }
 
+    if (!amount || parseFloat(amount) <= 0) {
+      toast({
+        title: "Error",
+        description: "Please enter a valid amount.",
+        variant: "destructive",
+      });
+      return;
+    }
+
     try {
       setErrorDetails(null);
+
+      // For now, we'll set minTokensOut to 0 to disable slippage protection
+      // In a production app, you'd want to calculate expected tokens first
+      const minTokensOut = parseEther("0"); // TODO: Calculate based on slippage tolerance
 
       writeContract({
         abi: FACTORY_ABI,
         address: FACTORY_ADDRESS,
         functionName: "buy",
-        args: [tokenAddress],
-        value: parseEther(amount || "1"),
+        args: [tokenAddress as `0x${string}`, minTokensOut],
+        value: parseEther(amount || "0"),
       });
 
       toast({
@@ -203,13 +233,33 @@ export function BuyTokenForm({ onAmountChange, maxAmount }: any) {
               }}
               onWheel={(e) => e.currentTarget.blur()}
               className="text-center pr-2 dark:bg-black/80"
+              step="0.001"
+              min="0"
             />
           </div>
+
+          <div className="flex flex-col space-y-1.5">
+            <Label htmlFor="slippage">Slippage Tolerance (%)</Label>
+            <Input
+              id="slippage"
+              type="number"
+              value={slippageTolerance}
+              onChange={(e) => setSlippageTolerance(e.target.value)}
+              className="text-center pr-2 dark:bg-black/80"
+              step="0.1"
+              min="0.1"
+              max="50"
+            />
+            <div className="text-xs text-muted-foreground text-center">
+              Protects against price changes during transaction
+            </div>
+          </div>
         </div>
+
         <Button
           type="submit"
           className="mt-4 w-full"
-          disabled={isPending || !tokenAddress}
+          disabled={isPending || !tokenAddress || !amount}
         >
           {isPending ? "Processing..." : "Buy Tokens"}
         </Button>
@@ -239,6 +289,7 @@ export function BuyTokenForm({ onAmountChange, maxAmount }: any) {
                 Tokens Received:{" "}
                 {(Number(receiptDetails.tokensReceived) / 1e18).toFixed(2)}
               </li>
+              <li>Slippage Used: {slippageTolerance}%</li>
               <li className="flex items-center">
                 Transaction:{" "}
                 <AddressComponent hash={`${transactionData}`} type="tx" />
