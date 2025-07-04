@@ -42,18 +42,30 @@ import {
   House,
   GamepadIcon,
   Palette,
+  Check,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useAccount, useDisconnect } from "wagmi";
 import { ConnectButton } from "@/components/ConnectButton";
 import { FACTORY_ADDRESS } from "@/types";
 import { AddressComponent } from "@/components/AddressComponent";
+import { useColorTheme } from "@/contexts/ColorThemeProvider";
 
 interface NavItem {
   href: string;
   label: string;
   icon?: React.ReactNode;
   description?: string;
+}
+
+interface ThemePreset {
+  name: string;
+  description: string;
+  colors: Array<{
+    hue: number;
+    saturation: number;
+    lightness: number;
+  }>;
 }
 
 const navItems: NavItem[] = [
@@ -110,6 +122,55 @@ const userMenuItems: NavItem[] = [
   },
 ];
 
+// Theme presets matching your theme page
+const themePresets: ThemePreset[] = [
+  {
+    name: "Motherhaven Classic",
+    description: "Original purple theme",
+    colors: [
+      { hue: 263, saturation: 60, lightness: 50 },
+      { hue: 240, saturation: 5, lightness: 11 },
+      { hue: 240, saturation: 6, lightness: 5 },
+    ],
+  },
+  {
+    name: "Ocean Blue",
+    description: "Deep ocean vibes",
+    colors: [
+      { hue: 200, saturation: 80, lightness: 55 },
+      { hue: 210, saturation: 15, lightness: 12 },
+      { hue: 180, saturation: 70, lightness: 10 },
+    ],
+  },
+  {
+    name: "Forest Green",
+    description: "Natural and calming",
+    colors: [
+      { hue: 140, saturation: 60, lightness: 45 },
+      { hue: 150, saturation: 10, lightness: 10 },
+      { hue: 120, saturation: 50, lightness: 15 },
+    ],
+  },
+  {
+    name: "Sunset Orange",
+    description: "Warm and energetic",
+    colors: [
+      { hue: 25, saturation: 85, lightness: 55 },
+      { hue: 30, saturation: 8, lightness: 12 },
+      { hue: 45, saturation: 75, lightness: 20 },
+    ],
+  },
+  {
+    name: "Royal Purple",
+    description: "Elegant and premium",
+    colors: [
+      { hue: 280, saturation: 75, lightness: 50 },
+      { hue: 270, saturation: 8, lightness: 9 },
+      { hue: 290, saturation: 65, lightness: 35 },
+    ],
+  },
+];
+
 export default function MyMenu() {
   const pathname = usePathname();
   const [mounted, setMounted] = useState(false);
@@ -118,6 +179,9 @@ export default function MyMenu() {
   // User account hooks
   const { address, isConnected } = useAccount();
   const { disconnect } = useDisconnect();
+
+  // Color theme hooks
+  const { colors, applyColors, resetToDefault } = useColorTheme();
 
   useEffect(() => {
     setMounted(true);
@@ -194,6 +258,31 @@ export default function MyMenu() {
     );
   };
 
+  const applyThemePreset = (preset: ThemePreset) => {
+    const newColors = colors.map((color, index) => ({
+      ...color,
+      ...preset.colors[index],
+    }));
+    applyColors(newColors);
+  };
+
+  const getCurrentThemeName = () => {
+    // Simple heuristic to detect current theme
+    const currentPrimary = colors[0];
+
+    for (const preset of themePresets) {
+      const presetPrimary = preset.colors[0];
+      if (
+        Math.abs(currentPrimary.hue - presetPrimary.hue) < 10 &&
+        Math.abs(currentPrimary.saturation - presetPrimary.saturation) < 10 &&
+        Math.abs(currentPrimary.lightness - presetPrimary.lightness) < 10
+      ) {
+        return preset.name;
+      }
+    }
+    return "Custom";
+  };
+
   return (
     <>
       {/* Desktop Floating Menu */}
@@ -245,7 +334,7 @@ export default function MyMenu() {
 
               <MenubarSeparator />
 
-              {/* Factory Address - Moved to bottom */}
+              {/* Factory Address */}
               <MenubarItem>
                 <div className="flex items-center gap-3 px-3 py-2 w-full">
                   <Factory className="h-4 w-4 text-primary" />
@@ -332,24 +421,6 @@ export default function MyMenu() {
                   ))}
 
                   <MenubarSeparator />
-
-                  {/* Theme Toggle */}
-                  <MenubarItem>
-                    <Link
-                      href="/theme"
-                      className="flex items-center gap-3 cursor-pointer rounded-lg px-3 py-2 w-full transition-colors duration-200 hover:bg-accent"
-                    >
-                      <Palette className="h-4 w-4" />
-                      <div className="flex-1">
-                        <div className="font-medium">Theme</div>
-                        <div className="text-xs text-muted-foreground">
-                          Customize appearance
-                        </div>
-                      </div>
-                    </Link>
-                  </MenubarItem>
-
-                  <MenubarSeparator />
                   <MenubarItem onClick={copyAddress} className="gap-3">
                     <Copy className="h-4 w-4" />
                     <span>{copied ? "Copied!" : "Copy Address"}</span>
@@ -392,6 +463,65 @@ export default function MyMenu() {
               )}
             </MenubarContent>
           </MenubarMenu>
+
+          {/* Theme Palette Icon - MenubarMenu to match styling */}
+          <MenubarMenu>
+            <MenubarTrigger
+              className={cn(
+                "hover:bg-accent data-[state=open]:bg-accent",
+                "rounded-xl px-3 py-2 transition-all duration-200",
+                "flex items-center justify-center min-w-10"
+              )}
+            >
+              <Palette className="h-4 w-4 text-primary" />
+            </MenubarTrigger>
+            <MenubarContent className="rounded-xl border-border/50 bg-background/95 backdrop-blur-md shadow-xl z-[110] w-64">
+              <MenubarItem disabled className="opacity-100">
+                <div className="flex items-center gap-2 px-3 py-2 w-full">
+                  <Palette className="h-4 w-4 text-primary" />
+                  <div className="flex-1">
+                    <div className="font-medium">Themes</div>
+                    <div className="text-xs text-muted-foreground">
+                      Current: {getCurrentThemeName()}
+                    </div>
+                  </div>
+                </div>
+              </MenubarItem>
+              <MenubarSeparator />
+
+              {/* Theme Presets */}
+              {themePresets.map((preset) => (
+                <MenubarItem
+                  key={preset.name}
+                  onClick={() => applyThemePreset(preset)}
+                  className="gap-3 cursor-pointer"
+                >
+                  <div className="flex items-center gap-2 w-full">
+                    <div className="flex gap-1">
+                      {preset.colors.slice(0, 3).map((color, i) => (
+                        <div
+                          key={i}
+                          className="w-3 h-3 rounded-full border border-border/50"
+                          style={{
+                            backgroundColor: `hsl(${color.hue}deg ${color.saturation}% ${color.lightness}%)`,
+                          }}
+                        />
+                      ))}
+                    </div>
+                    <div className="flex-1">
+                      <div className="font-medium text-sm">{preset.name}</div>
+                      <div className="text-xs text-muted-foreground">
+                        {preset.description}
+                      </div>
+                    </div>
+                    {getCurrentThemeName() === preset.name && (
+                      <Check className="h-3 w-3 text-primary" />
+                    )}
+                  </div>
+                </MenubarItem>
+              ))}
+            </MenubarContent>
+          </MenubarMenu>
         </Menubar>
       </div>
 
@@ -411,6 +541,64 @@ export default function MyMenu() {
               <Sparkles className="h-4 w-4" />
               <span className="text-base uppercase">Motherhaven</span>
             </div>
+
+            {/* Theme Palette for Mobile */}
+            <DropdownMenu>
+              <DropdownMenuTrigger asChild>
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  className="h-8 w-8 rounded-lg"
+                >
+                  <Palette className="h-4 w-4 text-primary" />
+                </Button>
+              </DropdownMenuTrigger>
+              <DropdownMenuContent
+                className="w-64 rounded-xl z-[110]"
+                align="end"
+              >
+                <DropdownMenuLabel className="flex items-center gap-2">
+                  <Palette className="h-4 w-4" />
+                  Themes
+                  <span className="text-xs text-muted-foreground ml-auto">
+                    {getCurrentThemeName()}
+                  </span>
+                </DropdownMenuLabel>
+                <DropdownMenuSeparator />
+
+                {/* Theme Presets */}
+                {themePresets.map((preset) => (
+                  <DropdownMenuItem
+                    key={preset.name}
+                    onClick={() => applyThemePreset(preset)}
+                    className="gap-3 cursor-pointer"
+                  >
+                    <div className="flex items-center gap-2 w-full">
+                      <div className="flex gap-1">
+                        {preset.colors.slice(0, 3).map((color, i) => (
+                          <div
+                            key={i}
+                            className="w-3 h-3 rounded-full border border-border/50"
+                            style={{
+                              backgroundColor: `hsl(${color.hue}deg ${color.saturation}% ${color.lightness}%)`,
+                            }}
+                          />
+                        ))}
+                      </div>
+                      <div className="flex-1">
+                        <div className="font-medium text-sm">{preset.name}</div>
+                        <div className="text-xs text-muted-foreground">
+                          {preset.description}
+                        </div>
+                      </div>
+                      {getCurrentThemeName() === preset.name && (
+                        <Check className="h-3 w-3 text-primary" />
+                      )}
+                    </div>
+                  </DropdownMenuItem>
+                ))}
+              </DropdownMenuContent>
+            </DropdownMenu>
           </div>
 
           {/* Navigation - Compact */}
@@ -513,24 +701,6 @@ export default function MyMenu() {
                         </Link>
                       </DropdownMenuItem>
                     ))}
-
-                    <DropdownMenuSeparator />
-
-                    {/* Theme Toggle for Mobile */}
-                    <DropdownMenuItem asChild>
-                      <Link
-                        href="/theme"
-                        className="flex items-center gap-3 w-full"
-                      >
-                        <Palette className="h-4 w-4" />
-                        <div>
-                          <div className="font-medium">Theme</div>
-                          <div className="text-xs text-muted-foreground">
-                            Customize appearance
-                          </div>
-                        </div>
-                      </Link>
-                    </DropdownMenuItem>
 
                     <DropdownMenuSeparator />
                     <DropdownMenuItem onClick={copyAddress} className="gap-3">
