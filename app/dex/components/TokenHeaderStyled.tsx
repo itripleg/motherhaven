@@ -1,5 +1,5 @@
 import React, { useEffect, useState, useRef, useCallback, FC } from "react";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Card, CardContent } from "@/components/ui/card";
 import { Label } from "@/components/ui/label";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -12,7 +12,6 @@ import {
 } from "@/components/ui/tooltip";
 import { AddressComponent } from "@/components/AddressComponent";
 import { Progress } from "@/components/ui/progress";
-// FINAL-HOOKS: Updated to use consolidated final-hooks
 import { useTokenData } from "@/final-hooks/useTokenData";
 import { useFactoryContract } from "@/final-hooks/useFactoryContract";
 import { useUnifiedTokenPrice } from "@/final-hooks/useUnifiedTokenPrice";
@@ -30,6 +29,9 @@ import {
   Minimize,
   Square,
   User,
+  TrendingUp,
+  Target,
+  Sparkles,
 } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
 
@@ -52,6 +54,8 @@ interface ImagePosition {
 }
 
 // --- Constants ---
+const HEADER_HEIGHT = "h-80"; // Fixed height for consistency
+
 const FIT_MODES = {
   cover: { icon: Maximize, label: "Cover" },
   contain: { icon: Minimize, label: "Contain" },
@@ -91,10 +95,10 @@ export const TokenHeaderStyled: FC<TokenHeaderProps> = ({ address }) => {
   const { address: userAddress } = useAccount();
   const { updatePosition, isUpdating } = useImagePosition();
 
-  // FINAL-HOOKS: Use unified token data hook that combines Firestore + contract data
+  // Use unified token data hook that combines Firestore + contract data
   const { token, isLoading: loading } = useTokenData(address as Address);
 
-  // FINAL-HOOKS: Use consolidated factory contract hook
+  // Use consolidated factory contract hook
   const { useTokenState } = useFactoryContract();
   const { state } = useTokenState(address as Address);
 
@@ -163,8 +167,9 @@ export const TokenHeaderStyled: FC<TokenHeaderProps> = ({ address }) => {
         return;
       e.preventDefault();
       const rect = imageContainerRef.current.getBoundingClientRect();
+      // Fixed: Only invert Y (vertical), keep X (horizontal) normal
       const deltaX = ((e.clientX - dragStart.x) / rect.width) * 100;
-      const deltaY = ((e.clientY - dragStart.y) / rect.height) * 100;
+      const deltaY = -((e.clientY - dragStart.y) / rect.height) * 100;
       setPosition((prev) => ({
         ...prev,
         x: Math.max(-100, Math.min(100, prev.x + deltaX)),
@@ -199,7 +204,7 @@ export const TokenHeaderStyled: FC<TokenHeaderProps> = ({ address }) => {
         container.removeEventListener("wheel", handleWheel);
       };
     }
-  }, [isEditing, position.fit]); // Re-attach listener if fit mode changes while editing
+  }, [isEditing, position.fit]);
 
   // --- Style Generation ---
   const getBackgroundStyle = useCallback(() => {
@@ -233,15 +238,26 @@ export const TokenHeaderStyled: FC<TokenHeaderProps> = ({ address }) => {
   // --- Render Logic ---
   if (loading || !token) {
     return (
-      <Card className="min-h-[300px] flex items-center justify-center">
-        <div className="p-8 text-gray-400">Loading token data...</div>
+      <Card
+        className={`${HEADER_HEIGHT} flex items-center justify-center unified-card border-primary/20`}
+      >
+        <div className="text-center space-y-4">
+          <motion.div
+            animate={{ rotate: 360 }}
+            transition={{ duration: 2, repeat: Infinity, ease: "linear" }}
+            className="mx-auto w-8 h-8 border-2 border-primary border-t-transparent rounded-full"
+          />
+          <p className="text-muted-foreground">Loading token data...</p>
+        </div>
       </Card>
     );
   }
 
   return (
     <TooltipProvider delayDuration={100}>
-      <Card className="relative overflow-hidden min-h-[300px]">
+      <Card
+        className={`${HEADER_HEIGHT} relative overflow-hidden unified-card border-primary/20`}
+      >
         {isEditing ? (
           /* --- EDITING MODE RENDER --- */
           <div
@@ -257,11 +273,15 @@ export const TokenHeaderStyled: FC<TokenHeaderProps> = ({ address }) => {
               className="absolute inset-0 bg-cover bg-center"
               style={getBackgroundStyle()}
             />
-            <div className="absolute inset-0 bg-black/50" />
+            <div className="absolute inset-0 bg-black/60" />
+
+            {/* Crosshair Center Guide */}
             <div className="absolute inset-0 flex items-center justify-center pointer-events-none opacity-50">
               <div className="w-px h-8 bg-white" />
               <div className="w-8 h-px bg-white absolute" />
             </div>
+
+            {/* Edit Controls */}
             <div className="absolute top-4 right-4 z-20 flex items-center gap-2">
               <Tooltip>
                 <TooltipTrigger asChild>
@@ -274,10 +294,9 @@ export const TokenHeaderStyled: FC<TokenHeaderProps> = ({ address }) => {
                     <X className="h-4 w-4" />
                   </Button>
                 </TooltipTrigger>
-                <TooltipContent>
-                  <p>Cancel</p>
-                </TooltipContent>
+                <TooltipContent>Cancel</TooltipContent>
               </Tooltip>
+
               <Tooltip>
                 <TooltipTrigger asChild>
                   <Button
@@ -294,11 +313,11 @@ export const TokenHeaderStyled: FC<TokenHeaderProps> = ({ address }) => {
                     )}
                   </Button>
                 </TooltipTrigger>
-                <TooltipContent>
-                  <p>Save Position</p>
-                </TooltipContent>
+                <TooltipContent>Save Position</TooltipContent>
               </Tooltip>
             </div>
+
+            {/* Edit Panel */}
             <motion.div
               initial={{ opacity: 0, y: 20 }}
               animate={{ opacity: 1, y: 0 }}
@@ -306,7 +325,7 @@ export const TokenHeaderStyled: FC<TokenHeaderProps> = ({ address }) => {
               transition={{ duration: 0.2 }}
               className="absolute bottom-4 left-4 right-4 z-20"
             >
-              <div className="bg-black/80 backdrop-blur-md rounded-lg p-4 border border-white/20 space-y-4 max-w-lg mx-auto">
+              <div className="bg-black/90 backdrop-blur-md rounded-xl p-4 border border-white/20 space-y-4 max-w-2xl mx-auto">
                 <div className="flex items-center justify-between">
                   <span className="text-white text-sm font-medium">
                     Image Controls
@@ -315,11 +334,12 @@ export const TokenHeaderStyled: FC<TokenHeaderProps> = ({ address }) => {
                     variant="ghost"
                     size="sm"
                     onClick={resetPosition}
-                    className="text-white hover:bg-white/20"
+                    className="text-white hover:bg-white/20 h-8"
                   >
                     <RotateCcw className="h-4 w-4 mr-1" /> Reset
                   </Button>
                 </div>
+
                 <div className="grid grid-cols-3 gap-2">
                   {Object.entries(FIT_MODES).map(
                     ([mode, { icon: Icon, label }]) => (
@@ -334,14 +354,15 @@ export const TokenHeaderStyled: FC<TokenHeaderProps> = ({ address }) => {
                         onClick={() =>
                           setFitMode(mode as keyof typeof FIT_MODES)
                         }
-                        className="text-xs"
+                        className="text-xs h-8"
                       >
                         <Icon className="h-3 w-3 mr-1" /> {label}
                       </Button>
                     )
                   )}
                 </div>
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-x-4 gap-y-2">
+
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-x-4 gap-y-3">
                   {SLIDER_CONTROLS.map(
                     ({ key, label, min, max, step, suffix }) => {
                       const disabled =
@@ -371,6 +392,7 @@ export const TokenHeaderStyled: FC<TokenHeaderProps> = ({ address }) => {
                             max={max}
                             step={step}
                             disabled={disabled}
+                            className="h-2"
                           />
                         </div>
                       );
@@ -388,12 +410,14 @@ export const TokenHeaderStyled: FC<TokenHeaderProps> = ({ address }) => {
                 className="absolute inset-0 bg-cover bg-center"
                 style={getBackgroundStyle()}
               />
-              <div className="absolute inset-0 bg-gradient-to-b from-black/60 via-black/50 to-black/70" />
+              <div className="absolute inset-0 bg-gradient-to-b from-black/50 via-black/30 to-black/60" />
             </div>
-            <div className="relative z-10 flex flex-col justify-between h-full min-h-[300px] p-4">
+
+            <div className="relative z-10 flex flex-col justify-between h-full p-6">
+              {/* Top Bar */}
               <div className="flex justify-between items-start">
                 <AddressComponent hash={address} type="address" />
-                <div className="flex items-center gap-2">
+                <div className="flex items-center gap-3">
                   <TokenStatusBadge state={state} />
                   {isCreator ? (
                     <div className="flex items-center gap-2">
@@ -404,14 +428,12 @@ export const TokenHeaderStyled: FC<TokenHeaderProps> = ({ address }) => {
                               variant="outline"
                               size="icon"
                               onClick={() => setIsEditing(true)}
-                              className="bg-black/50 border-white/30 text-white hover:bg-black/70 h-8 w-8"
+                              className="bg-black/30 border-white/20 text-white hover:bg-black/50 h-8 w-8"
                             >
                               <Edit3 className="h-4 w-4" />
                             </Button>
                           </TooltipTrigger>
-                          <TooltipContent>
-                            <p>Edit photo position</p>
-                          </TooltipContent>
+                          <TooltipContent>Edit photo position</TooltipContent>
                         </Tooltip>
                       )}
                       <Tooltip>
@@ -420,9 +442,7 @@ export const TokenHeaderStyled: FC<TokenHeaderProps> = ({ address }) => {
                             <Crown className="h-4 w-4 text-yellow-400" />
                           </div>
                         </TooltipTrigger>
-                        <TooltipContent>
-                          <p>You are the creator</p>
-                        </TooltipContent>
+                        <TooltipContent>You are the creator</TooltipContent>
                       </Tooltip>
                     </div>
                   ) : (
@@ -434,13 +454,15 @@ export const TokenHeaderStyled: FC<TokenHeaderProps> = ({ address }) => {
                           </div>
                         </TooltipTrigger>
                         <TooltipContent>
-                          <p>Created by: {token.creator}</p>
+                          Created by: {token.creator}
                         </TooltipContent>
                       </Tooltip>
                     )
                   )}
                 </div>
               </div>
+
+              {/* Token Info */}
               <TokenInfoDisplay token={token} />
             </div>
           </>
@@ -450,7 +472,7 @@ export const TokenHeaderStyled: FC<TokenHeaderProps> = ({ address }) => {
   );
 };
 
-/* --- Sub-components for cleaner render logic --- */
+/* --- Sub-components --- */
 const TokenStatusBadge: FC<{ state: number | undefined }> = ({ state }) => {
   const stateMap: Record<number, StateDisplay> = {
     0: { text: "Not Created", color: "bg-red-500/80" },
@@ -464,21 +486,15 @@ const TokenStatusBadge: FC<{ state: number | undefined }> = ({ state }) => {
     color: "bg-gray-500/80",
   };
   return (
-    <Badge
-      className={`${display.color} text-white px-3 py-1`}
-      variant="outline"
-    >
+    <Badge className={`${display.color} text-white border-0`} variant="outline">
       {display.text}
     </Badge>
   );
 };
 
 const TokenInfoDisplay: FC<{ token: any }> = ({ token }) => {
-  // FINAL-HOOKS: Use consolidated factory contract hook
   const { useCollateral } = useFactoryContract();
   const { collateral: rawCollateral } = useCollateral(token.address as Address);
-
-  // FINAL-HOOKS: Use unified token price hook from final-hooks
   const { formatted: formattedCurrentPrice, isLoading: priceLoading } =
     useUnifiedTokenPrice(token.address as Address);
 
@@ -501,48 +517,67 @@ const TokenInfoDisplay: FC<{ token: any }> = ({ token }) => {
   }, [token.fundingGoal, rawCollateral]);
 
   return (
-    <div className="space-y-4">
-      <CardHeader className="p-0">
-        <CardTitle className="text-white text-3xl font-bold flex items-center gap-4">
+    <div className="space-y-6">
+      {/* Token Title & Description */}
+      <div className="space-y-3">
+        <h1 className="text-4xl font-bold text-white leading-tight">
           {token.name}
           {token.symbol && (
-            <span className="text-2xl text-gray-300">({token.symbol})</span>
+            <span className="text-2xl text-white/70 ml-3">
+              ({token.symbol})
+            </span>
           )}
-        </CardTitle>
-      </CardHeader>
-      <CardContent className="p-0">
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-          <div className="backdrop-blur-sm bg-white/10 p-4 rounded-lg">
-            <Label className="text-gray-200">Current Price (Final-Hooks)</Label>
-            <p className="text-white text-lg font-semibold">
-              {priceLoading ? (
-                <span className="animate-pulse">Loading...</span>
-              ) : (
-                <>
-                  {formattedCurrentPrice}{" "}
-                  <span className="text-gray-300">AVAX</span>
-                </>
-              )}
-            </p>
-            <div className="text-xs text-gray-400 mt-1">
-              via useUnifiedTokenPrice
-            </div>
+        </h1>
+
+        {/* Token Description */}
+        {token.description ? (
+          <blockquote className="text-white/80 text-lg italic leading-relaxed max-w-2xl">
+            "{token.description}"
+          </blockquote>
+        ) : (
+          <div className="text-white/50 text-lg italic leading-relaxed">
+            "No description provided"
           </div>
+        )}
+      </div>
+
+      {/* Stats Grid */}
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+        {/* Current Price */}
+        <div className="backdrop-blur-sm bg-white/10 p-4 rounded-xl border border-white/20">
+          <div className="flex items-center gap-2 mb-2">
+            <TrendingUp className="h-4 w-4 text-white" />
+            <span className="text-white/80 text-sm">Current Price</span>
+          </div>
+          <p className="text-white text-xl font-bold">
+            {priceLoading ? (
+              <span className="animate-pulse">Loading...</span>
+            ) : (
+              <>
+                {formattedCurrentPrice}{" "}
+                <span className="text-white/70 text-base">AVAX</span>
+              </>
+            )}
+          </p>
         </div>
+
+        {/* Funding Progress */}
         {token.fundingGoal && token.fundingGoal !== "0" && (
-          <div className="mt-6 backdrop-blur-sm bg-white/10 p-4 rounded-lg">
-            <Label className="text-gray-200 mb-2 block">Funding Progress</Label>
-            <Progress value={progress} className="h-2 mb-2" />
-            <p className="text-white text-sm font-semibold">
-              {progress.toFixed(2)}% - {formattedCollateral} /{" "}
-              {formattedFundingGoal} AVAX
-            </p>
-            <div className="text-xs text-gray-400 mt-1">
-              Collateral via final-hooks useCollateral
+          <div className="backdrop-blur-sm bg-white/10 p-4 rounded-xl border border-white/20">
+            <div className="flex items-center gap-2 mb-2">
+              <Target className="h-4 w-4 text-white" />
+              <span className="text-white/80 text-sm">Funding Progress</span>
+            </div>
+            <div className="space-y-2">
+              <Progress value={progress} className="h-2" />
+              <p className="text-white text-sm font-semibold">
+                {progress.toFixed(1)}% • {formattedCollateral} /{" "}
+                {formattedFundingGoal} AVAX
+              </p>
             </div>
           </div>
         )}
-      </CardContent>
+      </div>
     </div>
   );
 };

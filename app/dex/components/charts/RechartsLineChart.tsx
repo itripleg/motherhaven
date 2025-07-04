@@ -9,6 +9,8 @@ import {
   YAxis,
   Tooltip,
   CartesianGrid,
+  Area,
+  ComposedChart,
 } from "recharts";
 import { format, parseISO } from "date-fns";
 import { formatUnits, parseUnits } from "viem";
@@ -20,13 +22,16 @@ import {
   formatChartPrice,
   priceToNumber,
 } from "@/utils/tokenPriceFormatter";
+import { Badge } from "@/components/ui/badge";
+import { TrendingUp, TrendingDown, Activity, BarChart3 } from "lucide-react";
+import { motion } from "framer-motion";
 
 // This interface defines the shape of the data that our chart will use
 interface ChartPoint {
   price: number;
   formattedPrice: string;
   timeLabel: string;
-  timestamp: number; // Add timestamp for proper sorting
+  timestamp: number;
 }
 
 // Props for the main component
@@ -36,23 +41,32 @@ interface RechartsLineChartProps {
   token: Token;
 }
 
-// A custom tooltip component for the chart
+// Enhanced custom tooltip component
 const CustomTooltip = ({ active, payload, label }: any) => {
   if (active && payload && payload.length) {
-    // Get the formatted price that was already calculated for this data point
     const dataPoint = payload[0].payload;
-    const formattedPrice = dataPoint.formattedPrice; // Use the pre-calculated formatted price
+    const formattedPrice = dataPoint.formattedPrice;
 
     return (
-      <div className="p-3 bg-background/90 backdrop-blur-sm border border-border rounded-lg shadow-lg">
-        <p className="text-sm font-medium text-muted-foreground mb-1">
+      <motion.div
+        initial={{ opacity: 0, scale: 0.95 }}
+        animate={{ opacity: 1, scale: 1 }}
+        className="p-4 bg-background/95 backdrop-blur-md border border-primary/20 rounded-xl shadow-xl"
+      >
+        <p className="text-sm font-medium text-muted-foreground mb-2">
           {label}
         </p>
-        <p className="text-lg font-bold text-primary">{formattedPrice} AVAX</p>
-        <p className="text-xs text-muted-foreground mt-1">
-          📊 Trade avg price (from Firestore)
+        <div className="flex items-center gap-2">
+          <div className="w-3 h-3 rounded-full bg-primary" />
+          <p className="text-lg font-bold text-primary">
+            {formattedPrice} AVAX
+          </p>
+        </div>
+        <p className="text-xs text-muted-foreground mt-2 flex items-center gap-1">
+          <BarChart3 className="h-3 w-3" />
+          Trade execution price
         </p>
-      </div>
+      </motion.div>
     );
   }
   return null;
@@ -80,9 +94,8 @@ export default function RechartsLineChart({
     return "#8b5cf6"; // Fallback color
   }, []);
 
-  // useMemo will re-calculate the chart data only when its dependencies change
+  // Calculate chart data with genesis point
   const chartData: ChartPoint[] = useMemo(() => {
-    // 1. Create the "Genesis Point" from the token's creation data
     const genesisTimestamp = token.createdAt
       ? parseISO(token.createdAt).getTime()
       : Date.now();
@@ -92,18 +105,13 @@ export default function RechartsLineChart({
       priceInWei: parseUnits(token.initialPrice || "0.00001", 18),
     };
 
-    // 2. Process the raw trade data from Firestore
     const processedTrades = trades
       .map((trade) => {
-        // Safeguard against bad data
         if (!trade.pricePerToken || !trade.timestamp) {
           return null;
         }
 
         const tradeTimestamp = parseISO(trade.timestamp).getTime();
-
-        // Use the pricePerToken that's already stored in the trade
-        // This should match what the factory contract stored in lastPrice mapping
         const priceInWei = parseUnits(trade.pricePerToken, 18);
 
         return {
@@ -116,163 +124,249 @@ export default function RechartsLineChart({
           point !== null
       );
 
-    // 3. Combine the genesis point with actual trades and sort chronologically
     const allPoints = [...processedTrades, genesisPoint].sort(
       (a, b) => a.timestamp - b.timestamp
     );
 
-    // 4. Format the sorted points into the final shape for the chart
     return allPoints.map((point) => ({
-      price: priceToNumber(point.priceInWei), // Convert to number for chart calculations
-      formattedPrice: formatTokenPrice(formatUnits(point.priceInWei, 18)), // Use unified formatting
+      price: priceToNumber(point.priceInWei),
+      formattedPrice: formatTokenPrice(formatUnits(point.priceInWei, 18)),
       timeLabel: format(point.timestamp, "MMM d, h:mm a"),
-      timestamp: point.timestamp, // Keep timestamp for proper sorting
+      timestamp: point.timestamp,
     }));
   }, [trades, token.createdAt, token.initialPrice]);
 
-  // Calculate analytics with proper formatting
+  // Enhanced analytics calculation
   const analytics = useMemo(() => {
     if (trades.length === 0) {
       return {
         tradeCount: 0,
         totalVolume: "0.0000",
         buyPressure: 0,
+        priceChange: 0,
+        priceDirection: "neutral" as "up" | "down" | "neutral",
       };
     }
 
-    // Calculate volume in AVAX (not wei)
+    // Calculate volume in AVAX
     const totalVolumeWei = trades.reduce((sum, trade) => {
       const ethAmount = parseFloat(trade.ethAmount) || 0;
       return sum + ethAmount;
     }, 0);
 
-    // Convert from wei to AVAX and format
     const totalVolumeAVAX = totalVolumeWei / 1e18;
-
     const buyTrades = trades.filter((t) => t.type === "buy");
     const buyPressure = buyTrades.length / trades.length;
+
+    // Calculate price change
+    const firstPrice = chartData[0]?.price || 0;
+    const lastPrice = chartData[chartData.length - 1]?.price || 0;
+    const priceChange =
+      firstPrice > 0 ? ((lastPrice - firstPrice) / firstPrice) * 100 : 0;
+    const priceDirection =
+      priceChange > 0 ? "up" : priceChange < 0 ? "down" : "neutral";
 
     return {
       tradeCount: trades.length,
       totalVolume: totalVolumeAVAX.toFixed(4),
       buyPressure,
+      priceChange,
+      priceDirection,
     };
-  }, [trades]);
+  }, [trades, chartData]);
 
-  // The price displayed in the header uses the current live price from unified hook
   const displayPrice = priceLoading ? "Loading..." : currentPrice || "0.000000";
 
   if (loading) {
     return (
-      <div className="text-center text-muted-foreground animate-pulse">
-        Loading Chart Data...
+      <div className="flex items-center justify-center h-96 text-center space-y-4">
+        <div>
+          <motion.div
+            animate={{ rotate: 360 }}
+            transition={{ duration: 2, repeat: Infinity, ease: "linear" }}
+            className="mx-auto w-8 h-8 border-2 border-primary border-t-transparent rounded-full mb-4"
+          />
+          <p className="text-muted-foreground">Loading Chart Data...</p>
+        </div>
       </div>
     );
   }
 
   return (
-    <div className="h-full w-full">
-      {/* Chart Header */}
-      <div className="mb-3 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2">
-        {" "}
-        {/* Reduced margin bottom */}
-        <div>
-          <h3 className="text-base font-bold text-foreground">
-            {" "}
-            {/* Slightly smaller text */}
-            {token.symbol} Price History
-          </h3>
-          <p className="text-xl text-primary">
-            {" "}
-            {/* Use primary color */}
+    <div className="h-full w-full space-y-6">
+      {/* Simplified Analytics Cards Only */}
+      <div className="flex flex-col lg:flex-row lg:items-center lg:justify-between gap-4">
+        <div className="flex items-center gap-4">
+          <div className="text-3xl font-bold text-primary">
             {displayPrice} AVAX
-            {priceLoading && (
-              <span className="text-xs text-muted-foreground ml-2">
-                🔄 Loading contract.lastPrice...
-              </span>
-            )}
-            {!priceLoading && (
-              <span className="text-xs text-muted-foreground ml-2">
-                🔗 contract.lastPrice (most recent trade avg)
-              </span>
-            )}
-          </p>
+          </div>
+          {analytics.priceDirection !== "neutral" && (
+            <Badge
+              variant="outline"
+              className={`flex items-center gap-1 ${
+                analytics.priceDirection === "up"
+                  ? "text-green-400 border-green-400/30 bg-green-400/10"
+                  : "text-red-400 border-red-400/30 bg-red-400/10"
+              }`}
+            >
+              {analytics.priceDirection === "up" ? (
+                <TrendingUp className="h-3 w-3" />
+              ) : (
+                <TrendingDown className="h-3 w-3" />
+              )}
+              {analytics.priceChange > 0 ? "+" : ""}
+              {analytics.priceChange.toFixed(2)}%
+            </Badge>
+          )}
         </div>
-        {/* Analytics - Responsive */}
-        <div className="flex flex-wrap items-center gap-4 text-sm text-muted-foreground">
-          <span className="whitespace-nowrap">
-            Trades: {analytics.tradeCount}
-          </span>
-          <span className="whitespace-nowrap">
-            Volume: {analytics.totalVolume} AVAX
-          </span>
-          <span className="whitespace-nowrap">
-            Buy Pressure: {(analytics.buyPressure * 100).toFixed(1)}%
-          </span>
+
+        {/* Analytics Cards */}
+        <div className="flex flex-wrap gap-3">
+          <div className="flex items-center gap-2 px-3 py-2 bg-primary/10 rounded-lg border border-primary/20">
+            <Activity className="h-4 w-4 text-primary" />
+            <div className="text-sm">
+              <span className="font-semibold text-foreground">
+                {analytics.tradeCount}
+              </span>
+              <span className="text-muted-foreground ml-1">Trades</span>
+            </div>
+          </div>
+
+          <div className="flex items-center gap-2 px-3 py-2 bg-primary/10 rounded-lg border border-primary/20">
+            <TrendingUp className="h-4 w-4 text-primary" />
+            <div className="text-sm">
+              <span className="font-semibold text-foreground">
+                {analytics.totalVolume}
+              </span>
+              <span className="text-muted-foreground ml-1">AVAX</span>
+            </div>
+          </div>
+
+          <div className="flex items-center gap-2 px-3 py-2 bg-primary/10 rounded-lg border border-primary/20">
+            <div
+              className={`h-4 w-4 rounded-full ${
+                analytics.buyPressure > 0.6
+                  ? "bg-green-400"
+                  : analytics.buyPressure > 0.4
+                  ? "bg-yellow-400"
+                  : "bg-red-400"
+              }`}
+            />
+            <div className="text-sm">
+              <span className="font-semibold text-foreground">
+                {(analytics.buyPressure * 100).toFixed(0)}%
+              </span>
+              <span className="text-muted-foreground ml-1">Buy</span>
+            </div>
+          </div>
         </div>
       </div>
 
-      {/* Chart */}
+      {/* Chart with no borders */}
       {chartData.length > 0 ? (
-        <div className="h-72 sm:h-80 md:h-96 max-h-96">
-          {" "}
-          {/* Cap at 384px (96 * 4px) */}
+        <div className="h-80 lg:h-96 p-6">
           <ResponsiveContainer width="100%" height="100%">
-            <LineChart
+            <ComposedChart
               data={chartData}
               margin={{
-                top: 5,
+                top: 10,
                 right: 10,
                 left: 0,
-                bottom: 5,
+                bottom: 40,
               }}
             >
+              {/* Simple, effective grid */}
               <CartesianGrid
-                strokeDasharray="3 3"
-                stroke="hsl(var(--border))"
-                strokeOpacity={0.3}
+                strokeDasharray="2 2"
+                stroke="hsl(var(--muted-foreground))"
+                strokeOpacity={0.1}
               />
+
+              {/* Gradient Definition */}
+              <defs>
+                <linearGradient id="priceGradient" x1="0" y1="0" x2="0" y2="1">
+                  <stop
+                    offset="0%"
+                    stopColor={primaryColor}
+                    stopOpacity={0.3}
+                  />
+                  <stop
+                    offset="100%"
+                    stopColor={primaryColor}
+                    stopOpacity={0.05}
+                  />
+                </linearGradient>
+              </defs>
+
               <XAxis
                 dataKey="timeLabel"
                 stroke="hsl(var(--muted-foreground))"
-                fontSize={12}
+                fontSize={11}
                 tickLine={false}
                 axisLine={false}
                 interval="preserveStartEnd"
                 angle={-45}
                 textAnchor="end"
-                height={60}
+                height={40}
+                tick={{ fill: "hsl(var(--muted-foreground))" }}
               />
+
               <YAxis
                 stroke="hsl(var(--muted-foreground))"
-                fontSize={12}
+                fontSize={11}
                 tickLine={false}
                 axisLine={false}
-                // Use the same formatting as tooltip for consistency
                 tickFormatter={(value) => formatChartPrice(Number(value))}
                 domain={["dataMin", "dataMax"]}
-                width={80} // Fixed width to prevent overflow
+                width={80}
+                tick={{ fill: "hsl(var(--muted-foreground))" }}
               />
+
               <Tooltip content={<CustomTooltip />} />
+
+              {/* Area fill under the line */}
+              <Area
+                type="monotone"
+                dataKey="price"
+                stroke="none"
+                fill="url(#priceGradient)"
+                fillOpacity={1}
+              />
+
+              {/* Main price line */}
               <Line
                 type="monotone"
                 dataKey="price"
                 stroke={primaryColor}
-                strokeWidth={2}
-                dot={chartData.length < 50}
+                strokeWidth={3}
+                dot={false}
                 activeDot={{
-                  r: 4,
+                  r: 6,
                   stroke: primaryColor,
-                  strokeWidth: 2,
-                  fill: primaryColor,
+                  strokeWidth: 3,
+                  fill: "hsl(var(--background))",
+                  style: {
+                    filter: `drop-shadow(0 0 6px ${primaryColor})`,
+                  },
+                }}
+                style={{
+                  filter: `drop-shadow(0 2px 4px ${primaryColor}40)`,
                 }}
               />
-            </LineChart>
+            </ComposedChart>
           </ResponsiveContainer>
         </div>
       ) : (
-        <div className="flex items-center justify-center h-72 sm:h-80 md:h-96 max-h-96">
-          <p className="text-muted-foreground">No trade data available.</p>
+        <div className="flex flex-col items-center justify-center h-80 lg:h-96 space-y-4">
+          <div className="text-6xl opacity-20">📈</div>
+          <div className="text-center">
+            <p className="text-lg font-medium text-muted-foreground">
+              No trade data yet
+            </p>
+            <p className="text-sm text-muted-foreground/70">
+              Chart will appear after the first trade
+            </p>
+          </div>
         </div>
       )}
     </div>

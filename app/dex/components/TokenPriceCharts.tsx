@@ -48,14 +48,10 @@ export function TokenPriceCharts({ address }: TokenPriceChartsProps) {
 
   // FINAL-HOOKS: Component is now much simpler - let the chart handle its own analytics
   return (
-    <div className="grid gap-4 md:grid-cols-1">
-      {/* Chart with built-in analytics */}
-      <Card className="h-auto p-6">
-        {" "}
-        {/* Let chart control its own height */}
-        <RechartsLineChart trades={trades} loading={loading} token={token} />
-      </Card>
-
+    <div className="grid gap-4 md:grid-cols-1 ">
+      {/* Chart with built-in analytics */}{" "}
+      {/* Let chart control its own height */}
+      <RechartsLineChart trades={trades} loading={loading} token={token} />
       {/* Optional: Add TradingView chart if available */}
       {/* 
       <Card className="h-[400px] p-6">
