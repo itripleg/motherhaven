@@ -20,6 +20,11 @@ import {
   Loader2,
   Sparkles,
   Target,
+  Crown,
+  Coins,
+  TrendingUp,
+  Heart,
+  Gift,
 } from "lucide-react";
 
 interface FactoryLaunchSectionProps {
@@ -62,31 +67,31 @@ export function FactoryLaunchSection({
 }: FactoryLaunchSectionProps) {
   const buttonRef = useRef<HTMLButtonElement>(null);
   const containerRef = useRef<HTMLDivElement>(null);
-  const readyIndicatorRef = useRef<HTMLDivElement>(null);
+  const flamesRef = useRef<HTMLDivElement>(null);
+  const pulseRef = useRef<HTMLDivElement>(null);
 
-  // Elegant ready-to-launch animations
+  // Enhanced ready-to-launch animations
   useEffect(() => {
     if (isFormValid && !isCreating && !isPending && !isConfirming && !error) {
       const button = buttonRef.current;
       const container = containerRef.current;
-      const indicator = readyIndicatorRef.current;
+      const flames = flamesRef.current;
+      const pulse = pulseRef.current;
 
       if (button) {
-        // Subtle breathing glow
+        // Breathing glow effect
         gsap.to(button, {
           boxShadow:
-            "0 8px 32px rgba(var(--primary-rgb), 0.25), 0 0 0 1px rgba(var(--primary-rgb), 0.1)",
-          duration: 2.5,
+            "0 0 40px rgba(var(--primary-rgb), 0.6), 0 0 80px rgba(var(--primary-rgb), 0.3)",
+          duration: 2,
           ease: "sine.inOut",
           repeat: -1,
           yoyo: true,
         });
-      }
 
-      if (container) {
-        // Very subtle border pulse
-        gsap.to(container, {
-          borderColor: "rgba(var(--primary-rgb), 0.3)",
+        // Subtle scale pulse
+        gsap.to(button, {
+          scale: 1.02,
           duration: 3,
           ease: "sine.inOut",
           repeat: -1,
@@ -94,20 +99,37 @@ export function FactoryLaunchSection({
         });
       }
 
-      if (indicator) {
-        // Rotating sparkle effect
-        gsap.to(indicator, {
-          rotation: 360,
-          duration: 8,
-          ease: "none",
+      if (container) {
+        // Container border animation
+        gsap.to(container, {
+          borderColor: "rgba(var(--primary-rgb), 0.5)",
+          duration: 2.5,
+          ease: "sine.inOut",
           repeat: -1,
+          yoyo: true,
         });
+      }
+
+      if (pulse) {
+        // Pulse rings
+        gsap.fromTo(
+          pulse.children,
+          { scale: 0, opacity: 0.8 },
+          {
+            scale: 3,
+            opacity: 0,
+            duration: 2,
+            ease: "power2.out",
+            stagger: 0.3,
+            repeat: -1,
+          }
+        );
       }
 
       return () => {
         if (button) gsap.killTweensOf(button);
         if (container) gsap.killTweensOf(container);
-        if (indicator) gsap.killTweensOf(indicator);
+        if (pulse) gsap.killTweensOf(pulse);
       };
     }
   }, [isFormValid, isCreating, isPending, isConfirming, error]);
@@ -119,6 +141,7 @@ export function FactoryLaunchSection({
         icon: Upload,
         disabled: true,
         variant: "loading",
+        description: "Preparing your token's visual identity",
       };
     if (isCreating)
       return {
@@ -126,6 +149,7 @@ export function FactoryLaunchSection({
         icon: Flame,
         disabled: true,
         variant: "loading",
+        description: "Forging your token on the blockchain",
       };
     if (isPending)
       return {
@@ -133,6 +157,7 @@ export function FactoryLaunchSection({
         icon: Clock,
         disabled: true,
         variant: "loading",
+        description: "Waiting for blockchain confirmation",
       };
     if (isConfirming)
       return {
@@ -140,6 +165,7 @@ export function FactoryLaunchSection({
         icon: Zap,
         disabled: true,
         variant: "loading",
+        description: "Almost there! Final confirmation in progress",
       };
     if (!isFormValid)
       return {
@@ -147,12 +173,14 @@ export function FactoryLaunchSection({
         icon: AlertTriangle,
         disabled: true,
         variant: "disabled",
+        description: "Fill out the required fields above",
       };
     return {
       text: "Launch Token",
       icon: Rocket,
       disabled: false,
       variant: "ready",
+      description: "All systems go! Ready to deploy your token",
     };
   };
 
@@ -164,19 +192,19 @@ export function FactoryLaunchSection({
       {/* Main Launch Card */}
       <Card
         ref={containerRef}
-        className={`unified-card border-primary/20 transition-all duration-1000 ${
+        className={`unified-card transition-all duration-1000 relative overflow-hidden ${
           error
-            ? "border-red-400/30 bg-red-400/5"
+            ? "border-red-400/40 bg-red-500/5"
             : receipt
-            ? "border-green-400/30 bg-green-400/5"
+            ? "border-primary/40 bg-primary/5"
             : isCreating || isPending || isConfirming
-            ? "border-blue-400/30 bg-blue-400/5"
+            ? "border-primary/40 bg-primary/5"
             : isFormValid
-            ? "border-primary/30 bg-primary/5"
-            : ""
+            ? "border-primary/40 bg-primary/10"
+            : "border-border/30"
         }`}
       >
-        <CardContent className="p-8">
+        <CardContent className="p-8 relative z-10">
           {/* Success State */}
           {receipt ? (
             <motion.div
@@ -185,37 +213,116 @@ export function FactoryLaunchSection({
               transition={{ type: "spring", stiffness: 100 }}
               className="text-center space-y-8"
             >
+              {/* Celebration Effects */}
+              <div className="absolute inset-0 pointer-events-none overflow-hidden">
+                {/* Confetti */}
+                {[...Array(20)].map((_, i) => (
+                  <motion.div
+                    key={i}
+                    className="absolute w-2 h-2 rounded"
+                    style={{
+                      backgroundColor: [
+                        "#3b82f6",
+                        "#10b981",
+                        "#f59e0b",
+                        "#ef4444",
+                        "#8b5cf6",
+                      ][i % 5],
+                      left: `${Math.random() * 100}%`,
+                      top: `-10px`,
+                    }}
+                    animate={{
+                      y: [0, 400],
+                      x: [(Math.random() - 0.5) * 200],
+                      rotate: [0, 360],
+                      opacity: [1, 0],
+                    }}
+                    transition={{
+                      duration: 3 + Math.random() * 2,
+                      delay: Math.random() * 2,
+                      ease: "easeOut",
+                    }}
+                  />
+                ))}
+
+                {/* Golden sparkles */}
+                {[...Array(15)].map((_, i) => (
+                  <motion.div
+                    key={`sparkle-${i}`}
+                    className="absolute text-yellow-400"
+                    style={{
+                      left: `${Math.random() * 100}%`,
+                      top: `${Math.random() * 100}%`,
+                    }}
+                    animate={{
+                      scale: [0, 1, 0],
+                      rotate: [0, 180],
+                      opacity: [0, 1, 0],
+                    }}
+                    transition={{
+                      duration: 2,
+                      delay: Math.random() * 3,
+                      repeat: Infinity,
+                      repeatDelay: Math.random() * 4,
+                    }}
+                  >
+                    ✨
+                  </motion.div>
+                ))}
+              </div>
+
               {/* Success Header */}
               <div className="relative">
                 <motion.div
                   initial={{ scale: 0 }}
                   animate={{ scale: 1 }}
                   transition={{ type: "spring", delay: 0.2 }}
-                  className="inline-flex items-center justify-center gap-4"
+                  className="text-center"
                 >
-                  <div className="p-4 unified-card border-green-400/30 bg-green-400/10">
-                    <Trophy className="h-12 w-12 text-green-400" />
-                  </div>
-
-                  <div className="text-center">
-                    <h3 className="text-3xl font-bold text-gradient bg-gradient-to-r from-green-400 to-green-600 bg-clip-text text-transparent">
-                      Token Created Successfully!
-                    </h3>
-                    <p className="text-green-400/80 mt-2">
-                      Your token is now live on the blockchain
-                    </p>
-                  </div>
-
-                  <motion.div
-                    animate={{ rotate: 360 }}
-                    transition={{
-                      duration: 3,
-                      ease: "linear",
-                      repeat: Infinity,
-                    }}
-                    className="p-4 unified-card border-green-400/30 bg-green-400/10"
+                  <motion.h3
+                    initial={{ y: 20, opacity: 0 }}
+                    animate={{ y: 0, opacity: 1 }}
+                    transition={{ delay: 0.3 }}
+                    className="text-4xl font-bold text-foreground mb-2"
                   >
-                    <Star className="h-12 w-12 text-green-400" />
+                    🎉 Token Created! 🎉
+                  </motion.h3>
+                  <motion.p
+                    initial={{ y: 20, opacity: 0 }}
+                    animate={{ y: 0, opacity: 1 }}
+                    transition={{ delay: 0.4 }}
+                    className="text-muted-foreground text-lg mb-6"
+                  >
+                    Your token is now live and trading!
+                  </motion.p>
+
+                  {/* View on DEX Button */}
+                  <motion.div
+                    initial={{ y: 20, opacity: 0 }}
+                    animate={{ y: 0, opacity: 1 }}
+                    transition={{ delay: 0.5 }}
+                  >
+                    <Button
+                      onClick={() => {
+                        // Extract token address from receipt logs if available
+                        const tokenAddress =
+                          receipt?.logs?.[0]?.address || transactionData;
+                        if (tokenAddress) {
+                          window.open(`/dex/${tokenAddress}`, "_blank");
+                        }
+                      }}
+                      className="btn-primary px-8 py-3 text-lg font-semibold rounded-xl shadow-lg hover:shadow-xl transition-all duration-300 group"
+                    >
+                      <div className="flex items-center gap-3">
+                        <span>View on DEX</span>
+                        <motion.div
+                          animate={{ x: [0, 4, 0] }}
+                          transition={{ duration: 1.5, repeat: Infinity }}
+                        >
+                          <ArrowRight className="h-5 w-5 group-hover:scale-110 transition-transform" />
+                        </motion.div>
+                      </div>
+                    </Button>
                   </motion.div>
                 </motion.div>
               </div>
@@ -224,350 +331,378 @@ export function FactoryLaunchSection({
               <motion.div
                 initial={{ opacity: 0, y: 20 }}
                 animate={{ opacity: 1, y: 0 }}
-                transition={{ delay: 0.4 }}
-                className="unified-card border-green-400/20 bg-green-400/5 p-6"
+                transition={{ delay: 0.6 }}
+                className="grid grid-cols-1 lg:grid-cols-2 gap-6"
               >
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
-                  <div className="space-y-4">
-                    <h4 className="text-lg font-semibold text-foreground flex items-center gap-2">
-                      <CheckCircle className="h-5 w-5 text-green-400" />
-                      Token Details
-                    </h4>
-                    <div className="space-y-3">
-                      {[
-                        { label: "Name", value: tokenInfo.name },
-                        { label: "Symbol", value: tokenInfo.ticker },
-                        {
-                          label: "Image",
-                          value: tokenInfo.image ? "✅ Included" : "❌ None",
-                        },
-                      ].map((item) => (
-                        <div
-                          key={item.label}
-                          className="flex justify-between items-center py-2 border-b border-green-400/10 last:border-0"
-                        >
-                          <span className="text-muted-foreground">
-                            {item.label}:
-                          </span>
-                          <span className="font-medium text-foreground">
-                            {item.value}
-                          </span>
-                        </div>
-                      ))}
-                    </div>
-                  </div>
-
-                  <div className="space-y-4">
-                    <h4 className="text-lg font-semibold text-foreground flex items-center gap-2">
-                      <Target className="h-5 w-5 text-green-400" />
-                      Economics
-                    </h4>
-                    <div className="space-y-3">
-                      {[
-                        {
-                          label: "Funding Goal",
-                          value: `${tokenomics.fundingGoal} AVAX`,
-                        },
-                        {
-                          label: "Max Supply",
-                          value: tokenomics.maxSupply.toLocaleString(),
-                        },
-                        {
-                          label: "Initial Price",
-                          value: `${tokenomics.initialPrice.toFixed(8)} AVAX`,
-                        },
-                        {
-                          label: "Curve Type",
-                          value:
-                            tokenomics.bondingCurve.charAt(0).toUpperCase() +
-                            tokenomics.bondingCurve.slice(1),
-                        },
-                      ].map((item) => (
-                        <div
-                          key={item.label}
-                          className="flex justify-between items-center py-2 border-b border-green-400/10 last:border-0"
-                        >
-                          <span className="text-muted-foreground">
-                            {item.label}:
-                          </span>
-                          <span className="font-medium text-foreground">
-                            {item.value}
-                          </span>
-                        </div>
-                      ))}
-                    </div>
+                <div className="unified-card border-primary/30 bg-primary/10 p-6">
+                  <h4 className="text-lg font-semibold text-foreground flex items-center gap-2 mb-4">
+                    <CheckCircle className="h-5 w-5 text-primary" />
+                    Token Details
+                  </h4>
+                  <div className="space-y-3">
+                    {[
+                      { label: "Name", value: tokenInfo.name },
+                      { label: "Symbol", value: tokenInfo.ticker },
+                      {
+                        label: "Image",
+                        value: tokenInfo.image ? "✅ Uploaded" : "❌ None",
+                      },
+                    ].map((item) => (
+                      <div
+                        key={item.label}
+                        className="flex justify-between items-center py-2 border-b border-primary/20 last:border-0"
+                      >
+                        <span className="text-muted-foreground">
+                          {item.label}:
+                        </span>
+                        <span className="font-medium text-foreground">
+                          {item.value}
+                        </span>
+                      </div>
+                    ))}
                   </div>
                 </div>
 
-                {transactionData && (
-                  <div className="pt-6 mt-6 border-t border-green-400/20">
-                    <div className="flex items-center justify-center gap-3">
-                      <Zap className="h-4 w-4 text-green-400" />
-                      <span className="text-sm text-muted-foreground">
-                        Transaction Hash:
-                      </span>
-                      <AddressComponent hash={transactionData} type="tx" />
-                    </div>
+                <div className="unified-card border-primary/30 bg-primary/10 p-6">
+                  <h4 className="text-lg font-semibold text-foreground flex items-center gap-2 mb-4">
+                    <Target className="h-5 w-5 text-primary" />
+                    Economics
+                  </h4>
+                  <div className="space-y-3">
+                    {[
+                      {
+                        label: "Funding Goal",
+                        value: `${tokenomics.fundingGoal} AVAX`,
+                      },
+                      {
+                        label: "Max Supply",
+                        value: tokenomics.maxSupply.toLocaleString(),
+                      },
+                      {
+                        label: "Initial Price",
+                        value: `${tokenomics.initialPrice.toFixed(8)} AVAX`,
+                      },
+                    ].map((item) => (
+                      <div
+                        key={item.label}
+                        className="flex justify-between items-center py-2 border-b border-primary/20 last:border-0"
+                      >
+                        <span className="text-muted-foreground">
+                          {item.label}:
+                        </span>
+                        <span className="font-medium text-foreground">
+                          {item.value}
+                        </span>
+                      </div>
+                    ))}
                   </div>
-                )}
+                </div>
               </motion.div>
+
+              {transactionData && (
+                <motion.div
+                  initial={{ opacity: 0 }}
+                  animate={{ opacity: 1 }}
+                  transition={{ delay: 0.8 }}
+                  className="unified-card border-primary/30 bg-primary/5 p-4"
+                >
+                  <div className="flex items-center justify-center gap-3">
+                    <Zap className="h-4 w-4 text-primary" />
+                    <span className="text-sm text-muted-foreground">
+                      Transaction Hash:
+                    </span>
+                    <AddressComponent hash={transactionData} type="tx" />
+                  </div>
+                </motion.div>
+              )}
             </motion.div>
           ) : (
             /* Launch Interface */
-            <div className="text-center space-y-8">
-              {/* Status Header */}
-              <div className="relative">
-                {/* Background Animation Layer */}
-                <div className="absolute inset-0 overflow-hidden rounded-xl pointer-events-none">
-                  {isFormValid &&
-                    !isCreating &&
-                    !isPending &&
-                    !isConfirming &&
-                    !error && (
-                      <>
-                        {/* Animated Flames */}
-                        {[...Array(6)].map((_, i) => (
+            <div className="text-center space-y-8 relative">
+              {/* Background Effects */}
+              <div className="absolute inset-0 pointer-events-none overflow-hidden rounded-xl">
+                {/* Ready State: Rocket Flames and Energy */}
+                {isFormValid &&
+                  !isCreating &&
+                  !isPending &&
+                  !isConfirming &&
+                  !error && (
+                    <>
+                      {/* Rocket Flames at Bottom */}
+                      <div
+                        ref={flamesRef}
+                        className="absolute bottom-0 left-1/2 transform -translate-x-1/2 w-32 h-16"
+                      >
+                        {[...Array(8)].map((_, i) => (
                           <motion.div
                             key={i}
                             className="absolute bottom-0"
                             style={{
-                              left: `${15 + i * 12}%`,
-                              width: "16px",
-                              height: "32px",
+                              left: `${10 + i * 12}%`,
+                              width: "8px",
+                              height: "24px",
                             }}
                             animate={{
-                              height: [24, 40, 28, 36, 24],
-                              opacity: [0.4, 0.8, 0.6, 0.9, 0.5],
-                              scale: [0.9, 1.2, 1.0, 1.1, 0.9],
+                              height: [16, 32, 20, 28, 16],
+                              opacity: [0.6, 1, 0.8, 0.9, 0.7],
+                              scaleX: [0.8, 1.2, 1.0, 1.1, 0.9],
                             }}
                             transition={{
-                              duration: 1.5 + Math.random() * 0.8,
+                              duration: 1.2 + Math.random() * 0.6,
                               repeat: Infinity,
-                              delay: i * 0.15,
+                              delay: i * 0.1,
                               ease: "easeInOut",
                             }}
                           >
-                            <div className="w-full h-full bg-gradient-to-t from-orange-500/70 via-red-500/60 to-yellow-400/50 rounded-full blur-[1px]" />
+                            <div className="w-full h-full bg-gradient-to-t from-orange-500 via-red-500 to-yellow-400 rounded-full blur-[0.5px]" />
                           </motion.div>
                         ))}
+                      </div>
 
-                        {/* Floating Embers */}
-                        {[...Array(8)].map((_, i) => (
-                          <motion.div
-                            key={`ember-${i}`}
-                            className="absolute w-1 h-1 bg-orange-400/80 rounded-full"
-                            style={{
-                              left: `${20 + Math.random() * 60}%`,
-                              bottom: "20px",
-                            }}
-                            animate={{
-                              y: [-5, -60, -45, -80],
-                              x: [
-                                (Math.random() - 0.5) * 15,
-                                (Math.random() - 0.5) * 25,
-                              ],
-                              opacity: [0.8, 0.6, 0.3, 0],
-                              scale: [1, 1.1, 0.7, 0],
-                            }}
-                            transition={{
-                              duration: 2.5 + Math.random() * 1.5,
-                              repeat: Infinity,
-                              delay: Math.random() * 2,
-                              ease: "easeOut",
-                            }}
+                      {/* Energy Pulses */}
+                      <div
+                        ref={pulseRef}
+                        className="absolute inset-0 flex items-center justify-center"
+                      >
+                        {[...Array(3)].map((_, i) => (
+                          <div
+                            key={i}
+                            className="absolute w-4 h-4 border-2 border-primary/30 rounded-full"
                           />
                         ))}
+                      </div>
 
-                        {/* Energy Waves */}
+                      {/* Floating Icons */}
+                      {[
+                        {
+                          Icon: Star,
+                          position: "top-1/4 left-1/4",
+                          delay: 0,
+                          animation: "spin",
+                        },
+                        {
+                          Icon: Coins,
+                          position: "top-1/3 right-1/4",
+                          delay: 0.5,
+                          animation: "float",
+                        },
+                        {
+                          Icon: Crown,
+                          position: "bottom-1/3 left-1/5",
+                          delay: 1,
+                          animation: "pulse",
+                        },
+                        {
+                          Icon: TrendingUp,
+                          position: "bottom-1/4 right-1/3",
+                          delay: 1.5,
+                          animation: "float",
+                        },
+                      ].map(({ Icon, position, delay, animation }, i) => (
                         <motion.div
-                          className="absolute inset-0 opacity-15"
-                          animate={{
-                            background: [
-                              "radial-gradient(ellipse at 25% 100%, rgba(59, 130, 246, 0.15) 0%, transparent 60%)",
-                              "radial-gradient(ellipse at 75% 100%, rgba(147, 51, 234, 0.15) 0%, transparent 60%)",
-                              "radial-gradient(ellipse at 50% 100%, rgba(59, 130, 246, 0.15) 0%, transparent 60%)",
-                              "radial-gradient(ellipse at 25% 100%, rgba(59, 130, 246, 0.15) 0%, transparent 60%)",
-                            ],
-                          }}
+                          key={i}
+                          className={`absolute ${position} opacity-20`}
+                          animate={
+                            animation === "spin"
+                              ? { rotate: [0, 360] }
+                              : animation === "pulse"
+                              ? { scale: [1, 1.3, 1] }
+                              : { y: [-5, 5, -5], rotate: [0, 10, -10, 0] }
+                          }
                           transition={{
-                            duration: 4,
+                            duration:
+                              animation === "spin"
+                                ? 6
+                                : animation === "pulse"
+                                ? 2
+                                : 3 + Math.random(),
                             repeat: Infinity,
-                            ease: "easeInOut",
+                            delay,
+                            ease: animation === "spin" ? "linear" : "easeInOut",
                           }}
-                        />
-                      </>
-                    )}
-
-                  {/* Error state background */}
-                  {error && (
-                    <motion.div
-                      className="absolute inset-0 opacity-25"
-                      animate={{
-                        background: [
-                          "radial-gradient(ellipse at 50% 100%, rgba(239, 68, 68, 0.1) 0%, transparent 70%)",
-                          "radial-gradient(ellipse at 50% 100%, rgba(239, 68, 68, 0.2) 0%, transparent 70%)",
-                        ],
-                      }}
-                      transition={{
-                        duration: 2,
-                        repeat: Infinity,
-                        ease: "easeInOut",
-                      }}
-                    />
+                        >
+                          <Icon className="h-6 w-6 text-primary" />
+                        </motion.div>
+                      ))}
+                    </>
                   )}
-                </div>
 
-                <motion.div
-                  key={`${isCreating}-${isPending}-${isConfirming}-${isFormValid}-${error}`}
-                  initial={{ opacity: 0, y: 20 }}
-                  animate={{ opacity: 1, y: 0 }}
-                  transition={{ duration: 0.6 }}
-                  className="space-y-6 relative z-10"
-                >
-                  {/* Status Title */}
-                  <div className="text-center">
-                    {error ? (
-                      <>
-                        <div className="flex items-center justify-center gap-3 mb-3">
-                          <AlertTriangle className="h-8 w-8 text-red-400" />
-                          <h3 className="text-3xl font-bold text-red-400">
-                            Launch Failed
-                          </h3>
-                        </div>
-                        <p className="text-red-400/80">
-                          There was an issue with token creation
-                        </p>
-                      </>
-                    ) : isCreating || isPending || isConfirming ? (
-                      <>
-                        <div className="flex items-center justify-center gap-3 mb-3">
-                          <motion.div
-                            animate={{ rotate: 360 }}
-                            transition={{
-                              duration: 2,
-                              ease: "linear",
-                              repeat: Infinity,
-                            }}
-                          >
-                            <Loader2 className="h-8 w-8 text-blue-400" />
-                          </motion.div>
-                          <h3 className="text-3xl font-bold text-blue-400">
-                            {isCreating
-                              ? "Creating Token..."
-                              : isPending
-                              ? "Transaction Pending..."
-                              : "Confirming..."}
-                          </h3>
-                        </div>
-                        <p className="text-blue-400/80">
-                          Deploying to blockchain...
-                        </p>
-                      </>
-                    ) : isFormValid ? (
-                      <>
-                        <div className="flex items-center justify-center gap-3 mb-3">
-                          <motion.div
-                            animate={{ scale: [1, 1.1, 1] }}
-                            transition={{ duration: 2, repeat: Infinity }}
-                          >
-                            <Rocket className="h-8 w-8 text-primary" />
-                          </motion.div>
-                          <h3 className="text-4xl font-bold text-gradient bg-gradient-to-r from-primary via-purple-400 to-primary bg-clip-text text-transparent">
-                            Ready for Launch
-                          </h3>
-                          <motion.div
-                            animate={{ rotate: [0, 10, -10, 0] }}
-                            transition={{ duration: 3, repeat: Infinity }}
-                          >
-                            <Flame className="h-8 w-8 text-orange-400" />
-                          </motion.div>
-                        </div>
-                        <p className="text-primary/80 text-lg font-medium">
-                          🔥 All systems go! Your token is ready to ignite! 🔥
-                        </p>
-                      </>
-                    ) : (
-                      <>
-                        <div className="flex items-center justify-center gap-3 mb-3">
-                          <Clock className="h-8 w-8 text-muted-foreground" />
-                          <h3 className="text-3xl font-bold text-muted-foreground">
-                            Complete Your Token
-                          </h3>
-                        </div>
-                        <p className="text-muted-foreground/80">
-                          Fill out the form to proceed
-                        </p>
-                      </>
-                    )}
-                  </div>
+                {/* Loading State: Spinning Energy */}
+                {(isCreating || isPending || isConfirming) && (
+                  <motion.div
+                    className="absolute inset-0 opacity-20"
+                    animate={{
+                      background: [
+                        "radial-gradient(ellipse at 50% 50%, rgba(var(--primary-rgb), 0.2) 0%, transparent 70%)",
+                        "radial-gradient(ellipse at 30% 30%, rgba(var(--primary-rgb), 0.15) 0%, transparent 70%)",
+                        "radial-gradient(ellipse at 70% 70%, rgba(var(--primary-rgb), 0.25) 0%, transparent 70%)",
+                        "radial-gradient(ellipse at 50% 50%, rgba(var(--primary-rgb), 0.2) 0%, transparent 70%)",
+                      ],
+                    }}
+                    transition={{
+                      duration: 3,
+                      repeat: Infinity,
+                      ease: "easeInOut",
+                    }}
+                  />
+                )}
 
-                  {/* Ready Animation Dots */}
-                  {isFormValid &&
-                    !isCreating &&
-                    !isPending &&
-                    !isConfirming &&
-                    !error && (
-                      <motion.div
-                        initial={{ opacity: 0 }}
-                        animate={{ opacity: 1 }}
-                        className="flex justify-center gap-2"
-                      >
+                {/* Error State */}
+                {error && (
+                  <motion.div
+                    className="absolute inset-0 opacity-30"
+                    animate={{
+                      background: [
+                        "radial-gradient(ellipse at 50% 50%, rgba(239, 68, 68, 0.15) 0%, transparent 70%)",
+                        "radial-gradient(ellipse at 50% 50%, rgba(239, 68, 68, 0.25) 0%, transparent 70%)",
+                      ],
+                    }}
+                    transition={{
+                      duration: 2,
+                      repeat: Infinity,
+                      ease: "easeInOut",
+                    }}
+                  />
+                )}
+              </div>
+
+              {/* Status Header */}
+              <motion.div
+                key={`${isCreating}-${isPending}-${isConfirming}-${isFormValid}-${error}`}
+                initial={{ opacity: 0, y: 20 }}
+                animate={{ opacity: 1, y: 0 }}
+                transition={{ duration: 0.6 }}
+                className="space-y-6 relative z-10"
+              >
+                <div className="text-center">
+                  {error ? (
+                    <div className="space-y-3">
+                      <div className="flex items-center justify-center gap-3">
+                        <AlertTriangle className="h-10 w-10 text-red-400" />
+                        <h3 className="text-3xl font-bold text-red-400">
+                          Launch Failed
+                        </h3>
+                      </div>
+                      <p className="text-red-400/80 text-lg">
+                        {buttonState.description}
+                      </p>
+                    </div>
+                  ) : isCreating || isPending || isConfirming ? (
+                    <div className="space-y-4">
+                      <div className="flex items-center justify-center gap-4">
+                        <motion.div
+                          animate={{ rotate: 360 }}
+                          transition={{
+                            duration: 2,
+                            ease: "linear",
+                            repeat: Infinity,
+                          }}
+                        >
+                          <Loader2 className="h-10 w-10 text-primary" />
+                        </motion.div>
+                        <h3 className="text-3xl font-bold text-primary">
+                          {buttonState.text}
+                        </h3>
+                      </div>
+                      <p className="text-primary/80 text-lg">
+                        {buttonState.description}
+                      </p>
+
+                      {/* Progress Dots */}
+                      <div className="flex justify-center gap-2">
                         {[0, 1, 2].map((index) => (
                           <motion.div
                             key={index}
-                            className="w-3 h-3 bg-gradient-to-t from-orange-500 to-yellow-400 rounded-full"
+                            className="w-2 h-2 bg-primary rounded-full"
                             animate={{
-                              scale: [1, 1.4, 1],
-                              opacity: [0.6, 1, 0.6],
-                              boxShadow: [
-                                "0 0 10px rgba(251, 191, 36, 0.3)",
-                                "0 0 20px rgba(251, 191, 36, 0.8)",
-                                "0 0 10px rgba(251, 191, 36, 0.3)",
-                              ],
+                              scale: [1, 1.5, 1],
+                              opacity: [0.5, 1, 0.5],
                             }}
                             transition={{
-                              duration: 2,
+                              duration: 1.5,
                               repeat: Infinity,
-                              delay: index * 0.3,
+                              delay: index * 0.2,
                               ease: "easeInOut",
                             }}
                           />
                         ))}
-                      </motion.div>
-                    )}
-                </motion.div>
-              </div>
+                      </div>
+                    </div>
+                  ) : isFormValid ? (
+                    <div className="space-y-4">
+                      <div className="flex items-center justify-center gap-4">
+                        <motion.div
+                          animate={{
+                            scale: [1, 1.1, 1],
+                            rotate: [0, 5, -5, 0],
+                          }}
+                          transition={{ duration: 2, repeat: Infinity }}
+                        >
+                          <Rocket className="h-12 w-12 text-primary" />
+                        </motion.div>
+                        <h3 className="text-4xl font-bold text-gradient bg-gradient-to-r from-primary via-purple-400 to-primary bg-clip-text text-transparent">
+                          Ready for Launch
+                        </h3>
+                        <motion.div
+                          animate={{
+                            rotate: [0, 10, -10, 0],
+                            scale: [1, 1.2, 1],
+                          }}
+                          transition={{ duration: 2.5, repeat: Infinity }}
+                        >
+                          <Flame className="h-12 w-12 text-orange-400" />
+                        </motion.div>
+                      </div>
+                      <p className="text-primary/90 text-xl font-medium">
+                        🚀 {buttonState.description} 🚀
+                      </p>
+                    </div>
+                  ) : (
+                    <div className="space-y-3">
+                      <div className="flex items-center justify-center gap-3">
+                        <Clock className="h-10 w-10 text-muted-foreground" />
+                        <h3 className="text-3xl font-bold text-muted-foreground">
+                          Complete Your Token
+                        </h3>
+                      </div>
+                      <p className="text-muted-foreground/80 text-lg">
+                        {buttonState.description}
+                      </p>
+                    </div>
+                  )}
+                </div>
+              </motion.div>
 
               {/* Launch Button */}
               <motion.div
                 whileHover={!buttonState.disabled ? { scale: 1.02 } : {}}
                 whileTap={!buttonState.disabled ? { scale: 0.98 } : {}}
-                className="flex justify-center"
+                className="flex justify-center relative"
               >
                 <Button
                   ref={buttonRef}
                   onClick={onLaunch}
                   disabled={buttonState.disabled}
                   className={`
-                    px-12 py-6 text-xl font-bold rounded-2xl transition-all duration-500 relative overflow-hidden group
+                    px-16 py-8 text-2xl font-bold rounded-2xl transition-all duration-500 relative overflow-hidden group
                     ${
                       buttonState.variant === "ready"
-                        ? "btn-primary border-2 border-primary/50 text-white shadow-xl"
+                        ? "btn-primary border-2 border-primary/50 text-white shadow-2xl"
                         : buttonState.variant === "loading"
                         ? "bg-primary/20 text-primary border-2 border-primary/30 cursor-wait"
                         : "bg-muted text-muted-foreground border-2 border-muted cursor-not-allowed"
                     }
                   `}
                 >
-                  {/* Ready state background effect */}
+                  {/* Ready state shimmer effect */}
                   {buttonState.variant === "ready" && (
                     <motion.div
-                      className="absolute inset-0 bg-gradient-to-r from-transparent via-white/10 to-transparent"
-                      animate={{ x: ["-100%", "100%"] }}
+                      className="absolute inset-0 bg-gradient-to-r from-transparent via-white/20 to-transparent"
+                      animate={{ x: ["-120%", "120%"] }}
                       transition={{
-                        duration: 2,
+                        duration: 2.5,
                         repeat: Infinity,
-                        ease: "linear",
+                        ease: "easeInOut",
                       }}
                     />
                   )}
@@ -578,10 +713,10 @@ export function FactoryLaunchSection({
                       initial={{ opacity: 0, y: 5 }}
                       animate={{ opacity: 1, y: 0 }}
                       exit={{ opacity: 0, y: -5 }}
-                      className="flex items-center gap-3 relative z-10"
+                      className="flex items-center gap-4 relative z-10"
                     >
                       <ButtonIcon
-                        className={`h-6 w-6 ${
+                        className={`h-8 w-8 ${
                           buttonState.variant === "loading"
                             ? "animate-spin"
                             : buttonState.variant === "ready"
@@ -592,10 +727,10 @@ export function FactoryLaunchSection({
                       {buttonState.text}
                       {buttonState.variant === "ready" && (
                         <motion.div
-                          animate={{ x: [0, 3, 0] }}
+                          animate={{ x: [0, 5, 0] }}
                           transition={{ duration: 1.5, repeat: Infinity }}
                         >
-                          <ArrowRight className="h-6 w-6" />
+                          <ArrowRight className="h-8 w-8" />
                         </motion.div>
                       )}
                     </motion.div>
