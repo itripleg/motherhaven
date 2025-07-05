@@ -2,11 +2,7 @@
 import { useState, useEffect } from "react";
 import { collection, getDocs, doc, setDoc } from "firebase/firestore";
 import { db } from "@/firebase";
-import {
-  FACTORY_ADDRESS,
-  TokensPurchasedEvent,
-  TokensSoldEvent,
-} from "@/types";
+import { FACTORY_ADDRESS } from "@/types";
 import { formatEther, parseAbiItem } from "viem";
 import { usePublicClient } from "wagmi";
 import { Button } from "@/components/ui/button";
@@ -21,9 +17,30 @@ import {
   Info,
   X,
   TrendingUp,
+  Calendar,
+  Database,
+  Activity,
+  BarChart3,
+  ArrowUpRight,
+  ArrowDownLeft,
 } from "lucide-react";
 
-const DEFAULT_STARTING_BLOCK = 36999988n;
+// Event interfaces based on your contract
+interface TokensPurchasedEvent {
+  token: string;
+  buyer: string;
+  amount: bigint;
+  price: bigint;
+  fee: bigint;
+}
+
+interface TokensSoldEvent {
+  token: string;
+  seller: string;
+  tokenAmount: bigint;
+  ethAmount: bigint;
+  fee: bigint;
+}
 
 interface FirestoreTrade {
   blockNumber: number;
@@ -35,15 +52,21 @@ interface FirestoreTrade {
   trader: string;
   transactionHash: string;
   type: "buy" | "sell";
+  fee?: string;
 }
 
 interface TokenTrades {
   address: string;
+  name?: string;
+  symbol?: string;
   trades: FirestoreTrade[];
   inContract: boolean;
   inFirestore: boolean;
   buyTrades: number;
   sellTrades: number;
+  totalVolume: string;
+  firstTradeBlock: number;
+  lastTradeBlock: number;
 }
 
 interface BlockRange {
@@ -56,7 +79,9 @@ const calculatePricePerToken = (
   tokenAmount: bigint
 ): string => {
   if (tokenAmount === 0n) return "0";
-  return (Number(ethAmount) / Number(tokenAmount)).toString();
+  const ethInEther = Number(formatEther(ethAmount));
+  const tokensInEther = Number(formatEther(tokenAmount));
+  return (ethInEther / tokensInEther).toString();
 };
 
 export default function RestoreTrades() {
@@ -64,41 +89,95 @@ export default function RestoreTrades() {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [currentBlock, setCurrentBlock] = useState<bigint | null>(null);
+  const [factoryCreationBlock, setFactoryCreationBlock] = useState<
+    bigint | null
+  >(null);
   const [blockRange, setBlockRange] = useState<BlockRange>({
-    from: DEFAULT_STARTING_BLOCK.toString(),
+    from: "",
     to: "latest",
   });
-  const [batchSize, setBatchSize] = useState("500");
+  const [batchSize, setBatchSize] = useState("1000");
   const [progress, setProgress] = useState<{
     current: number;
     total: number;
+    currentRange?: string;
+    tradesFound?: number;
   } | null>(null);
   const [cancelRequested, setCancelRequested] = useState(false);
 
   const publicClient = usePublicClient();
 
-  // Get current block number on load
+  // Get factory creation block and current block
   useEffect(() => {
-    const getCurrentBlock = async () => {
+    const getBlockInfo = async () => {
       if (publicClient) {
         try {
-          const block = await publicClient.getBlockNumber();
-          setCurrentBlock(block);
+          const currentBlock = await publicClient.getBlockNumber();
+          setCurrentBlock(currentBlock);
 
-          // Set a reasonable default range (last 10k blocks)
-          const defaultFrom = block - 10000n;
+          // Find factory creation block
+          const factoryBlock = await findFactoryCreationBlock();
+          setFactoryCreationBlock(factoryBlock);
+
+          // Set default range from factory creation to latest
           setBlockRange({
-            from: defaultFrom.toString(),
+            from: factoryBlock.toString(),
             to: "latest",
           });
         } catch (err) {
-          console.error("Error getting current block:", err);
+          console.error("Error getting block info:", err);
+          // Fallback
+          const fallbackBlock = currentBlock
+            ? currentBlock - 50000n
+            : 36999988n;
+          setFactoryCreationBlock(fallbackBlock);
+          setBlockRange({
+            from: fallbackBlock.toString(),
+            to: "latest",
+          });
         }
       }
     };
 
-    getCurrentBlock();
+    getBlockInfo();
   }, [publicClient]);
+
+  // Binary search to find factory creation block
+  const findFactoryCreationBlock = async (): Promise<bigint> => {
+    if (!publicClient) throw new Error("Public client not available");
+
+    try {
+      const currentBlock = await publicClient.getBlockNumber();
+      let low = currentBlock - 100000n;
+      let high = currentBlock;
+      let creationBlock = low;
+
+      while (low <= high) {
+        const mid = (low + high) / 2n;
+
+        try {
+          const code = await publicClient.getCode({
+            address: FACTORY_ADDRESS,
+            blockNumber: mid,
+          });
+
+          if (code && code !== "0x") {
+            creationBlock = mid;
+            high = mid - 1n;
+          } else {
+            low = mid + 1n;
+          }
+        } catch (err) {
+          high = mid - 1n;
+        }
+      }
+
+      return creationBlock;
+    } catch (err) {
+      console.error("Error finding factory creation block:", err);
+      return 36999988n;
+    }
+  };
 
   // Get existing Firestore trades
   const fetchFirestoreTrades = async () => {
@@ -118,20 +197,35 @@ export default function RestoreTrades() {
     }
   };
 
-  // Fetch contract trades with user-defined range and batching
+  // Get token info from Firestore
+  const fetchTokenInfo = async () => {
+    try {
+      const tokenDocs = await getDocs(collection(db, "tokens"));
+      const tokenMap = new Map();
+      tokenDocs.docs.forEach((doc) => {
+        const data = doc.data();
+        tokenMap.set(doc.id.toLowerCase(), {
+          name: data.name,
+          symbol: data.symbol,
+        });
+      });
+      return tokenMap;
+    } catch (err) {
+      console.error("Error fetching token info:", err);
+      return new Map();
+    }
+  };
+
+  // Fetch contract trades with improved batching and UI
   const fetchContractTrades = async (
     fromBlock: bigint,
     toBlock: bigint | "latest"
   ) => {
     if (!publicClient) {
-      console.error("Public client not initialized");
       throw new Error("Public client not initialized");
     }
 
     try {
-      console.log("Fetching trade logs for factory address:", FACTORY_ADDRESS);
-      console.log("Block range:", fromBlock.toString(), "to", toBlock);
-
       const actualToBlock =
         toBlock === "latest" ? await publicClient.getBlockNumber() : toBlock;
       const BATCH_SIZE = BigInt(batchSize);
@@ -140,14 +234,20 @@ export default function RestoreTrades() {
       const totalBlocks = Number(actualToBlock - fromBlock + 1n);
       const totalBatches = Math.ceil(totalBlocks / Number(BATCH_SIZE));
       let currentBatch = 0;
-
       let currentFromBlock = fromBlock;
+      let totalTradesFound = 0;
+
+      // Define event signatures
+      const buyEventSignature = parseAbiItem(
+        "event TokensPurchased(address indexed token, address indexed buyer, uint256 amount, uint256 price, uint256 fee)"
+      );
+
+      const sellEventSignature = parseAbiItem(
+        "event TokensSold(address indexed token, address indexed seller, uint256 tokenAmount, uint256 ethAmount, uint256 fee)"
+      );
 
       while (currentFromBlock <= actualToBlock) {
-        // Check if cancel was requested
         if (cancelRequested) {
-          console.log("Trade search cancelled by user");
-          setProgress(null);
           throw new Error("Search cancelled by user");
         }
 
@@ -157,36 +257,31 @@ export default function RestoreTrades() {
             : currentFromBlock + BATCH_SIZE - 1n;
 
         currentBatch++;
-        setProgress({ current: currentBatch, total: totalBatches });
-
-        console.log(
-          `Fetching trade batch ${currentBatch}/${totalBatches}: blocks ${currentFromBlock} to ${currentToBlock}`
-        );
+        setProgress({
+          current: currentBatch,
+          total: totalBatches,
+          currentRange: `${currentFromBlock.toString()} - ${currentToBlock.toString()}`,
+          tradesFound: totalTradesFound,
+        });
 
         try {
-          // Fetch buy events
-          const buyLogs = await publicClient.getLogs({
-            address: FACTORY_ADDRESS,
-            event: parseAbiItem(
-              "event TokensPurchased(address indexed token, address indexed buyer, uint256 amount, uint256 price, uint256 fee)"
-            ),
-            fromBlock: currentFromBlock,
-            toBlock: currentToBlock,
-          });
+          // Fetch both buy and sell events in parallel
+          const [buyLogs, sellLogs] = await Promise.all([
+            publicClient.getLogs({
+              address: FACTORY_ADDRESS,
+              event: buyEventSignature,
+              fromBlock: currentFromBlock,
+              toBlock: currentToBlock,
+            }),
+            publicClient.getLogs({
+              address: FACTORY_ADDRESS,
+              event: sellEventSignature,
+              fromBlock: currentFromBlock,
+              toBlock: currentToBlock,
+            }),
+          ]);
 
-          // Fetch sell events
-          const sellLogs = await publicClient.getLogs({
-            address: FACTORY_ADDRESS,
-            event: parseAbiItem(
-              "event TokensSold(address indexed token, address indexed seller, uint256 tokenAmount, uint256 ethAmount, uint256 fee)"
-            ),
-            fromBlock: currentFromBlock,
-            toBlock: currentToBlock,
-          });
-
-          console.log(
-            `Found ${buyLogs.length} buy events and ${sellLogs.length} sell events in batch ${currentBatch}`
-          );
+          totalTradesFound += buyLogs.length + sellLogs.length;
 
           // Process buy events
           for (const log of buyLogs) {
@@ -204,9 +299,13 @@ export default function RestoreTrades() {
                 inFirestore: false,
                 buyTrades: 0,
                 sellTrades: 0,
+                totalVolume: "0",
+                firstTradeBlock: blockNumber,
+                lastTradeBlock: blockNumber,
               });
             }
 
+            // Get block timestamp (cache blocks to avoid repeated calls)
             const block = await publicClient.getBlock({
               blockNumber: BigInt(blockNumber),
             });
@@ -221,11 +320,20 @@ export default function RestoreTrades() {
               trader: args.buyer.toLowerCase(),
               transactionHash: log.transactionHash,
               type: "buy",
+              fee: args.fee.toString(),
             };
 
             const tokenData = tradesByToken.get(tokenAddress)!;
             tokenData.trades.push(trade);
             tokenData.buyTrades++;
+            tokenData.firstTradeBlock = Math.min(
+              tokenData.firstTradeBlock,
+              blockNumber
+            );
+            tokenData.lastTradeBlock = Math.max(
+              tokenData.lastTradeBlock,
+              blockNumber
+            );
           }
 
           // Process sell events
@@ -244,6 +352,9 @@ export default function RestoreTrades() {
                 inFirestore: false,
                 buyTrades: 0,
                 sellTrades: 0,
+                totalVolume: "0",
+                firstTradeBlock: blockNumber,
+                lastTradeBlock: blockNumber,
               });
             }
 
@@ -264,47 +375,59 @@ export default function RestoreTrades() {
               trader: args.seller.toLowerCase(),
               transactionHash: log.transactionHash,
               type: "sell",
+              fee: args.fee.toString(),
             };
 
             const tokenData = tradesByToken.get(tokenAddress)!;
             tokenData.trades.push(trade);
             tokenData.sellTrades++;
+            tokenData.firstTradeBlock = Math.min(
+              tokenData.firstTradeBlock,
+              blockNumber
+            );
+            tokenData.lastTradeBlock = Math.max(
+              tokenData.lastTradeBlock,
+              blockNumber
+            );
           }
         } catch (batchError) {
-          console.error(
-            `Error fetching trade batch ${currentBatch} from ${currentFromBlock} to ${currentToBlock}:`,
-            batchError
-          );
-          // Continue with next batch instead of failing completely
+          console.error(`Error in batch ${currentBatch}:`, batchError);
         }
 
         currentFromBlock = currentToBlock + 1n;
 
-        // Add a small delay to avoid rate limiting
-        await new Promise((resolve) => setTimeout(resolve, 100));
+        // Rate limiting
+        if (currentBatch % 10 === 0) {
+          await new Promise((resolve) => setTimeout(resolve, 100));
+        }
       }
 
       setProgress(null);
 
-      // Sort trades by block number for each token
+      // Calculate total volume and sort trades for each token
       const result = Array.from(tradesByToken.values());
       result.forEach((tokenData) => {
+        // Sort trades by block number
         tokenData.trades.sort((a, b) => a.blockNumber - b.blockNumber);
+
+        // Calculate total volume in AVAX
+        const totalVolumeWei = tokenData.trades.reduce((sum, trade) => {
+          return sum + parseFloat(trade.ethAmount);
+        }, 0);
+        tokenData.totalVolume = formatEther(BigInt(Math.floor(totalVolumeWei)));
       });
 
       // Sort tokens by total trade count (most active first)
       result.sort((a, b) => b.trades.length - a.trades.length);
 
-      console.log(`Found trades for ${result.length} tokens`);
       return result;
     } catch (err) {
       setProgress(null);
-      console.error("Error fetching contract trades:", err);
-      throw new Error(`Failed to fetch trades from contract: ${err}`);
+      throw err;
     }
   };
 
-  // Search for trades with user-defined range
+  // Main search function
   const handleSearch = async () => {
     if (!publicClient) {
       setError("Waiting for network connection...");
@@ -328,31 +451,35 @@ export default function RestoreTrades() {
           ? ("latest" as const)
           : BigInt(blockRange.to);
 
-      console.log("Starting trade search...");
-      console.log("Using factory address:", FACTORY_ADDRESS);
-      console.log("Block range:", fromBlock.toString(), "to", toBlock);
+      const [contractTrades, existingTradeHashes, tokenInfoMap] =
+        await Promise.all([
+          fetchContractTrades(fromBlock, toBlock),
+          fetchFirestoreTrades(),
+          fetchTokenInfo(),
+        ]);
 
-      const [contractTrades, existingTradeHashes] = await Promise.all([
-        fetchContractTrades(fromBlock, toBlock),
-        fetchFirestoreTrades(),
-      ]);
-
-      // Check which tokens already have trades in Firestore
+      // Enhance token data with names/symbols and check Firestore status
       contractTrades.forEach((tokenData) => {
+        const tokenInfo = tokenInfoMap.get(tokenData.address);
+        if (tokenInfo) {
+          tokenData.name = tokenInfo.name;
+          tokenData.symbol = tokenInfo.symbol;
+        }
+
+        // Check if any trades exist in Firestore
         const hasTradesInFirestore = tokenData.trades.some((trade) =>
           existingTradeHashes.has(trade.transactionHash)
         );
         tokenData.inFirestore = hasTradesInFirestore;
       });
 
-      console.log("Final trade results:", contractTrades);
       setTokenTrades(contractTrades);
     } catch (err: any) {
       console.error("Error searching for trades:", err);
       if (err.message?.includes("cancelled")) {
         setError("Search was cancelled");
       } else {
-        setError(`Failed to load trade data: ${err}`);
+        setError(`Failed to load trade data: ${err.message}`);
       }
     } finally {
       setLoading(false);
@@ -361,30 +488,19 @@ export default function RestoreTrades() {
     }
   };
 
-  // Cancel the current search
   const handleCancel = () => {
     setCancelRequested(true);
   };
 
-  // Function to restore trades for a token to Firestore
+  // Restore trades for a token to Firestore
   const handleRestoreTrades = async (token: TokenTrades) => {
     try {
-      console.log(
-        `Starting restore for token ${token.address} with ${token.trades.length} trades`
-      );
-
-      // Get existing trades to avoid duplicates
       const existingTradeHashes = await fetchFirestoreTrades();
       const newTrades = token.trades.filter(
         (trade) => !existingTradeHashes.has(trade.transactionHash)
       );
 
-      console.log(
-        `Processing ${newTrades.length} new trades out of ${token.trades.length} total`
-      );
-
       if (newTrades.length === 0) {
-        console.log("No new trades to restore");
         setTokenTrades((prev) =>
           prev.map((t) =>
             t.address === token.address ? { ...t, inFirestore: true } : t
@@ -395,25 +511,10 @@ export default function RestoreTrades() {
 
       const tradesRef = collection(db, "trades");
 
-      for (let i = 0; i < newTrades.length; i++) {
-        const trade = newTrades[i];
-        try {
-          console.log(`Storing trade ${i + 1}/${newTrades.length}:`, trade);
-          const newTradeRef = doc(tradesRef);
-          await setDoc(newTradeRef, trade);
-          console.log(
-            `Successfully stored trade ${i + 1} with ID: ${newTradeRef.id}`
-          );
-        } catch (tradeError) {
-          console.error(`Failed to store trade ${i + 1}:`, tradeError);
-          console.error("Trade data:", trade);
-          throw tradeError;
-        }
+      for (const trade of newTrades) {
+        const newTradeRef = doc(tradesRef);
+        await setDoc(newTradeRef, trade);
       }
-
-      console.log(
-        `Successfully restored ${newTrades.length} new trades for token ${token.address}`
-      );
 
       setTokenTrades((prev) =>
         prev.map((t) =>
@@ -421,20 +522,24 @@ export default function RestoreTrades() {
         )
       );
     } catch (err) {
-      console.error("Error in handleRestoreTrades:", err);
-      setError(
-        `Failed to restore trades for token ${token.address}: ${
-          (err as Error).message
-        }`
-      );
+      console.error("Error restoring trades:", err);
+      setError(`Failed to restore trades for token ${token.address}: ${err}`);
     }
   };
 
-  // Quick preset buttons
-  const handlePresetRange = (preset: "last1k" | "last10k" | "all") => {
+  // Preset range functions
+  const handlePresetRange = (
+    preset: "last1k" | "last10k" | "factory" | "recent"
+  ) => {
     if (!currentBlock) return;
 
     switch (preset) {
+      case "recent":
+        setBlockRange({
+          from: (currentBlock - 100n).toString(),
+          to: "latest",
+        });
+        break;
       case "last1k":
         setBlockRange({
           from: (currentBlock - 1000n).toString(),
@@ -447,9 +552,9 @@ export default function RestoreTrades() {
           to: "latest",
         });
         break;
-      case "all":
+      case "factory":
         setBlockRange({
-          from: DEFAULT_STARTING_BLOCK.toString(),
+          from: factoryCreationBlock?.toString() || "36999988",
           to: "latest",
         });
         break;
@@ -469,39 +574,61 @@ export default function RestoreTrades() {
     );
   }
 
+  const missingCount = tokenTrades.filter((t) => !t.inFirestore).length;
+  const totalTrades = tokenTrades.reduce((sum, t) => sum + t.trades.length, 0);
+
   return (
     <Container>
-      <div className="p-4 max-w-6xl mx-auto">
-        <h1 className="text-3xl font-bold mb-6">
-          Trade History Restore Interface
-        </h1>
+      <div className="p-4 max-w-7xl mx-auto space-y-6">
+        {/* Header */}
+        <div className="text-center">
+          <h1 className="text-4xl font-bold mb-2">Trade History Restore</h1>
+          <p className="text-muted-foreground">
+            Find and restore missing trade history from the factory contract to
+            Firestore
+          </p>
+        </div>
 
         {/* Network Info */}
-        <Card className="p-4 mb-6 bg-blue-50 border-blue-200">
-          <div className="flex items-center gap-2 mb-2">
-            <Info className="h-4 w-4 text-blue-600" />
-            <h3 className="font-semibold text-blue-800">Network Information</h3>
+        <Card className="p-6 bg-gradient-to-r from-green-50 to-emerald-50 border-green-200">
+          <div className="flex items-center gap-2 mb-4">
+            <Info className="h-5 w-5 text-green-600" />
+            <h3 className="font-semibold text-green-800">
+              Network Information
+            </h3>
           </div>
-          <div className="text-sm text-blue-700 space-y-1">
-            <p>
-              <strong>Factory Address:</strong> {FACTORY_ADDRESS}
-            </p>
-            <p>
-              <strong>Current Block:</strong>{" "}
-              {currentBlock?.toString() || "Loading..."}
-            </p>
-            <p>
-              <strong>Default Starting Block:</strong>{" "}
-              {DEFAULT_STARTING_BLOCK.toString()}
-            </p>
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-4 text-sm">
+            <div>
+              <p className="text-green-600 font-medium">Factory Address</p>
+              <code className="text-xs bg-green-100 px-2 py-1 rounded block mt-1 text-green-800">
+                {FACTORY_ADDRESS}
+              </code>
+            </div>
+            <div>
+              <p className="text-green-600 font-medium">Current Block</p>
+              <p className="text-green-800 font-mono">
+                {currentBlock?.toLocaleString() || "Loading..."}
+              </p>
+            </div>
+            <div>
+              <p className="text-green-600 font-medium">Factory Created At</p>
+              <p className="text-green-800 font-mono">
+                Block {factoryCreationBlock?.toLocaleString() || "Detecting..."}
+              </p>
+            </div>
           </div>
         </Card>
 
         {/* Search Controls */}
-        <Card className="p-6 mb-6">
-          <h2 className="text-xl font-semibold mb-4">Search Configuration</h2>
+        <Card className="p-6">
+          <div className="flex items-center gap-2 mb-6">
+            <Activity className="h-5 w-5 text-primary" />
+            <h2 className="text-xl font-semibold">
+              Trade Search Configuration
+            </h2>
+          </div>
 
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-4">
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-6">
             <div>
               <Label htmlFor="fromBlock">From Block</Label>
               <Input
@@ -512,6 +639,7 @@ export default function RestoreTrades() {
                   setBlockRange((prev) => ({ ...prev, from: e.target.value }))
                 }
                 placeholder="Starting block number"
+                className="font-mono"
               />
             </div>
 
@@ -525,6 +653,7 @@ export default function RestoreTrades() {
                   setBlockRange((prev) => ({ ...prev, to: e.target.value }))
                 }
                 placeholder="End block (or 'latest')"
+                className="font-mono"
               />
             </div>
 
@@ -535,18 +664,27 @@ export default function RestoreTrades() {
                 type="number"
                 value={batchSize}
                 onChange={(e) => setBatchSize(e.target.value)}
-                placeholder="500"
+                placeholder="1000"
                 min="1"
-                max="500"
+                max="2000"
               />
-              <p className="text-xs text-gray-500 mt-1">
-                Max 500 for Alchemy free tier
+              <p className="text-xs text-muted-foreground mt-1">
+                Blocks per batch (max 2000)
               </p>
             </div>
           </div>
 
           {/* Preset Buttons */}
-          <div className="flex flex-wrap gap-2 mb-4">
+          <div className="flex flex-wrap gap-2 mb-6">
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => handlePresetRange("recent")}
+              disabled={!currentBlock}
+            >
+              <Calendar className="h-4 w-4 mr-1" />
+              Last 100 Blocks
+            </Button>
             <Button
               variant="outline"
               size="sm"
@@ -566,50 +704,62 @@ export default function RestoreTrades() {
             <Button
               variant="outline"
               size="sm"
-              onClick={() => handlePresetRange("all")}
-              disabled={!currentBlock}
+              onClick={() => handlePresetRange("factory")}
+              disabled={!factoryCreationBlock}
+              className="bg-primary/10"
             >
-              All History (Slow!)
+              <Database className="h-4 w-4 mr-1" />
+              Full History (Since Factory)
             </Button>
           </div>
 
-          {/* Search Button */}
-          <div className="flex gap-2">
+          {/* Search Actions */}
+          <div className="flex gap-3">
             <Button
               onClick={handleSearch}
-              disabled={loading}
+              disabled={loading || !blockRange.from}
               className="flex-1 md:flex-none"
             >
               {loading ? (
                 <>
                   <RefreshCw className="h-4 w-4 mr-2 animate-spin" />
-                  Searching Trades...
+                  Searching...
                 </>
               ) : (
                 <>
-                  <TrendingUp className="h-4 w-4 mr-2" />
+                  <Search className="h-4 w-4 mr-2" />
                   Search for Trades
                 </>
               )}
             </Button>
 
             {loading && (
-              <Button onClick={handleCancel} variant="outline" className="px-3">
+              <Button onClick={handleCancel} variant="outline">
                 <X className="h-4 w-4 mr-2" />
                 Cancel
               </Button>
             )}
           </div>
 
-          {/* Progress Indicator */}
+          {/* Enhanced Progress Indicator */}
           {progress && (
-            <div className="mt-4 p-3 bg-blue-50 rounded-lg">
-              <div className="flex justify-between items-center text-sm text-blue-700 mb-2">
-                <span>Processing trade batches...</span>
-                <div className="flex items-center gap-2">
-                  <span>
+            <div className="mt-6 p-4 bg-primary/5 border border-primary/20 rounded-lg">
+              <div className="flex justify-between items-center text-sm text-primary mb-2">
+                <span className="font-medium">Processing trade events...</span>
+                <div className="flex items-center gap-4">
+                  {progress.currentRange && (
+                    <span className="text-xs text-muted-foreground font-mono">
+                      Blocks {progress.currentRange}
+                    </span>
+                  )}
+                  <span className="font-medium">
                     {progress.current} / {progress.total}
                   </span>
+                  {progress.tradesFound !== undefined && (
+                    <span className="text-xs bg-primary/20 px-2 py-1 rounded">
+                      {progress.tradesFound} trades found
+                    </span>
+                  )}
                   {cancelRequested && (
                     <span className="text-orange-600 font-medium">
                       Cancelling...
@@ -617,15 +767,15 @@ export default function RestoreTrades() {
                   )}
                 </div>
               </div>
-              <div className="w-full bg-blue-200 rounded-full h-2">
+              <div className="w-full bg-primary/20 rounded-full h-2">
                 <div
                   className={`h-2 rounded-full transition-all duration-300 ${
-                    cancelRequested ? "bg-orange-500" : "bg-blue-600"
+                    cancelRequested ? "bg-orange-500" : "bg-primary"
                   }`}
                   style={{
                     width: `${(progress.current / progress.total) * 100}%`,
                   }}
-                ></div>
+                />
               </div>
             </div>
           )}
@@ -633,104 +783,125 @@ export default function RestoreTrades() {
 
         {/* Error Display */}
         {error && (
-          <Card className="p-4 mb-6 border-red-200 bg-red-50">
-            <div className="flex items-center gap-2">
-              <AlertCircle className="h-4 w-4 text-red-600" />
+          <Card className="p-4 border-red-200 bg-red-50">
+            <div className="flex items-start gap-3">
+              <AlertCircle className="h-5 w-5 text-red-600 mt-0.5" />
               <div className="text-red-800">
                 <p className="font-semibold">Error encountered:</p>
-                <p className="text-sm">{error}</p>
+                <p className="text-sm mt-1">{error}</p>
               </div>
             </div>
           </Card>
         )}
 
-        {/* Results */}
-        {!loading && tokenTrades.length === 0 && !error && (
-          <Card className="p-8 text-center text-gray-500">
-            <TrendingUp className="h-12 w-12 mx-auto mb-4 text-gray-300" />
-            <p>No trades found in the specified range.</p>
-            <p className="text-sm">
-              Try adjusting your search parameters or expanding the block range.
+        {/* Results Summary */}
+        {tokenTrades.length > 0 && (
+          <Card className="p-6">
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-3">
+                <BarChart3 className="h-5 w-5 text-primary" />
+                <div>
+                  <h3 className="font-semibold">Trade Search Results</h3>
+                  <p className="text-sm text-muted-foreground">
+                    Found {totalTrades} trades across {tokenTrades.length} token
+                    {tokenTrades.length !== 1 ? "s" : ""}
+                  </p>
+                </div>
+              </div>
+              {missingCount > 0 && (
+                <div className="text-right">
+                  <p className="text-lg font-bold text-orange-600">
+                    {missingCount}
+                  </p>
+                  <p className="text-xs text-muted-foreground">
+                    Tokens missing trades
+                  </p>
+                </div>
+              )}
+            </div>
+          </Card>
+        )}
+
+        {/* Empty State */}
+        {!loading && tokenTrades.length === 0 && !error && blockRange.from && (
+          <Card className="p-12 text-center">
+            <TrendingUp className="h-16 w-16 mx-auto mb-4 text-muted-foreground/50" />
+            <h3 className="text-xl font-semibold mb-2">No Trades Found</h3>
+            <p className="text-muted-foreground max-w-md mx-auto">
+              No trading activity was found in the specified block range. Try
+              expanding your search parameters or check a different time period.
             </p>
           </Card>
         )}
 
+        {/* Results List */}
         {tokenTrades.length > 0 && (
           <div className="space-y-4">
-            <h2 className="text-xl font-semibold">
-              Found Trades for {tokenTrades.length} Token
-              {tokenTrades.length !== 1 ? "s" : ""}
-            </h2>
-
             {tokenTrades.map((token) => (
-              <Card key={token.address} className="p-6">
-                <div className="flex justify-between items-start">
-                  <div className="flex-1">
+              <Card
+                key={token.address}
+                className="p-6 hover:shadow-md transition-shadow"
+              >
+                <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-4">
+                  <div className="flex-1 min-w-0">
                     <div className="flex items-center gap-3 mb-3">
-                      <h3 className="text-lg font-bold">
-                        Token: {token.address}
+                      <h3 className="text-lg font-bold truncate">
+                        {token.name && token.symbol
+                          ? `${token.name} (${token.symbol})`
+                          : `Token ${token.address.slice(0, 8)}...`}
                       </h3>
-                      <div className="flex gap-2">
-                        <span
-                          className={`px-2 py-1 rounded-full text-xs font-medium ${
-                            token.inContract
-                              ? "bg-green-100 text-green-800"
-                              : "bg-red-100 text-red-800"
-                          }`}
-                        >
-                          {token.inContract
-                            ? "✓ In Contract"
-                            : "✗ Not in Contract"}
-                        </span>
+                      <div className="flex gap-2 flex-shrink-0">
                         <span
                           className={`px-2 py-1 rounded-full text-xs font-medium ${
                             token.inFirestore
                               ? "bg-green-100 text-green-800"
-                              : "bg-yellow-100 text-yellow-800"
+                              : "bg-orange-100 text-orange-800"
                           }`}
                         >
-                          {token.inFirestore
-                            ? "✓ In Firestore"
-                            : "Missing from Firestore"}
+                          {token.inFirestore ? "✓ In Firestore" : "⚠ Missing"}
+                        </span>
+                        <span className="px-2 py-1 rounded-full text-xs font-medium bg-blue-100 text-blue-800 flex items-center gap-1">
+                          <Activity className="h-3 w-3" />
+                          {token.trades.length} trades
                         </span>
                       </div>
                     </div>
 
-                    <div className="grid grid-cols-1 md:grid-cols-2 gap-3 text-sm text-gray-600">
+                    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-3 text-sm">
                       <div>
-                        <p>
-                          <strong>Total Trades:</strong> {token.trades.length}
-                        </p>
-                        <p>
-                          <strong>Buy Trades:</strong> {token.buyTrades}
-                        </p>
-                        <p>
-                          <strong>Sell Trades:</strong> {token.sellTrades}
+                        <p className="text-muted-foreground">Token Address</p>
+                        <code className="text-xs bg-muted px-1.5 py-0.5 rounded block">
+                          {token.address}
+                        </code>
+                      </div>
+                      <div className="flex items-center gap-3">
+                        <div>
+                          <p className="text-muted-foreground">Buy Trades</p>
+                          <p className="font-semibold text-green-600 flex items-center gap-1">
+                            <ArrowUpRight className="h-3 w-3" />
+                            {token.buyTrades}
+                          </p>
+                        </div>
+                        <div>
+                          <p className="text-muted-foreground">Sell Trades</p>
+                          <p className="font-semibold text-red-600 flex items-center gap-1">
+                            <ArrowDownLeft className="h-3 w-3" />
+                            {token.sellTrades}
+                          </p>
+                        </div>
+                      </div>
+                      <div>
+                        <p className="text-muted-foreground">Total Volume</p>
+                        <p className="font-semibold">
+                          {parseFloat(token.totalVolume).toFixed(4)} AVAX
                         </p>
                       </div>
                       <div>
-                        <p>
-                          <strong>Address:</strong>{" "}
-                          <code className="bg-gray-100 px-1 rounded text-xs">
-                            {token.address}
-                          </code>
+                        <p className="text-muted-foreground">Block Range</p>
+                        <p className="text-xs font-mono">
+                          {token.firstTradeBlock.toLocaleString()} -{" "}
+                          {token.lastTradeBlock.toLocaleString()}
                         </p>
-                        {token.trades.length > 0 && (
-                          <>
-                            <p>
-                              <strong>First Trade Block:</strong>{" "}
-                              {Math.min(
-                                ...token.trades.map((t) => t.blockNumber)
-                              ).toLocaleString()}
-                            </p>
-                            <p>
-                              <strong>Latest Trade Block:</strong>{" "}
-                              {Math.max(
-                                ...token.trades.map((t) => t.blockNumber)
-                              ).toLocaleString()}
-                            </p>
-                          </>
-                        )}
                       </div>
                     </div>
                   </div>
@@ -738,9 +909,9 @@ export default function RestoreTrades() {
                   {!token.inFirestore && (
                     <Button
                       onClick={() => handleRestoreTrades(token)}
-                      variant="default"
-                      className="ml-4"
+                      className="lg:ml-4 self-start lg:self-center"
                     >
+                      <Database className="h-4 w-4 mr-2" />
                       Restore {token.trades.length} Trade
                       {token.trades.length !== 1 ? "s" : ""}
                     </Button>

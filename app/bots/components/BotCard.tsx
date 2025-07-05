@@ -162,14 +162,14 @@ const BotCard: React.FC<BotCardProps> = ({ bot, index }) => {
           {/* Header - Fixed Height */}
           <CardHeader className="pb-3 flex-shrink-0 h-[140px]">
             <div className="flex items-center justify-between mb-4">
-              <Badge className={getStatusColor(bot.isOnline)} variant="outline">
+              {/* <Badge className={getStatusColor(bot.isOnline)} variant="outline">
                 {bot.isOnline ? (
                   <Wifi className="h-3 w-3 mr-1" />
                 ) : (
                   <WifiOff className="h-3 w-3 mr-1" />
                 )}
                 {bot.isOnline ? "Online" : "Offline"}
-              </Badge>
+              </Badge> */}
               {bot.character?.mood && (
                 <div className="flex items-center gap-2">
                   {getMoodIcon(bot.character.mood)}
