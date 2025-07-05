@@ -1,7 +1,7 @@
 // app/dex/factory/page.tsx
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useCallback } from "react";
 import { motion } from "framer-motion";
 import { Container } from "@/components/craft";
 import { useToast } from "@/hooks/use-toast";
@@ -104,6 +104,7 @@ export default function FactoryPage() {
     error,
     isPending,
     writeContract,
+    reset: resetContract,
   } = useWriteContract();
 
   const { isLoading: isConfirming, data: receipt } =
@@ -173,13 +174,75 @@ export default function FactoryPage() {
     }
   }, [tokenInfo.image]);
 
+  // Enhanced error handling with user-friendly messages
+  useEffect(() => {
+    if (error) {
+      console.error("Token creation error:", error);
+
+      // Parse error for user-friendly message
+      let errorMessage = "Failed to create token. Please try again.";
+      let errorTitle = "Transaction Failed";
+
+      // Type-safe error parsing
+      const errorObj = error as any;
+
+      if (errorObj?.cause?.reason) {
+        errorMessage = errorObj.cause.reason;
+        errorTitle = "Smart Contract Error";
+      } else if (errorObj?.cause?.shortMessage) {
+        errorMessage = errorObj.cause.shortMessage;
+        errorTitle = "Transaction Error";
+      } else if (errorObj?.shortMessage) {
+        errorMessage = errorObj.shortMessage;
+        errorTitle = "Transaction Error";
+      } else if (errorObj?.message) {
+        const message = errorObj.message.toLowerCase();
+        if (message.includes("insufficient funds")) {
+          errorTitle = "Insufficient Funds";
+          errorMessage =
+            "You don't have enough AVAX to complete this transaction.";
+        } else if (message.includes("user rejected")) {
+          errorTitle = "Transaction Rejected";
+          errorMessage = "You cancelled the transaction in your wallet.";
+        } else if (message.includes("gas")) {
+          errorTitle = "Gas Error";
+          errorMessage =
+            "Transaction failed due to gas estimation issues. Please try again.";
+        } else if (message.includes("nonce")) {
+          errorTitle = "Network Error";
+          errorMessage =
+            "Transaction nonce conflict. Please wait a moment and try again.";
+        } else if (message.includes("already exists")) {
+          errorTitle = "Token Already Exists";
+          errorMessage =
+            "A token with this name or symbol already exists. Please choose different values.";
+        } else {
+          errorMessage = errorObj.message;
+        }
+      }
+
+      toast({
+        title: errorTitle,
+        description: errorMessage,
+        variant: "destructive",
+        duration: 8000, // Longer duration for errors
+      });
+
+      setIsCreating(false);
+      setUploadingImage(false);
+    }
+  }, [error, toast]);
+
   // Handle successful transaction
   useEffect(() => {
     if (receipt && !isConfirming) {
       toast({
         title: "🎉 Token Created Successfully!",
         description: "Your token is now live and ready for trading!",
+        duration: 10000, // Longer duration for success
       });
+      setIsCreating(false);
+      setUploadingImage(false);
     }
   }, [receipt, isConfirming, toast]);
 
@@ -202,13 +265,16 @@ export default function FactoryPage() {
   // Check if form is valid for submission
   const isFormValid = !!(tokenInfo.name && tokenInfo.ticker);
 
-  // Handle token creation
-  const handleTokenCreation = async () => {
+  // Handle token creation with better error handling
+  const handleTokenCreation = useCallback(async () => {
     if (!mounted || !isFormValid) return;
 
     try {
       setIsCreating(true);
       let imageUrl = "";
+
+      // Reset any previous errors
+      resetContract();
 
       // Upload image if present
       if (tokenInfo.image) {
@@ -219,10 +285,10 @@ export default function FactoryPage() {
             title: "📸 Image uploaded!",
             description: "Your token image is ready for launch",
           });
-        } catch (error) {
-          console.error("Error uploading image:", error);
+        } catch (imageError) {
+          console.error("Error uploading image:", imageError);
           toast({
-            title: "Upload Failed",
+            title: "Upload Warning",
             description: "Failed to upload image. Proceeding without image.",
             variant: "destructive",
           });
@@ -236,10 +302,24 @@ export default function FactoryPage() {
         description: "Prepare for takeoff! Your token is being created.",
       });
 
+      // Validate inputs before proceeding
+      if (!tokenInfo.name.trim()) {
+        throw new Error("Token name is required");
+      }
+      if (!tokenInfo.ticker.trim()) {
+        throw new Error("Token symbol is required");
+      }
+      if (tokenInfo.name.length > 32) {
+        throw new Error("Token name must be 32 characters or less");
+      }
+      if (tokenInfo.ticker.length > 8) {
+        throw new Error("Token symbol must be 8 characters or less");
+      }
+
       // Prepare transaction parameters
       const createTokenArgs = [
-        tokenInfo.name,
-        tokenInfo.ticker.toUpperCase(), // Ensure uppercase
+        tokenInfo.name.trim(),
+        tokenInfo.ticker.trim().toUpperCase(), // Ensure uppercase
         imageUrl,
         tokenInfo.burnManager || zeroAddress,
         tokenInfo.purchase.enabled && tokenInfo.purchase.minTokensOut
@@ -252,6 +332,13 @@ export default function FactoryPage() {
           ? parseEther(tokenInfo.purchase.amount)
           : undefined;
 
+      console.log(
+        "Creating token with args:",
+        createTokenArgs,
+        "value:",
+        transactionValue
+      );
+
       // Create token on blockchain
       writeContract({
         abi: FACTORY_ABI,
@@ -261,17 +348,27 @@ export default function FactoryPage() {
         value: transactionValue,
       });
     } catch (error) {
-      console.error("Error:", error);
+      console.error("Error in handleTokenCreation:", error);
+
+      const errorMessage =
+        error instanceof Error ? error.message : "Unknown error occurred";
+
       toast({
         title: "Launch Failed",
-        description: "Failed to create token. Please try again.",
+        description: errorMessage,
         variant: "destructive",
       });
-    } finally {
+
       setIsCreating(false);
       setUploadingImage(false);
     }
-  };
+  }, [mounted, isFormValid, tokenInfo, writeContract, resetContract, toast]);
+
+  // Retry function that clears errors and attempts creation again
+  const handleRetry = useCallback(() => {
+    resetContract(); // Clear previous error state
+    handleTokenCreation();
+  }, [resetContract, handleTokenCreation]);
 
   // Show loading state during hydration
   if (!mounted) {
@@ -367,6 +464,7 @@ export default function FactoryPage() {
               tokenomics={tokenomics}
               transactionData={transactionData}
               onLaunch={handleTokenCreation}
+              onRetry={handleRetry}
             />
           </motion.div>
         </Container>

@@ -25,6 +25,9 @@ import {
   TrendingUp,
   Heart,
   Gift,
+  XCircle,
+  RefreshCw,
+  ExternalLink,
 } from "lucide-react";
 
 interface FactoryLaunchSectionProps {
@@ -50,6 +53,7 @@ interface FactoryLaunchSectionProps {
   };
   transactionData: string | undefined;
   onLaunch: () => void;
+  onRetry?: () => void; // Add retry function
 }
 
 export function FactoryLaunchSection({
@@ -64,6 +68,7 @@ export function FactoryLaunchSection({
   tokenomics,
   transactionData,
   onLaunch,
+  onRetry,
 }: FactoryLaunchSectionProps) {
   const buttonRef = useRef<HTMLButtonElement>(null);
   const containerRef = useRef<HTMLDivElement>(null);
@@ -134,6 +139,88 @@ export function FactoryLaunchSection({
     }
   }, [isFormValid, isCreating, isPending, isConfirming, error]);
 
+  // Parse error message for better user experience
+  const parseErrorMessage = (
+    error: any
+  ): { title: string; message: string; code?: string } => {
+    if (!error) return { title: "", message: "" };
+
+    // Type-safe error parsing using 'any' to access dynamic properties
+    const errorObj = error as any;
+
+    // Handle different error types
+    if (typeof error === "string") {
+      return {
+        title: "Transaction Failed",
+        message: error,
+      };
+    }
+
+    // Wagmi/Viem error structure
+    if (errorObj?.cause?.reason) {
+      return {
+        title: "Smart Contract Error",
+        message: errorObj.cause.reason,
+        code: errorObj.cause.code,
+      };
+    }
+
+    if (errorObj?.cause?.shortMessage) {
+      return {
+        title: "Transaction Error",
+        message: errorObj.cause.shortMessage,
+        code: errorObj.cause.code,
+      };
+    }
+
+    if (errorObj?.shortMessage) {
+      return {
+        title: "Transaction Error",
+        message: errorObj.shortMessage,
+        code: errorObj.code,
+      };
+    }
+
+    if (errorObj?.message) {
+      let message = errorObj.message;
+      let title = "Transaction Failed";
+
+      // Common error patterns
+      if (message.includes("insufficient funds")) {
+        title = "Insufficient Funds";
+        message = "You don't have enough AVAX to complete this transaction.";
+      } else if (message.includes("user rejected")) {
+        title = "Transaction Rejected";
+        message = "You cancelled the transaction in your wallet.";
+      } else if (message.includes("gas")) {
+        title = "Gas Error";
+        message = "Transaction failed due to gas estimation issues.";
+      } else if (message.includes("nonce")) {
+        title = "Nonce Error";
+        message = "Transaction nonce conflict. Please try again.";
+      } else if (
+        message.includes("already exists") ||
+        message.includes("duplicate")
+      ) {
+        title = "Token Already Exists";
+        message = "A token with this name or symbol already exists.";
+      }
+
+      return {
+        title,
+        message,
+        code: errorObj.code,
+      };
+    }
+
+    // Fallback for unknown errors
+    return {
+      title: "Unknown Error",
+      message: "An unexpected error occurred. Please try again.",
+      code: errorObj?.code,
+    };
+  };
+
   const getButtonState = () => {
     if (uploadingImage)
       return {
@@ -167,6 +254,14 @@ export function FactoryLaunchSection({
         variant: "loading",
         description: "Almost there! Final confirmation in progress",
       };
+    if (error)
+      return {
+        text: "Retry Launch",
+        icon: RefreshCw,
+        disabled: false,
+        variant: "retry",
+        description: "Something went wrong. Click to try again",
+      };
     if (!isFormValid)
       return {
         text: "Complete Form to Launch",
@@ -186,6 +281,15 @@ export function FactoryLaunchSection({
 
   const buttonState = getButtonState();
   const ButtonIcon = buttonState.icon;
+  const errorDetails = parseErrorMessage(error);
+
+  const handleButtonClick = () => {
+    if (error && onRetry) {
+      onRetry();
+    } else {
+      onLaunch();
+    }
+  };
 
   return (
     <div className="space-y-6">
@@ -568,7 +672,7 @@ export function FactoryLaunchSection({
 
               {/* Status Header */}
               <motion.div
-                key={`${isCreating}-${isPending}-${isConfirming}-${isFormValid}-${error}`}
+                key={`${isCreating}-${isPending}-${isConfirming}-${isFormValid}-${error}-${errorDetails.title}`}
                 initial={{ opacity: 0, y: 20 }}
                 animate={{ opacity: 1, y: 0 }}
                 transition={{ duration: 0.6 }}
@@ -576,16 +680,21 @@ export function FactoryLaunchSection({
               >
                 <div className="text-center">
                   {error ? (
-                    <div className="space-y-3">
+                    <div className="space-y-4">
                       <div className="flex items-center justify-center gap-3">
-                        <AlertTriangle className="h-10 w-10 text-red-400" />
+                        <XCircle className="h-10 w-10 text-red-400" />
                         <h3 className="text-3xl font-bold text-red-400">
-                          Launch Failed
+                          {errorDetails.title}
                         </h3>
                       </div>
-                      <p className="text-red-400/80 text-lg">
-                        {buttonState.description}
+                      <p className="text-red-400/80 text-lg max-w-md mx-auto">
+                        {errorDetails.message}
                       </p>
+                      {errorDetails.code && (
+                        <p className="text-red-400/60 text-sm">
+                          Error Code: {errorDetails.code}
+                        </p>
+                      )}
                     </div>
                   ) : isCreating || isPending || isConfirming ? (
                     <div className="space-y-4">
@@ -681,7 +790,7 @@ export function FactoryLaunchSection({
               >
                 <Button
                   ref={buttonRef}
-                  onClick={onLaunch}
+                  onClick={handleButtonClick}
                   disabled={buttonState.disabled}
                   className={`
                     px-16 py-8 text-2xl font-bold rounded-2xl transition-all duration-500 relative overflow-hidden group
@@ -690,6 +799,8 @@ export function FactoryLaunchSection({
                         ? "btn-primary border-2 border-primary/50 text-white shadow-2xl"
                         : buttonState.variant === "loading"
                         ? "bg-primary/20 text-primary border-2 border-primary/30 cursor-wait"
+                        : buttonState.variant === "retry"
+                        ? "bg-red-500/20 text-red-400 border-2 border-red-400/30 hover:bg-red-500/30 hover:border-red-400/50"
                         : "bg-muted text-muted-foreground border-2 border-muted cursor-not-allowed"
                     }
                   `}
@@ -719,13 +830,15 @@ export function FactoryLaunchSection({
                         className={`h-8 w-8 ${
                           buttonState.variant === "loading"
                             ? "animate-spin"
-                            : buttonState.variant === "ready"
+                            : buttonState.variant === "ready" ||
+                              buttonState.variant === "retry"
                             ? "group-hover:scale-110 transition-transform duration-300"
                             : ""
                         }`}
                       />
                       {buttonState.text}
-                      {buttonState.variant === "ready" && (
+                      {(buttonState.variant === "ready" ||
+                        buttonState.variant === "retry") && (
                         <motion.div
                           animate={{ x: [0, 5, 0] }}
                           transition={{ duration: 1.5, repeat: Infinity }}
@@ -740,7 +853,7 @@ export function FactoryLaunchSection({
             </div>
           )}
 
-          {/* Error Details */}
+          {/* Enhanced Error Details */}
           <AnimatePresence>
             {error && (
               <motion.div
@@ -749,19 +862,98 @@ export function FactoryLaunchSection({
                 exit={{ opacity: 0, height: 0 }}
                 className="mt-6"
               >
-                <div className="unified-card border-red-400/30 bg-red-400/5 p-4">
-                  <div className="text-sm">
-                    <div className="font-semibold text-red-400 mb-2 flex items-center gap-2">
-                      <AlertTriangle className="h-4 w-4" />
-                      Error Details
+                <div className="unified-card border-red-400/30 bg-red-400/5 p-6 space-y-4">
+                  <div className="flex items-center gap-3 mb-4">
+                    <AlertTriangle className="h-5 w-5 text-red-400" />
+                    <h4 className="font-semibold text-red-400 text-lg">
+                      {errorDetails.title}
+                    </h4>
+                  </div>
+
+                  <div className="space-y-3">
+                    <div className="p-4 bg-red-950/20 rounded-lg border border-red-400/20">
+                      <p className="text-red-300/90 text-sm leading-relaxed">
+                        {errorDetails.message}
+                      </p>
                     </div>
-                    <div className="text-red-300/90 font-mono text-xs break-all bg-red-950/20 p-3 rounded border border-red-400/20">
-                      {typeof error === "string"
-                        ? error
-                        : error?.message ||
-                          error?.reason ||
-                          JSON.stringify(error, null, 2)}
+
+                    {errorDetails.code && (
+                      <div className="flex items-center gap-2 text-xs text-red-400/70">
+                        <span>Error Code:</span>
+                        <code className="bg-red-950/30 px-2 py-1 rounded font-mono">
+                          {errorDetails.code}
+                        </code>
+                      </div>
+                    )}
+
+                    {/* Common Solutions */}
+                    <div className="space-y-2">
+                      <h5 className="text-red-400 font-medium text-sm">
+                        Possible Solutions:
+                      </h5>
+                      <ul className="text-red-300/80 text-xs space-y-1 ml-4">
+                        {errorDetails.message.includes(
+                          "insufficient funds"
+                        ) && (
+                          <>
+                            <li>• Add more AVAX to your wallet</li>
+                            <li>• Reduce the purchase amount</li>
+                            <li>• Check if you have enough for gas fees</li>
+                          </>
+                        )}
+                        {errorDetails.message.includes("user rejected") && (
+                          <>
+                            <li>• Try the transaction again</li>
+                            <li>
+                              • Check your wallet for pending transactions
+                            </li>
+                          </>
+                        )}
+                        {errorDetails.message.includes("gas") && (
+                          <>
+                            <li>• Wait a few minutes and try again</li>
+                            <li>• Check network congestion</li>
+                            <li>• Ensure you have enough AVAX for gas</li>
+                          </>
+                        )}
+                        {errorDetails.message.includes("nonce") && (
+                          <>
+                            <li>• Reset your wallet's transaction history</li>
+                            <li>• Wait a moment and try again</li>
+                          </>
+                        )}
+                        {errorDetails.message.includes("already exists") && (
+                          <>
+                            <li>• Try a different token name</li>
+                            <li>• Use a different symbol</li>
+                            <li>• Check if the token already exists</li>
+                          </>
+                        )}
+                        {!errorDetails.message.includes("insufficient funds") &&
+                          !errorDetails.message.includes("user rejected") &&
+                          !errorDetails.message.includes("gas") &&
+                          !errorDetails.message.includes("nonce") &&
+                          !errorDetails.message.includes("already exists") && (
+                            <>
+                              <li>• Check your wallet connection</li>
+                              <li>• Ensure you're on the correct network</li>
+                              <li>• Wait a moment and try again</li>
+                              <li>• Contact support if the issue persists</li>
+                            </>
+                          )}
+                      </ul>
                     </div>
+
+                    {/* Transaction Hash for Failed Transactions */}
+                    {transactionData && (
+                      <div className="flex items-center gap-2 pt-2 border-t border-red-400/20">
+                        <ExternalLink className="h-4 w-4 text-red-400/70" />
+                        <span className="text-xs text-red-400/70">
+                          Failed Transaction:
+                        </span>
+                        <AddressComponent hash={transactionData} type="tx" />
+                      </div>
+                    )}
                   </div>
                 </div>
               </motion.div>
