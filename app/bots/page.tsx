@@ -1,6 +1,7 @@
+// app/bots/page.tsx
 "use client";
 
-import React, { useState, useEffect, useCallback } from "react";
+import React, { useState, useEffect, useCallback, useMemo } from "react";
 import { motion } from "framer-motion";
 import { Card, CardContent } from "@/components/ui/card";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
@@ -18,6 +19,17 @@ const TVBPage = () => {
   const [error, setError] = useState<string | null>(null);
   const [activeTab, setActiveTab] = useState<string>("fleet");
   const [lastUpdate, setLastUpdate] = useState<Date | null>(null);
+
+  // Generate fixed star positions that won't change on re-renders
+  const fixedStars = useMemo(() => {
+    return Array.from({ length: 50 }).map((_, i) => ({
+      id: i,
+      left: Math.random() * 100,
+      top: Math.random() * 100,
+      animationDelay: Math.random() * 5,
+      animationDuration: 2 + Math.random() * 3,
+    }));
+  }, []); // Empty dependency array ensures this only runs once
 
   // Fetch bot data from TVB API
   const fetchBots = useCallback(async () => {
@@ -93,24 +105,24 @@ const TVBPage = () => {
 
   return (
     <div className="min-h-screen animated-bg floating-particles">
-      {/* Background Stars Effect */}
+      {/* Fixed Background Stars Effect */}
       <div className="fixed inset-0 z-0">
-        {Array.from({ length: 50 }).map((_, i) => (
+        {fixedStars.map((star) => (
           <motion.div
-            key={i}
+            key={star.id}
             className="absolute w-1 h-1 bg-white rounded-full opacity-30"
             style={{
-              left: `${Math.random() * 100}%`,
-              top: `${Math.random() * 100}%`,
+              left: `${star.left}%`,
+              top: `${star.top}%`,
             }}
             animate={{
               opacity: [0.3, 0.8, 0.3],
               scale: [1, 1.2, 1],
             }}
             transition={{
-              duration: 2 + Math.random() * 3,
+              duration: star.animationDuration,
               repeat: Infinity,
-              delay: Math.random() * 5,
+              delay: star.animationDelay,
             }}
           />
         ))}
@@ -131,13 +143,15 @@ const TVBPage = () => {
             animate={{ opacity: 1, y: 0 }}
             className="mb-8"
           >
-            <Card className="unified-card border-error/30 bg-error/10">
+            <Card className="unified-card border-destructive/30 bg-destructive/10">
               <CardContent className="p-6">
                 <div className="flex items-center gap-3">
-                  <AlertCircle className="h-5 w-5 text-error" />
+                  <AlertCircle className="h-5 w-5 text-destructive" />
                   <div>
-                    <h3 className="text-error font-medium">Connection Error</h3>
-                    <p className="text-error/80 text-sm">{error}</p>
+                    <h3 className="text-destructive font-medium">
+                      Connection Error
+                    </h3>
+                    <p className="text-destructive/80 text-sm">{error}</p>
                   </div>
                 </div>
               </CardContent>
@@ -151,16 +165,16 @@ const TVBPage = () => {
           onValueChange={setActiveTab}
           className="space-y-6"
         >
-          <TabsList className="glass-card p-1 border border-border/50">
+          <TabsList className="bg-background/80 border border-border/50 backdrop-blur-sm">
             <TabsTrigger
               value="fleet"
-              className="flex items-center gap-2 data-[state=active]:bg-primary/20 data-[state=active]:text-primary"
+              className="flex items-center gap-2 data-[state=active]:bg-primary/20 data-[state=active]:text-primary text-foreground"
             >
               🤖 Bot Fleet ({bots.length})
             </TabsTrigger>
             <TabsTrigger
               value="activity"
-              className="flex items-center gap-2 data-[state=active]:bg-primary/20 data-[state=active]:text-primary"
+              className="flex items-center gap-2 data-[state=active]:bg-primary/20 data-[state=active]:text-primary text-foreground"
             >
               📊 Live Activity
             </TabsTrigger>

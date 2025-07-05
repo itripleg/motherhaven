@@ -1,6 +1,7 @@
+// app/bots/[bot]/page.tsx
 "use client";
 
-import React, { useState, useEffect, useCallback } from "react";
+import React, { useState, useEffect, useCallback, useMemo } from "react";
 import { useParams } from "next/navigation";
 import { motion } from "framer-motion";
 import Link from "next/link";
@@ -29,6 +30,17 @@ const BotDetailPage = () => {
 
   const params = useParams();
   const botName = params.bot as string;
+
+  // Generate fixed star positions that won't change on re-renders
+  const fixedStars = useMemo(() => {
+    return Array.from({ length: 30 }).map((_, i) => ({
+      id: i,
+      left: Math.random() * 100,
+      top: Math.random() * 100,
+      animationDelay: Math.random() * 5,
+      animationDuration: 2 + Math.random() * 3,
+    }));
+  }, []); // Empty dependency array ensures this only runs once
 
   const fetchBotDetails = useCallback(async () => {
     if (!botName) return;
@@ -206,10 +218,12 @@ const BotDetailPage = () => {
 
   if (isLoading && !bot) {
     return (
-      <div className="min-h-screen bg-gradient-to-br from-gray-900 via-gray-800 to-black flex items-center justify-center">
+      <div className="min-h-screen animated-bg floating-particles flex items-center justify-center">
         <div className="text-center">
-          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-purple-400 mx-auto mb-4"></div>
-          <p className="text-white">Loading bot details for "{botName}"...</p>
+          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary mx-auto mb-4"></div>
+          <p className="text-foreground">
+            Loading bot details for "{botName}"...
+          </p>
         </div>
       </div>
     );
@@ -217,15 +231,15 @@ const BotDetailPage = () => {
 
   if (!bot) {
     return (
-      <div className="min-h-screen bg-gradient-to-br from-gray-900 via-gray-800 to-black flex items-center justify-center text-center">
+      <div className="min-h-screen animated-bg floating-particles flex items-center justify-center text-center">
         <div>
-          <h1 className="text-2xl text-white mb-4">Bot Not Found</h1>
-          <p className="text-gray-400 mb-4">
+          <h1 className="text-2xl text-foreground mb-4">Bot Not Found</h1>
+          <p className="text-muted-foreground mb-4">
             Could not find bot "{botName}" in the active fleet.
           </p>
           <Link
             href="/bots"
-            className="text-purple-400 hover:underline inline-flex items-center gap-2"
+            className="text-primary hover:underline inline-flex items-center gap-2"
           >
             <ArrowLeft className="h-4 w-4" />
             Back to Bot Fleet
@@ -236,21 +250,25 @@ const BotDetailPage = () => {
   }
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-gray-900 via-gray-800 to-black">
+    <div className="min-h-screen animated-bg floating-particles">
+      {/* Fixed Background Stars Effect */}
       <div className="fixed inset-0 z-0">
-        {Array.from({ length: 30 }).map((_, i) => (
+        {fixedStars.map((star) => (
           <motion.div
-            key={i}
+            key={star.id}
             className="absolute w-1 h-1 bg-white rounded-full opacity-30"
             style={{
-              left: `${Math.random() * 100}%`,
-              top: `${Math.random() * 100}%`,
+              left: `${star.left}%`,
+              top: `${star.top}%`,
             }}
-            animate={{ opacity: [0.3, 0.8, 0.3], scale: [1, 1.2, 1] }}
+            animate={{
+              opacity: [0.3, 0.8, 0.3],
+              scale: [1, 1.2, 1],
+            }}
             transition={{
-              duration: 2 + Math.random() * 3,
+              duration: star.animationDuration,
               repeat: Infinity,
-              delay: Math.random() * 5,
+              delay: star.animationDelay,
             }}
           />
         ))}
@@ -264,14 +282,14 @@ const BotDetailPage = () => {
         >
           <Link
             href="/bots"
-            className="flex items-center gap-2 text-purple-400 hover:text-purple-300 transition-colors"
+            className="flex items-center gap-2 text-primary hover:text-primary/80 transition-colors"
           >
             <ArrowLeft className="h-4 w-4" />
             Back to Bot Fleet
           </Link>
           <div className="flex items-center gap-3">
             {lastUpdate && (
-              <div className="text-sm text-gray-400 flex items-center gap-1">
+              <div className="text-sm text-muted-foreground flex items-center gap-1">
                 <RefreshCw className="h-3 w-3" />
                 Updated {lastUpdate.toLocaleTimeString()}
               </div>
@@ -280,7 +298,7 @@ const BotDetailPage = () => {
               onClick={fetchBotDetails}
               variant="outline"
               size="sm"
-              className="border-gray-600 text-gray-300"
+              className="border-border text-foreground hover:bg-secondary"
               disabled={isLoading}
             >
               <RefreshCw

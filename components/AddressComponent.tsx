@@ -29,11 +29,6 @@ export function AddressComponent({ hash, type }: TransactionHashProps) {
     setMounted(true);
   }, []);
 
-  // Debug logging to see what hash we're getting
-  // useEffect(() => {
-  //   console.log("AddressComponent received:", { hash, type });
-  // }, [hash, type]);
-
   // Validate hash before using it
   const isValidHash =
     hash &&
@@ -94,7 +89,7 @@ export function AddressComponent({ hash, type }: TransactionHashProps) {
   if (!isValidHash) {
     return (
       <div className="flex items-center space-x-2 p-2 rounded-md text-center justify-center">
-        <span className="text-red-400 text-sm">No address available</span>
+        <span className="text-destructive text-sm">No address available</span>
       </div>
     );
   }
@@ -122,7 +117,7 @@ export function AddressComponent({ hash, type }: TransactionHashProps) {
                 variant="ghost"
                 size="icon"
                 onClick={copyToClipboard}
-                className="h-8 w-8 text-primary hover:text-white/80 hover:bg-primary/20"
+                className="h-8 w-8 text-primary hover:text-primary/80 hover:bg-primary/20"
               >
                 <Copy className="h-4 w-4" />
               </Button>
@@ -140,7 +135,7 @@ export function AddressComponent({ hash, type }: TransactionHashProps) {
                 variant="ghost"
                 size="icon"
                 onClick={handleExternalClick}
-                className="h-8 w-8 text-primary hover:text-white/80 hover:bg-primary/20"
+                className="h-8 w-8 text-primary hover:text-primary/80 hover:bg-primary/20"
               >
                 <ExternalLink className="h-4 w-4" />
               </Button>

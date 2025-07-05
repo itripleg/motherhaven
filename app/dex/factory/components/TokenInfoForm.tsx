@@ -1,4 +1,4 @@
-// app/dex/factory/TokenInfoForm.tsx
+// app/dex/factory/components/TokenInfoForm.tsx
 "use client";
 
 import type React from "react";
@@ -94,7 +94,7 @@ export function TokenInfoForm({
             placeholder="My Awesome Token"
             maxLength={32}
             required
-            className="bg-background/80 border-border/50"
+            className="bg-background border-border focus:border-primary focus:ring-primary focus:ring-1 focus:ring-offset-0 focus-visible:ring-primary focus-visible:border-primary"
           />
           <div className="text-xs text-muted-foreground mt-1">
             Max 32 characters
@@ -114,7 +114,7 @@ export function TokenInfoForm({
             maxLength={8}
             style={{ textTransform: "uppercase" }}
             required
-            className="bg-background/80 border-border/50"
+            className="bg-background border-border focus:border-primary focus:ring-primary focus:ring-1 focus:ring-offset-0 focus-visible:ring-primary focus-visible:border-primary"
           />
           <div className="text-xs text-muted-foreground mt-1">
             Max 8 characters
@@ -131,12 +131,14 @@ export function TokenInfoForm({
             value={tokenInfo.burnManager || ""}
             onChange={handleChange}
             placeholder="0x... (leave empty for none)"
-            className={`bg-background/80 border-border/50 ${
-              burnManagerError ? "border-red-500" : ""
+            className={`bg-background border-border focus:ring-1 focus:ring-offset-0 focus-visible:ring-offset-0 ${
+              burnManagerError
+                ? "border-destructive focus:border-destructive focus:ring-destructive focus-visible:border-destructive focus-visible:ring-destructive"
+                : "focus:border-primary focus:ring-primary focus-visible:border-primary focus-visible:ring-primary"
             }`}
           />
           {burnManagerError && (
-            <p className="text-sm text-red-400 mt-1">{burnManagerError}</p>
+            <p className="text-sm text-destructive mt-1">{burnManagerError}</p>
           )}
           <div className="text-xs text-muted-foreground mt-1">
             Address with burn privileges

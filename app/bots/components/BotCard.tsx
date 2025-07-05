@@ -1,3 +1,4 @@
+// app/bots/components/BotCard.tsx
 "use client";
 import React from "react";
 import { motion } from "framer-motion";
@@ -5,7 +6,14 @@ import { useRouter } from "next/navigation";
 import Link from "next/link";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
-import { Wifi, WifiOff, MessageCircle, ExternalLink } from "lucide-react";
+import {
+  Wifi,
+  WifiOff,
+  MessageCircle,
+  ExternalLink,
+  Wallet,
+} from "lucide-react";
+import { AddressComponent } from "@/components/AddressComponent";
 import { TVBBot } from "./helpers";
 import {
   getStatusColor,
@@ -51,14 +59,17 @@ const BotCard: React.FC<BotCardProps> = ({ bot, index }) => {
     e: React.SyntheticEvent<HTMLImageElement, Event>
   ) => {
     const target = e.target as HTMLImageElement;
-    target.src = `https://via.placeholder.com/64x64/9333ea/ffffff?text=${
+    target.src = `https://via.placeholder.com/64x64/hsl(var(--primary))/ffffff?text=${
       bot.displayName?.charAt(0) || "B"
     }`;
   };
 
   const handleCardClick = (e: React.MouseEvent) => {
-    // Don't navigate if clicking on a link
-    if ((e.target as HTMLElement).closest("a")) {
+    // Don't navigate if clicking on a link or address component
+    if (
+      (e.target as HTMLElement).closest("a") ||
+      (e.target as HTMLElement).closest(".address-component")
+    ) {
       return;
     }
     router.push(`/bots/${bot.name}`);
@@ -111,7 +122,20 @@ const BotCard: React.FC<BotCardProps> = ({ bot, index }) => {
     return null;
   };
 
+  // Extract bot wallet address from bot details
+  const getBotWalletAddress = (): string | null => {
+    // Try multiple possible locations for the wallet address
+    return (
+      bot.lastAction?.details?.walletAddress ||
+      bot.lastAction?.details?.address ||
+      (bot as any).walletAddress ||
+      (bot as any).address ||
+      null
+    );
+  };
+
   const tokenInfo = getTokenInfo();
+  const botWalletAddress = getBotWalletAddress();
 
   return (
     <motion.div
@@ -121,7 +145,7 @@ const BotCard: React.FC<BotCardProps> = ({ bot, index }) => {
       className="h-full"
     >
       <Card
-        className="bg-gray-800/50 border-gray-700/50 backdrop-blur-sm hover:bg-gray-800/70 transition-all duration-300 cursor-pointer group relative overflow-hidden"
+        className="unified-card border-border/50 bg-background/50 backdrop-blur-sm hover:bg-background/70 transition-all duration-300 cursor-pointer group relative overflow-hidden"
         onClick={handleCardClick}
       >
         {/* Background */}
@@ -130,7 +154,7 @@ const BotCard: React.FC<BotCardProps> = ({ bot, index }) => {
             className="absolute inset-0 bg-cover bg-center opacity-10 group-hover:opacity-20 transition-opacity duration-300"
             style={{ backgroundImage: `url(${bot.avatarUrl})` }}
           />
-          <div className="absolute inset-0 bg-gradient-to-br from-purple-900/20 via-transparent to-blue-900/20" />
+          <div className="absolute inset-0 bg-gradient-to-br from-primary/10 via-transparent to-primary/5" />
         </div>
 
         {/* Content */}
@@ -166,18 +190,18 @@ const BotCard: React.FC<BotCardProps> = ({ bot, index }) => {
                 <img
                   src={bot.avatarUrl}
                   alt={bot.displayName}
-                  className="w-16 h-16 rounded-full border-2 border-purple-500/30 object-cover"
+                  className="w-16 h-16 rounded-full border-2 border-primary/30 object-cover"
                   onError={handleImageError}
                 />
                 {bot.isOnline && (
-                  <div className="absolute -bottom-1 -right-1 w-5 h-5 bg-green-500 rounded-full border-2 border-gray-800 animate-pulse" />
+                  <div className="absolute -bottom-1 -right-1 w-5 h-5 bg-green-500 rounded-full border-2 border-background animate-pulse" />
                 )}
               </div>
               <div className="flex-1 min-w-0">
-                <CardTitle className="text-white text-lg truncate">
+                <CardTitle className="text-foreground text-lg truncate">
                   {bot.displayName}
                 </CardTitle>
-                <p className="text-gray-400 text-sm truncate">
+                <p className="text-muted-foreground text-sm truncate">
                   {bot.character?.personality?.replace(/_/g, " ") ||
                     "Trading Bot"}
                 </p>
@@ -187,11 +211,26 @@ const BotCard: React.FC<BotCardProps> = ({ bot, index }) => {
 
           {/* Content - Flexible Height */}
           <CardContent className="flex-1 flex flex-col space-y-4 pb-4">
+            {/* Bot Wallet Address Section */}
+            {botWalletAddress && (
+              <div className="address-component flex-shrink-0">
+                <div className="p-2 bg-secondary/30 rounded-lg border border-border/30">
+                  <div className="flex items-center gap-2 mb-1">
+                    <Wallet className="h-3 w-3 text-primary" />
+                    <span className="text-xs font-medium text-muted-foreground">
+                      Bot Wallet:
+                    </span>
+                  </div>
+                  <AddressComponent hash={botWalletAddress} type="address" />
+                </div>
+              </div>
+            )}
+
             {/* Bio Section - Fixed Height */}
             <div className="h-[60px] flex-shrink-0">
               {bot.bio ? (
-                <div className="p-3 bg-gray-700/30 rounded-lg border border-gray-600/30 h-full overflow-hidden">
-                  <p className="text-gray-300 text-sm italic leading-tight overflow-hidden text-ellipsis">
+                <div className="p-3 bg-secondary/30 rounded-lg border border-border/30 h-full overflow-hidden">
+                  <p className="text-muted-foreground text-sm italic leading-tight overflow-hidden text-ellipsis">
                     &quot;
                     {bot.bio.length > 80
                       ? `${bot.bio.substring(0, 80)}...`
@@ -200,8 +239,8 @@ const BotCard: React.FC<BotCardProps> = ({ bot, index }) => {
                   </p>
                 </div>
               ) : (
-                <div className="p-3 bg-gray-700/20 rounded-lg border border-gray-600/20 h-full flex items-center justify-center">
-                  <p className="text-gray-500 text-sm italic">
+                <div className="p-3 bg-secondary/20 rounded-lg border border-border/20 h-full flex items-center justify-center">
+                  <p className="text-muted-foreground/70 text-sm italic">
                     No bio available
                   </p>
                 </div>
@@ -210,15 +249,17 @@ const BotCard: React.FC<BotCardProps> = ({ bot, index }) => {
 
             {/* Stats Grid - Fixed Height */}
             <div className="grid grid-cols-2 gap-3 flex-shrink-0 h-[60px]">
-              <div className="text-center p-2 bg-blue-500/10 rounded-lg flex flex-col justify-center">
-                <p className="text-white font-bold text-lg">
+              <div className="text-center p-2 bg-primary/10 rounded-lg flex flex-col justify-center border border-primary/20">
+                <p className="text-foreground font-bold text-lg">
                   {bot.totalActions || 0}
                 </p>
-                <p className="text-gray-400 text-xs">Actions</p>
+                <p className="text-muted-foreground text-xs">Actions</p>
               </div>
-              <div className="text-center p-2 bg-purple-500/10 rounded-lg flex flex-col justify-center">
-                <p className="text-white font-bold text-lg">{uptimeDisplay}</p>
-                <p className="text-gray-400 text-xs">Uptime</p>
+              <div className="text-center p-2 bg-secondary/30 rounded-lg flex flex-col justify-center border border-border/30">
+                <p className="text-foreground font-bold text-lg">
+                  {uptimeDisplay}
+                </p>
+                <p className="text-muted-foreground text-xs">Uptime</p>
               </div>
             </div>
 
@@ -228,7 +269,7 @@ const BotCard: React.FC<BotCardProps> = ({ bot, index }) => {
                 <div className="space-y-2">
                   {/* Action Type and Time */}
                   <div className="flex items-center justify-between text-sm">
-                    <span className="text-gray-400">Last Action:</span>
+                    <span className="text-muted-foreground">Last Action:</span>
                     <div className="flex items-center gap-2">
                       <div
                         className={`flex items-center gap-1 px-2 py-1 rounded-full text-xs ${getActionColor(
@@ -244,7 +285,7 @@ const BotCard: React.FC<BotCardProps> = ({ bot, index }) => {
                           bot.lastAction.type === "sell") && (
                           <Link
                             href={`/dex/${tokenInfo.address}`}
-                            className="flex items-center gap-1 px-2 py-1 bg-purple-500/20 text-purple-400 hover:text-purple-300 rounded-full transition-colors border border-purple-500/30"
+                            className="flex items-center gap-1 px-2 py-1 bg-primary/20 text-primary hover:text-primary/80 rounded-full transition-colors border border-primary/30"
                             onClick={(e) => e.stopPropagation()}
                           >
                             <span className="text-xs font-medium">
@@ -257,7 +298,7 @@ const BotCard: React.FC<BotCardProps> = ({ bot, index }) => {
                       {!tokenInfo &&
                         (bot.lastAction.type === "buy" ||
                           bot.lastAction.type === "sell") && (
-                          <div className="px-2 py-1 bg-gray-500/20 text-gray-400 rounded-full border border-gray-500/30">
+                          <div className="px-2 py-1 bg-muted/30 text-muted-foreground rounded-full border border-border/30">
                             <span className="text-xs">TOKEN</span>
                           </div>
                         )}
@@ -266,15 +307,15 @@ const BotCard: React.FC<BotCardProps> = ({ bot, index }) => {
 
                   {/* Time */}
                   <div className="flex items-center justify-between text-sm">
-                    <span className="text-gray-400">When:</span>
-                    <span className="text-white text-xs">
+                    <span className="text-muted-foreground">When:</span>
+                    <span className="text-foreground text-xs">
                       {new Date(bot.lastAction.timestamp).toLocaleTimeString()}
                     </span>
                   </div>
                 </div>
               ) : (
                 <div className="h-full flex items-center justify-center">
-                  <p className="text-gray-500 text-sm italic">
+                  <p className="text-muted-foreground/70 text-sm italic">
                     No recent actions
                   </p>
                 </div>
@@ -282,9 +323,9 @@ const BotCard: React.FC<BotCardProps> = ({ bot, index }) => {
             </div>
 
             {/* Message Section - Fixed Height with Subtle Animation */}
-            <div className=" flex-shrink-0">
+            <div className="flex-shrink-0">
               {bot.lastAction?.message ? (
-                <div className="p-3 bg-gray-700/40 rounded-lg h-full overflow-hidden">
+                <div className="p-3 bg-secondary/40 rounded-lg h-full overflow-hidden border border-border/30">
                   <motion.div
                     key={lastMessageKey}
                     initial={{ y: 10, opacity: 0 }}
@@ -292,8 +333,8 @@ const BotCard: React.FC<BotCardProps> = ({ bot, index }) => {
                     transition={{ duration: 0.5, ease: "easeOut" }}
                     className="flex items-start gap-2 h-full"
                   >
-                    <MessageCircle className="h-4 w-4 text-purple-400 mt-0.5 flex-shrink-0" />
-                    <p className="text-gray-300 text-sm leading-tight overflow-hidden">
+                    <MessageCircle className="h-4 w-4 text-primary mt-0.5 flex-shrink-0" />
+                    <p className="text-muted-foreground text-sm leading-tight overflow-hidden">
                       &quot;
                       {bot.lastAction.message.length > 60
                         ? `${bot.lastAction.message.substring(0, 60)}...`
@@ -303,8 +344,10 @@ const BotCard: React.FC<BotCardProps> = ({ bot, index }) => {
                   </motion.div>
                 </div>
               ) : (
-                <div className="p-3 bg-gray-700/20 rounded-lg h-full flex items-center justify-center">
-                  <p className="text-gray-500 text-sm italic">No message</p>
+                <div className="p-3 bg-secondary/20 rounded-lg h-full flex items-center justify-center border border-border/20">
+                  <p className="text-muted-foreground/70 text-sm italic">
+                    No message
+                  </p>
                 </div>
               )}
             </div>

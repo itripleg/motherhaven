@@ -82,10 +82,10 @@ const navItems: NavItem[] = [
     description: "Transparent Volume Bots",
   },
   {
-    href: "/game",
-    label: "Battle",
+    href: "/games",
+    label: "Games",
     icon: <GamepadIcon className="h-4 w-4" />,
-    description: "BigBrain Battle Arena",
+    description: "We're building games!",
   },
   {
     href: "/faucet",

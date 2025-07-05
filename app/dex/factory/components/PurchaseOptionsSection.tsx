@@ -115,7 +115,7 @@ export const PurchaseOptionsSection: React.FC<PurchaseOptionsSectionProps> = ({
                     variant="ghost"
                     size="sm"
                     onClick={setMaxAmount}
-                    className="h-6 px-2 text-primary hover:text-primary/80"
+                    className="h-6 px-2 text-primary hover:text-primary/80 hover:bg-primary/10"
                   >
                     Max
                   </Button>
@@ -130,7 +130,7 @@ export const PurchaseOptionsSection: React.FC<PurchaseOptionsSectionProps> = ({
                 step="0.001"
                 min={FACTORY_CONSTANTS.MIN_PURCHASE}
                 max={FACTORY_CONSTANTS.MAX_PURCHASE}
-                className="text-center bg-background/80 border-border/50"
+                className="text-center bg-background border-border focus:border-primary focus:ring-primary focus:ring-1 focus:ring-offset-0 focus-visible:ring-primary focus-visible:border-primary"
               />
               <div className="flex justify-between text-xs text-muted-foreground mt-1">
                 <span>Min: {FACTORY_CONSTANTS.MIN_PURCHASE} AVAX</span>
@@ -171,7 +171,7 @@ export const PurchaseOptionsSection: React.FC<PurchaseOptionsSectionProps> = ({
                 placeholder="0"
                 step="0.001"
                 min="0"
-                className="text-center bg-background/80 border-border/50"
+                className="text-center bg-background border-border focus:border-primary focus:ring-primary focus:ring-1 focus:ring-offset-0 focus-visible:ring-primary focus-visible:border-primary"
               />
               <div className="text-xs text-muted-foreground mt-1">
                 Set to 0 to disable slippage protection (not recommended)
@@ -189,7 +189,7 @@ export const PurchaseOptionsSection: React.FC<PurchaseOptionsSectionProps> = ({
                   const withSlippage = estimated * 0.99; // 1% slippage tolerance
                   handleMinTokensChange(withSlippage.toFixed(6));
                 }}
-                className="w-full border-primary/20 hover:bg-primary/10"
+                className="w-full border-primary/20 hover:bg-primary/10 hover:border-primary/30 text-foreground"
               >
                 Set to {(parseFloat(estimatedTokens) * 0.99).toFixed(2)} (99% of
                 estimated)
@@ -197,9 +197,9 @@ export const PurchaseOptionsSection: React.FC<PurchaseOptionsSectionProps> = ({
             )}
 
             {/* Warning */}
-            <div className="flex items-start gap-2 p-3 bg-amber-500/10 border border-amber-200/30 rounded-lg">
-              <Info className="h-4 w-4 text-amber-400 mt-0.5" />
-              <div className="text-xs text-amber-200">
+            <div className="flex items-start gap-2 p-3 bg-secondary/50 border border-border rounded-lg">
+              <Info className="h-4 w-4 text-muted-foreground mt-0.5" />
+              <div className="text-xs text-muted-foreground">
                 <strong>Note:</strong> Your purchase will be included in the
                 token creation transaction. This makes you the first trader and
                 helps bootstrap initial liquidity.
