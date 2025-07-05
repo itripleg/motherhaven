@@ -1,11 +1,13 @@
+// app/bots/components/BotHeader.tsx
 "use client";
 import React from "react";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Progress } from "@/components/ui/progress";
-import { Wifi, WifiOff, Eye, EyeOff, Settings } from "lucide-react";
+import { Wifi, WifiOff, Eye, EyeOff, Settings, Wallet } from "lucide-react";
 import { BotStatus, getMoodColor, getMoodIcon } from "./detailHelpers";
+import { AddressComponent } from "@/components/AddressComponent";
 
 interface BotHeaderProps {
   bot: BotStatus;
@@ -29,6 +31,36 @@ const BotHeader: React.FC<BotHeaderProps> = ({
       bot.displayName?.charAt(0) || "B"
     }`;
   };
+
+  // Extract bot wallet address from bot details
+  const getBotWalletAddress = (): string | null => {
+    // Try multiple possible locations for the wallet address
+    return (
+      bot.lastAction?.details?.walletAddress ||
+      bot.lastAction?.details?.address ||
+      (bot as any).walletAddress ||
+      (bot as any).address ||
+      null
+    );
+  };
+
+  const botWalletAddress = getBotWalletAddress();
+
+  // Log the bot address for debugging
+  React.useEffect(() => {
+    if (botWalletAddress) {
+      console.log(`🤖 ${bot.displayName} Wallet Address:`, botWalletAddress);
+    } else {
+      console.log(`🤖 ${bot.displayName}: No wallet address found in bot data`);
+      console.log("Bot data structure:", {
+        lastAction: bot.lastAction,
+        botKeys: Object.keys(bot),
+        lastActionDetails: bot.lastAction?.details
+          ? Object.keys(bot.lastAction.details)
+          : "No details",
+      });
+    }
+  }, [botWalletAddress, bot.displayName, bot.lastAction]);
 
   return (
     <Card className="bg-gray-800/50 border-gray-700/50 backdrop-blur-sm relative overflow-hidden">
@@ -102,6 +134,31 @@ const BotHeader: React.FC<BotHeaderProps> = ({
                   <p className="text-purple-300 italic mb-4 text-lg">
                     "{bot.character.catchphrase}"
                   </p>
+                )}
+
+                {/* Bot Wallet Address Section */}
+                {botWalletAddress && (
+                  <div className="mb-4 p-3 bg-gray-700/40 rounded-lg border border-gray-600/40">
+                    <div className="flex items-center gap-2 mb-2">
+                      <Wallet className="h-4 w-4 text-blue-400" />
+                      <span className="text-sm font-medium text-blue-400">
+                        Bot Wallet Address:
+                      </span>
+                    </div>
+                    <AddressComponent hash={botWalletAddress} type="address" />
+                  </div>
+                )}
+
+                {/* If no wallet address found, show a debug message */}
+                {!botWalletAddress && (
+                  <div className="mb-4 p-3 bg-orange-500/10 rounded-lg border border-orange-500/30">
+                    <div className="flex items-center gap-2">
+                      <Wallet className="h-4 w-4 text-orange-400" />
+                      <span className="text-sm text-orange-400">
+                        Wallet address not available - check bot webhook data
+                      </span>
+                    </div>
+                  </div>
                 )}
 
                 <div className="grid grid-cols-2 md:grid-cols-4 gap-4 text-sm">

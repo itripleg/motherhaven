@@ -17,19 +17,32 @@ import BotHeader from "../components/BotHeader";
 import PerformanceStats from "../components/PerformanceStats";
 import BotConfiguration from "../components/BotConfiguration";
 import ActivityLog from "../components/ActivityLog";
+import InlineBotSelector from "../components/InlineBotSelector";
+import { AddressComponent } from "@/components/AddressComponent";
+
+// Import the new bot activities hook
+import { useBotActivity } from "@/hooks/useBotActivities";
 
 const BotDetailPage = () => {
   const [bot, setBot] = useState<BotStatus | null>(null);
-  const [activityLog, setActivityLog] = useState<ActivityLogType[]>([]);
   const [isLoading, setIsLoading] = useState<boolean>(true);
   const [showConfig, setShowConfig] = useState<boolean>(false);
   const [lastUpdate, setLastUpdate] = useState<Date | null>(null);
-  const [realTimeActivity, setRealTimeActivity] = useState<ActivityLogType[]>(
-    []
-  );
 
   const params = useParams();
   const botName = params.bot as string;
+
+  // Use the new persistent activities hook
+  const {
+    activities: persistentActivities,
+    loading: activitiesLoading,
+    error: activitiesError,
+    statistics: activityStats,
+    refresh: refreshActivities,
+  } = useBotActivity(botName, {
+    limitCount: 50,
+    realTime: true,
+  });
 
   // Generate fixed star positions that won't change on re-renders
   const fixedStars = useMemo(() => {
@@ -41,6 +54,22 @@ const BotDetailPage = () => {
       animationDuration: 2 + Math.random() * 3,
     }));
   }, []); // Empty dependency array ensures this only runs once
+
+  // Convert persistent activities to the format expected by ActivityLog component
+  const activityLog = useMemo((): ActivityLogType[] => {
+    return persistentActivities.map((activity) => ({
+      id: activity.id || `${activity.botName}-${activity.timestamp}`,
+      action: activity.actionType,
+      message: activity.message,
+      timestamp: new Date(activity.timestamp),
+      tokenSymbol: activity.tokenSymbol,
+      amount: activity.tradeAmount
+        ? `${activity.tradeAmount} AVAX`
+        : activity.details?.readableAmount
+        ? `${activity.details.readableAmount} ${activity.tokenSymbol}`
+        : undefined,
+    }));
+  }, [persistentActivities]);
 
   const fetchBotDetails = useCallback(async () => {
     if (!botName) return;
@@ -55,33 +84,6 @@ const BotDetailPage = () => {
         if (specificBot) {
           setBot(specificBot);
           setLastUpdate(new Date());
-
-          // Create real activity log from bot's last action
-          if (specificBot.lastAction) {
-            const newActivity: ActivityLogType = {
-              id: `${specificBot.name}-${specificBot.lastAction.timestamp}`,
-              action: specificBot.lastAction.type,
-              message: specificBot.lastAction.message,
-              timestamp: new Date(specificBot.lastAction.timestamp),
-              tokenSymbol: specificBot.lastAction.details?.tokenSymbol,
-              amount: specificBot.lastAction.details?.amountAvax
-                ? `${specificBot.lastAction.details.amountAvax} AVAX`
-                : specificBot.lastAction.details?.readableAmount
-                ? `${specificBot.lastAction.details.readableAmount} ${specificBot.lastAction.details.tokenSymbol}`
-                : undefined,
-            };
-
-            // Add to real-time activity if it's new
-            setRealTimeActivity((prev) => {
-              const exists = prev.some(
-                (activity) => activity.id === newActivity.id
-              );
-              if (!exists) {
-                return [newActivity, ...prev.slice(0, 29)]; // Keep last 30 real activities
-              }
-              return prev;
-            });
-          }
         } else {
           setBot(null);
         }
@@ -94,127 +96,17 @@ const BotDetailPage = () => {
     }
   }, [botName]);
 
-  // Generate historical activity based on bot's personality and config
-  const generateHistoricalActivity = useCallback(
-    (botData: any): ActivityLogType[] => {
-      if (!botData) return [];
-
-      const activities: ActivityLogType[] = [];
-      const now = Date.now();
-
-      // Use bot's actual interval for realistic timing
-      const minInterval = (botData.config?.minInterval || 15) * 1000; // Convert to ms
-      const maxInterval = (botData.config?.maxInterval || 60) * 1000;
-
-      // Generate activities based on bot's personality
-      const buyBias = botData.config?.buyBias || 0.6;
-      const actions = [];
-
-      // Weight actions based on buy bias
-      const buyWeight = Math.floor(buyBias * 10);
-      const sellWeight = Math.floor((1 - buyBias) * 10);
-
-      for (let i = 0; i < buyWeight; i++) actions.push("buy");
-      for (let i = 0; i < sellWeight; i++) actions.push("sell");
-      actions.push("heartbeat"); // Add some heartbeats
-
-      let currentTime = now;
-
-      for (let i = 0; i < 12; i++) {
-        // Generate 12 historical activities
-        const action = actions[Math.floor(Math.random() * actions.length)];
-        const interval =
-          Math.random() * (maxInterval - minInterval) + minInterval;
-        currentTime -= interval + Math.random() * 120000; // Add more randomness
-
-        let message = "";
-        let tokenSymbol: string | undefined;
-        let amount: string | undefined;
-
-        // Always use bot's personality phrases for buy/sell actions
-        if (action === "buy") {
-          const buyPhrases = botData.config?.buyPhrases || [
-            "Going long! 📈",
-            "Buying the dip! 💎",
-            "This looks bullish! 🚀",
-            "Adding to my position! 💰",
-            "Can't resist this price! 🤑",
-          ];
-          message = buyPhrases[Math.floor(Math.random() * buyPhrases.length)];
-          tokenSymbol = [
-            "MOON",
-            "BULL",
-            "ROCKET",
-            "DOGE",
-            "PEPE",
-            "SHIB",
-            "FLOKI",
-          ][Math.floor(Math.random() * 7)];
-          const tradeAmount =
-            Math.random() *
-              (botData.config?.maxTradeAmount ||
-                0.02 - botData.config?.minTradeAmount ||
-                0.005) +
-            (botData.config?.minTradeAmount || 0.005);
-          amount = `${tradeAmount.toFixed(4)} AVAX`;
-        } else if (action === "sell") {
-          const sellPhrases = botData.config?.sellPhrases || [
-            "Taking profits! 💰",
-            "Time to secure gains! ✅",
-            "Partial exit here! 📉",
-            "Booking some wins! 🎯",
-            "Smart exit strategy! 🧠",
-          ];
-          message = sellPhrases[Math.floor(Math.random() * sellPhrases.length)];
-          tokenSymbol = [
-            "MOON",
-            "BULL",
-            "ROCKET",
-            "DOGE",
-            "PEPE",
-            "SHIB",
-            "FLOKI",
-          ][Math.floor(Math.random() * 7)];
-          const tokenAmount = Math.random() * 2000 + 100;
-          amount = `${tokenAmount.toFixed(2)} ${tokenSymbol}`;
-        } else if (action === "heartbeat") {
-          message = `${botData.displayName} is active and trading`;
-        }
-
-        activities.push({
-          id: `${botData.name}-historical-${i}-${currentTime}`,
-          action,
-          message,
-          timestamp: new Date(currentTime),
-          tokenSymbol,
-          amount,
-        });
-      }
-
-      return activities.sort(
-        (a, b) => b.timestamp.getTime() - a.timestamp.getTime()
-      );
-    },
-    []
-  );
-
-  // Update activity log when bot data changes
-  useEffect(() => {
-    if (bot) {
-      // Only use real-time activities, no historical mock data
-      const realActivities = [...realTimeActivity]
-        .sort((a, b) => b.timestamp.getTime() - a.timestamp.getTime())
-        .slice(0, 20); // Keep only latest 20
-
-      setActivityLog(realActivities);
-    }
-  }, [bot, realTimeActivity]);
-
   useEffect(() => {
     fetchBotDetails();
     const interval = setInterval(fetchBotDetails, 10000); // Refresh every 10 seconds for more real-time feel
     return () => clearInterval(interval);
   }, [fetchBotDetails]);
+
+  // Handle refresh for both bot details and activities
+  const handleRefresh = useCallback(() => {
+    fetchBotDetails();
+    refreshActivities();
+  }, [fetchBotDetails, refreshActivities]);
 
   if (isLoading && !bot) {
     return (
@@ -295,18 +187,29 @@ const BotDetailPage = () => {
               </div>
             )}
             <Button
-              onClick={fetchBotDetails}
+              onClick={handleRefresh}
               variant="outline"
               size="sm"
               className="border-border text-foreground hover:bg-secondary"
-              disabled={isLoading}
+              disabled={isLoading || activitiesLoading}
             >
               <RefreshCw
-                className={`h-4 w-4 mr-1 ${isLoading ? "animate-spin" : ""}`}
+                className={`h-4 w-4 mr-1 ${
+                  isLoading || activitiesLoading ? "animate-spin" : ""
+                }`}
               />
               Refresh
             </Button>
           </div>
+        </motion.div>
+
+        {/* Inline Bot Selector Component */}
+        <motion.div
+          initial={{ opacity: 0, y: -20 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ delay: 0.05 }}
+        >
+          <InlineBotSelector currentBotName={botName} />
         </motion.div>
 
         <motion.div
@@ -337,7 +240,12 @@ const BotDetailPage = () => {
           animate={{ opacity: 1, y: 0 }}
           transition={{ delay: 0.2 }}
         >
-          <ActivityLog logs={activityLog} />
+          <ActivityLog
+            logs={activityLog}
+            // loading={activitiesLoading}
+            // error={activitiesError}
+            // statistics={activityStats}
+          />
         </motion.div>
       </div>
     </div>

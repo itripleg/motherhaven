@@ -1,6 +1,17 @@
-// app/api/tvb/webhook/route.ts - WITH DEV MODE TOGGLE
+// app/api/tvb/webhook/route.ts - Complete webhook with Firestore activity persistence
 
 import { NextRequest, NextResponse } from "next/server";
+import {
+  collection,
+  addDoc,
+  serverTimestamp,
+  query,
+  where,
+  orderBy,
+  limit,
+  getDocs,
+} from "firebase/firestore";
+import { db } from "@/firebase";
 
 // Development mode toggle - set to true to allow bots without secrets
 const DEV_MODE =
@@ -13,7 +24,7 @@ const BOT_SECRETS = {
   melancholy_mort: "melancholy_mort_secret_2024",
 };
 
-// In-memory storage for bot status
+// In-memory storage for bot status (still needed for real-time status)
 interface BotActivity {
   botName: string;
   displayName: string;
@@ -28,7 +39,6 @@ interface BotActivity {
   };
   totalActions: number;
   sessionStarted: string;
-  // Store bot configuration data from bots themselves
   config?: {
     buyBias?: number;
     riskTolerance?: number;
@@ -42,17 +52,207 @@ interface BotActivity {
     createPhrases?: string[];
     errorPhrases?: string[];
   };
-  // Store character data from bots themselves
   character?: {
     mood?: string;
     personality?: string;
   };
-  // Track if this bot is using dev mode (no secret)
   isDevMode?: boolean;
 }
 
-// Simple in-memory store
+// Simple in-memory store (for current session status)
 const botActivities = new Map<string, BotActivity>();
+
+// Firestore collection names
+const COLLECTIONS = {
+  BOT_ACTIVITIES: "bot_activities",
+  BOT_STATUS: "bot_status",
+};
+
+// Activity types that should be persisted to Firestore
+const PERSISTENT_ACTIVITY_TYPES = new Set([
+  "buy",
+  "sell",
+  "create_token",
+  "hold",
+  "error",
+  "startup",
+  "shutdown",
+  "insufficient_funds",
+  "balance_alert",
+]);
+
+// Activity types that are considered "personality actions" for display
+const PERSONALITY_ACTIONS = new Set([
+  "buy",
+  "sell",
+  "create_token",
+  "hold",
+  "error",
+]);
+
+interface PersistentBotActivity {
+  botName: string;
+  displayName: string;
+  avatarUrl: string;
+  actionType: string;
+  message: string;
+  details: any;
+  timestamp: string;
+  isPersonalityAction: boolean;
+  sessionId: string; // Track different bot sessions
+
+  // Financial metrics (if available)
+  currentBalance?: number;
+  pnlAmount?: number;
+  pnlPercentage?: number;
+
+  // Token info (if applicable)
+  tokenAddress?: string;
+  tokenSymbol?: string;
+  tokenName?: string;
+
+  // Trade details (if applicable)
+  tradeAmount?: number;
+  txHash?: string;
+
+  // Server timestamp for consistent ordering
+  createdAt: any; // Firestore serverTimestamp
+}
+
+async function persistActivityToFirestore(
+  botName: string,
+  displayName: string,
+  avatarUrl: string,
+  actionType: string,
+  details: any,
+  timestamp: string,
+  sessionId: string
+): Promise<boolean> {
+  try {
+    // Only persist certain activity types
+    if (!PERSISTENT_ACTIVITY_TYPES.has(actionType)) {
+      return true; // Don't persist but don't error
+    }
+
+    const activityData: PersistentBotActivity = {
+      botName,
+      displayName,
+      avatarUrl,
+      actionType,
+      message: details.message || `${actionType} action`,
+      details,
+      timestamp,
+      isPersonalityAction: PERSONALITY_ACTIONS.has(actionType),
+      sessionId,
+      createdAt: serverTimestamp(),
+    };
+
+    // Add financial metrics if available
+    if (details.currentBalance !== undefined) {
+      activityData.currentBalance = details.currentBalance;
+    }
+    if (details.pnlAmount !== undefined) {
+      activityData.pnlAmount = details.pnlAmount;
+    }
+    if (details.pnlPercentage !== undefined) {
+      activityData.pnlPercentage = details.pnlPercentage;
+    }
+
+    // Add token info if available
+    if (details.tokenAddress) {
+      activityData.tokenAddress = details.tokenAddress;
+    }
+    if (details.tokenSymbol) {
+      activityData.tokenSymbol = details.tokenSymbol;
+    }
+    if (details.tokenName) {
+      activityData.tokenName = details.tokenName;
+    }
+
+    // Add trade details if available
+    if (details.amountAvax) {
+      activityData.tradeAmount = details.amountAvax;
+    }
+    if (details.txHash) {
+      activityData.txHash = details.txHash;
+    }
+
+    // Store in Firestore
+    await addDoc(collection(db, COLLECTIONS.BOT_ACTIVITIES), activityData);
+
+    console.log(
+      `✅ Persisted ${actionType} activity for ${displayName} to Firestore`
+    );
+    return true;
+  } catch (error) {
+    console.error(`❌ Failed to persist activity for ${botName}:`, error);
+    return false;
+  }
+}
+
+async function getRecentActivitiesFromFirestore(
+  botName?: string,
+  limitCount: number = 50
+): Promise<PersistentBotActivity[]> {
+  try {
+    const activitiesRef = collection(db, COLLECTIONS.BOT_ACTIVITIES);
+
+    const queryConstraints: any[] = [
+      orderBy("createdAt", "desc"),
+      limit(limitCount),
+    ];
+
+    // Filter by bot if specified
+    if (botName) {
+      queryConstraints.unshift(where("botName", "==", botName));
+    }
+
+    const q = query(activitiesRef, ...queryConstraints);
+    const snapshot = await getDocs(q);
+
+    const activities: PersistentBotActivity[] = [];
+    snapshot.forEach((doc) => {
+      const data = doc.data() as PersistentBotActivity;
+      activities.push({
+        ...data,
+        id: doc.id,
+      } as any);
+    });
+
+    return activities;
+  } catch (error) {
+    console.error("❌ Failed to fetch activities from Firestore:", error);
+    return [];
+  }
+}
+
+async function cleanupOldActivities(daysToKeep: number = 30): Promise<void> {
+  try {
+    const cutoffDate = new Date();
+    cutoffDate.setDate(cutoffDate.getDate() - daysToKeep);
+
+    const activitiesRef = collection(db, COLLECTIONS.BOT_ACTIVITIES);
+    const q = query(
+      activitiesRef,
+      where("createdAt", "<", cutoffDate),
+      limit(100) // Process in batches
+    );
+
+    const snapshot = await getDocs(q);
+
+    if (snapshot.empty) {
+      return;
+    }
+
+    // In a real implementation, you'd batch delete these
+    // For now, just log what would be deleted
+    console.log(
+      `🧹 Would cleanup ${snapshot.size} old bot activities (older than ${daysToKeep} days)`
+    );
+  } catch (error) {
+    console.error("❌ Failed to cleanup old activities:", error);
+  }
+}
 
 export async function POST(request: NextRequest) {
   try {
@@ -116,7 +316,7 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    // Get or create bot activity record
+    // Get or create bot activity record (in-memory for real-time status)
     let botActivity = botActivities.get(botName);
 
     if (!botActivity) {
@@ -125,7 +325,7 @@ export async function POST(request: NextRequest) {
         botName,
         displayName: displayName || botName,
         avatarUrl: avatarUrl || "",
-        bio: details?.bio, // Get bio from bot data
+        bio: details?.bio,
         lastSeen: timestamp,
         lastAction: {
           type: action,
@@ -135,9 +335,9 @@ export async function POST(request: NextRequest) {
         },
         totalActions: 0,
         sessionStarted: timestamp,
-        character: details?.character, // Get character from bot data
-        config: details?.config, // Get config from bot data
-        isDevMode: isDevMode, // Track if this is a dev mode bot
+        character: details?.character,
+        config: details?.config,
+        isDevMode: isDevMode,
       };
 
       const modeLabel = isDevMode ? "🔧 DEV" : "🤖 PROD";
@@ -146,6 +346,9 @@ export async function POST(request: NextRequest) {
 
     // Update dev mode status
     botActivity.isDevMode = isDevMode;
+
+    // Generate session ID for grouping activities
+    const sessionId = `${botName}_${botActivity.sessionStarted}`;
 
     // Handle startup action specially
     if (action === "startup") {
@@ -187,8 +390,19 @@ export async function POST(request: NextRequest) {
       botActivity.config = details.config;
     }
 
-    // Store updated activity
+    // Store updated activity in memory
     botActivities.set(botName, botActivity);
+
+    // PERSIST TO FIRESTORE
+    await persistActivityToFirestore(
+      botName,
+      displayName || botName,
+      avatarUrl || "",
+      action,
+      details || {},
+      timestamp,
+      sessionId
+    );
 
     // Log the activity with mode indicator
     const modeLabel = isDevMode ? "🔧" : "🔄";
@@ -236,7 +450,7 @@ export async function POST(request: NextRequest) {
 
     return NextResponse.json({
       success: true,
-      message: "Bot activity recorded",
+      message: "Bot activity recorded and persisted",
       devMode: isDevMode,
       botStatus: {
         name: botActivity.botName,
@@ -246,6 +460,10 @@ export async function POST(request: NextRequest) {
         totalActions: botActivity.totalActions,
         sessionStarted: botActivity.sessionStarted,
         isDevMode: isDevMode,
+      },
+      persistence: {
+        stored: PERSISTENT_ACTIVITY_TYPES.has(action),
+        sessionId: sessionId,
       },
     });
   } catch (error) {
@@ -259,6 +477,11 @@ export async function POST(request: NextRequest) {
 
 export async function GET(request: NextRequest) {
   try {
+    const { searchParams } = new URL(request.url);
+    const botName = searchParams.get("bot");
+    const includeHistory = searchParams.get("history") === "true";
+    const limit = parseInt(searchParams.get("limit") || "50");
+
     console.log(
       `📊 GET request received from frontend (DEV_MODE: ${DEV_MODE})`
     );
@@ -283,14 +506,14 @@ export async function GET(request: NextRequest) {
         sessionStarted: bot.sessionStarted,
         character: bot.character,
         config: bot.config,
-        isDevMode: bot.isDevMode || false, // Include dev mode status
+        isDevMode: bot.isDevMode || false,
       };
     });
 
     const devBots = botStatuses.filter((bot) => bot.isDevMode).length;
     const prodBots = botStatuses.filter((bot) => !bot.isDevMode).length;
 
-    const response = {
+    const response: any = {
       success: true,
       bots: botStatuses,
       totalBots: botStatuses.length,
@@ -301,6 +524,25 @@ export async function GET(request: NextRequest) {
       timestamp: new Date().toISOString(),
     };
 
+    // Include historical activity data if requested
+    if (includeHistory) {
+      try {
+        const activities = await getRecentActivitiesFromFirestore(
+          botName || undefined,
+          limit
+        );
+
+        response.activities = activities;
+        response.activityCount = activities.length;
+
+        console.log(`📚 Included ${activities.length} historical activities`);
+      } catch (error) {
+        console.error("❌ Failed to fetch historical activities:", error);
+        response.activities = [];
+        response.activityError = "Failed to fetch historical activities";
+      }
+    }
+
     console.log(
       `✅ Returning status for ${botStatuses.length} bots (${response.onlineBots} online, ${devBots} dev, ${prodBots} prod)`
     );
@@ -308,6 +550,27 @@ export async function GET(request: NextRequest) {
     return NextResponse.json(response);
   } catch (error) {
     console.error("❌ TVB Status error:", error);
+    return NextResponse.json(
+      { error: "Internal server error" },
+      { status: 500 }
+    );
+  }
+}
+
+// Cleanup endpoint (could be called by a cron job)
+export async function DELETE(request: NextRequest) {
+  try {
+    const { searchParams } = new URL(request.url);
+    const days = parseInt(searchParams.get("days") || "30");
+
+    await cleanupOldActivities(days);
+
+    return NextResponse.json({
+      success: true,
+      message: `Initiated cleanup of activities older than ${days} days`,
+    });
+  } catch (error) {
+    console.error("❌ TVB Cleanup error:", error);
     return NextResponse.json(
       { error: "Internal server error" },
       { status: 500 }

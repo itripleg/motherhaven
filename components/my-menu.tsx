@@ -76,6 +76,12 @@ const navItems: NavItem[] = [
     description: "Trade tokens",
   },
   {
+    href: "/dex/factory",
+    label: "Token Factory",
+    icon: <Factory className="h-4 w-4" />,
+    description: "Create tokens",
+  },
+  {
     href: "/bots",
     label: "TVBs",
     icon: <Bot className="h-4 w-4" />,
@@ -93,12 +99,7 @@ const navItems: NavItem[] = [
     icon: <Droplets className="h-4 w-4" />,
     description: "Get test tokens",
   },
-  {
-    href: "/dex/factory",
-    label: "Token Factory",
-    icon: <Factory className="h-4 w-4" />,
-    description: "Create tokens",
-  },
+
   {
     href: "/roadmap",
     label: "Road to Riches",
@@ -130,7 +131,7 @@ const themePresets: ThemePreset[] = [
     colors: [
       { hue: 263, saturation: 60, lightness: 50 },
       { hue: 240, saturation: 5, lightness: 11 },
-      { hue: 240, saturation: 6, lightness: 5 },
+      { hue: 240, saturation: 6, lightness: 9 },
     ],
   },
   {
@@ -157,7 +158,7 @@ const themePresets: ThemePreset[] = [
     colors: [
       { hue: 25, saturation: 85, lightness: 55 },
       { hue: 30, saturation: 8, lightness: 12 },
-      { hue: 45, saturation: 75, lightness: 20 },
+      { hue: 45, saturation: 75, lightness: 15 },
     ],
   },
   {
@@ -166,7 +167,7 @@ const themePresets: ThemePreset[] = [
     colors: [
       { hue: 280, saturation: 75, lightness: 50 },
       { hue: 270, saturation: 8, lightness: 9 },
-      { hue: 290, saturation: 65, lightness: 35 },
+      { hue: 290, saturation: 65, lightness: 15 },
     ],
   },
 ];
