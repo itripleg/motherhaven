@@ -160,6 +160,14 @@ export function SellTokenForm({
       return "Amount must be greater than 0";
     }
 
+    if (errorMessage.includes("Sell amount too small")) {
+      return "Sell amount too small - minimum sell value not met";
+    }
+
+    if (errorMessage.includes("Insufficient output amount")) {
+      return "Slippage tolerance exceeded - try reducing amount or accepting higher slippage";
+    }
+
     // Check for gas estimation failures (often indicates revert)
     if (
       errorMessage.includes("gas required exceeds allowance") ||
@@ -258,11 +266,15 @@ export function SellTokenForm({
       setErrorDetails(null);
       const parsedAmount = parseEther(amount);
 
+      // Set minEthOut to 0 to disable slippage protection for now
+      // Users can always add slippage protection later if needed
+      const minEthOut = parseEther("0");
+
       writeSellContract({
         abi: FACTORY_ABI,
         address: FACTORY_ADDRESS,
         functionName: "sell",
-        args: [tokenAddress, parsedAmount],
+        args: [tokenAddress, parsedAmount, minEthOut], // Added the required third parameter
       });
 
       toast({
@@ -423,6 +435,7 @@ export function SellTokenForm({
             <div>Token Balance: {maxAmount}</div>
             <div>Allowance: {allowance?.toString()}</div>
             <div>Needs Approval: {needsApproval.toString()}</div>
+            <div>Min ETH Out: 0 (slippage protection disabled)</div>
           </div>
         </div>
       )}

@@ -3,7 +3,8 @@
 import { NextResponse } from "next/server";
 import { collection, setDoc, doc, updateDoc, getDoc } from "firebase/firestore";
 import { db } from "@/firebase";
-import { decodeEventLog, formatEther } from "viem";
+import { decodeEventLog, formatEther, createPublicClient, http } from "viem";
+import { avalancheFuji } from "viem/chains"; // Use the correct chain for your network
 import {
   TokenCreatedEvent,
   TokensPurchasedEvent,
@@ -11,6 +12,7 @@ import {
   TokenState,
   TradingHaltedEvent,
   TradingResumedEvent,
+  TradingAutoResumedEvent,
 } from "@/types";
 
 // Import from the updated contracts types
@@ -18,7 +20,16 @@ import {
   FACTORY_ADDRESS,
   FACTORY_EVENTS,
   FACTORY_CONSTANTS,
+  FACTORY_ABI,
 } from "@/types/contracts";
+
+// Create viem client for reading contract state - use your actual RPC URL
+const publicClient = createPublicClient({
+  chain: avalancheFuji, // Make sure this matches your network
+  transport: http(
+    process.env.RPC_URL || "https://api.avax-test.network/ext/bc/C/rpc"
+  ), // Use server-side env var
+});
 
 // Collection names
 const COLLECTIONS = {
@@ -26,6 +37,63 @@ const COLLECTIONS = {
   USERS: "users",
   TRADES: "trades",
 };
+
+/**
+ * Reads the current collateral and virtual supply from the contract
+ * Falls back to null if contract read fails
+ */
+async function getContractTokenData(tokenAddress: string) {
+  try {
+    console.log("🔍 Attempting to read contract data for:", tokenAddress);
+    console.log("🔍 Using factory address:", FACTORY_ADDRESS);
+    console.log("🔍 Using RPC:", process.env.RPC_URL || "fallback RPC");
+
+    const [collateral, virtualSupply, lastPrice] = await Promise.all([
+      publicClient.readContract({
+        address: FACTORY_ADDRESS as `0x${string}`,
+        abi: FACTORY_ABI,
+        functionName: "collateral",
+        args: [tokenAddress as `0x${string}`],
+      }),
+      publicClient.readContract({
+        address: FACTORY_ADDRESS as `0x${string}`,
+        abi: FACTORY_ABI,
+        functionName: "virtualSupply",
+        args: [tokenAddress as `0x${string}`],
+      }),
+      publicClient.readContract({
+        address: FACTORY_ADDRESS as `0x${string}`,
+        abi: FACTORY_ABI,
+        functionName: "lastPrice",
+        args: [tokenAddress as `0x${string}`],
+      }),
+    ]);
+
+    console.log("✅ Contract read successful:", {
+      collateral: collateral.toString(),
+      virtualSupply: virtualSupply.toString(),
+      lastPrice: lastPrice.toString(),
+    });
+
+    return {
+      collateral: formatEther(collateral as bigint),
+      virtualSupply: formatEther(virtualSupply as bigint),
+      lastPrice: formatEther(lastPrice as bigint),
+      success: true,
+    };
+  } catch (error) {
+    console.error(
+      "❌ Error reading contract data, will use calculated values:"
+    );
+    console.error("Error details:", error);
+    return {
+      collateral: null,
+      virtualSupply: null,
+      lastPrice: null,
+      success: false,
+    };
+  }
+}
 
 async function handleTokenCreated(
   args: TokenCreatedEvent,
@@ -83,6 +151,12 @@ async function handleTokenCreated(
       maxWalletPercentage: FACTORY_CONSTANTS.MAX_WALLET_PERCENTAGE,
       priceRate: FACTORY_CONSTANTS.PRICE_RATE,
       tradingFee: FACTORY_CONSTANTS.TRADING_FEE,
+
+      // Initialize goal tracking
+      goalReachedTimestamp: null,
+      haltedAt: null,
+      resumedAt: null,
+      autoResumedAt: null,
 
       statistics: {
         currentPrice:
@@ -203,7 +277,17 @@ async function handleTokenTrade(
   console.log("Price per Token:", pricePerToken);
 
   try {
-    // 1. Create trade document
+    // 1. Create trade document with deduplication
+    const tradeId = `${transactionHash}-${eventType}-${token.toLowerCase()}`;
+    const tradeRef = doc(db, COLLECTIONS.TRADES, tradeId);
+
+    // Check if this trade already exists to prevent duplicates
+    const existingTrade = await getDoc(tradeRef);
+    if (existingTrade.exists()) {
+      console.log("⚠️ Trade already processed, skipping:", tradeId);
+      return;
+    }
+
     const tradeData = {
       type: eventType,
       token: token.toLowerCase(),
@@ -217,16 +301,19 @@ async function handleTokenTrade(
       timestamp,
     };
 
-    const tradeRef = doc(collection(db, COLLECTIONS.TRADES));
     await setDoc(tradeRef, tradeData);
     console.log(
       "✅ Trade document created in",
       COLLECTIONS.TRADES,
       "with ID:",
-      tradeRef.id
+      tradeId
     );
 
-    // 2. Update token statistics - use proper atomic updates
+    // 2. Try to read actual contract state, fallback to calculation if it fails
+    console.log("📖 Reading current contract state...");
+    const contractData = await getContractTokenData(token.toLowerCase());
+
+    // 3. Update token statistics with real contract data or calculated values
     const tokenDocRef = doc(db, COLLECTIONS.TOKENS, token.toLowerCase());
     const tokenDoc = await getDoc(tokenDocRef);
 
@@ -236,7 +323,6 @@ async function handleTokenTrade(
     }
 
     const currentData = tokenDoc.data();
-    const currentCollateral = parseFloat(currentData.collateral || "0");
     const currentVolume = parseFloat(currentData.statistics?.volumeETH || "0");
     const currentTradeCount = currentData.statistics?.tradeCount || 0;
     const currentUniqueHolders = currentData.statistics?.uniqueHolders || 0;
@@ -252,40 +338,74 @@ async function handleTokenTrade(
       ? [...existingHolders, traderLower]
       : existingHolders;
 
-    // Calculate new values
+    // Calculate new volume (still need to track this for statistics)
     const ethAmountNum = parseFloat(formattedEthAmount);
-    const newCollateral =
-      eventType === "buy"
-        ? currentCollateral + ethAmountNum
-        : currentCollateral - ethAmountNum;
     const newVolume = currentVolume + ethAmountNum;
     const newTradeCount = currentTradeCount + 1;
 
-    // Update token with consistent data structure
-    const tokenUpdateData = {
-      collateral: newCollateral.toString(),
-      lastPrice: pricePerToken,
-      uniqueTraders: updatedHolders, // Track for uniqueHolders calculation
-      statistics: {
-        currentPrice: pricePerToken, // Same as lastPrice - both represent the most recent trade average
-        volumeETH: newVolume.toString(),
-        tradeCount: newTradeCount,
-        uniqueHolders: newUniqueHolders,
-      },
-      lastTrade: {
-        price: pricePerToken,
-        timestamp,
-        type: eventType,
-        fee: formattedFee,
-      },
-    };
+    let tokenUpdateData;
+
+    if (contractData.success) {
+      // Use actual contract values when available
+      console.log("✅ Using contract data");
+      tokenUpdateData = {
+        collateral: contractData.collateral,
+        virtualSupply: contractData.virtualSupply,
+        lastPrice: contractData.lastPrice,
+
+        uniqueTraders: updatedHolders,
+        statistics: {
+          currentPrice: contractData.lastPrice,
+          volumeETH: newVolume.toString(),
+          tradeCount: newTradeCount,
+          uniqueHolders: newUniqueHolders,
+        },
+        lastTrade: {
+          price: pricePerToken,
+          timestamp,
+          type: eventType,
+          fee: formattedFee,
+        },
+      };
+
+      console.log("📊 Contract collateral:", contractData.collateral);
+      console.log("📊 Contract virtual supply:", contractData.virtualSupply);
+      console.log("📊 Contract last price:", contractData.lastPrice);
+    } else {
+      // Fallback to calculated values when contract read fails
+      console.log("⚠️ Contract read failed, using calculated values");
+      const currentCollateral = parseFloat(currentData.collateral || "0");
+      const newCollateral =
+        eventType === "buy"
+          ? currentCollateral + ethAmountNum
+          : currentCollateral - ethAmountNum;
+
+      tokenUpdateData = {
+        collateral: newCollateral.toString(),
+        lastPrice: pricePerToken,
+
+        uniqueTraders: updatedHolders,
+        statistics: {
+          currentPrice: pricePerToken,
+          volumeETH: newVolume.toString(),
+          tradeCount: newTradeCount,
+          uniqueHolders: newUniqueHolders,
+        },
+        lastTrade: {
+          price: pricePerToken,
+          timestamp,
+          type: eventType,
+          fee: formattedFee,
+        },
+      };
+
+      console.log("📊 Calculated collateral:", newCollateral.toString());
+    }
 
     await updateDoc(tokenDocRef, tokenUpdateData);
     console.log("✅ Token statistics updated in", COLLECTIONS.TOKENS);
-    console.log("📊 New collateral:", newCollateral.toString());
     console.log("📊 New volume:", newVolume.toString());
     console.log("📊 New trade count:", newTradeCount);
-    console.log("📊 New price:", pricePerToken);
   } catch (error) {
     console.error("❌ Database Error:", error);
     throw error;
@@ -307,10 +427,11 @@ async function handleTradingHalted(
 
   try {
     const tokenUpdateData = {
-      currentState: TokenState.GOAL_REACHED, // Use GOAL_REACHED instead of HALTED
+      currentState: TokenState.GOAL_REACHED,
       finalCollateral: formattedCollateral,
       haltedAt: timestamp,
       haltBlock: blockNumber,
+      goalReachedTimestamp: timestamp, // Track when goal was reached for auto-resume
     };
 
     await setDoc(doc(db, COLLECTIONS.TOKENS, tokenAddress), tokenUpdateData, {
@@ -338,7 +459,7 @@ async function handleTradingResumed(
 
   try {
     const tokenUpdateData = {
-      currentState: TokenState.RESUMED, // Use RESUMED instead of TRADING
+      currentState: TokenState.RESUMED,
       resumedAt: timestamp,
       resumeBlock: blockNumber,
     };
@@ -347,6 +468,40 @@ async function handleTradingResumed(
       merge: true,
     });
     console.log("✅ Token state updated to RESUMED in", COLLECTIONS.TOKENS);
+  } catch (error) {
+    console.error("❌ Database Error:", error);
+    throw error;
+  }
+}
+
+async function handleTradingAutoResumed(
+  token: string,
+  resumeTimestamp: bigint,
+  timestamp: string,
+  blockNumber: number
+) {
+  const tokenAddress = token.toLowerCase();
+  const resumeTime = new Date(Number(resumeTimestamp) * 1000).toISOString();
+
+  console.log("\n=== TRADING AUTO-RESUMED DETAILS ===");
+  console.log("Token Address:", tokenAddress);
+  console.log("Auto-Resume Timestamp:", resumeTime);
+
+  try {
+    const tokenUpdateData = {
+      currentState: TokenState.RESUMED,
+      autoResumedAt: timestamp,
+      autoResumeBlock: blockNumber,
+      actualResumeTimestamp: resumeTime, // When the auto-resume was triggered
+    };
+
+    await setDoc(doc(db, COLLECTIONS.TOKENS, tokenAddress), tokenUpdateData, {
+      merge: true,
+    });
+    console.log(
+      "✅ Token state updated to AUTO-RESUMED in",
+      COLLECTIONS.TOKENS
+    );
   } catch (error) {
     console.error("❌ Database Error:", error);
     throw error;
@@ -465,6 +620,17 @@ export async function POST(req: Request) {
             const args = decoded.args as unknown as TradingResumedEvent;
             await handleTradingResumed(
               args.token,
+              timestamp,
+              Number(blockInfo.number)
+            );
+            break;
+          }
+
+          case "TradingAutoResumed": {
+            const args = decoded.args as unknown as TradingAutoResumedEvent;
+            await handleTradingAutoResumed(
+              args.token,
+              args.timestamp,
               timestamp,
               Number(blockInfo.number)
             );

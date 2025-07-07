@@ -1,3 +1,8 @@
+// ===========================
+// Fixed RecentTrades Component
+// ===========================
+
+// Fixed RecentTrades.tsx - Remove optimistic updates and validate data
 "use client";
 
 import React from "react";
@@ -13,11 +18,55 @@ interface RecentTradesProps {
   tokenAddress: string;
 }
 
-// FIX: This helper function now correctly handles the ISO date string
-// It will format the timestamp into a relative time like "2 minutes ago"
+// Enhanced validation function for trades
+const validateTradeForDisplay = (trade: any): boolean => {
+  // Check for required fields
+  if (
+    !trade.trader ||
+    !trade.tokenAmount ||
+    !trade.ethAmount ||
+    !trade.timestamp
+  ) {
+    return false;
+  }
+
+  // Check for valid amounts - both token and ETH amounts must be positive
+  const tokenAmount = parseFloat(trade.tokenAmount);
+  const ethAmount = parseFloat(trade.ethAmount);
+
+  if (
+    isNaN(tokenAmount) ||
+    isNaN(ethAmount) ||
+    tokenAmount <= 0 ||
+    ethAmount <= 0
+  ) {
+    return false;
+  }
+
+  // Check for valid trade type
+  if (trade.type !== "buy" && trade.type !== "sell") {
+    return false;
+  }
+
+  // Check for valid address format
+  if (!trade.trader.startsWith("0x") || trade.trader.length !== 42) {
+    return false;
+  }
+
+  return true;
+};
+
+// Fixed timestamp formatting function
 const formatTimestamp = (timestampStr: string): string => {
   try {
     const date = parseISO(timestampStr);
+
+    // Validate the parsed date
+    if (isNaN(date.getTime())) {
+      console.error("Invalid date from timestamp:", timestampStr);
+      return "Invalid date";
+    }
+
     return formatDistanceToNow(date, { addSuffix: true });
   } catch (error) {
     console.error("Failed to format timestamp:", timestampStr, error);
@@ -27,6 +76,11 @@ const formatTimestamp = (timestampStr: string): string => {
 
 export default function RecentTrades({ tokenAddress }: RecentTradesProps) {
   const { trades, loading, error } = useTrades(tokenAddress);
+
+  // Filter and validate trades
+  const validTrades = React.useMemo(() => {
+    return trades.filter(validateTradeForDisplay);
+  }, [trades]);
 
   const renderSkeleton = () => (
     <div className="space-y-4">
@@ -55,40 +109,64 @@ export default function RecentTrades({ tokenAddress }: RecentTradesProps) {
           renderSkeleton()
         ) : error ? (
           <p className="text-sm text-destructive">{error}</p>
-        ) : trades.length === 0 ? (
-          <p className="text-sm text-muted-foreground">No trades yet.</p>
+        ) : validTrades.length === 0 ? (
+          <div className="text-center py-8">
+            <div className="text-4xl mb-2 opacity-50">📊</div>
+            <p className="text-sm text-muted-foreground">
+              No valid trades yet.
+            </p>
+            <p className="text-xs text-muted-foreground/70 mt-1">
+              Trades will appear here after successful transactions
+            </p>
+          </div>
         ) : (
           <div className="space-y-4">
-            {trades.slice(0, 10).map((trade) => (
-              <div
-                key={trade.transactionHash}
-                className="flex items-center justify-between text-sm"
-              >
-                <div className="flex items-center gap-2">
-                  {trade.type === "buy" ? (
-                    <ArrowUpRight className="h-5 w-5 text-green-500" />
-                  ) : (
-                    <ArrowDownLeft className="h-5 w-5 text-red-500" />
-                  )}
-                  <div>
-                    <AddressComponent hash={trade.trader} type="address" />
-                    <span className="text-xs text-muted-foreground">
-                      {/* This now works because formatTimestamp accepts a string */}
-                      {formatTimestamp(trade.timestamp)}
-                    </span>
+            {validTrades.slice(0, 10).map((trade) => {
+              // Additional validation at render time
+              const tokenAmount = parseFloat(trade.tokenAmount);
+              const ethAmount = parseFloat(trade.ethAmount);
+
+              // Skip rendering if amounts are still invalid
+              if (tokenAmount <= 0 || ethAmount <= 0) {
+                return null;
+              }
+
+              return (
+                <div
+                  key={`${trade.transactionHash}-${trade.trader}-${trade.timestamp}`}
+                  className="flex items-center justify-between text-sm p-2 rounded-lg hover:bg-muted/30 transition-colors"
+                >
+                  <div className="flex items-center gap-2">
+                    {trade.type === "buy" ? (
+                      <ArrowUpRight className="h-5 w-5 text-green-500" />
+                    ) : (
+                      <ArrowDownLeft className="h-5 w-5 text-red-500" />
+                    )}
+                    <div className="min-w-0">
+                      <div className="flex items-center gap-1">
+                        <AddressComponent hash={trade.trader} type="address" />
+                      </div>
+                      <div className="text-xs text-muted-foreground">
+                        {formatTimestamp(trade.timestamp)}
+                      </div>
+                    </div>
+                  </div>
+                  <div className="text-right">
+                    <div
+                      className={`font-mono text-sm ${
+                        trade.type === "buy" ? "text-green-500" : "text-red-500"
+                      }`}
+                    >
+                      {formatUnits(BigInt(trade.tokenAmount), 18).slice(0, 8)}
+                    </div>
+                    <div className="text-xs text-muted-foreground">
+                      {formatUnits(BigInt(trade.ethAmount), 18).slice(0, 6)}{" "}
+                      AVAX
+                    </div>
                   </div>
                 </div>
-                <div
-                  className={`font-mono ${
-                    trade.type === "buy" ? "text-green-500" : "text-red-500"
-                  }`}
-                >
-                  {parseFloat(
-                    formatUnits(BigInt(trade.tokenAmount), 18)
-                  ).toFixed(2)}
-                </div>
-              </div>
-            ))}
+              );
+            })}
           </div>
         )}
       </CardContent>

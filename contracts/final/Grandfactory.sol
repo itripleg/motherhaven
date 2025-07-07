@@ -39,6 +39,8 @@ contract GrandFactory is Ownable, ReentrancyGuard {
     uint256 public immutable PRICE_RATE;
     /// @dev The trading fee expressed in basis points (1/100th of 1%). 30 = 0.3%.
     uint256 public constant TRADING_FEE = 30;
+    /// @dev Time in seconds after which trading automatically resumes (3 hours).
+    uint256 public constant AUTO_RESUME_TIME = 3 hours;
 
     // =================================================================
     //                         State Variables
@@ -63,6 +65,8 @@ contract GrandFactory is Ownable, ReentrancyGuard {
     mapping(address => uint256) private fundingGoals;
     /// @dev Maps a token address to its current total supply.
     mapping(address => uint256) public virtualSupply;
+    /// @dev Maps a token address to the timestamp when it reached its funding goal.
+    mapping(address => uint256) public goalReachedTimestamp;
 
     // =================================================================
     //                              Events
@@ -94,6 +98,7 @@ contract GrandFactory is Ownable, ReentrancyGuard {
     );
     event TradingHalted(address indexed token, uint256 collateral);
     event TradingResumed(address indexed token);
+    event TradingAutoResumed(address indexed token, uint256 timestamp);
     event FeeRecipientUpdated(
         address indexed oldRecipient,
         address indexed newRecipient
@@ -179,8 +184,11 @@ contract GrandFactory is Ownable, ReentrancyGuard {
         uint256 oldGoal = fundingGoals[tokenAddress];
         fundingGoals[tokenAddress] = newGoal;
         emit TokenFundingGoalUpdated(tokenAddress, oldGoal, newGoal);
+
+        // Enable trade halting with automatic resumption
         if (collateral[tokenAddress] >= newGoal) {
             tokens[tokenAddress] = TokenState.GOAL_REACHED;
+            goalReachedTimestamp[tokenAddress] = block.timestamp;
             emit TradingHalted(tokenAddress, newGoal);
         }
     }
@@ -196,6 +204,23 @@ contract GrandFactory is Ownable, ReentrancyGuard {
     // =================================================================
     //                    Price Calculation Logic
     // =================================================================
+
+    /**
+     * @dev Checks if a token should automatically resume trading and updates state if needed.
+     * @param tokenAddress The address of the token to check.
+     */
+    function _checkAutoResume(address tokenAddress) internal {
+        if (
+            tokens[tokenAddress] == TokenState.GOAL_REACHED &&
+            goalReachedTimestamp[tokenAddress] > 0 &&
+            block.timestamp >=
+            goalReachedTimestamp[tokenAddress] + AUTO_RESUME_TIME
+        ) {
+            tokens[tokenAddress] = TokenState.RESUMED;
+            emit TradingAutoResumed(tokenAddress, block.timestamp);
+        }
+    }
+
     function calculateFee(uint256 amount) public pure returns (uint256) {
         return (amount * TRADING_FEE) / 10000;
     }
@@ -375,8 +400,10 @@ contract GrandFactory is Ownable, ReentrancyGuard {
                 (purchaseAmount * DECIMALS) /
                 tokensToMint;
 
+            // Enable trade halting with automatic resumption
             if (collateral[tokenAddress] >= fundingGoals[tokenAddress]) {
                 tokens[tokenAddress] = TokenState.GOAL_REACHED;
+                goalReachedTimestamp[tokenAddress] = block.timestamp;
                 emit TradingHalted(tokenAddress, fundingGoals[tokenAddress]);
             }
         }
@@ -436,6 +463,9 @@ contract GrandFactory is Ownable, ReentrancyGuard {
         address tokenAddress,
         uint256 minTokensOut
     ) external payable nonReentrant validToken(tokenAddress) {
+        // Check for automatic resumption
+        _checkAutoResume(tokenAddress);
+
         require(
             tokens[tokenAddress] == TokenState.TRADING ||
                 tokens[tokenAddress] == TokenState.RESUMED,
@@ -477,44 +507,71 @@ contract GrandFactory is Ownable, ReentrancyGuard {
             msg.value,
             fee
         );
+
+        // Enable trade halting with automatic resumption
         if (collateral[tokenAddress] >= fundingGoals[tokenAddress]) {
             tokens[tokenAddress] = TokenState.GOAL_REACHED;
+            goalReachedTimestamp[tokenAddress] = block.timestamp;
             emit TradingHalted(tokenAddress, fundingGoals[tokenAddress]);
         }
     }
 
+    /**
+     * @dev Sell tokens for ETH using the bonding curve price.
+     * @param tokenAddress The address of the token to sell.
+     * @param tokenAmount The amount of tokens to sell.
+     * @param minEthOut Minimum ETH expected (pass 0 to disable slippage protection).
+     */
     function sell(
         address tokenAddress,
-        uint256 tokenAmount
+        uint256 tokenAmount,
+        uint256 minEthOut
     ) external nonReentrant validToken(tokenAddress) {
+        // Check for automatic resumption
+        _checkAutoResume(tokenAddress);
+
         require(
             tokens[tokenAddress] == TokenState.TRADING ||
                 tokens[tokenAddress] == TokenState.RESUMED,
             "Not trading"
         );
         require(tokenAmount > 0, "Amount must be > 0");
+
         BurnToken token = BurnToken(tokenAddress);
         require(
             token.balanceOf(msg.sender) >= tokenAmount,
             "Insufficient balance"
         );
+
         uint256 grossAmount = calculateSellPrice(tokenAddress, tokenAmount);
+
+        // Minimum sell amount check - gross amount (before fee) must be at least INITIAL_PRICE
+        require(grossAmount >= INITIAL_PRICE, "Sell amount too small");
+
         uint256 fee = calculateFee(grossAmount);
         uint256 netAmountToReceive = grossAmount - fee;
+
+        // Slippage protection
+        require(netAmountToReceive >= minEthOut, "Insufficient output amount");
+
         require(
             collateral[tokenAddress] >= grossAmount,
             "Insufficient token collateral"
         );
+
         token.factoryBurn(msg.sender, tokenAmount);
         virtualSupply[tokenAddress] -= tokenAmount;
         collateral[tokenAddress] -= grossAmount;
         lastPrice[tokenAddress] = (grossAmount * DECIMALS) / tokenAmount;
+
         (bool feeSuccess, ) = payable(feeRecipient).call{value: fee}("");
         require(feeSuccess, "Fee transfer failed");
+
         (bool success, ) = payable(msg.sender).call{value: netAmountToReceive}(
             ""
         );
         require(success, "Transfer failed");
+
         emit TokensSold(
             tokenAddress,
             msg.sender,
@@ -537,8 +594,28 @@ contract GrandFactory is Ownable, ReentrancyGuard {
     // =================================================================
     //                       Public View Functions
     // =================================================================
-    function getTokenState(address token) external view returns (TokenState) {
-        return tokens[token];
+
+    /**
+     * @dev Returns the current state of a token, checking for automatic resumption.
+     * @param tokenAddress The address of the token to check.
+     * @return The current token state.
+     */
+    function getTokenState(
+        address tokenAddress
+    ) external view returns (TokenState) {
+        TokenState currentState = tokens[tokenAddress];
+
+        // Check if token should be automatically resumed
+        if (
+            currentState == TokenState.GOAL_REACHED &&
+            goalReachedTimestamp[tokenAddress] > 0 &&
+            block.timestamp >=
+            goalReachedTimestamp[tokenAddress] + AUTO_RESUME_TIME
+        ) {
+            return TokenState.RESUMED;
+        }
+
+        return currentState;
     }
 
     function getAllTokens() external view returns (address[] memory) {
@@ -547,5 +624,40 @@ contract GrandFactory is Ownable, ReentrancyGuard {
 
     function getFundingGoal(address token) external view returns (uint256) {
         return fundingGoals[token];
+    }
+
+    /**
+     * @dev Returns the timestamp when a token reached its funding goal.
+     * @param tokenAddress The address of the token.
+     * @return The timestamp when the goal was reached (0 if not reached).
+     */
+    function getGoalReachedTimestamp(
+        address tokenAddress
+    ) external view returns (uint256) {
+        return goalReachedTimestamp[tokenAddress];
+    }
+
+    /**
+     * @dev Returns the time remaining until automatic resumption (0 if already resumed or not applicable).
+     * @param tokenAddress The address of the token.
+     * @return The time remaining in seconds.
+     */
+    function getTimeUntilAutoResume(
+        address tokenAddress
+    ) external view returns (uint256) {
+        if (
+            tokens[tokenAddress] != TokenState.GOAL_REACHED ||
+            goalReachedTimestamp[tokenAddress] == 0
+        ) {
+            return 0;
+        }
+
+        uint256 resumeTime = goalReachedTimestamp[tokenAddress] +
+            AUTO_RESUME_TIME;
+        if (block.timestamp >= resumeTime) {
+            return 0;
+        }
+
+        return resumeTime - block.timestamp;
     }
 }

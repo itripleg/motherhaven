@@ -1,4 +1,4 @@
-// app/dex/components/charts/RechartsLineChart.tsx
+// Fixed RechartsLineChart.tsx - Proper genesis point handling
 "use client";
 import React, { useMemo } from "react";
 import {
@@ -25,6 +25,7 @@ import {
 import { Badge } from "@/components/ui/badge";
 import { TrendingUp, TrendingDown, Activity, BarChart3 } from "lucide-react";
 import { motion } from "framer-motion";
+import { FACTORY_CONSTANTS } from "@/types";
 
 // This interface defines the shape of the data that our chart will use
 interface ChartPoint {
@@ -32,6 +33,7 @@ interface ChartPoint {
   formattedPrice: string;
   timeLabel: string;
   timestamp: number;
+  isGenesis?: boolean; // Mark genesis point for styling
 }
 
 // Props for the main component
@@ -46,6 +48,7 @@ const CustomTooltip = ({ active, payload, label }: any) => {
   if (active && payload && payload.length) {
     const dataPoint = payload[0].payload;
     const formattedPrice = dataPoint.formattedPrice;
+    const isGenesis = dataPoint.isGenesis;
 
     return (
       <motion.div
@@ -64,12 +67,52 @@ const CustomTooltip = ({ active, payload, label }: any) => {
         </div>
         <p className="text-xs text-muted-foreground mt-2 flex items-center gap-1">
           <BarChart3 className="h-3 w-3" />
-          Trade execution price
+          {isGenesis ? "Initial price" : "Trade execution price"}
         </p>
       </motion.div>
     );
   }
   return null;
+};
+
+// Validation function to filter out invalid trades
+const validateTrade = (trade: Trade): boolean => {
+  // Check for required fields
+  if (!trade.pricePerToken || !trade.timestamp) {
+    console.warn("Trade missing required fields:", trade);
+    return false;
+  }
+
+  // Check for zero or negative prices
+  const price = parseFloat(trade.pricePerToken);
+  if (isNaN(price) || price <= 0) {
+    console.warn("Trade has invalid price:", trade.pricePerToken);
+    return false;
+  }
+
+  // Check for zero amounts (these shouldn't exist)
+  if (trade.tokenAmount && trade.ethAmount) {
+    const tokenAmount = parseFloat(trade.tokenAmount);
+    const ethAmount = parseFloat(trade.ethAmount);
+
+    if (tokenAmount <= 0 || ethAmount <= 0) {
+      console.warn("Trade has zero amounts:", { tokenAmount, ethAmount });
+      return false;
+    }
+  }
+
+  // Check for reasonable timestamp
+  const tradeTime = parseISO(trade.timestamp).getTime();
+  const now = Date.now();
+  const oneYearAgo = now - 365 * 24 * 60 * 60 * 1000;
+
+  if (tradeTime < oneYearAgo || tradeTime > now + 60000) {
+    // Allow 1 minute future for clock skew
+    console.warn("Trade has unreasonable timestamp:", trade.timestamp);
+    return false;
+  }
+
+  return true;
 };
 
 // The main chart component
@@ -94,51 +137,62 @@ export default function RechartsLineChart({
     return "#8b5cf6"; // Fallback color
   }, []);
 
-  // Calculate chart data with genesis point
+  // Calculate chart data with proper genesis point
   const chartData: ChartPoint[] = useMemo(() => {
-    const genesisTimestamp = token.createdAt
-      ? parseISO(token.createdAt).getTime()
-      : Date.now();
+    // Filter and validate trades first
+    const validTrades = trades.filter(validateTrade);
 
-    const genesisPoint = {
-      timestamp: genesisTimestamp,
-      priceInWei: parseUnits(token.initialPrice || "0.00001", 18),
-    };
+    // Sort trades by timestamp to ensure chronological order
+    const sortedTrades = validTrades.sort((a, b) => {
+      const timeA = parseISO(a.timestamp).getTime();
+      const timeB = parseISO(b.timestamp).getTime();
+      return timeA - timeB;
+    });
 
-    const processedTrades = trades
-      .map((trade) => {
-        if (!trade.pricePerToken || !trade.timestamp) {
-          return null;
-        }
+    // Convert trades to chart points
+    const tradePoints = sortedTrades.map((trade) => {
+      const tradeTimestamp = parseISO(trade.timestamp).getTime();
+      const priceInWei = parseUnits(trade.pricePerToken, 18);
 
-        const tradeTimestamp = parseISO(trade.timestamp).getTime();
-        const priceInWei = parseUnits(trade.pricePerToken, 18);
+      return {
+        price: priceToNumber(priceInWei),
+        formattedPrice: formatTokenPrice(trade.pricePerToken),
+        timeLabel: format(tradeTimestamp, "MMM d, h:mm a"),
+        timestamp: tradeTimestamp,
+        isGenesis: false,
+      };
+    });
 
-        return {
-          timestamp: tradeTimestamp,
-          priceInWei,
-        };
-      })
-      .filter(
-        (point): point is { timestamp: number; priceInWei: bigint } =>
-          point !== null
-      );
+    // Always add genesis point if we have token creation time
+    if (token.createdAt) {
+      const creationTime = parseISO(token.createdAt).getTime();
+      const initialPrice = parseFloat(FACTORY_CONSTANTS.INITIAL_PRICE);
 
-    const allPoints = [...processedTrades, genesisPoint].sort(
-      (a, b) => a.timestamp - b.timestamp
-    );
+      const genesisPoint: ChartPoint = {
+        price: initialPrice,
+        formattedPrice: formatTokenPrice(FACTORY_CONSTANTS.INITIAL_PRICE),
+        timeLabel: format(creationTime, "MMM d, h:mm a"),
+        timestamp: creationTime,
+        isGenesis: true,
+      };
 
-    return allPoints.map((point) => ({
-      price: priceToNumber(point.priceInWei),
-      formattedPrice: formatTokenPrice(formatUnits(point.priceInWei, 18)),
-      timeLabel: format(point.timestamp, "MMM d, h:mm a"),
-      timestamp: point.timestamp,
-    }));
-  }, [trades, token.createdAt, token.initialPrice]);
+      // Insert genesis point at the beginning, ensuring chronological order
+      const allPoints = [genesisPoint, ...tradePoints];
 
-  // Enhanced analytics calculation
+      // Sort again to ensure proper chronological order
+      return allPoints.sort((a, b) => a.timestamp - b.timestamp);
+    }
+
+    // If no creation time, just return trade points
+    return tradePoints;
+  }, [trades, token.createdAt]);
+
+  // Enhanced analytics calculation with validation
   const analytics = useMemo(() => {
-    if (trades.length === 0) {
+    // Only use validated trades for analytics
+    const validTrades = trades.filter(validateTrade);
+
+    if (validTrades.length === 0) {
       return {
         tradeCount: 0,
         totalVolume: "0.0000",
@@ -148,26 +202,43 @@ export default function RechartsLineChart({
       };
     }
 
-    // Calculate volume in AVAX
-    const totalVolumeWei = trades.reduce((sum, trade) => {
-      const ethAmount = parseFloat(trade.ethAmount) || 0;
+    // Calculate volume in AVAX with validation
+    const totalVolumeWei = validTrades.reduce((sum, trade) => {
+      if (!trade.ethAmount) return sum;
+      const ethAmount = parseFloat(trade.ethAmount);
+      if (isNaN(ethAmount) || ethAmount <= 0) return sum;
       return sum + ethAmount;
     }, 0);
 
     const totalVolumeAVAX = totalVolumeWei / 1e18;
-    const buyTrades = trades.filter((t) => t.type === "buy");
-    const buyPressure = buyTrades.length / trades.length;
+    const buyTrades = validTrades.filter((t) => t.type === "buy");
+    const buyPressure = buyTrades.length / validTrades.length;
 
-    // Calculate price change
-    const firstPrice = chartData[0]?.price || 0;
-    const lastPrice = chartData[chartData.length - 1]?.price || 0;
-    const priceChange =
-      firstPrice > 0 ? ((lastPrice - firstPrice) / firstPrice) * 100 : 0;
-    const priceDirection =
-      priceChange > 0 ? "up" : priceChange < 0 ? "down" : "neutral";
+    // Calculate price change from genesis to latest trade
+    let priceChange = 0;
+    let priceDirection: "up" | "down" | "neutral" = "neutral";
+
+    if (chartData.length >= 2) {
+      // Find genesis and latest actual trade prices
+      const genesisPoint = chartData.find((point) => point.isGenesis);
+      const latestTradePoint = chartData
+        .filter((point) => !point.isGenesis)
+        .slice(-1)[0];
+
+      if (genesisPoint && latestTradePoint) {
+        const genesisPrice = genesisPoint.price;
+        const latestPrice = latestTradePoint.price;
+
+        if (genesisPrice > 0) {
+          priceChange = ((latestPrice - genesisPrice) / genesisPrice) * 100;
+          priceDirection =
+            priceChange > 0 ? "up" : priceChange < 0 ? "down" : "neutral";
+        }
+      }
+    }
 
     return {
-      tradeCount: trades.length,
+      tradeCount: validTrades.length,
       totalVolume: totalVolumeAVAX.toFixed(4),
       buyPressure,
       priceChange,
@@ -175,7 +246,20 @@ export default function RechartsLineChart({
     };
   }, [trades, chartData]);
 
-  const displayPrice = priceLoading ? "Loading..." : currentPrice || "0.000000";
+  // Get current price - use lastPrice from token as fallback for consistency
+  const getCurrentPrice = () => {
+    if (!priceLoading && currentPrice && currentPrice !== "0.000000") {
+      return currentPrice;
+    }
+    // Fallback to token's lastPrice for consistency
+    if (token.lastPrice && parseFloat(token.lastPrice) > 0) {
+      return formatTokenPrice(token.lastPrice);
+    }
+    // Final fallback to initial price if no trades yet
+    return formatTokenPrice(FACTORY_CONSTANTS.INITIAL_PRICE);
+  };
+
+  const displayPrice = getCurrentPrice();
 
   if (loading) {
     return (
@@ -194,7 +278,7 @@ export default function RechartsLineChart({
 
   return (
     <div className="h-full w-full space-y-6">
-      {/* Simplified Analytics Cards Only */}
+      {/* Analytics Cards */}
       <div className="flex flex-col lg:flex-row lg:items-center lg:justify-between gap-4">
         <div className="flex items-center gap-4">
           <div className="text-3xl font-bold text-primary">
@@ -262,7 +346,7 @@ export default function RechartsLineChart({
         </div>
       </div>
 
-      {/* Chart with no borders */}
+      {/* Chart - Show genesis point + trades or just current price */}
       {chartData.length > 0 ? (
         <div className="h-80 lg:h-96 p-6">
           <ResponsiveContainer width="100%" height="100%">
@@ -340,14 +424,38 @@ export default function RechartsLineChart({
                 stroke={primaryColor}
                 strokeWidth={3}
                 dot={false}
-                activeDot={{
-                  r: 6,
-                  stroke: primaryColor,
-                  strokeWidth: 3,
-                  fill: "hsl(var(--background))",
-                  style: {
-                    filter: `drop-shadow(0 0 6px ${primaryColor})`,
-                  },
+                activeDot={(props: any) => {
+                  // Special styling for genesis point when hovered
+                  if (props.payload?.isGenesis) {
+                    return (
+                      <circle
+                        cx={props.cx}
+                        cy={props.cy}
+                        r={8}
+                        fill={primaryColor}
+                        stroke="hsl(var(--background))"
+                        strokeWidth={3}
+                        opacity={1}
+                        style={{
+                          filter: `drop-shadow(0 0 8px ${primaryColor})`,
+                        }}
+                      />
+                    );
+                  }
+                  // Default active dot for trades
+                  return (
+                    <circle
+                      cx={props.cx}
+                      cy={props.cy}
+                      r={6}
+                      fill="hsl(var(--background))"
+                      stroke={primaryColor}
+                      strokeWidth={3}
+                      style={{
+                        filter: `drop-shadow(0 0 6px ${primaryColor})`,
+                      }}
+                    />
+                  );
                 }}
                 style={{
                   filter: `drop-shadow(0 2px 4px ${primaryColor}40)`,
@@ -357,14 +465,16 @@ export default function RechartsLineChart({
           </ResponsiveContainer>
         </div>
       ) : (
+        // Show current price when no chart data
         <div className="flex flex-col items-center justify-center h-80 lg:h-96 space-y-4">
-          <div className="text-6xl opacity-20">📈</div>
-          <div className="text-center">
-            <p className="text-lg font-medium text-muted-foreground">
-              No trade data yet
+          <div className="text-center space-y-2">
+            <div className="text-6xl opacity-20">📈</div>
+            <p className="text-lg font-medium text-primary">
+              Current Price: {displayPrice} AVAX
             </p>
-            <p className="text-sm text-muted-foreground/70">
-              Chart will appear after the first trade
+            <p className="text-sm text-muted-foreground">
+              Chart will show price history starting from{" "}
+              {formatTokenPrice(FACTORY_CONSTANTS.INITIAL_PRICE)} AVAX
             </p>
           </div>
         </div>
