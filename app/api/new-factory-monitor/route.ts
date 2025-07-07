@@ -48,26 +48,32 @@ async function getContractTokenData(tokenAddress: string) {
     console.log("🔍 Using factory address:", FACTORY_ADDRESS);
     console.log("🔍 Using RPC:", process.env.RPC_URL || "fallback RPC");
 
-    const [collateral, virtualSupply, lastPrice] = await Promise.all([
-      publicClient.readContract({
-        address: FACTORY_ADDRESS as `0x${string}`,
-        abi: FACTORY_ABI,
-        functionName: "collateral",
-        args: [tokenAddress as `0x${string}`],
-      }),
-      publicClient.readContract({
-        address: FACTORY_ADDRESS as `0x${string}`,
-        abi: FACTORY_ABI,
-        functionName: "virtualSupply",
-        args: [tokenAddress as `0x${string}`],
-      }),
-      publicClient.readContract({
-        address: FACTORY_ADDRESS as `0x${string}`,
-        abi: FACTORY_ABI,
-        functionName: "lastPrice",
-        args: [tokenAddress as `0x${string}`],
-      }),
-    ]);
+    const [collateralResult, virtualSupplyResult, lastPriceResult] =
+      await Promise.all([
+        publicClient.readContract({
+          address: FACTORY_ADDRESS as `0x${string}`,
+          abi: FACTORY_ABI,
+          functionName: "collateral",
+          args: [tokenAddress as `0x${string}`],
+        }),
+        publicClient.readContract({
+          address: FACTORY_ADDRESS as `0x${string}`,
+          abi: FACTORY_ABI,
+          functionName: "virtualSupply",
+          args: [tokenAddress as `0x${string}`],
+        }),
+        publicClient.readContract({
+          address: FACTORY_ADDRESS as `0x${string}`,
+          abi: FACTORY_ABI,
+          functionName: "lastPrice",
+          args: [tokenAddress as `0x${string}`],
+        }),
+      ]);
+
+    // Type assertion to bigint since we know these should be bigint values
+    const collateral = collateralResult as bigint;
+    const virtualSupply = virtualSupplyResult as bigint;
+    const lastPrice = lastPriceResult as bigint;
 
     console.log("✅ Contract read successful:", {
       collateral: collateral.toString(),
@@ -76,9 +82,9 @@ async function getContractTokenData(tokenAddress: string) {
     });
 
     return {
-      collateral: formatEther(collateral as bigint),
-      virtualSupply: formatEther(virtualSupply as bigint),
-      lastPrice: formatEther(lastPrice as bigint),
+      collateral: formatEther(collateral),
+      virtualSupply: formatEther(virtualSupply),
+      lastPrice: formatEther(lastPrice),
       success: true,
     };
   } catch (error) {

@@ -199,7 +199,8 @@ export const DebugTokenLoading: React.FC<DebugTokenLoadingProps> = ({
                 AVAX
               </div>
               <div>
-                <strong>State:</strong> {finalHooksData?.state ?? "Unknown"}
+                <strong>State:</strong>{" "}
+                {finalHooksData?.currentState ?? "Unknown"}
               </div>
               {finalHooksError && (
                 <div>

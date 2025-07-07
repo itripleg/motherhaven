@@ -164,7 +164,9 @@ export function TokenDataDisplay({
                 <div>
                   <span className="text-muted-foreground">State:</span>
                   <div className="font-medium">
-                    {token.state !== undefined ? token.state : "N/A"}
+                    {token.currentState !== undefined
+                      ? token.currentState
+                      : "N/A"}
                   </div>
                 </div>
                 <div>

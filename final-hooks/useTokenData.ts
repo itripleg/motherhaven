@@ -109,14 +109,13 @@ export function useTokenData(tokenAddress?: Address) {
       burnManager: (firestoreData.burnManager || "0x0") as `0x${string}`,
 
       // Contract state (real-time)
-      state: mapTokenState(contractState),
+      currentState: mapTokenState(contractState),
       lastPrice: priceFormatted || "0",
       collateral: collateralFormatted || "0",
 
       // Factory constants (properly mapped to Token interface)
       decimals: useConfig.decimals,
       maxSupply: useConfig.maxSupply,
-      initialMint: FACTORY_CONSTANTS.INITIAL_MINT, // Keep this constant
       initialPrice: useConfig.initialPrice,
       minPurchase: useConfig.minPurchase,
       maxPurchase: useConfig.maxPurchase,

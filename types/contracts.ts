@@ -94,9 +94,3 @@ export function calculateAutoResumeTimestamp(
 ): number {
   return goalReachedTimestamp + FACTORY_CONSTANTS.AUTO_RESUME_TIME;
 }
-
-export function isAutoResumeReady(goalReachedTimestamp: number): boolean {
-  if (!goalReachedTimestamp) return false;
-  const resumeTime = calculateAutoResumeTimestamp(goalReachedTimestamp);
-  return Date.now() / 1000 >= resumeTime;
-}

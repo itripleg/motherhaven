@@ -36,17 +36,17 @@ export interface Trade {
   fee?: string; // Optional fee property
 }
 
-// Import TokenStatistics from database.ts to avoid duplication
+// Consolidated TokenStatistics interface (removed duplicate from database.ts)
 export interface TokenStatistics {
-  totalSupply: string;
-  currentPrice: string;
-  volumeETH: string;
-  tradeCount: number;
-  uniqueHolders: number;
-  priceChange24h?: number;
-  highPrice24h?: string;
-  lowPrice24h?: string;
-  lastTradeTimestamp?: string;
+  totalSupply?: string; // This does not exist in the factory contract it's an ERC20 function
+  currentPrice: string; // From getCurrentPrice()
+  volumeETH: string; // Calculated from TokensPurchased and TokensSold events
+  tradeCount: number; // Count of trades from events
+  uniqueHolders: number; // Count unique addresses from events
+  priceChange24h?: number; // Calculate from price history
+  highPrice24h?: string; // Track highest price in 24h
+  lowPrice24h?: string; // Track lowest price in 24h
+  lastTradeTimestamp?: string; // Last trade event timestamp
 }
 
 export interface Token {
@@ -147,6 +147,47 @@ export interface TokenUpdateLog {
   timestamp: string;
   userAgent?: string;
   ipAddress?: string; // Optional for analytics
+}
+
+// Consolidated TokenData interface from database.ts (with references to above types)
+export interface TokenData {
+  // Basic Info (from contract creation)
+  id: string;
+  name: string;
+  symbol: string;
+  address: string;
+  description?: string;
+  imageUrl?: string;
+  creator: string;
+
+  // Creation Info
+  createdAt: string;
+  creationBlock: number;
+  transactionHash: string;
+
+  // Current State
+  currentState: TokenState;
+  fundingGoal: string; // From contract _fundingGoals
+  collateral: string; // From contract collateral mapping
+
+  // Statistics
+  statistics: TokenStatistics;
+
+  // Trading Info
+  lastTrade?: Trade; // Most recent trade details
+  price?: number;
+
+  // Additional Metrics (derived)
+  marketCap?: string; // currentPrice * totalSupply
+  tradingVolume24h?: string; // Sum of trades in last 24h
+  buyPressure24h?: number; // Ratio of buys to sells in 24h
+  timeToGoal?: number; // Estimated time to reach funding goal
+  initialPrice: string; // From contract _initialPrice
+  maxSupply: string; // From contract _maxSupply
+  priceRate: string; // From contract _priceRate
+  tradeCooldown: number; // From contract _tradeCooldown
+  maxWalletPercentage: number; // From contract _maxWalletPercentage
+  liquidity?: number; // Calculated from contract _liquidity
 }
 
 // Type guards remain the same

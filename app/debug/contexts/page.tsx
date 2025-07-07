@@ -239,7 +239,7 @@ function TokenDataDebug({
               </div>
               <div>
                 <span className="text-muted-foreground">State:</span>
-                <div className="font-medium">{tokenData.state}</div>
+                <div className="font-medium">{tokenData.currentState}</div>
               </div>
               <div>
                 <span className="text-muted-foreground">Last Price:</span>

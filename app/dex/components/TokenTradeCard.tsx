@@ -267,8 +267,12 @@ export function TokenTradeCard({
     }));
   };
 
-  const formatNumber = (num: number | string, decimals: number = 2): string => {
+  const formatNumber = (
+    num: number | string | undefined,
+    decimals: number = 2
+  ): string => {
     try {
+      if (num === undefined || num === null) return "0.00";
       const value = typeof num === "string" ? parseFloat(num) : num;
       if (isNaN(value)) return "0.00";
 
@@ -361,7 +365,6 @@ export function TokenTradeCard({
 
             {/* Auto-resume countdown */}
             {tokenData?.goalReachedTimestamp &&
-              // @ts-expect-error type
               !isAutoResumeReady(tokenData.goalReachedTimestamp) && (
                 <motion.div
                   initial={{ opacity: 0 }}
@@ -383,7 +386,6 @@ export function TokenTradeCard({
 
             {/* Ready to resume */}
             {tokenData?.goalReachedTimestamp &&
-              // @ts-expect-error type
               isAutoResumeReady(tokenData.goalReachedTimestamp) && (
                 <motion.div
                   initial={{ opacity: 0 }}

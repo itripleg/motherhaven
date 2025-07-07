@@ -21,9 +21,7 @@ export function getTokenStatus(token: Token): TokenStatus {
   // Parse numeric values
   const collateral = parseFloat(token.collateral || "0");
   const fundingGoal = parseFloat(token.fundingGoal || "0");
-  //   @ts-expect-error may not work
   const tradeCount = token.statistics?.tradeCount || 0;
-  //   @ts-expect-error may not work
   const volumeETH = parseFloat(token.statistics?.volumeETH || "0");
 
   // Calculate funding progress
@@ -131,7 +129,6 @@ export function getAdvancedTokenStatus(
       ageInHours < TOKEN_STATUS_CRITERIA.TRENDING_HOURS);
   const isHot =
     Math.abs(priceChange24h) > TOKEN_STATUS_CRITERIA.PRICE_CHANGE_THRESHOLD ||
-    // @ts-expect-error might not work
     parseFloat(token.statistics?.volumeETH || "0") >
       TOKEN_STATUS_CRITERIA.MIN_VOLUME_HOT;
 
