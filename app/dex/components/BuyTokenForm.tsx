@@ -2,7 +2,7 @@
 
 import { useState, useEffect } from "react";
 import { useWriteContract, useWaitForTransactionReceipt } from "wagmi";
-import { parseEther } from "viem";
+import { parseEther, formatEther } from "viem";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -10,6 +10,8 @@ import { useToast } from "@/hooks/use-toast";
 import { usePathname } from "next/navigation";
 import { AddressComponent } from "@/components/AddressComponent";
 import { FACTORY_ABI, FACTORY_ADDRESS } from "@/types";
+import { readContract } from "@wagmi/core";
+import { publicClient } from "@/wagmi-config";
 
 export function BuyTokenForm({ onAmountChange, maxAmount }: any) {
   const pathname = usePathname();
@@ -18,6 +20,7 @@ export function BuyTokenForm({ onAmountChange, maxAmount }: any) {
   const [amount, setAmount] = useState("");
   const [slippageTolerance, setSlippageTolerance] = useState("1"); // 1% default slippage
   const [errorDetails, setErrorDetails] = useState<string | null>(null);
+  const [estimatedTokensOut, setEstimatedTokensOut] = useState<string>("0");
   const [receiptDetails, setReceiptDetails] = useState<{
     pricePaid?: string;
     tokensReceived?: string;
@@ -36,6 +39,37 @@ export function BuyTokenForm({ onAmountChange, maxAmount }: any) {
     useWaitForTransactionReceipt({
       hash: transactionData,
     });
+
+  // Get estimated token output for the current amount using contract function
+  useEffect(() => {
+    const getEstimatedTokensOut = async () => {
+      if (!amount || !tokenAddress || parseFloat(amount) <= 0) {
+        setEstimatedTokensOut("0");
+        return;
+      }
+
+      try {
+        const parsedAmount = parseEther(amount);
+        // Calculate fee (0.3%)
+        const fee = (parsedAmount * 30n) / 10000n;
+        const purchaseAmount = parsedAmount - fee;
+
+        const estimatedTokens = await publicClient.readContract({
+          address: FACTORY_ADDRESS,
+          abi: FACTORY_ABI,
+          functionName: "calculateTokenAmount",
+          args: [tokenAddress as `0x${string}`, purchaseAmount],
+        });
+
+        setEstimatedTokensOut(formatEther(estimatedTokens as bigint));
+      } catch (error) {
+        console.error("Error calculating token amount:", error);
+        setEstimatedTokensOut("0");
+      }
+    };
+
+    getEstimatedTokensOut();
+  }, [amount, tokenAddress]);
 
   // Helper function to extract revert reason
   const extractRevertReason = (error: any): string => {
@@ -93,18 +127,6 @@ export function BuyTokenForm({ onAmountChange, maxAmount }: any) {
     return errorMessage.split("\n")[0] || "Transaction failed";
   };
 
-  // Calculate minimum tokens out based on slippage tolerance
-  const calculateMinTokensOut = (expectedTokens: string): string => {
-    try {
-      const expected = parseFloat(expectedTokens);
-      const slippage = parseFloat(slippageTolerance) / 100; // Convert percentage to decimal
-      const minTokens = expected * (1 - slippage);
-      return minTokens.toString();
-    } catch {
-      return "0";
-    }
-  };
-
   // Clear error when amount changes
   useEffect(() => {
     setErrorDetails(null);
@@ -146,9 +168,13 @@ export function BuyTokenForm({ onAmountChange, maxAmount }: any) {
     try {
       setErrorDetails(null);
 
-      // For now, we'll set minTokensOut to 0 to disable slippage protection
-      // In a production app, you'd want to calculate expected tokens first
-      const minTokensOut = parseEther("0"); // TODO: Calculate based on slippage tolerance
+      // Calculate minimum tokens out with slippage protection
+      const estimatedTokensBigInt = parseEther(estimatedTokensOut);
+      const slippageMultiplier = BigInt(
+        Math.floor((100 - parseFloat(slippageTolerance)) * 100)
+      );
+      const minTokensOut =
+        (estimatedTokensBigInt * slippageMultiplier) / 10000n;
 
       writeContract({
         abi: FACTORY_ABI,
@@ -160,7 +186,7 @@ export function BuyTokenForm({ onAmountChange, maxAmount }: any) {
 
       toast({
         title: "Transaction Submitted",
-        description: "Waiting for confirmation...",
+        description: `Buying with ${slippageTolerance}% slippage protection...`,
       });
     } catch (error) {
       console.error("Error:", error);
@@ -179,31 +205,102 @@ export function BuyTokenForm({ onAmountChange, maxAmount }: any) {
   useEffect(() => {
     if (receipt && !hasHandledReceipt) {
       const pricePaid = amount;
-      const tokensReceivedLog = receipt.logs?.find(
-        (log: any) =>
-          log.topics[0] ===
-          "0x377aadedb6b2a771959584d10a6a36eccb5f56b4eb3a48525f76108d2660d8d4"
-      );
 
-      if (tokensReceivedLog) {
-        const tokensReceived = BigInt(tokensReceivedLog.data).toString();
-        setReceiptDetails({
-          pricePaid,
-          tokensReceived,
+      try {
+        // Try to find the TokensPurchased event log
+        const tokensPurchasedLog = receipt.logs?.find((log: any) => {
+          // TokensPurchased event signature
+          return (
+            log.topics[0] ===
+            "0x377aadedb6b2a771959584d10a6a36eccb5f56b4eb3a48525f76108d2660d8d4"
+          );
         });
 
+        if (tokensPurchasedLog && tokensPurchasedLog.data) {
+          // The event data contains: amount, price, fee (all uint256)
+          // We need to decode the first value (amount of tokens)
+          const dataWithoutPrefix = tokensPurchasedLog.data.slice(2); // Remove 0x
+
+          // Each uint256 is 64 hex characters (32 bytes)
+          const amountHex = "0x" + dataWithoutPrefix.slice(0, 64);
+          const tokensReceivedBigInt = BigInt(amountHex);
+          const tokensReceivedFormatted = formatEther(tokensReceivedBigInt);
+
+          // Format safely
+          const tokensReceivedNumber = parseFloat(tokensReceivedFormatted);
+          const tokensReceivedDisplay = tokensReceivedNumber.toLocaleString(
+            "en-US",
+            {
+              minimumFractionDigits: 2,
+              maximumFractionDigits: 2,
+            }
+          );
+
+          setReceiptDetails({
+            pricePaid,
+            tokensReceived: tokensReceivedDisplay,
+          });
+
+          toast({
+            title: "Purchase Confirmed",
+            description: `You received ${tokensReceivedDisplay} tokens for ${pricePaid} AVAX.`,
+          });
+        } else {
+          // Fallback to estimated amount if we can't parse the event
+          const fallbackDisplay = estimatedTokensOut
+            ? parseFloat(estimatedTokensOut).toLocaleString("en-US", {
+                minimumFractionDigits: 2,
+                maximumFractionDigits: 2,
+              })
+            : "Unknown";
+
+          setReceiptDetails({
+            pricePaid,
+            tokensReceived: `~${fallbackDisplay} (estimated)`,
+          });
+
+          toast({
+            title: "Purchase Confirmed",
+            description: `Transaction successful for ${pricePaid} AVAX.`,
+          });
+        }
+
         setErrorDetails(null);
+        setHasHandledReceipt(true);
+      } catch (error) {
+        console.error("Error parsing transaction receipt:", error);
+
+        // Fallback to estimated amount with clear indication
+        const fallbackDisplay = estimatedTokensOut
+          ? parseFloat(estimatedTokensOut).toLocaleString("en-US", {
+              minimumFractionDigits: 2,
+              maximumFractionDigits: 2,
+            })
+          : "Unknown";
+
+        setReceiptDetails({
+          pricePaid,
+          tokensReceived: `~${fallbackDisplay} (estimated)`,
+        });
+
         toast({
           title: "Purchase Confirmed",
-          description: `You purchased ${(Number(tokensReceived) / 1e18).toFixed(
-            2
-          )} tokens for ${pricePaid} AVAX.`,
+          description: `Transaction successful for ${pricePaid} AVAX.`,
         });
 
         setHasHandledReceipt(true);
       }
     }
-  }, [receipt, hasHandledReceipt, amount, toast]);
+  }, [receipt, hasHandledReceipt, amount, estimatedTokensOut, toast]);
+
+  // Calculate minimum tokens out with current slippage
+  const minTokensOut = estimatedTokensOut
+    ? (
+        (parseFloat(estimatedTokensOut) *
+          (100 - parseFloat(slippageTolerance))) /
+        100
+      ).toFixed(2)
+    : "0";
 
   return (
     <>
@@ -238,28 +335,67 @@ export function BuyTokenForm({ onAmountChange, maxAmount }: any) {
             />
           </div>
 
+          {/* Slippage Tolerance Setting */}
           <div className="flex flex-col space-y-1.5">
             <Label htmlFor="slippage">Slippage Tolerance (%)</Label>
-            <Input
-              id="slippage"
-              type="number"
-              value={slippageTolerance}
-              onChange={(e) => setSlippageTolerance(e.target.value)}
-              className="text-center pr-2 dark:bg-black/80"
-              step="0.1"
-              min="0.1"
-              max="50"
-            />
-            <div className="text-xs text-muted-foreground text-center">
-              Protects against price changes during transaction
+            <div className="flex gap-2">
+              {["0.5", "1", "2", "5"].map((preset) => (
+                <Button
+                  key={preset}
+                  type="button"
+                  variant={slippageTolerance === preset ? "default" : "outline"}
+                  size="sm"
+                  onClick={() => setSlippageTolerance(preset)}
+                  className="flex-1"
+                >
+                  {preset}%
+                </Button>
+              ))}
+              <Input
+                id="slippage"
+                type="number"
+                value={slippageTolerance}
+                onChange={(e) => setSlippageTolerance(e.target.value)}
+                onWheel={(e) => e.currentTarget.blur()}
+                className="w-20 text-center dark:bg-black/80"
+                step="0.1"
+                min="0"
+                max="50"
+              />
             </div>
           </div>
+
+          {/* Transaction Preview */}
+          {amount && parseFloat(amount) > 0 && (
+            <div className="p-3 bg-muted/50 rounded-lg space-y-2">
+              <div className="flex justify-between text-sm">
+                <span>Estimated Tokens:</span>
+                <span className="font-mono">
+                  {parseFloat(estimatedTokensOut).toFixed(2)} tokens
+                </span>
+              </div>
+              <div className="flex justify-between text-sm">
+                <span>
+                  Minimum Tokens (after {slippageTolerance}% slippage):
+                </span>
+                <span className="font-mono">{minTokensOut} tokens</span>
+              </div>
+              <div className="flex justify-between text-sm text-muted-foreground">
+                <span>Fee (0.3%):</span>
+                <span className="font-mono">
+                  ~{(parseFloat(amount) * 0.003).toFixed(6)} AVAX
+                </span>
+              </div>
+            </div>
+          )}
         </div>
 
         <Button
           type="submit"
           className="mt-4 w-full"
-          disabled={isPending || !tokenAddress || !amount}
+          disabled={
+            isPending || !tokenAddress || !amount || parseFloat(amount) <= 0
+          }
         >
           {isPending ? "Processing..." : "Buy Tokens"}
         </Button>
@@ -285,16 +421,28 @@ export function BuyTokenForm({ onAmountChange, maxAmount }: any) {
             <p className="font-semibold">Transaction Receipt:</p>
             <ul className="mt-2 space-y-1">
               <li>Price Paid: {receiptDetails.pricePaid} AVAX</li>
-              <li>
-                Tokens Received:{" "}
-                {(Number(receiptDetails.tokensReceived) / 1e18).toFixed(2)}
-              </li>
+              <li>Tokens Received: {receiptDetails.tokensReceived}</li>
               <li>Slippage Used: {slippageTolerance}%</li>
               <li className="flex items-center">
                 Transaction:{" "}
                 <AddressComponent hash={`${transactionData}`} type="tx" />
               </li>
             </ul>
+          </div>
+        )}
+
+        {process.env.NODE_ENV === "development" && (
+          <div className="mt-4 p-3 bg-gray-50 dark:bg-gray-900/20 border border-gray-200 dark:border-gray-800 rounded-md">
+            <p className="text-gray-600 dark:text-gray-400 font-medium text-sm mb-2">
+              Debug Info:
+            </p>
+            <div className="text-xs space-y-1">
+              <div>Token Address: {tokenAddress}</div>
+              <div>Amount to Buy: {amount} AVAX</div>
+              <div>Estimated Tokens Out: {estimatedTokensOut}</div>
+              <div>Min Tokens Out: {minTokensOut}</div>
+              <div>Slippage: {slippageTolerance}%</div>
+            </div>
           </div>
         )}
       </form>

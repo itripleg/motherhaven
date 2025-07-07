@@ -36,6 +36,19 @@ export interface Trade {
   fee?: string; // Optional fee property
 }
 
+// Import TokenStatistics from database.ts to avoid duplication
+export interface TokenStatistics {
+  totalSupply: string;
+  currentPrice: string;
+  volumeETH: string;
+  tradeCount: number;
+  uniqueHolders: number;
+  priceChange24h?: number;
+  highPrice24h?: string;
+  lowPrice24h?: string;
+  lastTradeTimestamp?: string;
+}
+
 export interface Token {
   // Basic token information from Token contract
   address: `0x${string}`;
@@ -56,7 +69,6 @@ export interface Token {
   // Factory constants (immutable)
   decimals: string; // 10 ** 18
   maxSupply: string; // (10 ** 9) * DECIMALS
-  initialMint: string; // (MAX_SUPPLY * 20) / 100
   initialPrice: string; // 0.00001 ether
   minPurchase: string; // INITIAL_PRICE
   maxPurchase: string; // 50 ether
@@ -65,8 +77,15 @@ export interface Token {
   tradingFee: number; // 30 (0.3%)
 
   // Current state
-  state: TokenState;
+  currentState: TokenState; // Updated to match database field name
   lastPrice: string;
+
+  // NEW: Auto-resume tracking
+  goalReachedTimestamp?: string; // When goal was reached (ISO string)
+  haltedAt?: string; // When trading was halted
+  resumedAt?: string; // When trading was manually resumed
+  autoResumedAt?: string; // When trading was automatically resumed
+  actualResumeTimestamp?: string; // Timestamp from contract event
 
   // On-chain stats
   totalSupply: string;
@@ -84,6 +103,9 @@ export interface Token {
 
   // Trade history
   lastTrade?: Trade;
+
+  // Statistics
+  statistics?: TokenStatistics;
 }
 
 // Interface for purchase option in token creation
@@ -251,4 +273,40 @@ export const canEditToken = (token: Token, userAddress?: string): boolean => {
     token.creator &&
     userAddress.toLowerCase() === token.creator.toLowerCase()
   );
+};
+
+// NEW: Helper functions for auto-resume functionality
+export const getTimeUntilAutoResume = (
+  goalReachedTimestamp?: string
+): number => {
+  if (!goalReachedTimestamp) return 0;
+
+  const goalTime = new Date(goalReachedTimestamp).getTime();
+  const resumeTime = goalTime + 3 * 60 * 60 * 1000; // 3 hours in milliseconds
+  const now = Date.now();
+
+  return Math.max(0, resumeTime - now);
+};
+
+export const isAutoResumeReady = (goalReachedTimestamp?: string): boolean => {
+  return getTimeUntilAutoResume(goalReachedTimestamp) === 0;
+};
+
+export const formatTimeUntilResume = (
+  goalReachedTimestamp?: string
+): string => {
+  const timeRemaining = getTimeUntilAutoResume(goalReachedTimestamp);
+  if (timeRemaining === 0) return "Ready to resume";
+
+  const hours = Math.floor(timeRemaining / (60 * 60 * 1000));
+  const minutes = Math.floor((timeRemaining % (60 * 60 * 1000)) / (60 * 1000));
+  const seconds = Math.floor((timeRemaining % (60 * 1000)) / 1000);
+
+  if (hours > 0) {
+    return `${hours}h ${minutes}m ${seconds}s`;
+  } else if (minutes > 0) {
+    return `${minutes}m ${seconds}s`;
+  } else {
+    return `${seconds}s`;
+  }
 };

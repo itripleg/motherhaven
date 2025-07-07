@@ -43,3 +43,9 @@ export type TradingHaltedEvent = {
 export type TradingResumedEvent = {
   token: Address;
 };
+
+// NEW: TradingAutoResumed event from upgraded contract
+export type TradingAutoResumedEvent = {
+  token: Address;
+  timestamp: bigint; // When the auto-resume was triggered
+};

@@ -36,20 +36,22 @@ export const IS_TESTNET = CURRENT_NETWORK === "testnet";
 // =================================================================
 //                    FACTORY CONSTANTS
 // =================================================================
-// These are immutable constants from the TokenFactory contract
-// Keep these in sync with your contract if you ever redeploy
+// These are immutable constants from the GrandFactory contract
+// Updated to match your deployed contract's actual values
 
 export const FACTORY_CONSTANTS = {
   // Core constants (match contract exactly)
   DECIMALS: "1000000000000000000", // 10^18
   MAX_SUPPLY: "1000000000000000000000000000", // 1 billion * 10^18
-  INITIAL_MINT: "200000000000000000000000000", // 20% of MAX_SUPPLY
   INITIAL_PRICE: "0.00001", // 0.00001 ether
   MIN_PURCHASE: "0.00001", // INITIAL_PRICE
   MAX_PURCHASE: "50", // 50 ether
   MAX_WALLET_PERCENTAGE: 5, // 5%
   PRICE_RATE: "2000", // Bonding curve steepness
   TRADING_FEE: 30, // 30 basis points (0.3%)
+
+  // NEW: Auto-resume functionality
+  AUTO_RESUME_TIME: 10800, // 3 hours in seconds (3 * 60 * 60)
 
   // Derived values for convenience
   DEFAULT_FUNDING_GOAL: "25", // 25 ether (can be changed by owner)
@@ -81,3 +83,20 @@ export const TOKEN_EVENTS = TOKEN_ABI.filter(
 export const MANAGER_EVENTS = MANAGER_ABI.filter(
   (item: any) => item.type === "event"
 );
+
+// Helper functions for new contract features
+export function getAutoResumeTime(): number {
+  return FACTORY_CONSTANTS.AUTO_RESUME_TIME;
+}
+
+export function calculateAutoResumeTimestamp(
+  goalReachedTimestamp: number
+): number {
+  return goalReachedTimestamp + FACTORY_CONSTANTS.AUTO_RESUME_TIME;
+}
+
+export function isAutoResumeReady(goalReachedTimestamp: number): boolean {
+  if (!goalReachedTimestamp) return false;
+  const resumeTime = calculateAutoResumeTimestamp(goalReachedTimestamp);
+  return Date.now() / 1000 >= resumeTime;
+}

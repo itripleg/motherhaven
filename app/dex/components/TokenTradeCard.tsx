@@ -1,5 +1,5 @@
 "use client";
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useCallback } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Button } from "@/components/ui/button";
@@ -7,7 +7,13 @@ import { Badge } from "@/components/ui/badge";
 import { AddressComponent } from "@/components/AddressComponent";
 import { BuyTokenForm } from "./BuyTokenForm";
 import { SellTokenForm } from "./SellTokenForm";
-import { Token, TokenState } from "@/types";
+import {
+  Token,
+  TokenState,
+  getTimeUntilAutoResume,
+  formatTimeUntilResume,
+  isAutoResumeReady,
+} from "@/types";
 import { useConnect, useBalance, useAccount } from "wagmi";
 import { tokenEventEmitter } from "@/components/EventWatcher";
 import { useUnifiedTokenPrice } from "@/final-hooks/useUnifiedTokenPrice";
@@ -36,6 +42,8 @@ import {
   DollarSign,
   ArrowUpRight,
   ArrowDownLeft,
+  Clock,
+  Play,
 } from "lucide-react";
 
 interface TokenTradeCardProps {
@@ -61,8 +69,15 @@ export function TokenTradeCard({
   const { formatted: currentPrice, isLoading: priceLoading } =
     useUnifiedTokenPrice(tokenData?.address as Address);
 
-  const { useCalculateTokens, useCalculateBuyPrice, useCalculateSellPrice } =
-    useFactoryContract();
+  const {
+    useCalculateTokens,
+    useCalculateBuyPrice,
+    useCalculateSellPrice,
+    useTokenState,
+  } = useFactoryContract();
+
+  // Get current token state from contract
+  const { state: contractState } = useTokenState(tokenData?.address as Address);
 
   const effectivelyConnected = isConnected || isConnectedProp;
 
@@ -79,6 +94,33 @@ export function TokenTradeCard({
   );
   const [shouldRefresh, setShouldRefresh] = useState(0);
   const [activeTab, setActiveTab] = useState("buy");
+  const [autoResumeCountdown, setAutoResumeCountdown] = useState<string>("");
+
+  // Auto-resume countdown timer
+  useEffect(() => {
+    if (
+      tokenData?.goalReachedTimestamp &&
+      tokenData?.currentState === TokenState.GOAL_REACHED
+    ) {
+      const updateCountdown = () => {
+        const timeRemaining = getTimeUntilAutoResume(
+          tokenData.goalReachedTimestamp
+        );
+        if (timeRemaining > 0) {
+          setAutoResumeCountdown(
+            formatTimeUntilResume(tokenData.goalReachedTimestamp)
+          );
+        } else {
+          setAutoResumeCountdown("Ready to resume");
+        }
+      };
+
+      updateCountdown();
+      const interval = setInterval(updateCountdown, 1000);
+
+      return () => clearInterval(interval);
+    }
+  }, [tokenData?.goalReachedTimestamp, tokenData?.currentState]);
 
   // Get contract calculations for current trade
   const { tokenAmount: calculatedTokens, isLoading: buyCalculationLoading } =
@@ -117,35 +159,49 @@ export function TokenTradeCard({
   });
 
   // Calculate price impact using actual contract functions
-  const calculateRealPriceImpact = (amount: string, isBuy: boolean): number => {
-    if (!amount || amount === "0" || !tokenData) return 0;
+  const calculateRealPriceImpact = useCallback(
+    (amount: string, isBuy: boolean): number => {
+      if (!amount || amount === "0" || !tokenData || !currentPrice) return 0;
 
-    try {
-      const tradeAmount = parseFloat(amount);
-      if (isNaN(tradeAmount) || tradeAmount <= 0) return 0;
-      const currentPriceNum = parseFloat(currentPrice || "0");
-      if (currentPriceNum === 0) return 0;
+      try {
+        const tradeAmount = parseFloat(amount);
+        if (isNaN(tradeAmount) || tradeAmount <= 0) return 0;
 
-      if (isBuy) {
-        if (!calculatedBuyPrice) return 0;
-        const ethCostFromContract = parseFloat(formatEther(calculatedBuyPrice));
-        const expectedEthCost = tradeAmount * currentPriceNum;
-        const priceImpact =
-          ((ethCostFromContract - expectedEthCost) / expectedEthCost) * 100;
-        return Math.max(0, Math.min(95, priceImpact));
-      } else {
-        if (!calculatedEth) return 0;
-        const ethFromContract = parseFloat(formatEther(calculatedEth));
-        const expectedEthReceived = tradeAmount * currentPriceNum;
-        const priceImpact =
-          ((expectedEthReceived - ethFromContract) / expectedEthReceived) * 100;
-        return Math.max(0, Math.min(95, priceImpact));
+        const currentPriceNum = parseFloat(currentPrice);
+        if (currentPriceNum === 0) return 0;
+
+        if (isBuy) {
+          // For buys: compare contract calculation vs simple multiplication
+          if (!calculatedTokens) return 0;
+
+          const tokensFromContract = parseFloat(formatEther(calculatedTokens));
+          const expectedTokens = tradeAmount / currentPriceNum; // ETH amount / current price = expected tokens
+
+          if (expectedTokens === 0) return 0;
+
+          const priceImpact =
+            ((expectedTokens - tokensFromContract) / expectedTokens) * 100;
+          return Math.max(0, Math.min(50, priceImpact)); // Cap at 50%
+        } else {
+          // For sells: compare contract calculation vs simple multiplication
+          if (!calculatedEth) return 0;
+
+          const ethFromContract = parseFloat(formatEther(calculatedEth));
+          const expectedEth = tradeAmount * currentPriceNum; // Token amount * current price = expected ETH
+
+          if (expectedEth === 0) return 0;
+
+          const priceImpact =
+            ((expectedEth - ethFromContract) / expectedEth) * 100;
+          return Math.max(0, Math.min(50, priceImpact)); // Cap at 50%
+        }
+      } catch (error) {
+        console.error("Error calculating real price impact:", error);
+        return 0;
       }
-    } catch (error) {
-      console.error("Error calculating real price impact:", error);
-      return 0;
-    }
-  };
+    },
+    [tokenData, currentPrice, calculatedTokens, calculatedEth]
+  );
 
   useEffect(() => {
     if (!tokenData?.address) return;
@@ -153,7 +209,9 @@ export function TokenTradeCard({
     const handleTokenEvent = (event: any) => {
       if (
         event.eventName === "TokensPurchased" ||
-        event.eventName === "TokensSold"
+        event.eventName === "TokensSold" ||
+        event.eventName === "TradingAutoResumed" ||
+        event.eventName === "TradingResumed"
       ) {
         setShouldRefresh((prev) => prev + 1);
       }
@@ -190,15 +248,7 @@ export function TokenTradeCard({
         priceImpact: impact,
       }));
     }
-  }, [
-    tokenData,
-    currentAmount,
-    currentTradeType,
-    calculatedTokens,
-    calculatedBuyPrice,
-    calculatedEth,
-    currentPrice,
-  ]);
+  }, [currentAmount, currentTradeType, calculateRealPriceImpact]);
 
   const handleSlippageChange = (value: number) => {
     setTradeEstimation((prev) => ({
@@ -266,12 +316,15 @@ export function TokenTradeCard({
   const avaxFormatted = formatBalance(avaxBalance, 1);
   const tokenFormatted = formatBalance(tokenBalance, safePrice);
 
-  // Safe state checking
-  const isHalted =
-    tokenData?.state === TokenState.GOAL_REACHED ||
-    tokenData?.state === TokenState.HALTED;
+  // Use currentState instead of state, and check both database and contract state
+  const effectiveState = contractState ?? tokenData?.currentState;
 
-  const renderHaltedState = () => (
+  const isGoalReached = effectiveState === TokenState.GOAL_REACHED;
+  const isResumed = effectiveState === TokenState.RESUMED;
+  const isHalted = effectiveState === TokenState.HALTED;
+  const isTrading = effectiveState === TokenState.TRADING || isResumed;
+
+  const renderGoalReachedState = () => (
     <motion.div
       initial={{ opacity: 0, scale: 0.95 }}
       animate={{ opacity: 1, scale: 1 }}
@@ -303,26 +356,54 @@ export function TokenTradeCard({
               <span className="font-semibold text-green-400">
                 {formatNumber(tokenData.fundingGoal || "0")} AVAX
               </span>
-              . Trading is now moved to Uniswap.
+              . Trading is temporarily halted.
             </p>
-          </div>
-        </motion.div>
 
-        {/* Uniswap Link */}
-        <motion.div
-          initial={{ y: 20, opacity: 0 }}
-          animate={{ y: 0, opacity: 1 }}
-          transition={{ delay: 0.4 }}
-        >
-          <Button
-            onClick={() =>
-              window.open("https://app.uniswap.org/#/swap", "_blank")
-            }
-            className="btn-primary px-8 py-4 text-lg font-semibold rounded-xl group"
-          >
-            <span>Trade on Uniswap</span>
-            <ExternalLink className="ml-2 h-5 w-5 group-hover:translate-x-1 transition-transform duration-300" />
-          </Button>
+            {/* Auto-resume countdown */}
+            {tokenData?.goalReachedTimestamp &&
+              // @ts-expect-error type
+              !isAutoResumeReady(tokenData.goalReachedTimestamp) && (
+                <motion.div
+                  initial={{ opacity: 0 }}
+                  animate={{ opacity: 1 }}
+                  transition={{ delay: 0.5 }}
+                  className="mt-6 p-4 bg-blue-500/10 rounded-xl border border-blue-400/30"
+                >
+                  <div className="flex items-center justify-center gap-2 text-blue-400">
+                    <Clock className="h-5 w-5" />
+                    <span className="font-semibold">
+                      Auto-resume in: {autoResumeCountdown}
+                    </span>
+                  </div>
+                  <p className="text-sm text-muted-foreground mt-2">
+                    Trading will automatically resume after 3 hours
+                  </p>
+                </motion.div>
+              )}
+
+            {/* Ready to resume */}
+            {tokenData?.goalReachedTimestamp &&
+              // @ts-expect-error type
+              isAutoResumeReady(tokenData.goalReachedTimestamp) && (
+                <motion.div
+                  initial={{ opacity: 0 }}
+                  animate={{ opacity: 1 }}
+                  transition={{ delay: 0.5 }}
+                  className="mt-6 p-4 bg-green-500/10 rounded-xl border border-green-400/30"
+                >
+                  <div className="flex items-center justify-center gap-2 text-green-400">
+                    <Play className="h-5 w-5" />
+                    <span className="font-semibold">
+                      Ready to Resume Trading
+                    </span>
+                  </div>
+                  <p className="text-sm text-muted-foreground mt-2">
+                    Trading can now be resumed automatically with any
+                    transaction
+                  </p>
+                </motion.div>
+              )}
+          </div>
         </motion.div>
 
         {/* Stats Grid */}
@@ -375,214 +456,102 @@ export function TokenTradeCard({
   );
 
   const renderTradingInterface = () => (
-    <div className="space-y-8">
-      {/* Main Trading Grid */}
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-        {/* Portfolio Overview */}
-        <motion.div
-          whileHover={{ scale: 1.02 }}
-          transition={{ duration: 0.2 }}
-          className="unified-card border-primary/20 p-6"
-        >
-          <div className="flex items-center gap-3 mb-6">
-            <div className="p-2 rounded-lg bg-primary/20 border border-primary/30">
-              <Wallet className="h-5 w-5 text-primary" />
+    <div className="space-y-6">
+      {/* Single Consolidated Trading Card */}
+      <motion.div
+        whileHover={{ scale: 1.01 }}
+        transition={{ duration: 0.2 }}
+        className="unified-card border-primary/20 p-6"
+      >
+        {/* Header with balances */}
+        <div className="flex items-center justify-between mb-6">
+          <div>
+            <h3 className="text-xl font-semibold text-foreground">
+              Trade {tokenData?.symbol}
+            </h3>
+            <p className="text-sm text-muted-foreground">
+              Current price:{" "}
+              {priceLoading
+                ? "Loading..."
+                : `${currentPrice || "0.000000"} AVAX`}
+            </p>
+          </div>
+          <div className="text-right space-y-1">
+            <div className="text-sm">
+              <span className="text-muted-foreground">AVAX:</span>{" "}
+              <span className="font-medium">{avaxFormatted.amount}</span>
             </div>
-            <div>
-              <h4 className="font-semibold text-foreground">Your Portfolio</h4>
-              <p className="text-sm text-muted-foreground">Current balances</p>
+            <div className="text-sm">
+              <span className="text-muted-foreground">
+                {tokenData?.symbol}:
+              </span>{" "}
+              <span className="font-medium">{tokenFormatted.amount}</span>
             </div>
           </div>
+        </div>
 
-          <div className="space-y-4">
-            {/* AVAX Balance */}
-            <div className="p-4 bg-gradient-to-r from-blue-500/10 to-blue-600/10 rounded-xl border border-blue-400/20">
-              <div className="flex items-center justify-between">
-                <div className="flex items-center gap-3">
-                  <div className="w-8 h-8 rounded-full bg-blue-500/20 flex items-center justify-center">
-                    <DollarSign className="h-4 w-4 text-blue-400" />
-                  </div>
-                  <span className="font-medium text-foreground">AVAX</span>
-                </div>
-                <div className="text-right">
-                  <p className="font-bold text-foreground">
-                    {avaxFormatted.amount}
-                  </p>
-                  <p className="text-xs text-muted-foreground">Available</p>
-                </div>
-              </div>
-            </div>
-
-            {/* Token Balance */}
-            <div className="p-4 bg-gradient-to-r from-primary/10 to-primary/5 rounded-xl border border-primary/20">
-              <div className="flex items-center justify-between">
-                <div className="flex items-center gap-3">
-                  <div className="w-8 h-8 rounded-full bg-primary/20 flex items-center justify-center">
-                    <Crown className="h-4 w-4 text-primary" />
-                  </div>
-                  <span className="font-medium text-foreground">
-                    {tokenData?.symbol}
-                  </span>
-                </div>
-                <div className="text-right">
-                  <p className="font-bold text-foreground">
-                    {tokenFormatted.amount}
-                  </p>
-                  <p className="text-xs text-muted-foreground">
-                    ≈ {tokenFormatted.value} AVAX
-                  </p>
-                </div>
-              </div>
-            </div>
-          </div>
-        </motion.div>
-
-        {/* Market Info */}
-        <motion.div
-          whileHover={{ scale: 1.02 }}
-          transition={{ duration: 0.2 }}
-          className="unified-card border-primary/20 p-6"
-        >
-          <div className="flex items-center gap-3 mb-6">
-            <div className="p-2 rounded-lg bg-primary/20 border border-primary/30">
-              <BarChart3 className="h-5 w-5 text-primary" />
-            </div>
-            <div>
-              <h4 className="font-semibold text-foreground">Market Info</h4>
-              <p className="text-sm text-muted-foreground">Live trading data</p>
-            </div>
-          </div>
-
-          <div className="space-y-4">
-            {/* Current Price */}
-            <div className="p-4 bg-gradient-to-r from-green-500/10 to-emerald-500/10 rounded-xl border border-green-400/20">
-              <div className="flex items-center justify-between">
-                <span className="text-muted-foreground">Current Price</span>
-                <div className="text-right">
-                  <p className="font-bold text-foreground">
-                    {priceLoading ? (
-                      <span className="animate-pulse">Loading...</span>
-                    ) : (
-                      `${currentPrice || "0.000000"} AVAX`
-                    )}
-                  </p>
-                </div>
-              </div>
-            </div>
-
-            {/* Price Impact */}
-            <div className="p-4 bg-gradient-to-r from-orange-500/10 to-red-500/10 rounded-xl border border-orange-400/20">
-              <div className="flex items-center justify-between">
-                <span className="text-muted-foreground">Price Impact</span>
-                <div className="text-right">
-                  <span
-                    className={getPriceImpactColor(tradeEstimation.priceImpact)}
-                  >
-                    {formatNumber(tradeEstimation.priceImpact)}%
-                  </span>
-                </div>
-              </div>
-              {getPriceImpactWarning(tradeEstimation.priceImpact) && (
-                <div className="text-xs text-orange-400 mt-2 flex items-center gap-1">
-                  <AlertTriangle className="h-3 w-3" />
-                  {getPriceImpactWarning(tradeEstimation.priceImpact)}
-                </div>
-              )}
-            </div>
-
-            {/* Slippage Setting */}
-            <div className="p-4 bg-gradient-to-r from-purple-500/10 to-pink-500/10 rounded-xl border border-purple-400/20">
-              <div className="flex items-center justify-between mb-3">
-                <span className="text-muted-foreground">
-                  Slippage Tolerance
-                </span>
-                <SlippageTolerance
-                  value={tradeEstimation.slippage}
-                  onChange={handleSlippageChange}
-                  disabled={!effectivelyConnected}
-                />
-              </div>
-              <div className="flex items-center gap-1 text-xs text-purple-400">
-                <ShieldCheck className="h-3 w-3" />
-                <span>UI only - contract protection pending</span>
-              </div>
-            </div>
-
-            {/* Debug Info (Development) */}
-            {process.env.NODE_ENV === "development" && (
-              <div className="p-3 bg-muted/20 rounded-lg border border-border/30">
-                <div className="text-xs space-y-1 text-muted-foreground">
-                  <div>Collateral: {tokenData.collateral || "0"} AVAX</div>
-                  <div>Virtual Supply: {tokenData.virtualSupply || "0"}</div>
-                  <div>State: {tokenData.state}</div>
-                </div>
-              </div>
-            )}
-          </div>
-        </motion.div>
-
-        {/* Trading Forms */}
-        <motion.div
-          whileHover={{ scale: 1.02 }}
-          transition={{ duration: 0.2 }}
-          className="unified-card border-primary/20 overflow-hidden"
-        >
-          <div className="p-6">
-            <div className="flex items-center gap-3 mb-6">
-              <div className="p-2 rounded-lg bg-primary/20 border border-primary/30">
-                <Target className="h-5 w-5 text-primary" />
-              </div>
-              <div>
-                <h4 className="font-semibold text-foreground">Execute Trade</h4>
-                <p className="text-sm text-muted-foreground">
-                  Buy or sell tokens
-                </p>
-              </div>
-            </div>
-
-            <Tabs
-              value={activeTab}
-              onValueChange={setActiveTab}
-              className="w-full"
+        {/* Trading Tabs */}
+        <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
+          <TabsList className="grid w-full grid-cols-2 mb-6">
+            <TabsTrigger
+              value="buy"
+              className="data-[state=active]:bg-green-500/20 data-[state=active]:text-green-400"
             >
-              <TabsList className="grid w-full grid-cols-2 mb-6">
-                <TabsTrigger
-                  value="buy"
-                  className="data-[state=active]:bg-green-500/20 data-[state=active]:text-green-400"
-                >
-                  <ArrowUpRight className="h-4 w-4 mr-2" />
-                  Buy
-                </TabsTrigger>
-                <TabsTrigger
-                  value="sell"
-                  className="data-[state=active]:bg-red-500/20 data-[state=active]:text-red-400"
-                >
-                  <ArrowDownLeft className="h-4 w-4 mr-2" />
-                  Sell
-                </TabsTrigger>
-              </TabsList>
+              <ArrowUpRight className="h-4 w-4 mr-2" />
+              Buy
+            </TabsTrigger>
+            <TabsTrigger
+              value="sell"
+              className="data-[state=active]:bg-red-500/20 data-[state=active]:text-red-400"
+            >
+              <ArrowDownLeft className="h-4 w-4 mr-2" />
+              Sell
+            </TabsTrigger>
+          </TabsList>
 
-              <TabsContent value="buy" className="mt-0">
-                <BuyTokenForm
-                  maxAmount={avaxBalance?.formatted || "0"}
-                  onAmountChange={(amount: any) =>
-                    handleAmountChange(amount, true)
-                  }
-                />
-              </TabsContent>
+          <TabsContent value="buy" className="mt-0">
+            <BuyTokenForm
+              maxAmount={avaxBalance?.formatted || "0"}
+              onAmountChange={(amount: any) => handleAmountChange(amount, true)}
+            />
+          </TabsContent>
 
-              <TabsContent value="sell" className="mt-0">
-                <SellTokenForm
-                  maxAmount={tokenBalance?.formatted || "0"}
-                  onAmountChange={(amount: any) =>
-                    handleAmountChange(amount, false)
-                  }
-                />
-              </TabsContent>
-            </Tabs>
-          </div>
-        </motion.div>
-      </div>
+          <TabsContent value="sell" className="mt-0">
+            <SellTokenForm
+              maxAmount={tokenBalance?.formatted || "0"}
+              onAmountChange={(amount: any) =>
+                handleAmountChange(amount, false)
+              }
+              address={userAddress}
+            />
+          </TabsContent>
+        </Tabs>
+
+        {/* Price Impact Warning - Only show if significant */}
+        {currentAmount !== "0" &&
+          parseFloat(currentAmount) > 0 &&
+          tradeEstimation.priceImpact > 1 && (
+            <motion.div
+              initial={{ opacity: 0, height: 0 }}
+              animate={{ opacity: 1, height: "auto" }}
+              className="mt-4 p-3 bg-orange-500/10 rounded-lg border border-orange-400/30"
+            >
+              <div className="flex items-center gap-2 text-orange-400">
+                <AlertTriangle className="h-4 w-4" />
+                <span className="text-sm font-medium">
+                  High Price Impact: {formatNumber(tradeEstimation.priceImpact)}
+                  %
+                </span>
+              </div>
+              <p className="text-xs text-muted-foreground mt-1">
+                This trade will move the price due to the bonding curve. Your
+                slippage protection ({tradeEstimation.slippage}%) may still
+                allow the transaction if you receive more tokens than your
+                minimum.
+              </p>
+            </motion.div>
+          )}
+      </motion.div>
     </div>
   );
 
@@ -650,8 +619,14 @@ export function TokenTradeCard({
     <Card className="unified-card border-primary/20 overflow-hidden">
       <CardContent className="p-0">
         <AnimatePresence mode="wait">
-          {isHalted ? (
-            <motion.div key="halted">{renderHaltedState()}</motion.div>
+          {isGoalReached ? (
+            <motion.div key="goal-reached">
+              {renderGoalReachedState()}
+            </motion.div>
+          ) : isTrading ? (
+            <motion.div key="trading" className="p-8">
+              {renderTradingInterface()}
+            </motion.div>
           ) : effectivelyConnected ? (
             <motion.div key="trading" className="p-8">
               {renderTradingInterface()}

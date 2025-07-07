@@ -13,6 +13,7 @@ import { usePathname } from "next/navigation";
 import { AddressComponent } from "@/components/AddressComponent";
 import { FACTORY_ABI, FACTORY_ADDRESS } from "@/types";
 import { readContract } from "@wagmi/core";
+import { publicClient } from "@/wagmi-config";
 
 // Basic ERC20 ABI for approval
 const ERC20_ABI = [
@@ -81,9 +82,11 @@ export function SellTokenForm({
   const tokenAddress = pathname.split("/").pop() || "";
 
   const [amount, setAmount] = useState("");
+  const [slippageTolerance, setSlippageTolerance] = useState("1"); // 1% default slippage
   const [needsApproval, setNeedsApproval] = useState(false);
   const [isApproving, setIsApproving] = useState(false);
   const [errorDetails, setErrorDetails] = useState<string | null>(null);
+  const [estimatedEthOut, setEstimatedEthOut] = useState<string>("0");
   const [receiptDetails, setReceiptDetails] = useState<{
     avaxReceived?: string;
     tokensSold?: string;
@@ -117,7 +120,32 @@ export function SellTokenForm({
       hash: approvalData,
     });
 
-  // Check allowance
+  // Get estimated ETH output for the current amount
+  useEffect(() => {
+    const getEstimatedEthOut = async () => {
+      if (!amount || !tokenAddress || parseFloat(amount) <= 0) {
+        setEstimatedEthOut("0");
+        return;
+      }
+
+      try {
+        const parsedAmount = parseEther(amount);
+        const estimatedEth = await publicClient.readContract({
+          address: FACTORY_ADDRESS,
+          abi: FACTORY_ABI,
+          functionName: "calculateSellPrice",
+          args: [tokenAddress as `0x${string}`, parsedAmount],
+        });
+
+        setEstimatedEthOut(formatEther(estimatedEth as bigint));
+      } catch (error) {
+        console.error("Error calculating sell price:", error);
+        setEstimatedEthOut("0");
+      }
+    };
+
+    getEstimatedEthOut();
+  }, [amount, tokenAddress]);
   const { data: allowance } = useReadContract({
     address: tokenAddress as `0x${string}`,
     abi: ERC20_ABI,
@@ -183,7 +211,7 @@ export function SellTokenForm({
   // Clear error when amount changes
   useEffect(() => {
     setErrorDetails(null);
-  }, [amount]);
+  }, [amount, slippageTolerance]);
 
   // Check if approval is needed whenever amount changes
   useEffect(() => {
@@ -266,9 +294,12 @@ export function SellTokenForm({
       setErrorDetails(null);
       const parsedAmount = parseEther(amount);
 
-      // Set minEthOut to 0 to disable slippage protection for now
-      // Users can always add slippage protection later if needed
-      const minEthOut = parseEther("0");
+      // Calculate minimum ETH out with slippage protection
+      const estimatedEthBigInt = parseEther(estimatedEthOut);
+      const slippageMultiplier = BigInt(
+        Math.floor((100 - parseFloat(slippageTolerance)) * 100)
+      );
+      const minEthOut = (estimatedEthBigInt * slippageMultiplier) / 10000n;
 
       writeSellContract({
         abi: FACTORY_ABI,
@@ -279,7 +310,7 @@ export function SellTokenForm({
 
       toast({
         title: "Transaction Submitted",
-        description: "Waiting for confirmation...",
+        description: `Selling with ${slippageTolerance}% slippage protection...`,
       });
     } catch (error) {
       console.error("Error:", error);
@@ -387,6 +418,65 @@ export function SellTokenForm({
             className="text-center pr-2 dark:bg-black/80"
           />
         </div>
+
+        {/* Slippage Tolerance Setting */}
+        <div className="flex flex-col space-y-1.5">
+          <Label htmlFor="slippage">Slippage Tolerance (%)</Label>
+          <div className="flex gap-2">
+            {["0.5", "1", "2", "5"].map((preset) => (
+              <Button
+                key={preset}
+                type="button"
+                variant={slippageTolerance === preset ? "default" : "outline"}
+                size="sm"
+                onClick={() => setSlippageTolerance(preset)}
+                className="flex-1"
+              >
+                {preset}%
+              </Button>
+            ))}
+            <Input
+              id="slippage"
+              type="number"
+              value={slippageTolerance}
+              onChange={(e) => setSlippageTolerance(e.target.value)}
+              onWheel={(e) => e.currentTarget.blur()}
+              className="w-20 text-center dark:bg-black/80"
+              step="0.1"
+              min="0"
+              max="50"
+            />
+          </div>
+        </div>
+
+        {/* Transaction Preview */}
+        {amount && parseFloat(amount) > 0 && (
+          <div className="p-3 bg-muted/50 rounded-lg space-y-2">
+            <div className="flex justify-between text-sm">
+              <span>Estimated ETH:</span>
+              <span className="font-mono">
+                {parseFloat(estimatedEthOut).toFixed(6)} ETH
+              </span>
+            </div>
+            <div className="flex justify-between text-sm">
+              <span>Minimum ETH (after {slippageTolerance}% slippage):</span>
+              <span className="font-mono">
+                {(
+                  (parseFloat(estimatedEthOut) *
+                    (100 - parseFloat(slippageTolerance))) /
+                  100
+                ).toFixed(6)}{" "}
+                ETH
+              </span>
+            </div>
+            <div className="flex justify-between text-sm text-muted-foreground">
+              <span>Fee (0.3%):</span>
+              <span className="font-mono">
+                ~{(parseFloat(estimatedEthOut) * 0.003).toFixed(6)} ETH
+              </span>
+            </div>
+          </div>
+        )}
       </div>
 
       {needsApproval ? (
@@ -435,7 +525,16 @@ export function SellTokenForm({
             <div>Token Balance: {maxAmount}</div>
             <div>Allowance: {allowance?.toString()}</div>
             <div>Needs Approval: {needsApproval.toString()}</div>
-            <div>Min ETH Out: 0 (slippage protection disabled)</div>
+            <div>Estimated ETH Out: {estimatedEthOut}</div>
+            <div>
+              Min ETH Out:{" "}
+              {(
+                (parseFloat(estimatedEthOut) *
+                  (100 - parseFloat(slippageTolerance))) /
+                100
+              ).toFixed(6)}
+            </div>
+            <div>Slippage: {slippageTolerance}%</div>
           </div>
         </div>
       )}
@@ -446,6 +545,7 @@ export function SellTokenForm({
           <ul className="mt-2 space-y-1">
             <li>Tokens Sold: {receiptDetails.tokensSold}</li>
             <li>AVAX Received: {receiptDetails.avaxReceived} AVAX</li>
+            <li>Slippage Used: {slippageTolerance}%</li>
             <li className="flex items-center">
               Transaction: <AddressComponent hash={`${sellData}`} type="tx" />
             </li>
