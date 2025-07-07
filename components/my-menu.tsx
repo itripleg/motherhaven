@@ -83,7 +83,7 @@ const navItems: NavItem[] = [
   },
   {
     href: "/bots",
-    label: "TVBs",
+    label: "Bots",
     icon: <Bot className="h-4 w-4" />,
     description: "Transparent Volume Bots",
   },
