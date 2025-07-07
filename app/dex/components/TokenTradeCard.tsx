@@ -1,6 +1,7 @@
+// app/dex/components/TokenTradeCard.tsx
 "use client";
 import React, { useState, useEffect, useCallback } from "react";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Card, CardContent } from "@/components/ui/card";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -44,6 +45,8 @@ import {
   ArrowDownLeft,
   Clock,
   Play,
+  User,
+  CreditCard,
 } from "lucide-react";
 
 interface TokenTradeCardProps {
@@ -333,124 +336,70 @@ export function TokenTradeCard({
       initial={{ opacity: 0, scale: 0.95 }}
       animate={{ opacity: 1, scale: 1 }}
       transition={{ duration: 0.5 }}
-      className="text-center space-y-8 p-8"
+      className="text-center space-y-6 p-8"
     >
-      <div className="space-y-6">
+      <div className="space-y-4">
         {/* Success Header */}
         <motion.div
           initial={{ y: 20, opacity: 0 }}
           animate={{ y: 0, opacity: 1 }}
           transition={{ delay: 0.2 }}
-          className="relative"
         >
-          <div className="absolute inset-0 bg-gradient-to-r from-green-500/20 via-emerald-500/20 to-green-500/20 blur-xl rounded-full" />
-          <div className="relative p-8 bg-gradient-to-br from-green-500/10 to-emerald-500/10 rounded-2xl border border-green-400/30 backdrop-blur-sm">
-            <motion.div
-              animate={{ rotate: [0, 5, -5, 0] }}
-              transition={{ duration: 3, repeat: Infinity }}
-              className="text-6xl mb-4"
-            >
-              🎉
-            </motion.div>
-            <h3 className="text-3xl font-bold text-green-400 mb-3">
-              Funding Goal Reached!
-            </h3>
-            <p className="text-muted-foreground text-lg leading-relaxed max-w-md mx-auto">
-              This token has successfully reached its funding goal of{" "}
-              <span className="font-semibold text-green-400">
-                {formatNumber(tokenData.fundingGoal || "0")} AVAX
-              </span>
-              . Trading is temporarily halted.
-            </p>
+          <div className="text-5xl mb-4">🎉</div>
+          <h3 className="text-2xl font-bold text-green-400 mb-2">
+            Funding Goal Reached!
+          </h3>
+          <p className="text-muted-foreground max-w-md mx-auto">
+            This token has successfully reached its funding goal of{" "}
+            <span className="font-semibold text-green-400">
+              {formatNumber(tokenData.fundingGoal || "0")} AVAX
+            </span>
+            . Trading is temporarily halted.
+          </p>
 
-            {/* Auto-resume countdown */}
-            {tokenData?.goalReachedTimestamp &&
-              !isAutoResumeReady(tokenData.goalReachedTimestamp) && (
-                <motion.div
-                  initial={{ opacity: 0 }}
-                  animate={{ opacity: 1 }}
-                  transition={{ delay: 0.5 }}
-                  className="mt-6 p-4 bg-blue-500/10 rounded-xl border border-blue-400/30"
-                >
-                  <div className="flex items-center justify-center gap-2 text-blue-400">
-                    <Clock className="h-5 w-5" />
-                    <span className="font-semibold">
-                      Auto-resume in: {autoResumeCountdown}
-                    </span>
-                  </div>
-                  <p className="text-sm text-muted-foreground mt-2">
-                    Trading will automatically resume after 3 hours
-                  </p>
-                </motion.div>
-              )}
+          {/* Auto-resume countdown */}
+          {tokenData?.goalReachedTimestamp &&
+            !isAutoResumeReady(tokenData.goalReachedTimestamp) && (
+              <div className="mt-4 p-3 bg-blue-500/10 rounded-lg border border-blue-400/30">
+                <div className="flex items-center justify-center gap-2 text-blue-400">
+                  <Clock className="h-4 w-4" />
+                  <span className="font-medium">
+                    Auto-resume in: {autoResumeCountdown}
+                  </span>
+                </div>
+              </div>
+            )}
 
-            {/* Ready to resume */}
-            {tokenData?.goalReachedTimestamp &&
-              isAutoResumeReady(tokenData.goalReachedTimestamp) && (
-                <motion.div
-                  initial={{ opacity: 0 }}
-                  animate={{ opacity: 1 }}
-                  transition={{ delay: 0.5 }}
-                  className="mt-6 p-4 bg-green-500/10 rounded-xl border border-green-400/30"
-                >
-                  <div className="flex items-center justify-center gap-2 text-green-400">
-                    <Play className="h-5 w-5" />
-                    <span className="font-semibold">
-                      Ready to Resume Trading
-                    </span>
-                  </div>
-                  <p className="text-sm text-muted-foreground mt-2">
-                    Trading can now be resumed automatically with any
-                    transaction
-                  </p>
-                </motion.div>
-              )}
-          </div>
+          {/* Ready to resume */}
+          {tokenData?.goalReachedTimestamp &&
+            isAutoResumeReady(tokenData.goalReachedTimestamp) && (
+              <div className="mt-4 p-3 bg-green-500/10 rounded-lg border border-green-400/30">
+                <div className="flex items-center justify-center gap-2 text-green-400">
+                  <Play className="h-4 w-4" />
+                  <span className="font-medium">Ready to Resume Trading</span>
+                </div>
+              </div>
+            )}
         </motion.div>
 
-        {/* Stats Grid */}
+        {/* Your Holdings */}
         <motion.div
           initial={{ y: 20, opacity: 0 }}
           animate={{ y: 0, opacity: 1 }}
-          transition={{ delay: 0.6 }}
-          className="grid grid-cols-1 md:grid-cols-2 gap-6 max-w-2xl mx-auto"
+          transition={{ delay: 0.4 }}
+          className="p-4 bg-primary/10 rounded-lg border border-primary/20"
         >
-          <div className="p-6 bg-background/50 backdrop-blur-sm rounded-xl border border-border/50">
-            <h4 className="font-semibold mb-4 text-center flex items-center justify-center gap-2">
-              <BarChart3 className="h-5 w-5 text-primary" />
-              Final Stats
-            </h4>
-            <div className="space-y-3">
-              <div className="flex justify-between items-center">
-                <span className="text-muted-foreground">Total Raised:</span>
-                <span className="font-bold text-green-400">
-                  {formatNumber(tokenData.collateral || "0")} AVAX
-                </span>
-              </div>
-              <div className="flex justify-between items-center">
-                <span className="text-muted-foreground">Final Price:</span>
-                <span className="font-bold text-foreground">
-                  {priceLoading
-                    ? "Loading..."
-                    : `${currentPrice || "0.000000"} AVAX`}
-                </span>
-              </div>
-            </div>
-          </div>
-
-          <div className="p-6 bg-background/50 backdrop-blur-sm rounded-xl border border-border/50">
-            <h4 className="font-semibold mb-4 text-center flex items-center justify-center gap-2">
-              <Wallet className="h-5 w-5 text-primary" />
-              Your Holdings
-            </h4>
-            <div className="p-4 bg-primary/10 rounded-lg border border-primary/20 text-center">
-              <p className="text-2xl font-bold text-foreground">
-                {tokenFormatted.amount} {tokenData?.symbol || "TOKEN"}
-              </p>
-              <p className="text-sm text-muted-foreground mt-1">
-                ≈ {tokenFormatted.value} AVAX
-              </p>
-            </div>
+          <h4 className="font-medium mb-2 flex items-center gap-2 text-center justify-center">
+            <Wallet className="h-4 w-4 text-primary" />
+            Your Holdings
+          </h4>
+          <div className="text-center">
+            <p className="text-xl font-bold text-foreground">
+              {tokenFormatted.amount} {tokenData?.symbol || "TOKEN"}
+            </p>
+            <p className="text-sm text-muted-foreground">
+              ≈ {tokenFormatted.value} AVAX
+            </p>
           </div>
         </motion.div>
       </div>
@@ -459,101 +408,75 @@ export function TokenTradeCard({
 
   const renderTradingInterface = () => (
     <div className="space-y-6">
-      {/* Single Consolidated Trading Card */}
-      <motion.div
-        whileHover={{ scale: 1.01 }}
-        transition={{ duration: 0.2 }}
-        className="unified-card border-primary/20 p-6"
-      >
-        {/* Header with balances */}
-        <div className="flex items-center justify-between mb-6">
-          <div>
-            <h3 className="text-xl font-semibold text-foreground">
-              Trade {tokenData?.symbol}
-            </h3>
-            <p className="text-sm text-muted-foreground">
-              Current price:{" "}
-              {priceLoading
-                ? "Loading..."
-                : `${currentPrice || "0.000000"} AVAX`}
-            </p>
-          </div>
-          <div className="text-right space-y-1">
-            <div className="text-sm">
-              <span className="text-muted-foreground">AVAX:</span>{" "}
-              <span className="font-medium">{avaxFormatted.amount}</span>
-            </div>
-            <div className="text-sm">
-              <span className="text-muted-foreground">
-                {tokenData?.symbol}:
-              </span>{" "}
-              <span className="font-medium">{tokenFormatted.amount}</span>
-            </div>
-          </div>
+      {/* Wallet Balances - Clean header */}
+      <div className="flex items-center justify-end py-3 border-b border-border/30">
+        <div className="text-sm space-x-4">
+          <span className="text-foreground">
+            <span className="text-muted-foreground">AVAX:</span>{" "}
+            {avaxFormatted.amount}
+          </span>
+          <span className="text-foreground">
+            <span className="text-muted-foreground">{tokenData?.symbol}:</span>{" "}
+            {tokenFormatted.amount}
+          </span>
         </div>
+      </div>
 
-        {/* Trading Tabs */}
-        <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
-          <TabsList className="grid w-full grid-cols-2 mb-6">
-            <TabsTrigger
-              value="buy"
-              className="data-[state=active]:bg-green-500/20 data-[state=active]:text-green-400"
-            >
-              <ArrowUpRight className="h-4 w-4 mr-2" />
-              Buy
-            </TabsTrigger>
-            <TabsTrigger
-              value="sell"
-              className="data-[state=active]:bg-red-500/20 data-[state=active]:text-red-400"
-            >
-              <ArrowDownLeft className="h-4 w-4 mr-2" />
-              Sell
-            </TabsTrigger>
-          </TabsList>
+      {/* Trading Tabs - Streamlined */}
+      <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
+        <TabsList className="grid w-full grid-cols-2 mb-6 bg-secondary/30">
+          <TabsTrigger
+            value="buy"
+            className="data-[state=active]:bg-green-500/20 data-[state=active]:text-green-400 transition-all duration-200"
+          >
+            <ArrowUpRight className="h-4 w-4 mr-2" />
+            Buy
+          </TabsTrigger>
+          <TabsTrigger
+            value="sell"
+            className="data-[state=active]:bg-red-500/20 data-[state=active]:text-red-400 transition-all duration-200"
+          >
+            <ArrowDownLeft className="h-4 w-4 mr-2" />
+            Sell
+          </TabsTrigger>
+        </TabsList>
 
-          <TabsContent value="buy" className="mt-0">
-            <BuyTokenForm
-              maxAmount={avaxBalance?.formatted || "0"}
-              onAmountChange={(amount: any) => handleAmountChange(amount, true)}
-            />
-          </TabsContent>
+        <TabsContent value="buy" className="mt-0 space-y-4">
+          <BuyTokenForm
+            maxAmount={avaxBalance?.formatted || "0"}
+            onAmountChange={(amount: any) => handleAmountChange(amount, true)}
+          />
+        </TabsContent>
 
-          <TabsContent value="sell" className="mt-0">
-            <SellTokenForm
-              maxAmount={tokenBalance?.formatted || "0"}
-              onAmountChange={(amount: any) =>
-                handleAmountChange(amount, false)
-              }
-              address={userAddress}
-            />
-          </TabsContent>
-        </Tabs>
+        <TabsContent value="sell" className="mt-0 space-y-4">
+          <SellTokenForm
+            maxAmount={tokenBalance?.formatted || "0"}
+            onAmountChange={(amount: any) => handleAmountChange(amount, false)}
+            address={userAddress}
+          />
+        </TabsContent>
+      </Tabs>
 
-        {/* Price Impact Warning - Only show if significant */}
-        {currentAmount !== "0" &&
-          parseFloat(currentAmount) > 0 &&
-          tradeEstimation.priceImpact > 1 && (
-            <motion.div
-              initial={{ opacity: 0, height: 0 }}
-              animate={{ opacity: 1, height: "auto" }}
-              className="mt-4 p-3 bg-orange-500/10 rounded-lg border border-orange-400/30"
-            >
-              <div className="flex items-center gap-2 text-orange-400">
-                <AlertTriangle className="h-4 w-4" />
-                <span className="text-sm font-medium">
-                  High Price Impact: {formatNumber(tradeEstimation.priceImpact)}
-                  %
-                </span>
-              </div>
-              <p className="text-xs text-muted-foreground mt-1">
-                This trade will move the price due to the bonding curve. Your
-                slippage protection ({tradeEstimation.slippage}%) may still
-                allow the transaction if you receive more tokens than your
-                minimum.
-              </p>
-            </motion.div>
-          )}
-      </motion.div>
+      {/* Price Impact Warning - Only show if significant */}
+      {currentAmount !== "0" &&
+        parseFloat(currentAmount) > 0 &&
+        tradeEstimation.priceImpact > 1 && (
+          <motion.div
+            initial={{ opacity: 0, height: 0 }}
+            animate={{ opacity: 1, height: "auto" }}
+            className="p-3 bg-orange-500/10 rounded-lg border border-orange-400/30"
+          >
+            <div className="flex items-center gap-2 text-orange-400">
+              <AlertTriangle className="h-4 w-4" />
+              <span className="text-sm font-medium">
+                High Price Impact: {formatNumber(tradeEstimation.priceImpact)}%
+              </span>
+            </div>
+            <p className="text-xs text-muted-foreground mt-1">
+              This trade will move the price due to the bonding curve.
+            </p>
+          </motion.div>
+        )}
     </div>
   );
 
@@ -562,56 +485,40 @@ export function TokenTradeCard({
       initial={{ opacity: 0, scale: 0.95 }}
       animate={{ opacity: 1, scale: 1 }}
       transition={{ duration: 0.5 }}
-      className="text-center py-12 space-y-8"
+      className="text-center py-8 space-y-6"
     >
-      <div className="space-y-4">
-        <motion.div
-          animate={{
-            rotate: [0, 10, -10, 0],
-            scale: [1, 1.1, 1],
-          }}
-          transition={{
-            duration: 3,
-            repeat: Infinity,
-            repeatDelay: 2,
-          }}
-          className="text-6xl"
-        >
-          👋
-        </motion.div>
-
-        <div>
-          <h3 className="text-2xl font-bold text-foreground mb-2">
-            Connect Your Wallet
-          </h3>
-          <p className="text-muted-foreground max-w-md mx-auto">
-            Connect your wallet to start trading {tokenData?.symbol || "tokens"}
-            . Your funds remain secure in your wallet.
-          </p>
-        </div>
+      <div className="space-y-3">
+        <div className="text-4xl">👋</div>
+        <h3 className="text-xl font-bold text-foreground">
+          Connect Your Wallet
+        </h3>
+        <p className="text-muted-foreground max-w-sm mx-auto">
+          Connect your wallet to start trading {tokenData?.symbol || "tokens"}
+        </p>
       </div>
 
-      <div className="flex flex-col gap-3 max-w-sm mx-auto">
+      <div className="flex flex-col gap-3 max-w-xs mx-auto">
         {connectors.map((connector) => (
           <motion.div
             key={connector.id}
-            whileHover={{ scale: 1.05 }}
-            whileTap={{ scale: 0.95 }}
+            whileHover={{ scale: 1.02 }}
+            whileTap={{ scale: 0.98 }}
           >
             <Button
               onClick={() => connect({ connector })}
-              className="w-full btn-primary py-3 text-lg font-semibold rounded-xl"
+              className="w-full btn-primary py-3 font-medium"
             >
+              <CreditCard className="h-4 w-4 mr-2" />
               Connect {connector.name}
             </Button>
           </motion.div>
         ))}
       </div>
 
-      <div className="p-4 bg-primary/10 rounded-xl border border-primary/20 max-w-md mx-auto">
+      <div className="p-3 bg-primary/10 rounded-lg border border-primary/20 max-w-sm mx-auto">
         <div className="flex items-center gap-2 text-sm text-primary">
           <ShieldCheck className="h-4 w-4" />
-          <span>Secure • Non-custodial • Your keys, your crypto</span>
+          <span>Secure • Non-custodial</span>
         </div>
       </div>
     </motion.div>
@@ -619,24 +526,18 @@ export function TokenTradeCard({
 
   return (
     <Card className="unified-card border-primary/20 overflow-hidden">
-      <CardContent className="p-0">
+      <CardContent className="p-6">
         <AnimatePresence mode="wait">
           {isGoalReached ? (
             <motion.div key="goal-reached">
               {renderGoalReachedState()}
             </motion.div>
           ) : isTrading ? (
-            <motion.div key="trading" className="p-8">
-              {renderTradingInterface()}
-            </motion.div>
+            <motion.div key="trading">{renderTradingInterface()}</motion.div>
           ) : effectivelyConnected ? (
-            <motion.div key="trading" className="p-8">
-              {renderTradingInterface()}
-            </motion.div>
+            <motion.div key="trading">{renderTradingInterface()}</motion.div>
           ) : (
-            <motion.div key="connect" className="p-8">
-              {renderConnectWallet()}
-            </motion.div>
+            <motion.div key="connect">{renderConnectWallet()}</motion.div>
           )}
         </AnimatePresence>
       </CardContent>

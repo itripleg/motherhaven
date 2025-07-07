@@ -2,7 +2,7 @@ import React from "react";
 import { TokenDebugView } from "./TokenDebugView";
 import { TokenHeaderStyled } from "./TokenHeaderStyled";
 
-const DEBUG = false;
+const DEBUG = true;
 
 interface TokenHeaderProps {
   address: string;

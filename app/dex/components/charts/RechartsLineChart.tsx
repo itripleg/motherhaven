@@ -1,6 +1,6 @@
-// Fixed RechartsLineChart.tsx - Proper genesis point handling
+// Fixed RechartsLineChart.tsx - Proper genesis point handling + Theme reactivity
 "use client";
-import React, { useMemo } from "react";
+import React, { useMemo, useState, useEffect } from "react";
 import {
   ResponsiveContainer,
   LineChart,
@@ -26,6 +26,7 @@ import { Badge } from "@/components/ui/badge";
 import { TrendingUp, TrendingDown, Activity, BarChart3 } from "lucide-react";
 import { motion } from "framer-motion";
 import { FACTORY_CONSTANTS } from "@/types";
+import { useColorTheme } from "@/contexts/ColorThemeProvider";
 
 // This interface defines the shape of the data that our chart will use
 interface ChartPoint {
@@ -44,7 +45,7 @@ interface RechartsLineChartProps {
 }
 
 // Enhanced custom tooltip component
-const CustomTooltip = ({ active, payload, label }: any) => {
+const CustomTooltip = ({ active, payload, label, primaryColor }: any) => {
   if (active && payload && payload.length) {
     const dataPoint = payload[0].payload;
     const formattedPrice = dataPoint.formattedPrice;
@@ -60,7 +61,10 @@ const CustomTooltip = ({ active, payload, label }: any) => {
           {label}
         </p>
         <div className="flex items-center gap-2">
-          <div className="w-3 h-3 rounded-full bg-primary" />
+          <div
+            className="w-3 h-3 rounded-full"
+            style={{ backgroundColor: primaryColor }}
+          />
           <p className="text-lg font-bold text-primary">
             {formattedPrice} AVAX
           </p>
@@ -125,17 +129,63 @@ export default function RechartsLineChart({
   const { formatted: currentPrice, isLoading: priceLoading } =
     useUnifiedTokenPrice(token.address as Address);
 
-  // Get the primary color from CSS custom properties
-  const primaryColor = useMemo(() => {
-    if (typeof window !== "undefined") {
-      const root = document.documentElement;
-      const hsl = getComputedStyle(root).getPropertyValue("--primary").trim();
-      if (hsl) {
-        return `hsl(${hsl})`;
+  // Use color theme context to get reactive primary color
+  const { colors } = useColorTheme();
+  const [primaryColor, setPrimaryColor] = useState("#8b5cf6"); // Fallback
+
+  // Reactive primary color calculation
+  useEffect(() => {
+    const updatePrimaryColor = () => {
+      if (typeof window !== "undefined") {
+        // First try to get from CSS custom property (most reliable)
+        const root = document.documentElement;
+        const hsl = getComputedStyle(root).getPropertyValue("--primary").trim();
+
+        if (hsl) {
+          // Convert HSL to hex for recharts
+          const hslMatch = hsl.match(
+            /(\d+(?:\.\d+)?)\s+(\d+(?:\.\d+)?)%\s+(\d+(?:\.\d+)?)%/
+          );
+          if (hslMatch) {
+            const [, h, s, l] = hslMatch;
+            const color = `hsl(${h}deg ${s}% ${l}%)`;
+            setPrimaryColor(color);
+            return;
+          }
+        }
+
+        // Fallback: use ColorThemeProvider colors if available
+        if (colors && colors[0]) {
+          const { hue, saturation, lightness } = colors[0];
+          setPrimaryColor(`hsl(${hue}deg ${saturation}% ${lightness}%)`);
+        }
       }
+    };
+
+    // Update immediately
+    updatePrimaryColor();
+
+    // Set up observer for CSS changes
+    const observer = new MutationObserver((mutations) => {
+      mutations.forEach((mutation) => {
+        if (
+          mutation.type === "attributes" &&
+          mutation.attributeName === "style"
+        ) {
+          updatePrimaryColor();
+        }
+      });
+    });
+
+    if (typeof window !== "undefined") {
+      observer.observe(document.documentElement, {
+        attributes: true,
+        attributeFilter: ["style"],
+      });
     }
-    return "#8b5cf6"; // Fallback color
-  }, []);
+
+    return () => observer.disconnect();
+  }, [colors]); // Re-run when colors from ColorThemeProvider change
 
   // Calculate chart data with proper genesis point
   const chartData: ChartPoint[] = useMemo(() => {
@@ -366,7 +416,7 @@ export default function RechartsLineChart({
                 strokeOpacity={0.1}
               />
 
-              {/* Gradient Definition */}
+              {/* Gradient Definition - Uses reactive primary color */}
               <defs>
                 <linearGradient id="priceGradient" x1="0" y1="0" x2="0" y2="1">
                   <stop
@@ -406,7 +456,11 @@ export default function RechartsLineChart({
                 tick={{ fill: "hsl(var(--muted-foreground))" }}
               />
 
-              <Tooltip content={<CustomTooltip />} />
+              <Tooltip
+                content={(props) => (
+                  <CustomTooltip {...props} primaryColor={primaryColor} />
+                )}
+              />
 
               {/* Area fill under the line */}
               <Area
@@ -417,7 +471,7 @@ export default function RechartsLineChart({
                 fillOpacity={1}
               />
 
-              {/* Main price line */}
+              {/* Main price line - Uses reactive primary color */}
               <Line
                 type="monotone"
                 dataKey="price"

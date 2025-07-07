@@ -11,16 +11,26 @@ import {
   TooltipProvider,
   TooltipTrigger,
 } from "@/components/ui/tooltip";
+import { cn } from "@/lib/utils";
 
 interface TransactionHashProps {
   hash: string;
   type: "tx" | "address";
+  className?: string;
+  compact?: boolean; // New prop for compact display
+  showActions?: boolean; // New prop to show/hide action buttons
 }
 
 // Updated URL - use the correct testnet URL
 const SNOWTRACE_TESTNET_URL = "https://testnet.snowtrace.dev";
 
-export function AddressComponent({ hash, type }: TransactionHashProps) {
+export function AddressComponent({
+  hash,
+  type,
+  className,
+  compact = false,
+  showActions = true,
+}: TransactionHashProps) {
   const [copied, setCopied] = useState(false);
   const [mounted, setMounted] = useState(false);
 
@@ -51,14 +61,14 @@ export function AddressComponent({ hash, type }: TransactionHashProps) {
     }
   };
 
-  const truncateHash = (hash: string, isTx: boolean = true) => {
+  const truncateHash = (hash: string) => {
     if (!hash || hash === "0x0000000000000000000000000000000000000000") {
       return "Invalid address";
     }
-    if (isTx) {
-      return `${hash.slice(0, 6)}...${hash.slice(-4)}`;
+    if (compact) {
+      return `${hash.slice(0, 4)}...${hash.slice(-4)}`;
     }
-    return hash;
+    return `${hash.slice(0, 6)}...${hash.slice(-4)}`;
   };
 
   const handleExternalClick = (e: React.MouseEvent) => {
@@ -70,17 +80,16 @@ export function AddressComponent({ hash, type }: TransactionHashProps) {
       return;
     }
 
-    console.log("Opening explorer URL:", explorerUrl);
     window.open(explorerUrl, "_blank", "noopener,noreferrer");
   };
 
   // Don't render until mounted to prevent hydration issues
   if (!mounted) {
     return (
-      <div className="flex items-center space-x-2 p-2 rounded-md text-center justify-center">
-        <span className="text-primary">{truncateHash(hash)}</span>
-        <div className="h-8 w-8"></div>
-        <div className="h-8 w-8"></div>
+      <div className={cn("flex items-center", className)}>
+        <span className="text-current font-mono text-sm">
+          {truncateHash(hash)}
+        </span>
       </div>
     );
   }
@@ -88,64 +97,81 @@ export function AddressComponent({ hash, type }: TransactionHashProps) {
   // If hash is invalid, show a warning
   if (!isValidHash) {
     return (
-      <div className="flex items-center space-x-2 p-2 rounded-md text-center justify-center">
+      <div className={cn("flex items-center", className)}>
         <span className="text-destructive text-sm">No address available</span>
       </div>
     );
   }
 
+  // Compact version for use in lists/tables
+  if (compact) {
+    return (
+      <TooltipProvider>
+        <Tooltip>
+          <TooltipTrigger asChild>
+            <button
+              onClick={copyToClipboard}
+              className={cn(
+                "font-mono text-sm hover:text-primary transition-colors cursor-pointer",
+                className
+              )}
+            >
+              {truncateHash(hash)}
+            </button>
+          </TooltipTrigger>
+          <TooltipContent>
+            <p>{copied ? "Copied!" : "Click to copy"}</p>
+          </TooltipContent>
+        </Tooltip>
+      </TooltipProvider>
+    );
+  }
+
+  // Full version with action buttons
   return (
     <TooltipProvider>
-      <motion.div
-        className="flex items-center space-x-2 p-0 rounded-md text-center justify-center"
-        initial={{ opacity: 0, y: -20 }}
-        animate={{ opacity: 1, y: 0 }}
-        transition={{ duration: 0.5 }}
-      >
-        {/* Address text - no longer clickable */}
-        <motion.span
-          className="text-primary transition-colors duration-200 font-mono text-sm"
-          whileHover={{ scale: 1.05 }}
-        >
+      <div className={cn("flex items-center gap-2", className)}>
+        {/* Address text */}
+        <span className="text-current font-mono text-sm truncate">
           {truncateHash(hash)}
-        </motion.span>
+        </span>
 
-        <Tooltip>
-          <TooltipTrigger asChild>
-            <motion.div whileHover={{ scale: 1.1 }} whileTap={{ scale: 0.9 }}>
-              <Button
-                variant="ghost"
-                size="icon"
-                onClick={copyToClipboard}
-                className="h-8 w-8 text-primary hover:text-primary/80 hover:bg-primary/20"
-              >
-                <Copy className="h-4 w-4" />
-              </Button>
-            </motion.div>
-          </TooltipTrigger>
-          <TooltipContent>
-            <p>{copied ? "Copied!" : "Copy to clipboard"}</p>
-          </TooltipContent>
-        </Tooltip>
+        {showActions && (
+          <div className="flex items-center gap-1 flex-shrink-0">
+            <Tooltip>
+              <TooltipTrigger asChild>
+                <Button
+                  variant="ghost"
+                  size="icon"
+                  onClick={copyToClipboard}
+                  className="h-6 w-6 text-current hover:text-primary hover:bg-primary/10 transition-colors"
+                >
+                  <Copy className="h-3 w-3" />
+                </Button>
+              </TooltipTrigger>
+              <TooltipContent>
+                <p>{copied ? "Copied!" : "Copy to clipboard"}</p>
+              </TooltipContent>
+            </Tooltip>
 
-        <Tooltip>
-          <TooltipTrigger asChild>
-            <motion.div whileHover={{ scale: 1.1 }} whileTap={{ scale: 0.9 }}>
-              <Button
-                variant="ghost"
-                size="icon"
-                onClick={handleExternalClick}
-                className="h-8 w-8 text-primary hover:text-primary/80 hover:bg-primary/20"
-              >
-                <ExternalLink className="h-4 w-4" />
-              </Button>
-            </motion.div>
-          </TooltipTrigger>
-          <TooltipContent>
-            <p>View on Snowtrace</p>
-          </TooltipContent>
-        </Tooltip>
-      </motion.div>
+            <Tooltip>
+              <TooltipTrigger asChild>
+                <Button
+                  variant="ghost"
+                  size="icon"
+                  onClick={handleExternalClick}
+                  className="h-6 w-6 text-current hover:text-primary hover:bg-primary/10 transition-colors"
+                >
+                  <ExternalLink className="h-3 w-3" />
+                </Button>
+              </TooltipTrigger>
+              <TooltipContent>
+                <p>View on Snowtrace</p>
+              </TooltipContent>
+            </Tooltip>
+          </div>
+        )}
+      </div>
     </TooltipProvider>
   );
 }

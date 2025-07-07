@@ -146,6 +146,7 @@ export function SellTokenForm({
 
     getEstimatedEthOut();
   }, [amount, tokenAddress]);
+
   const { data: allowance } = useReadContract({
     address: tokenAddress as `0x${string}`,
     abi: ERC20_ABI,
@@ -393,9 +394,11 @@ export function SellTokenForm({
       <div className="grid w-full items-center gap-4">
         <div className="flex flex-col space-y-1.5">
           <div className="flex justify-between items-center">
-            <Label htmlFor="amount">Amount (Tokens)</Label>
+            <Label htmlFor="amount" className="text-foreground">
+              Amount (Tokens)
+            </Label>
             <span
-              className="text-sm text-muted-foreground cursor-pointer hover:text-primary"
+              className="text-sm text-muted-foreground cursor-pointer hover:text-primary transition-colors"
               onClick={() => {
                 if (maxAmount) {
                   setAmount(maxAmount);
@@ -415,22 +418,31 @@ export function SellTokenForm({
               onAmountChange?.(e.target.value);
             }}
             onWheel={(e) => e.currentTarget.blur()}
-            className="text-center pr-2 dark:bg-black/80"
+            className="text-center pr-2 !bg-input !border-border text-foreground placeholder:text-muted-foreground focus:!border-primary focus:!ring-2 focus:!ring-primary/20 focus:!ring-offset-0 transition-all duration-200"
+            step="0.001"
+            min="0"
+            placeholder="0.000"
           />
         </div>
 
         {/* Slippage Tolerance Setting */}
         <div className="flex flex-col space-y-1.5">
-          <Label htmlFor="slippage">Slippage Tolerance (%)</Label>
+          <Label htmlFor="slippage" className="text-foreground">
+            Slippage Tolerance (%)
+          </Label>
           <div className="flex gap-2">
             {["0.5", "1", "2", "5"].map((preset) => (
               <Button
                 key={preset}
                 type="button"
-                variant={slippageTolerance === preset ? "default" : "outline"}
                 size="sm"
                 onClick={() => setSlippageTolerance(preset)}
-                className="flex-1"
+                className={`flex-1 transition-all duration-200 focus:ring-2 focus:ring-primary/50 focus:ring-offset-0 ${
+                  slippageTolerance === preset
+                    ? "bg-primary text-primary-foreground hover:bg-primary/90"
+                    : "bg-secondary/50 text-foreground border border-border hover:bg-secondary hover:border-primary/30"
+                }`}
+                variant="ghost"
               >
                 {preset}%
               </Button>
@@ -441,26 +453,29 @@ export function SellTokenForm({
               value={slippageTolerance}
               onChange={(e) => setSlippageTolerance(e.target.value)}
               onWheel={(e) => e.currentTarget.blur()}
-              className="w-20 text-center dark:bg-black/80"
+              className="w-20 text-center !bg-input !border-border text-foreground placeholder:text-muted-foreground focus:!border-primary focus:!ring-2 focus:!ring-primary/20 focus:!ring-offset-0 transition-all duration-200"
               step="0.1"
               min="0"
               max="50"
+              placeholder="1.0"
             />
           </div>
         </div>
 
         {/* Transaction Preview */}
         {amount && parseFloat(amount) > 0 && (
-          <div className="p-3 bg-muted/50 rounded-lg space-y-2">
+          <div className="p-3 bg-primary/10 border border-primary/20 rounded-lg space-y-2">
             <div className="flex justify-between text-sm">
-              <span>Estimated ETH:</span>
-              <span className="font-mono">
+              <span className="text-foreground">Estimated ETH:</span>
+              <span className="font-mono text-primary">
                 {parseFloat(estimatedEthOut).toFixed(6)} ETH
               </span>
             </div>
             <div className="flex justify-between text-sm">
-              <span>Minimum ETH (after {slippageTolerance}% slippage):</span>
-              <span className="font-mono">
+              <span className="text-foreground">
+                Minimum ETH (after {slippageTolerance}% slippage):
+              </span>
+              <span className="font-mono text-primary">
                 {(
                   (parseFloat(estimatedEthOut) *
                     (100 - parseFloat(slippageTolerance))) /
@@ -482,7 +497,7 @@ export function SellTokenForm({
       {needsApproval ? (
         <Button
           type="button"
-          className="mt-4 w-full"
+          className="mt-4 w-full bg-primary text-primary-foreground hover:bg-primary/90 focus:ring-2 focus:ring-primary/50 focus:ring-offset-0 transition-all duration-200 border-0"
           onClick={handleApprove}
           disabled={isApprovalPending || isApproving}
         >
@@ -491,7 +506,7 @@ export function SellTokenForm({
       ) : (
         <Button
           type="submit"
-          className="mt-4 w-full"
+          className="mt-4 w-full bg-primary text-primary-foreground hover:bg-primary/90 focus:ring-2 focus:ring-primary/50 focus:ring-offset-0 transition-all duration-200 border-0"
           disabled={isSellPending || !tokenAddress || !amount}
         >
           {isSellPending ? "Processing..." : "Sell Tokens"}
@@ -499,27 +514,25 @@ export function SellTokenForm({
       )}
 
       {(isApprovalConfirming || isSellConfirming) && (
-        <div className="mt-2 text-center">Waiting for confirmation...</div>
+        <div className="mt-2 text-center text-muted-foreground">
+          Waiting for confirmation...
+        </div>
       )}
 
       {/* Enhanced Error Display */}
       {errorDetails && (
-        <div className="mt-4 p-3 bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 rounded-md">
-          <p className="text-red-600 dark:text-red-400 font-medium text-sm">
-            Error Details:
-          </p>
-          <p className="text-red-700 dark:text-red-300 text-sm mt-1">
-            {errorDetails}
-          </p>
+        <div className="mt-4 p-3 bg-destructive/10 border border-destructive/20 rounded-md">
+          <p className="text-destructive font-medium text-sm">Error Details:</p>
+          <p className="text-destructive/80 text-sm mt-1">{errorDetails}</p>
         </div>
       )}
 
       {process.env.NODE_ENV === "development" && (
-        <div className="mt-4 p-3 bg-gray-50 dark:bg-gray-900/20 border border-gray-200 dark:border-gray-800 rounded-md">
-          <p className="text-gray-600 dark:text-gray-400 font-medium text-sm mb-2">
+        <div className="mt-4 p-3 bg-secondary/20 border border-border rounded-md">
+          <p className="text-foreground font-medium text-sm mb-2">
             Debug Info:
           </p>
-          <div className="text-xs space-y-1">
+          <div className="text-xs space-y-1 text-muted-foreground">
             <div>Token Address: {tokenAddress}</div>
             <div>Amount to Sell: {amount}</div>
             <div>Token Balance: {maxAmount}</div>
@@ -540,14 +553,32 @@ export function SellTokenForm({
       )}
 
       {receiptDetails.tokensSold && (
-        <div className="mt-4">
-          <p className="font-semibold">Transaction Receipt:</p>
-          <ul className="mt-2 space-y-1">
-            <li>Tokens Sold: {receiptDetails.tokensSold}</li>
-            <li>AVAX Received: {receiptDetails.avaxReceived} AVAX</li>
-            <li>Slippage Used: {slippageTolerance}%</li>
-            <li className="flex items-center">
-              Transaction: <AddressComponent hash={`${sellData}`} type="tx" />
+        <div className="mt-4 p-3 bg-primary/10 border border-primary/20 rounded-lg">
+          <p className="font-semibold text-foreground mb-2">
+            Transaction Receipt:
+          </p>
+          <ul className="space-y-1 text-sm">
+            <li className="flex justify-between">
+              <span className="text-muted-foreground">Tokens Sold:</span>
+              <span className="text-foreground font-medium">
+                {receiptDetails.tokensSold}
+              </span>
+            </li>
+            <li className="flex justify-between">
+              <span className="text-muted-foreground">AVAX Received:</span>
+              <span className="text-foreground font-medium">
+                {receiptDetails.avaxReceived} AVAX
+              </span>
+            </li>
+            <li className="flex justify-between">
+              <span className="text-muted-foreground">Slippage Used:</span>
+              <span className="text-foreground font-medium">
+                {slippageTolerance}%
+              </span>
+            </li>
+            <li className="flex items-center justify-between">
+              <span className="text-muted-foreground">Transaction:</span>
+              <AddressComponent hash={`${sellData}`} type="tx" />
             </li>
           </ul>
         </div>

@@ -6,72 +6,44 @@ html {
   overflow-y: scroll; /* Always show vertical scrollbar */
 }
 
-
-
 @layer base {
   :root {
-    /* Light mode - Dark gray theme with much better contrast for UI elements */
-    --background: 240 8% 10%; /* Even darker background */
-    --foreground: 0 0% 98%; /* Very bright text for maximum contrast */
-    --card: 240 5% 16%; /* Clearer card separation */
-    --card-foreground: 0 0% 98%;
-    --popover: 240 5% 16%; /* Match card */
-    --popover-foreground: 0 0% 98%;
-    --primary: 263.4 70% 70%; /* Much brighter purple */
-    --primary-foreground: 210 20% 98%;
-    --secondary: 240 5% 22%; /* Lighter for better contrast */
-    --secondary-foreground: 0 0% 98%;
-    --muted: 240 5% 19%; /* Between card and secondary */
-    --muted-foreground: 217.9 8% 70%; /* Brighter muted text */
-    --accent: 240 5% 22%; /* Match secondary - subtle gray */
-    --accent-foreground: 0 0% 98%;
-    --destructive: 0 84.2% 60.2%; /* Keep vibrant */
-    --destructive-foreground: 210 20% 98%;
-    --border: 240 5% 28%; /* Much lighter borders for visibility */
-    --input: 240 5% 20%; /* Distinct but not too bright */
-    --ring: 263.4 70% 70%; /* Match brighter primary */
-    --radius: 0.5rem;
-    
-    /* Charts - Keep the same vibrant colors for both modes */
-    --chart-1: 12 76% 61%;
-    --chart-2: 173 58% 39%;
-    --chart-3: 197 37% 24%;
-    --chart-4: 43 74% 66%;
-    --chart-5: 27 87% 67%;
-  }
-
-  .dark {
-    /* Dark mode - Keep your existing dark mode as it looks great */
+    /* Single unified theme - dark mode optimized */
     --background: 240 10% 3.9%;
     --foreground: 0 0% 98%;
     --card: 240 10% 7.8%;
     --card-foreground: 0 0% 98%;
     --popover: 240 10% 7.8%;
     --popover-foreground: 0 0% 98%;
-    --primary: 263.4 70% 50.4%;
+    
+    /* Default primary - will be overridden by ColorThemeProvider */
+    --primary: 200 80% 55%; /* Nice blue default instead of purple */
     --primary-foreground: 210 20% 98%;
+    
     --secondary: 240 10% 10.9%;
     --secondary-foreground: 0 0% 98%;
     --muted: 240 10% 9.8%;
     --muted-foreground: 217.9 10.6% 64.9%;
-    --accent: 240 10% 10.9%; /* Match secondary - subtle gray */
+    --accent: 240 10% 10.9%;
     --accent-foreground: 0 0% 98%;
     --destructive: 0 62.8% 30.6%;
     --destructive-foreground: 210 20% 98%;
     --border: 240 10% 10.9%;
     --input: 240 10% 10.9%;
-    --ring: 263.4 70% 50.4%;
+    --ring: 200 80% 55%; /* Match default primary */
+    --radius: 0.5rem;
     
-    /* Charts - Same colors work well in dark mode */
+    /* Charts - vibrant colors for data visualization */
     --chart-1: 220 70% 50%;
     --chart-2: 160 60% 45%;
     --chart-3: 30 80% 55%;
     --chart-4: 280 65% 60%;
     --chart-5: 340 75% 55%;
   }
+
+  /* Remove .dark selector since we're single-theme now */
 }
 
-/* Custom theme classes that will be used by the theme customizer */
 @layer components {
   /* Unified card styling for consistency */
   .unified-card {
@@ -83,16 +55,32 @@ html {
     @apply bg-background/80 backdrop-blur-md border border-border/50;
   }
   
-  /* Primary button styling */
+  /* Primary button styling - uses CSS variables that update with theme */
   .btn-primary {
     @apply bg-gradient-to-r from-primary to-primary/80 hover:from-primary/90 hover:to-primary/70 
-           text-primary-foreground shadow-lg hover:shadow-primary/25 transition-all duration-300;
+           text-primary-foreground shadow-lg hover:shadow-primary/25 transition-all duration-300
+           border-0 focus:ring-2 focus:ring-primary/50 focus:ring-offset-0;
   }
   
   /* Secondary button styling */
   .btn-secondary {
     @apply bg-secondary/80 hover:bg-secondary text-secondary-foreground 
-           border border-border/50 transition-all duration-300;
+           border border-border/50 transition-all duration-300
+           focus:ring-2 focus:ring-primary/50 focus:ring-offset-0;
+  }
+  
+  /* Enhanced input styling with proper theme colors */
+  .themed-input {
+    @apply bg-input border-border text-foreground placeholder:text-muted-foreground
+           focus:border-primary focus:ring-2 focus:ring-primary/20 focus:ring-offset-0
+           transition-all duration-200;
+  }
+  
+  /* Enhanced button styling for forms */
+  .themed-button {
+    @apply bg-primary text-primary-foreground hover:bg-primary/90
+           focus:ring-2 focus:ring-primary/50 focus:ring-offset-0
+           transition-all duration-200 border-0;
   }
   
   /* Text gradient for special headings */
@@ -149,5 +137,27 @@ html {
   
   .scrollbar-thin::-webkit-scrollbar-thumb:hover {
     background: hsl(var(--primary) / 0.5);
+  }
+}
+
+/* Additional utility classes for consistent theming */
+@layer utilities {
+  /* Focus styles that respect theme colors */
+  .focus-theme {
+    @apply focus:outline-none focus:ring-2 focus:ring-primary/50 focus:ring-offset-0;
+  }
+  
+  /* Border utilities with theme colors */
+  .border-theme {
+    @apply border-primary/20;
+  }
+  
+  /* Background utilities with theme colors */
+  .bg-theme-subtle {
+    @apply bg-primary/10;
+  }
+  
+  .bg-theme-medium {
+    @apply bg-primary/20;
   }
 }
