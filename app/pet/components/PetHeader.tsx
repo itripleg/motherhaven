@@ -1,7 +1,7 @@
 // pet/components/PetHeader.tsx
 "use client";
 
-import React from "react";
+import React, { useState } from "react";
 import { motion } from "framer-motion";
 import {
   Heart,
@@ -12,14 +12,26 @@ import {
   Clock,
   Crown,
   DollarSign,
+  Edit3,
+  Check,
+  X,
+  RefreshCw,
 } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { Card, CardContent } from "@/components/ui/card";
 import { Progress } from "@/components/ui/progress";
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
 import { useAccount } from "wagmi";
+import { useToast } from "@/hooks/use-toast";
 import { PetHeaderProps } from "../types";
 
-export const PetHeader: React.FC<PetHeaderProps> = ({
+interface EnhancedPetHeaderProps extends PetHeaderProps {
+  onRenamePet?: (newName: string) => Promise<void>;
+  isWritePending?: boolean;
+}
+
+export const PetHeader: React.FC<EnhancedPetHeaderProps> = ({
   petName,
   isAlive,
   currentHealth,
@@ -28,8 +40,15 @@ export const PetHeader: React.FC<PetHeaderProps> = ({
   revivalCost = "0",
   isUserCaretaker = false,
   timeSinceLastFed,
+  onRenamePet,
+  isWritePending = false,
 }) => {
   const { address } = useAccount();
+  const { toast } = useToast();
+
+  const [isEditing, setIsEditing] = useState(false);
+  const [newName, setNewName] = useState(petName);
+  const [isRenaming, setIsRenaming] = useState(false);
 
   // Always show dog emoji since contract only supports dogs
   const petEmoji = "🐕";
@@ -79,6 +98,52 @@ export const PetHeader: React.FC<PetHeaderProps> = ({
   };
 
   const healthStatus = getHealthStatus(currentHealth);
+
+  const handleStartEdit = () => {
+    if (!isUserCaretaker || !onRenamePet) return;
+    setNewName(petName);
+    setIsEditing(true);
+  };
+
+  const handleCancelEdit = () => {
+    setIsEditing(false);
+    setNewName(petName);
+  };
+
+  const handleSaveEdit = async () => {
+    if (!onRenamePet || !newName.trim() || newName.trim() === petName) {
+      handleCancelEdit();
+      return;
+    }
+
+    if (newName.trim().length > 32) {
+      toast({
+        title: "Name Too Long",
+        description: "Pet name must be 32 characters or less.",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    setIsRenaming(true);
+    try {
+      await onRenamePet(newName.trim());
+      setIsEditing(false);
+      toast({
+        title: "🏷️ Pet Renamed!",
+        description: `Your pet is now called "${newName.trim()}"!`,
+      });
+    } catch (error) {
+      console.error("Rename failed:", error);
+      toast({
+        title: "Rename Failed",
+        description: "Failed to rename pet. Please try again.",
+        variant: "destructive",
+      });
+    } finally {
+      setIsRenaming(false);
+    }
+  };
 
   const getPetMessage = () => {
     if (!isAlive) {
@@ -135,7 +200,7 @@ export const PetHeader: React.FC<PetHeaderProps> = ({
       transition={{ duration: 0.6 }}
       className="w-full"
     >
-      <Card className="bg-white/80 dark:bg-gray-900/80 backdrop-blur-sm border-2 shadow-lg overflow-hidden">
+      <Card className="unified-card border-2 shadow-lg overflow-hidden">
         {/* Critical health warning bar */}
         {isAlive && healthStatus.urgency === "high" && (
           <div className="h-1 bg-red-500 animate-pulse" />
@@ -179,9 +244,68 @@ export const PetHeader: React.FC<PetHeaderProps> = ({
               </div>
 
               <div className="space-y-2">
-                <h1 className="text-3xl lg:text-4xl font-bold tracking-tight">
-                  {petName}
-                </h1>
+                {/* Pet Name with Rename Functionality */}
+                <div className="flex items-center gap-2">
+                  {isEditing ? (
+                    <div className="flex items-center gap-2">
+                      <Input
+                        value={newName}
+                        onChange={(e) => setNewName(e.target.value)}
+                        className="text-2xl lg:text-3xl font-bold h-auto p-1 min-w-0"
+                        style={{ fontSize: "inherit" }}
+                        maxLength={32}
+                        disabled={isRenaming}
+                        onKeyDown={(e) => {
+                          if (e.key === "Enter") handleSaveEdit();
+                          if (e.key === "Escape") handleCancelEdit();
+                        }}
+                        autoFocus
+                      />
+                      <div className="flex gap-1">
+                        <Button
+                          onClick={handleSaveEdit}
+                          disabled={isRenaming || isWritePending}
+                          size="sm"
+                          variant="ghost"
+                          className="h-8 w-8 p-0 text-green-600 hover:text-green-700 hover:bg-green-100 dark:hover:bg-green-900/30"
+                        >
+                          {isRenaming ? (
+                            <RefreshCw className="h-4 w-4 animate-spin" />
+                          ) : (
+                            <Check className="h-4 w-4" />
+                          )}
+                        </Button>
+                        <Button
+                          onClick={handleCancelEdit}
+                          disabled={isRenaming}
+                          size="sm"
+                          variant="ghost"
+                          className="h-8 w-8 p-0 text-red-600 hover:text-red-700 hover:bg-red-100 dark:hover:bg-red-900/30"
+                        >
+                          <X className="h-4 w-4" />
+                        </Button>
+                      </div>
+                    </div>
+                  ) : (
+                    <>
+                      <h1 className="text-3xl lg:text-4xl font-bold tracking-tight">
+                        {petName}
+                      </h1>
+                      {isUserCaretaker && onRenamePet && (
+                        <Button
+                          onClick={handleStartEdit}
+                          disabled={isWritePending}
+                          size="sm"
+                          variant="ghost"
+                          className="h-8 w-8 p-0 text-muted-foreground hover:text-primary opacity-60 hover:opacity-100 transition-opacity"
+                        >
+                          <Edit3 className="h-4 w-4" />
+                        </Button>
+                      )}
+                    </>
+                  )}
+                </div>
+
                 <div className="flex flex-col sm:flex-row sm:items-center gap-2">
                   <Badge variant="outline" className="text-sm w-fit">
                     Community Dog
@@ -277,7 +401,7 @@ export const PetHeader: React.FC<PetHeaderProps> = ({
                 <div className="flex items-center justify-center gap-1 mb-1">
                   <Crown
                     className={`h-4 w-4 ${
-                      isUserCaretaker ? "text-yellow-500" : "text-blue-500"
+                      isUserCaretaker ? "text-primary" : "text-muted-foreground"
                     }`}
                   />
                   <span className="text-sm font-medium">Current Caretaker</span>
@@ -285,14 +409,17 @@ export const PetHeader: React.FC<PetHeaderProps> = ({
                 <div
                   className={`text-sm ${
                     isUserCaretaker
-                      ? "text-yellow-600 dark:text-yellow-400 font-medium"
+                      ? "text-primary font-medium"
                       : "text-muted-foreground"
                   }`}
                 >
                   {getCaretakerDisplay()}
                 </div>
                 {isUserCaretaker && (
-                  <Badge variant="outline" className="mt-1 text-xs">
+                  <Badge
+                    variant="outline"
+                    className="mt-1 text-xs bg-primary/10 text-primary border-primary/30"
+                  >
                     <Crown className="h-2 w-2 mr-1" />
                     You own this pet
                   </Badge>
@@ -375,7 +502,7 @@ export const PetHeader: React.FC<PetHeaderProps> = ({
                   </div>
                   <div className="flex items-center gap-1">
                     <Heart className="h-3 w-3" />
-                    <span>+10 health per feed</span>
+                    <span>Health gain scales with amount</span>
                   </div>
                   {!isAlive && (
                     <div className="flex items-center gap-1">

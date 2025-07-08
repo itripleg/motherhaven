@@ -1,3 +1,4 @@
+// pet/page.tsx
 "use client";
 
 import React, { useState } from "react";
@@ -78,7 +79,7 @@ const PetPage = () => {
       <PetBackground variant="default" intensity="medium" />
 
       <div className="relative z-10 container mx-auto p-6 pt-24 space-y-8">
-        {/* Pet Header - Real Data Only */}
+        {/* Pet Header - Real Data Only with Rename Function */}
         <motion.div
           initial={{ opacity: 0, y: -20 }}
           animate={{ opacity: 1, y: 0 }}
@@ -93,6 +94,8 @@ const PetPage = () => {
             revivalCost={revivalCost}
             isUserCaretaker={isUserCaretaker}
             timeSinceLastFed={timeSinceLastFed}
+            onRenamePet={renamePet}
+            isWritePending={isWritePending}
           />
         </motion.div>
 
@@ -146,7 +149,6 @@ const PetPage = () => {
                   revivalInfo={revivalInfo}
                   userStats={userStats}
                   onRevive={revivePet}
-                  onRenamePet={renamePet}
                   onUpdateHealth={updatePetHealth}
                   isConnected={isConnected}
                   isWritePending={isWritePending}
@@ -289,7 +291,7 @@ const PetPage = () => {
             <span>•</span>
             <span>Health decays -1/hour</span>
             <span>•</span>
-            <span>Feed gives +10 health</span>
+            <span>Feed gives +1-50 health</span>
             <span>•</span>
             <span>Deaths: {extendedPetInfo.deathCount}</span>
           </div>

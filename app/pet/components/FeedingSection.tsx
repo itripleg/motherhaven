@@ -15,7 +15,6 @@ import {
   Loader2,
   AlertCircle,
   Coins,
-  TrendingUp,
   Calculator,
 } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -272,41 +271,37 @@ export const FeedingSection: React.FC<FeedingSectionProps> = ({
         </Alert>
       )}
 
-      {/* CHOW Token Feeding Interface */}
-      <Card>
+      {/* Main Feeding Interface */}
+      <Card className="unified-card">
         <CardHeader>
           <CardTitle className="flex items-center gap-2">
-            <Utensils className="h-5 w-5 text-green-500" />
+            <Utensils className="h-5 w-5 text-primary" />
             Feed with CHOW Tokens
           </CardTitle>
         </CardHeader>
         <CardContent className="space-y-6">
-          {/* Token Information */}
-          <div className="flex items-center justify-between p-4 bg-gradient-to-r from-green-50 to-blue-50 dark:from-green-950/30 dark:to-blue-950/30 rounded-lg border">
-            <div className="space-y-1">
-              <h3 className="font-semibold text-lg flex items-center gap-2">
-                <Coins className="h-5 w-5 text-orange-500" />
-                {chowName || "CHOW Token"}
-              </h3>
-              <div className="flex items-center gap-3 text-sm text-muted-foreground">
-                <span>Symbol: {chowSymbol || "CHOW"}</span>
-                <span>•</span>
-                <span className="font-mono">
+          {/* Token Info & Balance */}
+          <div className="flex items-center justify-between p-4 bg-gradient-to-r from-primary/10 to-secondary/10 rounded-lg border border-primary/20">
+            <div className="flex items-center gap-3">
+              <Coins className="h-5 w-5 text-primary" />
+              <div>
+                <div className="font-semibold">{chowName || "CHOW Token"}</div>
+                <div className="text-sm text-muted-foreground font-mono">
                   {CHOW_TOKEN_ADDRESS.slice(0, 6)}...
                   {CHOW_TOKEN_ADDRESS.slice(-4)}
-                </span>
-                <Button
-                  onClick={() => copyToClipboard(CHOW_TOKEN_ADDRESS, "CHOW")}
-                  variant="ghost"
-                  size="sm"
-                  className="h-5 w-5 p-0"
-                >
-                  {copiedAddress === "CHOW" ? (
-                    <CheckCircle className="h-3 w-3 text-green-500" />
-                  ) : (
-                    <Copy className="h-3 w-3" />
-                  )}
-                </Button>
+                  <Button
+                    onClick={() => copyToClipboard(CHOW_TOKEN_ADDRESS, "CHOW")}
+                    variant="ghost"
+                    size="sm"
+                    className="h-4 w-4 p-0 ml-2"
+                  >
+                    {copiedAddress === "CHOW" ? (
+                      <CheckCircle className="h-3 w-3 text-green-500" />
+                    ) : (
+                      <Copy className="h-3 w-3" />
+                    )}
+                  </Button>
+                </div>
               </div>
             </div>
 
@@ -327,58 +322,30 @@ export const FeedingSection: React.FC<FeedingSectionProps> = ({
 
           {/* Burn Amount Input */}
           <div className="space-y-4">
-            <div className="space-y-2">
-              <label className="text-sm font-medium flex items-center gap-2">
+            <div>
+              <label className="text-sm font-medium flex items-center gap-2 mb-2">
                 <Heart className="h-4 w-4 text-red-500" />
                 Amount to Burn
               </label>
-              <div className="flex gap-2">
-                <Input
-                  type="number"
-                  placeholder="0.0"
-                  value={burnAmount}
-                  onChange={(e) => setBurnAmount(e.target.value)}
-                  className="flex-1"
-                  min="0"
-                  step="0.01"
-                />
-                <Button
-                  variant="outline"
-                  onClick={() => handleQuickAmount(100)}
-                  disabled={!chowBalance || !isConnected}
-                  className="px-3"
-                >
-                  Max
-                </Button>
-              </div>
+              <Input
+                type="number"
+                placeholder="0.0"
+                value={burnAmount}
+                onChange={(e) => setBurnAmount(e.target.value)}
+                className="themed-input"
+                min="0"
+                step="0.01"
+              />
             </div>
-
-            {/* Health Gain Preview */}
-            {burnAmount && displayHealthGain !== null && (
-              <div className="p-3 bg-green-50 dark:bg-green-900/20 rounded-lg border border-green-200 dark:border-green-800">
-                <div className="flex items-center gap-2 mb-1">
-                  <Calculator className="h-4 w-4 text-green-600 dark:text-green-400" />
-                  <span className="font-medium text-green-700 dark:text-green-300">
-                    Health Gain Preview
-                  </span>
-                </div>
-                <div className="text-2xl font-bold text-green-600 dark:text-green-400">
-                  +{displayHealthGain} Health Points
-                </div>
-                <div className="text-sm text-green-600 dark:text-green-400">
-                  for {burnAmount} {chowSymbol || "CHOW"} tokens
-                </div>
-              </div>
-            )}
 
             {/* Quick Amount Buttons */}
             {isConnected && chowBalance && (
-              <div className="flex gap-2">
+              <div className="grid grid-cols-4 gap-2">
                 <Button
                   variant="outline"
                   size="sm"
                   onClick={() => handleQuickAmount(25)}
-                  className="flex-1"
+                  className="text-xs"
                 >
                   25%
                 </Button>
@@ -386,7 +353,7 @@ export const FeedingSection: React.FC<FeedingSectionProps> = ({
                   variant="outline"
                   size="sm"
                   onClick={() => handleQuickAmount(50)}
-                  className="flex-1"
+                  className="text-xs"
                 >
                   50%
                 </Button>
@@ -394,143 +361,165 @@ export const FeedingSection: React.FC<FeedingSectionProps> = ({
                   variant="outline"
                   size="sm"
                   onClick={() => handleQuickAmount(75)}
-                  className="flex-1"
+                  className="text-xs"
                 >
                   75%
+                </Button>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => handleQuickAmount(100)}
+                  className="text-xs"
+                >
+                  Max
                 </Button>
               </div>
             )}
 
-            {/* Feeding Info */}
-            <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 text-sm">
-              <div className="flex items-center gap-2 p-2 bg-muted/30 rounded">
-                <Heart className="h-3 w-3 text-red-500" />
-                <span>Scaled Health Gain</span>
+            {/* Health Gain Preview */}
+            {burnAmount && displayHealthGain !== null && (
+              <div className="p-3 bg-green-50 dark:bg-green-900/20 rounded-lg border border-green-200 dark:border-green-800">
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center gap-2">
+                    <Calculator className="h-4 w-4 text-green-600 dark:text-green-400" />
+                    <span className="font-medium text-green-700 dark:text-green-300">
+                      Health Gain Preview
+                    </span>
+                  </div>
+                  <div className="text-xl font-bold text-green-600 dark:text-green-400">
+                    +{displayHealthGain} HP
+                  </div>
+                </div>
+                <div className="text-sm text-green-600 dark:text-green-400 mt-1">
+                  for {burnAmount} {chowSymbol || "CHOW"} tokens
+                </div>
               </div>
-              <div className="flex items-center gap-2 p-2 bg-muted/30 rounded">
-                <Zap className="h-3 w-3 text-purple-500" />
-                <span>Instant Effect</span>
-              </div>
-              <div className="flex items-center gap-2 p-2 bg-muted/30 rounded">
-                <TrendingUp className="h-3 w-3 text-green-500" />
-                <span>Helps Community</span>
-              </div>
-            </div>
-          </div>
-
-          {/* Feed Button */}
-          <Button
-            onClick={handleBurnTokens}
-            disabled={
-              !isConnected ||
-              !petIsAlive ||
-              isBurnPending ||
-              !burnAmount ||
-              parseFloat(burnAmount) <= 0
-            }
-            className="w-full feed-button"
-            size="lg"
-          >
-            {isBurnPending ? (
-              <>
-                <Loader2 className="h-4 w-4 mr-2 animate-spin" />
-                Burning Tokens...
-              </>
-            ) : (
-              <>
-                <Utensils className="h-4 w-4 mr-2" />
-                Burn {burnAmount || "0"} {chowSymbol || "CHOW"}
-                {displayHealthGain !== null && burnAmount && (
-                  <span className="ml-1">for +{displayHealthGain} HP</span>
-                )}
-                <ArrowRight className="h-4 w-4 ml-2" />
-              </>
             )}
-          </Button>
 
-          {!isConnected && (
-            <p className="text-center text-sm text-muted-foreground">
-              Connect your wallet to feed {petName}
-            </p>
-          )}
-        </CardContent>
-      </Card>
+            {/* Feed Button */}
+            <Button
+              onClick={handleBurnTokens}
+              disabled={
+                !isConnected ||
+                !petIsAlive ||
+                isBurnPending ||
+                !burnAmount ||
+                parseFloat(burnAmount) <= 0
+              }
+              className="w-full themed-button feed-button"
+              size="lg"
+            >
+              {isBurnPending ? (
+                <>
+                  <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                  Burning Tokens...
+                </>
+              ) : (
+                <>
+                  <Utensils className="h-4 w-4 mr-2" />
+                  Burn {burnAmount || "0"} {chowSymbol || "CHOW"}
+                  {displayHealthGain !== null && burnAmount && (
+                    <span className="ml-2">→ +{displayHealthGain} HP</span>
+                  )}
+                  <ArrowRight className="h-4 w-4 ml-2" />
+                </>
+              )}
+            </Button>
 
-      {/* How Feeding Works */}
-      <Card>
-        <CardHeader>
-          <CardTitle className="flex items-center gap-2">
-            <Info className="h-5 w-5 text-blue-500" />
-            How Feeding Works
-          </CardTitle>
-        </CardHeader>
-        <CardContent>
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-            <div className="space-y-4">
-              <h4 className="font-medium">🔥 Token Burning Process</h4>
-              <div className="space-y-2 text-sm text-muted-foreground">
-                <p>• CHOW tokens are permanently destroyed when burned</p>
-                <p>• Burn triggers automatic pet feeding notification</p>
-                <p>• Health gain is calculated based on amount burned</p>
-                <p>• Total supply of CHOW decreases with each burn</p>
-              </div>
-            </div>
-
-            <div className="space-y-4">
-              <h4 className="font-medium">⚡ Health Calculation</h4>
-              <div className="space-y-2 text-sm text-muted-foreground">
-                <p>• Health gain scales with tokens burned</p>
-                <p>• Minimum 1 health point per feeding</p>
-                <p>• Maximum 50 health points per feeding</p>
-                <p>• Use preview to see exact health gain</p>
-              </div>
-            </div>
-          </div>
-
-          <Separator className="my-4" />
-
-          <div className="space-y-3">
-            <h4 className="font-medium">📊 Health Mechanics</h4>
-            <div className="grid grid-cols-2 md:grid-cols-4 gap-3 text-sm">
-              <div className="text-center p-3 bg-green-100 dark:bg-green-900/30 rounded">
-                <div className="font-bold text-green-600 dark:text-green-400">
-                  1-50
-                </div>
-                <div className="text-muted-foreground">Health per feed</div>
-              </div>
-              <div className="text-center p-3 bg-red-100 dark:bg-red-900/30 rounded">
-                <div className="font-bold text-red-600 dark:text-red-400">
-                  -1
-                </div>
-                <div className="text-muted-foreground">Health per hour</div>
-              </div>
-              <div className="text-center p-3 bg-blue-100 dark:bg-blue-900/30 rounded">
-                <div className="font-bold text-blue-600 dark:text-blue-400">
-                  100
-                </div>
-                <div className="text-muted-foreground">Maximum health</div>
-              </div>
-              <div className="text-center p-3 bg-orange-100 dark:bg-orange-900/30 rounded">
-                <div className="font-bold text-orange-600 dark:text-orange-400">
-                  0
-                </div>
-                <div className="text-muted-foreground">Death threshold</div>
-              </div>
-            </div>
+            {!isConnected && (
+              <p className="text-center text-sm text-muted-foreground">
+                Connect your wallet to feed {petName}
+              </p>
+            )}
           </div>
         </CardContent>
       </Card>
 
-      {/* Contract Information */}
-      <Card>
-        <CardHeader>
-          <CardTitle className="flex items-center gap-2">
-            <ExternalLink className="h-5 w-5 text-purple-500" />
-            Contract Information
-          </CardTitle>
-        </CardHeader>
-        <CardContent className="space-y-4">
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+      {/* Side-by-side Information Cards */}
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+        {/* How Feeding Works */}
+        <Card className="unified-card">
+          <CardHeader>
+            <CardTitle className="flex items-center gap-2">
+              <Info className="h-5 w-5 text-primary" />
+              How Feeding Works
+            </CardTitle>
+          </CardHeader>
+          <CardContent>
+            <div className="space-y-6">
+              {/* Mechanics Grid */}
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div className="space-y-3">
+                  <h4 className="font-medium">🔥 Token Burning</h4>
+                  <div className="space-y-2 text-sm text-muted-foreground">
+                    <p>• CHOW tokens are permanently destroyed</p>
+                    <p>• Triggers automatic pet feeding notification</p>
+                    <p>• Health gain scales with amount burned</p>
+                    <p>• Total supply decreases with each burn</p>
+                  </div>
+                </div>
+
+                <div className="space-y-3">
+                  <h4 className="font-medium">⚡ Health Calculation</h4>
+                  <div className="space-y-2 text-sm text-muted-foreground">
+                    <p>• Scaled health gain from tokens</p>
+                    <p>• Minimum 1 health point per feeding</p>
+                    <p>• Maximum 50 health points per feeding</p>
+                    <p>• Preview shows exact health gain</p>
+                  </div>
+                </div>
+              </div>
+
+              <Separator />
+
+              {/* Quick Stats */}
+              <div className="grid grid-cols-4 gap-3 text-sm">
+                <div className="text-center p-3 bg-green-100 dark:bg-green-900/30 rounded">
+                  <div className="font-bold text-green-600 dark:text-green-400">
+                    1-50
+                  </div>
+                  <div className="text-muted-foreground text-xs">
+                    Health/feed
+                  </div>
+                </div>
+                <div className="text-center p-3 bg-red-100 dark:bg-red-900/30 rounded">
+                  <div className="font-bold text-red-600 dark:text-red-400">
+                    -1
+                  </div>
+                  <div className="text-muted-foreground text-xs">
+                    Health/hour
+                  </div>
+                </div>
+                <div className="text-center p-3 bg-blue-100 dark:bg-blue-900/30 rounded">
+                  <div className="font-bold text-blue-600 dark:text-blue-400">
+                    100
+                  </div>
+                  <div className="text-muted-foreground text-xs">
+                    Max health
+                  </div>
+                </div>
+                <div className="text-center p-3 bg-orange-100 dark:bg-orange-900/30 rounded">
+                  <div className="font-bold text-orange-600 dark:text-orange-400">
+                    0
+                  </div>
+                  <div className="text-muted-foreground text-xs">
+                    Death point
+                  </div>
+                </div>
+              </div>
+            </div>
+          </CardContent>
+        </Card>
+
+        {/* Contract Information */}
+        <Card className="unified-card">
+          <CardHeader>
+            <CardTitle className="flex items-center gap-2">
+              <ExternalLink className="h-5 w-5 text-primary" />
+              Contract Information
+            </CardTitle>
+          </CardHeader>
+          <CardContent className="space-y-4">
             {/* CHOW Token Contract */}
             <div className="p-4 bg-muted/30 rounded-lg">
               <div className="flex items-center justify-between mb-2">
@@ -602,13 +591,13 @@ export const FeedingSection: React.FC<FeedingSectionProps> = ({
                 </Button>
               </div>
             )}
-          </div>
 
-          <div className="text-center text-sm text-muted-foreground">
-            All contracts are deployed on Avalanche Fuji Testnet
-          </div>
-        </CardContent>
-      </Card>
+            <div className="text-center text-sm text-muted-foreground">
+              All contracts are deployed on Avalanche Fuji Testnet
+            </div>
+          </CardContent>
+        </Card>
+      </div>
     </div>
   );
 };

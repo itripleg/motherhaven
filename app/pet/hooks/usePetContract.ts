@@ -79,6 +79,13 @@ const PET_CONTRACT_ABI = [
     type: "function",
   },
   {
+    inputs: [{ name: "amount", type: "uint256" }],
+    name: "previewHealthGain",
+    outputs: [{ name: "", type: "uint256" }],
+    stateMutability: "view",
+    type: "function",
+  },
+  {
     inputs: [{ name: "token", type: "address" }],
     name: "supportedTokens",
     outputs: [{ name: "", type: "bool" }],
@@ -140,6 +147,17 @@ const PET_CONTRACT_ABI = [
       { name: "deathCount", type: "uint256" },
     ],
     name: "PetRevived",
+    type: "event",
+  },
+  {
+    anonymous: false,
+    inputs: [
+      { indexed: true, name: "owner", type: "address" },
+      { name: "oldName", type: "string" },
+      { name: "newName", type: "string" },
+      { name: "timestamp", type: "uint256" },
+    ],
+    name: "PetRenamed",
     type: "event",
   },
   {
@@ -233,7 +251,10 @@ export function usePetContract(): UsePetContractReturn {
     ...petContract,
     functionName: "getPetInfo",
     query: {
-      refetchInterval: 30000,
+      refetchInterval: 30000, // 30 seconds
+      refetchOnMount: true,
+      refetchOnWindowFocus: false,
+      refetchOnReconnect: true,
     },
   });
 
@@ -246,7 +267,9 @@ export function usePetContract(): UsePetContractReturn {
     ...petContract,
     functionName: "getRevivalInfo",
     query: {
-      refetchInterval: 30000,
+      refetchInterval: 60000, // 1 minute
+      refetchOnMount: true,
+      refetchOnWindowFocus: false,
     },
   });
 
@@ -259,7 +282,9 @@ export function usePetContract(): UsePetContractReturn {
     ...petContract,
     functionName: "getCurrentHealth",
     query: {
-      refetchInterval: 10000,
+      refetchInterval: 15000, // 15 seconds for more frequent health updates
+      refetchOnMount: true,
+      refetchOnWindowFocus: false,
     },
   });
 
@@ -272,7 +297,9 @@ export function usePetContract(): UsePetContractReturn {
     ...petContract,
     functionName: "getTimeSinceLastFed",
     query: {
-      refetchInterval: 10000,
+      refetchInterval: 15000, // 15 seconds
+      refetchOnMount: true,
+      refetchOnWindowFocus: false,
     },
   });
 
@@ -287,11 +314,47 @@ export function usePetContract(): UsePetContractReturn {
     args: address ? [address] : undefined,
     query: {
       enabled: Boolean(address),
-      refetchInterval: 30000,
+      refetchInterval: 30000, // 30 seconds
+      refetchOnMount: true,
+      refetchOnWindowFocus: false,
     },
   });
 
-  // Watch for events
+  // Helper function to trigger data refresh
+  const triggerDataRefresh = useCallback(async () => {
+    // Manually trigger all refetches for immediate updates
+    await Promise.allSettled([
+      refetchExtendedPet(),
+      refetchRevival(),
+      refetchHealth(),
+      refetchTime(),
+      refetchUserStats(),
+    ]);
+  }, [
+    refetchExtendedPet,
+    refetchRevival,
+    refetchHealth,
+    refetchTime,
+    refetchUserStats,
+  ]);
+
+  // Enhanced error handler for event watchers
+  const handleEventError = useCallback((error: Error, eventName: string) => {
+    // Ignore common filter errors that don't affect functionality
+    if (
+      error.message.includes("filter not found") ||
+      error.message.includes("eth_uninstallFilter") ||
+      error.message.includes("RpcRequestError")
+    ) {
+      console.warn(`Event filter warning for ${eventName}:`, error.message);
+      return;
+    }
+
+    // Log other errors but don't show to user unless critical
+    console.error(`Event watch error for ${eventName}:`, error);
+  }, []);
+
+  // Watch for PetFed events
   useWatchContractEvent({
     ...petContract,
     eventName: "PetFed",
@@ -301,14 +364,21 @@ export function usePetContract(): UsePetContractReturn {
         title: "🍖 Pet Fed!",
         description: "The pet has been fed and is feeling better!",
       });
+
+      // Trigger immediate refresh
       setTimeout(() => {
-        refetchExtendedPet();
-        refetchHealth();
-        refetchUserStats();
+        triggerDataRefresh();
       }, 2000);
+
+      // Backup refresh
+      setTimeout(() => {
+        triggerDataRefresh();
+      }, 5000);
     },
+    onError: (error) => handleEventError(error, "PetFed"),
   });
 
+  // Watch for PetDied events
   useWatchContractEvent({
     ...petContract,
     eventName: "PetDied",
@@ -319,14 +389,15 @@ export function usePetContract(): UsePetContractReturn {
         description: "The pet needs to be revived!",
         variant: "destructive",
       });
+
       setTimeout(() => {
-        refetchExtendedPet();
-        refetchRevival();
-        refetchHealth();
+        triggerDataRefresh();
       }, 2000);
     },
+    onError: (error) => handleEventError(error, "PetDied"),
   });
 
+  // Watch for PetRevived events
   useWatchContractEvent({
     ...petContract,
     eventName: "PetRevived",
@@ -336,14 +407,33 @@ export function usePetContract(): UsePetContractReturn {
         title: "🎉 Pet Revived!",
         description: "Welcome back! The pet is alive again!",
       });
+
       setTimeout(() => {
-        refetchExtendedPet();
-        refetchRevival();
-        refetchHealth();
+        triggerDataRefresh();
       }, 2000);
     },
+    onError: (error) => handleEventError(error, "PetRevived"),
   });
 
+  // Watch for PetRenamed events
+  useWatchContractEvent({
+    ...petContract,
+    eventName: "PetRenamed",
+    onLogs: (logs) => {
+      console.log("🏷️ Pet renamed:", logs);
+      toast({
+        title: "🏷️ Pet Renamed!",
+        description: "Your pet has a new name!",
+      });
+
+      setTimeout(() => {
+        triggerDataRefresh();
+      }, 2000);
+    },
+    onError: (error) => handleEventError(error, "PetRenamed"),
+  });
+
+  // Watch for PetCaretakerChanged events
   useWatchContractEvent({
     ...petContract,
     eventName: "PetCaretakerChanged",
@@ -353,10 +443,12 @@ export function usePetContract(): UsePetContractReturn {
         title: "👑 New Caretaker!",
         description: "Pet ownership has been transferred!",
       });
+
       setTimeout(() => {
-        refetchExtendedPet();
+        triggerDataRefresh();
       }, 2000);
     },
+    onError: (error) => handleEventError(error, "PetCaretakerChanged"),
   });
 
   // Process extended pet data
@@ -419,7 +511,7 @@ export function usePetContract(): UsePetContractReturn {
     );
   }, [address, extendedPetInfo?.currentCaretaker]);
 
-  // Actions
+  // Actions with enhanced error handling and polling fallbacks
   const revivePet = useCallback(async () => {
     if (!address) {
       toast({
@@ -451,6 +543,11 @@ export function usePetContract(): UsePetContractReturn {
         description:
           "Your pet revival transaction has been submitted! You will become the new caretaker.",
       });
+
+      // Polling fallbacks in case events fail
+      setTimeout(() => triggerDataRefresh(), 5000);
+      setTimeout(() => triggerDataRefresh(), 10000);
+      setTimeout(() => triggerDataRefresh(), 20000);
     } catch (error) {
       console.error("Revival error:", error);
       toast({
@@ -459,7 +556,14 @@ export function usePetContract(): UsePetContractReturn {
         variant: "destructive",
       });
     }
-  }, [address, revivalInfo?.currentCost, writeContract, toast, petContract]);
+  }, [
+    address,
+    revivalInfo?.currentCost,
+    writeContract,
+    toast,
+    petContract,
+    triggerDataRefresh,
+  ]);
 
   const renamePet = useCallback(
     async (newName: string) => {
@@ -492,6 +596,10 @@ export function usePetContract(): UsePetContractReturn {
           title: "Rename Transaction Sent",
           description: `Renaming pet to "${newName}"!`,
         });
+
+        // Polling fallbacks in case events fail
+        setTimeout(() => triggerDataRefresh(), 5000);
+        setTimeout(() => triggerDataRefresh(), 10000);
       } catch (error) {
         console.error("Rename error:", error);
         toast({
@@ -501,7 +609,14 @@ export function usePetContract(): UsePetContractReturn {
         });
       }
     },
-    [address, isUserCaretaker, writeContract, toast, petContract]
+    [
+      address,
+      isUserCaretaker,
+      writeContract,
+      toast,
+      petContract,
+      triggerDataRefresh,
+    ]
   );
 
   const updatePetHealth = useCallback(async () => {
@@ -515,6 +630,10 @@ export function usePetContract(): UsePetContractReturn {
         title: "Health Update Sent",
         description: "Pet health update transaction submitted!",
       });
+
+      // Immediate refresh for health updates
+      setTimeout(() => triggerDataRefresh(), 3000);
+      setTimeout(() => triggerDataRefresh(), 8000);
     } catch (error) {
       console.error("Update health error:", error);
       toast({
@@ -523,23 +642,11 @@ export function usePetContract(): UsePetContractReturn {
         variant: "destructive",
       });
     }
-  }, [writeContract, toast, petContract]);
+  }, [writeContract, toast, petContract, triggerDataRefresh]);
 
   const refreshData = useCallback(async () => {
-    await Promise.all([
-      refetchExtendedPet(),
-      refetchRevival(),
-      refetchHealth(),
-      refetchTime(),
-      refetchUserStats(),
-    ]);
-  }, [
-    refetchExtendedPet,
-    refetchRevival,
-    refetchHealth,
-    refetchTime,
-    refetchUserStats,
-  ]);
+    await triggerDataRefresh();
+  }, [triggerDataRefresh]);
 
   // Helper function
   const formatTimeSince = useCallback((seconds: number): string => {
