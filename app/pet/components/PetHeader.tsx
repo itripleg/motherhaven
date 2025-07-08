@@ -9,32 +9,18 @@ import {
   Activity,
   Zap,
   TrendingDown,
-  Users,
   Clock,
   Crown,
   DollarSign,
 } from "lucide-react";
-import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Card, CardContent } from "@/components/ui/card";
 import { Progress } from "@/components/ui/progress";
 import { useAccount } from "wagmi";
-import { PetHeaderProps, PET_TYPE_EMOJIS, PET_TYPE_NAMES } from "../types";
+import { PetHeaderProps } from "../types";
 
-interface ExtendedPetHeaderProps
-  extends Omit<PetHeaderProps, "lastUpdate" | "onRefresh" | "isRefreshing"> {
-  currentCaretaker?: string;
-  deathCount?: number;
-  revivalCost?: string;
-  isUserCaretaker?: boolean;
-  lastUpdate?: Date | null;
-  onRefresh?: () => Promise<void>;
-  isRefreshing?: boolean;
-}
-
-export const PetHeader: React.FC<ExtendedPetHeaderProps> = ({
+export const PetHeader: React.FC<PetHeaderProps> = ({
   petName,
-  petType,
   isAlive,
   currentHealth,
   currentCaretaker,
@@ -44,8 +30,9 @@ export const PetHeader: React.FC<ExtendedPetHeaderProps> = ({
   timeSinceLastFed,
 }) => {
   const { address } = useAccount();
-  const petEmoji = PET_TYPE_EMOJIS[petType] || "🐕";
-  const petTypeName = PET_TYPE_NAMES[petType] || "Dog";
+
+  // Always show dog emoji since contract only supports dogs
+  const petEmoji = "🐕";
 
   const getHealthStatus = (health?: number) => {
     if (!health)
@@ -131,6 +118,16 @@ export const PetHeader: React.FC<ExtendedPetHeaderProps> = ({
     return formatAddress(currentCaretaker);
   };
 
+  const formatTimeSince = (seconds?: number) => {
+    if (!seconds) return "Unknown";
+    const hours = Math.floor(seconds / 3600);
+    const minutes = Math.floor((seconds % 3600) / 60);
+    if (hours > 0) {
+      return `${hours}h ${minutes}m ago`;
+    }
+    return `${minutes}m ago`;
+  };
+
   return (
     <motion.div
       initial={{ opacity: 0, y: -20 }}
@@ -187,7 +184,7 @@ export const PetHeader: React.FC<ExtendedPetHeaderProps> = ({
                 </h1>
                 <div className="flex flex-col sm:flex-row sm:items-center gap-2">
                   <Badge variant="outline" className="text-sm w-fit">
-                    Community {petTypeName}
+                    Community Dog
                   </Badge>
                   <Badge
                     variant={isAlive ? "default" : "destructive"}
@@ -213,7 +210,7 @@ export const PetHeader: React.FC<ExtendedPetHeaderProps> = ({
                   )}
                 </div>
                 <div className="text-sm text-muted-foreground">
-                  On Fuji Testnet • Auto-updates every 30s
+                  On Fuji Testnet
                 </div>
               </div>
             </div>
@@ -261,6 +258,14 @@ export const PetHeader: React.FC<ExtendedPetHeaderProps> = ({
                     </div>
                     <span className="font-mono">0 ←→ 100</span>
                   </div>
+                </div>
+              )}
+
+              {/* Last Fed Info */}
+              {timeSinceLastFed !== null && (
+                <div className="flex items-center gap-2 text-sm text-muted-foreground">
+                  <Clock className="h-3 w-3" />
+                  <span>Last fed: {formatTimeSince(timeSinceLastFed)}</span>
                 </div>
               )}
             </div>
@@ -370,7 +375,7 @@ export const PetHeader: React.FC<ExtendedPetHeaderProps> = ({
                   </div>
                   <div className="flex items-center gap-1">
                     <Heart className="h-3 w-3" />
-                    <span>Scaled health gain</span>
+                    <span>+10 health per feed</span>
                   </div>
                   {!isAlive && (
                     <div className="flex items-center gap-1">

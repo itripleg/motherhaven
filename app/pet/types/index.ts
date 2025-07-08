@@ -3,46 +3,11 @@
 import { type Address } from "viem";
 
 // =================================================================
-//                         Simplified Enums
+//                   Contract Data Interfaces (Real contract data only)
 // =================================================================
 
-// Keep for UI compatibility, but simplified contract only uses DOG
-export enum PetType {
-  DOG = 0,
-  CAT = 1,
-  ROBOT = 2,
-  DRAGON = 3,
-  ALIEN = 4,
-}
-
-// Keep for UI, but simplified contract doesn't track mood
-export enum PetMood {
-  ECSTATIC = 0,
-  HAPPY = 1,
-  CONTENT = 2,
-  SAD = 3,
-  DEPRESSED = 4,
-  MISERABLE = 5,
-}
-
-// Keep for UI, but simplified contract doesn't track actions
-export enum PetActionType {
-  SLEEPING = 0,
-  PLAYING = 1,
-  EATING = 2,
-  EXPLORING = 3,
-  RESTING = 4,
-  SOCIALIZING = 5,
-  DREAMING = 6,
-  EXERCISING = 7,
-}
-
-// =================================================================
-//                   Simplified Pet Interfaces
-// =================================================================
-
-// This matches our simplified contract getPetStatus() return
-export interface SimplePetStatus {
+// Matches your contract's getPetStatus() return exactly
+export interface PetStatus {
   name: string;
   health: number; // 0-100
   isAlive: boolean;
@@ -50,54 +15,46 @@ export interface SimplePetStatus {
   totalFeedings: number;
 }
 
-// Extended interface for UI compatibility (adds mock values for UI)
-export interface PetStatus {
+// Matches your contract's getPetInfo() return exactly
+export interface ExtendedPetInfo {
   name: string;
-  petType: PetType; // Always DOG in simplified version
   health: number; // 0-100
-  happiness: number; // Mock value for UI
-  energy: number; // Mock value for UI
-  age: number; // Mock value for UI
   isAlive: boolean;
-  mood: PetMood; // Mock value for UI
-  action: PetActionType; // Mock value for UI
-  message: string; // Mock message for UI
   lastFed: number; // timestamp in seconds
-  totalFeedings: number; // Real from contract
+  totalFeedings: number;
+  deathCount: number;
+  currentCaretaker: string; // address
 }
 
-// Simplified stats (most values are mocked for UI)
-export interface PetStats {
-  totalFeedings: number; // Real from contract
-  totalBurnedTokens: string; // Mock value
-  totalFeeders: number; // Mock value
-  longestSurvival: number; // Mock value
-  currentAge: number; // Mock value
-  deathCount: number; // Mock value
+// Matches your contract's getRevivalInfo() return exactly
+export interface RevivalInfo {
+  currentCost: bigint;
+  nextCost: bigint;
+  deathCount: number;
+  maxCost: bigint;
 }
 
-// Simplified user stats
+// Real user stats from contract
 export interface UserStats {
-  hasEverFed: boolean; // Derived from feedingCount > 0
-  feedingCount: number; // Real from contract
+  feedingCount: number; // from getUserFeedingCount()
+  hasEverFed: boolean; // derived from feedingCount > 0
 }
 
-// Simplified token interface (empty for now)
-export interface SupportedToken {
-  address: Address;
-  name: string;
-  feedingPower: string;
-  minBurnAmount: string;
-  isSupported: boolean;
+// Real pet stats from contract
+export interface PetStats {
+  totalFeedings: number; // from getPetInfo()
+  deathCount: number; // from getPetInfo()
+  // Note: No totalBurnedTokens, totalFeeders, longestSurvival, currentAge in simplified contract
 }
 
 // =================================================================
-//                Simplified Contract Event Interfaces
+//                Contract Event Interfaces
 // =================================================================
 
 export interface PetFedEvent {
   feeder: Address;
   amount: bigint;
+  healthGained: number;
   newHealth: number;
   timestamp: number;
 }
@@ -105,38 +62,54 @@ export interface PetFedEvent {
 export interface PetDeathEvent {
   timestamp: number;
   message: string;
+  deathCount: number;
 }
 
 export interface PetRevivedEvent {
   reviver: Address;
+  newOwner: Address;
+  revivalCost: bigint;
+  timestamp: number;
+  deathCount: number;
+}
+
+export interface PetRenamedEvent {
+  owner: Address;
+  oldName: string;
+  newName: string;
   timestamp: number;
 }
 
+export interface PetCaretakerChangedEvent {
+  previousCaretaker: Address;
+  newCaretaker: Address;
+}
+
 // =================================================================
-//                Component Props Interfaces (Updated)
+//                Component Props Interfaces
 // =================================================================
 
 export interface PetHeaderProps {
   petName: string;
-  petType: PetType;
   isAlive: boolean;
-  lastUpdate: Date | null;
-  onRefresh: () => Promise<void>; // Fixed return type
-  isRefreshing: boolean;
-  // New simplified props
   currentHealth?: number;
-  timeSinceLastFed?: string;
+  currentCaretaker?: string;
+  deathCount?: number;
+  revivalCost?: string;
+  isUserCaretaker?: boolean;
+  timeSinceLastFed?: number | null;
 }
 
 export interface PetStatusCardProps {
-  petStatus: PetStatus;
+  extendedPetInfo: ExtendedPetInfo | null;
+  revivalInfo: RevivalInfo | null;
   userStats: UserStats | null;
   onRevive: () => Promise<void>;
+  onRenamePet?: (newName: string) => Promise<void>;
+  onUpdateHealth?: () => Promise<void>;
   isConnected: boolean;
   isWritePending: boolean;
-  revivalCost?: string;
-  // New simplified props
-  onUpdateHealth?: () => Promise<void>;
+  isUserCaretaker: boolean;
   currentHealth?: number | null;
   timeSinceLastFed?: number | null;
   formatTimeSince?: (seconds: number) => string;
@@ -145,19 +118,13 @@ export interface PetStatusCardProps {
 export interface CommunityStatsProps {
   petStats: PetStats | null;
   userStats: UserStats | null;
-  // New prop to indicate simplified mode
-  isSimplified?: boolean;
 }
 
 export interface FeedingSectionProps {
   petName: string;
   petIsAlive: boolean;
-  supportedTokens: SupportedToken[];
-  onFeed: (tokenAddress: Address, amount: string) => Promise<void>;
   isConnected: boolean;
   isWritePending: boolean;
-  // New simplified props
-  isSimplified?: boolean;
   contractAddress?: string;
 }
 
@@ -167,16 +134,18 @@ export interface LoadingStateProps {
 
 export interface ErrorStateProps {
   error: string;
-  onRetry: () => void;
+  onRetry: () => Promise<void>;
 }
 
 // =================================================================
-//                Simplified Hook Return Type
+//                Hook Return Type
 // =================================================================
 
 export interface UsePetContractReturn {
-  // Core simplified data
-  petStatus: SimplePetStatus | null;
+  // Core contract data
+  petStatus: PetStatus | null;
+  extendedPetInfo: ExtendedPetInfo | null;
+  revivalInfo: RevivalInfo | null;
   currentHealth: number | null;
   timeSinceLastFed: number | null;
   userFeedingCount: number | null;
@@ -189,78 +158,20 @@ export interface UsePetContractReturn {
   // Actions
   refreshData: () => Promise<void>;
   revivePet: () => Promise<void>;
+  renamePet: (newName: string) => Promise<void>;
   updatePetHealth: () => Promise<void>;
   isWritePending: boolean;
 
   // Helpers
   formatTimeSince: (seconds: number) => string;
+  isUserCaretaker: boolean;
 
   // Contract info
   contractAddress: string;
 }
 
 // =================================================================
-//                    Constants (Unchanged for UI)
-// =================================================================
-
-export const PET_TYPE_NAMES: Record<PetType, string> = {
-  [PetType.DOG]: "Dog",
-  [PetType.CAT]: "Cat",
-  [PetType.ROBOT]: "Robot",
-  [PetType.DRAGON]: "Dragon",
-  [PetType.ALIEN]: "Alien",
-};
-
-export const PET_TYPE_EMOJIS: Record<PetType, string> = {
-  [PetType.DOG]: "🐕",
-  [PetType.CAT]: "🐱",
-  [PetType.ROBOT]: "🤖",
-  [PetType.DRAGON]: "🐉",
-  [PetType.ALIEN]: "👽",
-};
-
-export const PET_MOOD_NAMES: Record<PetMood, string> = {
-  [PetMood.ECSTATIC]: "Ecstatic",
-  [PetMood.HAPPY]: "Happy",
-  [PetMood.CONTENT]: "Content",
-  [PetMood.SAD]: "Sad",
-  [PetMood.DEPRESSED]: "Depressed",
-  [PetMood.MISERABLE]: "Miserable",
-};
-
-export const PET_MOOD_COLORS: Record<PetMood, string> = {
-  [PetMood.ECSTATIC]: "text-purple-400",
-  [PetMood.HAPPY]: "text-green-400",
-  [PetMood.CONTENT]: "text-blue-400",
-  [PetMood.SAD]: "text-yellow-400",
-  [PetMood.DEPRESSED]: "text-orange-400",
-  [PetMood.MISERABLE]: "text-red-400",
-};
-
-export const PET_ACTION_NAMES: Record<PetActionType, string> = {
-  [PetActionType.SLEEPING]: "Sleeping",
-  [PetActionType.PLAYING]: "Playing",
-  [PetActionType.EATING]: "Eating",
-  [PetActionType.EXPLORING]: "Exploring",
-  [PetActionType.RESTING]: "Resting",
-  [PetActionType.SOCIALIZING]: "Socializing",
-  [PetActionType.DREAMING]: "Dreaming",
-  [PetActionType.EXERCISING]: "Exercising",
-};
-
-export const PET_ACTION_COLORS: Record<PetActionType, string> = {
-  [PetActionType.SLEEPING]: "text-indigo-400",
-  [PetActionType.PLAYING]: "text-green-400",
-  [PetActionType.EATING]: "text-yellow-400",
-  [PetActionType.EXPLORING]: "text-blue-400",
-  [PetActionType.RESTING]: "text-purple-400",
-  [PetActionType.SOCIALIZING]: "text-pink-400",
-  [PetActionType.DREAMING]: "text-violet-400",
-  [PetActionType.EXERCISING]: "text-orange-400",
-};
-
-// =================================================================
-//                    Health Status Helpers (Unchanged)
+//                    Health Status Helper
 // =================================================================
 
 export const getHealthStatus = (
@@ -268,60 +179,48 @@ export const getHealthStatus = (
 ): {
   status: "critical" | "low" | "medium" | "good" | "excellent";
   color: string;
-  gradient: string;
+  urgency: "none" | "low" | "medium" | "high";
 } => {
-  if (health >= 90) {
+  if (health >= 80) {
     return {
       status: "excellent",
-      color: "text-green-400",
-      gradient: "from-green-500 to-emerald-400",
+      color: "text-green-500",
+      urgency: "none",
     };
-  } else if (health >= 70) {
+  } else if (health >= 60) {
     return {
       status: "good",
-      color: "text-lime-400",
-      gradient: "from-lime-500 to-green-400",
+      color: "text-lime-500",
+      urgency: "none",
     };
-  } else if (health >= 50) {
+  } else if (health >= 40) {
     return {
       status: "medium",
-      color: "text-yellow-400",
-      gradient: "from-yellow-500 to-orange-400",
+      color: "text-yellow-500",
+      urgency: "low",
     };
-  } else if (health >= 30) {
+  } else if (health >= 20) {
     return {
       status: "low",
-      color: "text-orange-400",
-      gradient: "from-orange-500 to-red-400",
+      color: "text-orange-500",
+      urgency: "medium",
     };
   } else {
     return {
       status: "critical",
-      color: "text-red-400",
-      gradient: "from-red-500 to-red-600",
+      color: "text-red-500",
+      urgency: "high",
     };
   }
 };
 
 // =================================================================
-//                Time Formatting Helpers (Simplified)
+//                Time Formatting Helpers
 // =================================================================
 
-export const formatAge = (ageInHours: number): string => {
-  const days = Math.floor(ageInHours / 24);
-  const hours = ageInHours % 24;
-
-  if (days > 0) {
-    return `${days}d ${hours}h`;
-  }
-  return `${hours}h`;
-};
-
-export const getTimeSinceLastFed = (lastFed: number): string => {
-  if (!lastFed) return "Never";
-  const timeDiff = Date.now() / 1000 - lastFed; // lastFed is in seconds
-  const hours = Math.floor(timeDiff / 3600);
-  const minutes = Math.floor((timeDiff % 3600) / 60);
+export const formatTimeSince = (seconds: number): string => {
+  const hours = Math.floor(seconds / 3600);
+  const minutes = Math.floor((seconds % 3600) / 60);
 
   if (hours > 0) {
     return `${hours}h ${minutes}m ago`;
@@ -344,17 +243,14 @@ export const formatDuration = (seconds: number): string => {
 };
 
 // =================================================================
-//                Helper Type Guards (Keep for compatibility)
+//                Contract Configuration
 // =================================================================
 
-export function isPetType(value: any): value is PetType {
-  return typeof value === "number" && value >= 0 && value <= 4;
-}
+// CHOW Token Address
+export const CHOW_TOKEN_ADDRESS =
+  "0xd701634Bd3572Dd34b8C303D2590a29691a333d3" as Address;
 
-export function isPetMood(value: any): value is PetMood {
-  return typeof value === "number" && value >= 0 && value <= 5;
-}
-
-export function isPetActionType(value: any): value is PetActionType {
-  return typeof value === "number" && value >= 0 && value <= 7;
-}
+// Pet Contract Address
+export const PET_CONTRACT_ADDRESS =
+  (process.env.NEXT_PUBLIC_PET_CONTRACT_ADDRESS as Address) ||
+  ("0x2903AEf441d642144F4264898a199dF259dff53a" as Address);

@@ -6,7 +6,7 @@ import { motion } from "framer-motion";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
-import { Activity, Users, Utensils, BarChart3 } from "lucide-react";
+import { Activity, Users, Utensils } from "lucide-react";
 import { usePetContract } from "./hooks/usePetContract";
 import { PetHeader } from "./components/PetHeader";
 import { PetStatusCard } from "./components/PetStatusCard";
@@ -17,10 +17,10 @@ import { LoadingState } from "./components/LoadingState";
 import { ErrorState } from "./components/ErrorState";
 
 const PetPage = () => {
-  const { address, isConnected } = useAccount();
+  const { isConnected } = useAccount();
   const [activeTab, setActiveTab] = useState("status");
 
-  // Get simplified pet data from our custom hook
+  // Get real contract data only
   const {
     petStatus,
     extendedPetInfo,
@@ -52,53 +52,25 @@ const PetPage = () => {
   }
 
   // No pet data
-  if (!petStatus) {
+  if (!petStatus || !extendedPetInfo) {
     return <ErrorState error="Pet data not available" onRetry={refreshData} />;
   }
 
-  // Transform simplified data to match component expectations
-  const transformedPetStatus = {
-    name: petStatus.name,
-    petType: 0, // Always DOG for simplified version
-    health: currentHealth !== null ? currentHealth : petStatus.health,
-    happiness: 50, // Fixed value for simplified version
-    energy: 50, // Fixed value for simplified version
-    age: 0, // Not tracked in simplified version
-    isAlive: petStatus.isAlive,
-    mood: 2, // Always CONTENT for simplified version
-    action: 3, // Always EXPLORING for simplified version
-    message: petStatus.isAlive
-      ? "Woof! I'm doing great thanks to the community!"
-      : "I need to be revived... please help me!",
-    lastFed: petStatus.lastFed,
-    totalFeedings: petStatus.totalFeedings,
-  };
-
-  // Simplified pet stats (mock data since we don't track all these in simplified contract)
-  const transformedPetStats = {
-    totalFeedings: petStatus.totalFeedings,
-    totalBurnedTokens: "0", // Not tracked in simplified version
-    totalFeeders: 1, // Simplified - would need separate tracking
-    longestSurvival: 0, // Not tracked in simplified version
-    currentAge: 0, // Not tracked in simplified version
-    deathCount: 0, // Not tracked in simplified version
-  };
-
-  // Simplified user stats
-  const transformedUserStats = {
-    hasEverFed: (userFeedingCount || 0) > 0,
+  // Create real user stats from contract data
+  const userStats = {
     feedingCount: userFeedingCount || 0,
+    hasEverFed: (userFeedingCount || 0) > 0,
   };
 
-  // No supported tokens in simplified version - feeding happens directly through burn contracts
-  const supportedTokens: any[] = [];
-
-  // Simplified feed function - just shows instructions
-  const feedPet = async (tokenAddress: string, amount: string) => {
-    // In simplified version, feeding happens through token burn contracts
-    // This is just a placeholder
-    console.log("Feed pet called - handled by token contracts");
+  // Create real pet stats from contract data
+  const petStats = {
+    totalFeedings: extendedPetInfo.totalFeedings,
+    deathCount: extendedPetInfo.deathCount,
   };
+
+  // Use current health if available, otherwise stored health
+  const displayHealth =
+    currentHealth !== null ? currentHealth : extendedPetInfo.health;
 
   return (
     <div className="min-h-screen animated-bg">
@@ -106,21 +78,21 @@ const PetPage = () => {
       <PetBackground variant="default" intensity="medium" />
 
       <div className="relative z-10 container mx-auto p-6 pt-24 space-y-8">
-        {/* Pet Header - Always Visible */}
+        {/* Pet Header - Real Data Only */}
         <motion.div
           initial={{ opacity: 0, y: -20 }}
           animate={{ opacity: 1, y: 0 }}
           transition={{ duration: 0.6 }}
         >
           <PetHeader
-            petName={transformedPetStatus.name}
-            petType={transformedPetStatus.petType}
-            isAlive={transformedPetStatus.isAlive}
-            currentHealth={transformedPetStatus.health}
-            currentCaretaker={extendedPetInfo?.currentCaretaker}
-            deathCount={extendedPetInfo?.deathCount || 0}
+            petName={extendedPetInfo.name}
+            isAlive={extendedPetInfo.isAlive}
+            currentHealth={displayHealth}
+            currentCaretaker={extendedPetInfo.currentCaretaker}
+            deathCount={extendedPetInfo.deathCount}
             revivalCost={revivalCost}
             isUserCaretaker={isUserCaretaker}
+            timeSinceLastFed={timeSinceLastFed}
           />
         </motion.div>
 
@@ -170,13 +142,15 @@ const PetPage = () => {
                 transition={{ duration: 0.4 }}
               >
                 <PetStatusCard
-                  petStatus={transformedPetStatus}
-                  userStats={transformedUserStats}
+                  extendedPetInfo={extendedPetInfo}
+                  revivalInfo={revivalInfo}
+                  userStats={userStats}
                   onRevive={revivePet}
+                  onRenamePet={renamePet}
+                  onUpdateHealth={updatePetHealth}
                   isConnected={isConnected}
                   isWritePending={isWritePending}
-                  revivalCost={revivalCost}
-                  onUpdateHealth={updatePetHealth}
+                  isUserCaretaker={isUserCaretaker}
                   currentHealth={currentHealth}
                   timeSinceLastFed={timeSinceLastFed}
                   formatTimeSince={formatTimeSince}
@@ -191,11 +165,7 @@ const PetPage = () => {
                 animate={{ opacity: 1, y: 0 }}
                 transition={{ duration: 0.4 }}
               >
-                <CommunityStats
-                  petStats={transformedPetStats}
-                  userStats={transformedUserStats}
-                  isSimplified={true}
-                />
+                <CommunityStats petStats={petStats} userStats={userStats} />
               </motion.div>
             </TabsContent>
 
@@ -207,13 +177,10 @@ const PetPage = () => {
                 transition={{ duration: 0.4 }}
               >
                 <FeedingSection
-                  petName={transformedPetStatus.name}
-                  petIsAlive={transformedPetStatus.isAlive}
-                  supportedTokens={supportedTokens}
-                  onFeed={feedPet}
+                  petName={extendedPetInfo.name}
+                  petIsAlive={extendedPetInfo.isAlive}
                   isConnected={isConnected}
                   isWritePending={isWritePending}
-                  isSimplified={true}
                   contractAddress={contractAddress}
                 />
               </motion.div>
@@ -221,7 +188,7 @@ const PetPage = () => {
           </Tabs>
         </motion.div>
 
-        {/* Quick Action Cards - Always Visible */}
+        {/* Quick Action Cards - Real Data Only */}
         <motion.div
           initial={{ opacity: 0, y: 20 }}
           animate={{ opacity: 1, y: 0 }}
@@ -237,9 +204,9 @@ const PetPage = () => {
               <div className="flex items-center gap-3">
                 <Activity
                   className={`h-5 w-5 ${
-                    transformedPetStatus.health >= 70
+                    displayHealth >= 70
                       ? "text-green-500"
-                      : transformedPetStatus.health >= 40
+                      : displayHealth >= 40
                       ? "text-yellow-500"
                       : "text-red-500"
                   }`}
@@ -247,16 +214,14 @@ const PetPage = () => {
                 <div>
                   <div className="font-medium">Health Status</div>
                   <div className="text-sm text-muted-foreground">
-                    {transformedPetStatus.health}/100 HP
+                    {displayHealth}/100 HP
                   </div>
                 </div>
                 <Badge
-                  variant={
-                    transformedPetStatus.isAlive ? "default" : "destructive"
-                  }
+                  variant={extendedPetInfo.isAlive ? "default" : "destructive"}
                   className="ml-auto"
                 >
-                  {transformedPetStatus.isAlive ? "Alive" : "Dead"}
+                  {extendedPetInfo.isAlive ? "Alive" : "Dead"}
                 </Badge>
               </div>
             </CardContent>
@@ -273,11 +238,11 @@ const PetPage = () => {
                 <div>
                   <div className="font-medium">Community</div>
                   <div className="text-sm text-muted-foreground">
-                    {transformedPetStats.totalFeedings} total feeds
+                    {extendedPetInfo.totalFeedings} total feeds
                   </div>
                 </div>
                 <Badge variant="outline" className="ml-auto">
-                  {transformedUserStats.feedingCount} yours
+                  {userStats.feedingCount} yours
                 </Badge>
               </div>
             </CardContent>
@@ -298,12 +263,10 @@ const PetPage = () => {
                   </div>
                 </div>
                 <Badge
-                  variant={
-                    transformedPetStatus.isAlive ? "default" : "secondary"
-                  }
+                  variant={extendedPetInfo.isAlive ? "default" : "secondary"}
                   className="ml-auto"
                 >
-                  {transformedPetStatus.isAlive ? "Ready" : "Revive First"}
+                  {extendedPetInfo.isAlive ? "Ready" : "Revive First"}
                 </Badge>
               </div>
             </CardContent>
@@ -327,6 +290,8 @@ const PetPage = () => {
             <span>Health decays -1/hour</span>
             <span>•</span>
             <span>Feed gives +10 health</span>
+            <span>•</span>
+            <span>Deaths: {extendedPetInfo.deathCount}</span>
           </div>
         </motion.div>
       </div>

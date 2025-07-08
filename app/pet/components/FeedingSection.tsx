@@ -5,7 +5,6 @@ import React, { useState } from "react";
 import { motion } from "framer-motion";
 import {
   Utensils,
-  Wallet,
   ExternalLink,
   Info,
   Zap,
@@ -17,6 +16,7 @@ import {
   AlertCircle,
   Coins,
   TrendingUp,
+  Calculator,
 } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -70,6 +70,17 @@ const CHOW_TOKEN_ABI = [
   },
 ] as const;
 
+// Pet Contract ABI for health preview
+const PET_CONTRACT_ABI = [
+  {
+    inputs: [{ name: "amount", type: "uint256" }],
+    name: "previewHealthGain",
+    outputs: [{ name: "", type: "uint256" }],
+    stateMutability: "view",
+    type: "function",
+  },
+] as const;
+
 // CHOW Token Address
 const CHOW_TOKEN_ADDRESS: Address =
   "0xd701634Bd3572Dd34b8C303D2590a29691a333d3";
@@ -113,6 +124,24 @@ export const FeedingSection: React.FC<FeedingSectionProps> = ({
     address: CHOW_TOKEN_ADDRESS,
     abi: CHOW_TOKEN_ABI,
     functionName: "decimals",
+  });
+
+  // Preview health gain for current burn amount
+  const burnAmountInWei =
+    burnAmount && !isNaN(parseFloat(burnAmount))
+      ? parseUnits(burnAmount, chowDecimals || 18)
+      : BigInt(0);
+
+  const { data: healthGainPreview } = useReadContract({
+    address: contractAddress as Address,
+    abi: PET_CONTRACT_ABI,
+    functionName: "previewHealthGain",
+    args: [burnAmountInWei],
+    query: {
+      enabled: Boolean(contractAddress && burnAmountInWei > 0),
+      refetchOnMount: false,
+      refetchOnWindowFocus: false,
+    },
   });
 
   const copyToClipboard = async (text: string, label: string) => {
@@ -182,11 +211,13 @@ export const FeedingSection: React.FC<FeedingSectionProps> = ({
         args: [amountInWei],
       });
 
+      const healthGain = healthGainPreview ? Number(healthGainPreview) : "some";
+
       toast({
         title: "🍖 Feeding Transaction Sent!",
         description: `Burning ${burnAmount} ${
           chowSymbol || "CHOW"
-        } to feed ${petName}!`,
+        } to give ${petName} +${healthGain} health!`,
       });
 
       setBurnAmount("");
@@ -216,6 +247,10 @@ export const FeedingSection: React.FC<FeedingSectionProps> = ({
     }
   };
 
+  const displayHealthGain = healthGainPreview
+    ? Number(healthGainPreview)
+    : null;
+
   return (
     <div className="space-y-6">
       {/* Pet Status Alert */}
@@ -224,15 +259,15 @@ export const FeedingSection: React.FC<FeedingSectionProps> = ({
           <AlertCircle className="h-4 w-4" />
           <AlertDescription>
             {petName} is currently dead and cannot be fed. Please revive the pet
-            in the Status tab first!
+            first!
           </AlertDescription>
         </Alert>
       ) : (
         <Alert>
           <Zap className="h-4 w-4" />
           <AlertDescription>
-            {petName} is alive and ready to eat! Each feeding increases health
-            by 10 points.
+            {petName} is alive and ready to eat! Health gain depends on the
+            amount of CHOW you burn.
           </AlertDescription>
         </Alert>
       )}
@@ -295,7 +330,7 @@ export const FeedingSection: React.FC<FeedingSectionProps> = ({
             <div className="space-y-2">
               <label className="text-sm font-medium flex items-center gap-2">
                 <Heart className="h-4 w-4 text-red-500" />
-                Amount to Burn (gives +10 health to {petName})
+                Amount to Burn
               </label>
               <div className="flex gap-2">
                 <Input
@@ -317,6 +352,24 @@ export const FeedingSection: React.FC<FeedingSectionProps> = ({
                 </Button>
               </div>
             </div>
+
+            {/* Health Gain Preview */}
+            {burnAmount && displayHealthGain !== null && (
+              <div className="p-3 bg-green-50 dark:bg-green-900/20 rounded-lg border border-green-200 dark:border-green-800">
+                <div className="flex items-center gap-2 mb-1">
+                  <Calculator className="h-4 w-4 text-green-600 dark:text-green-400" />
+                  <span className="font-medium text-green-700 dark:text-green-300">
+                    Health Gain Preview
+                  </span>
+                </div>
+                <div className="text-2xl font-bold text-green-600 dark:text-green-400">
+                  +{displayHealthGain} Health Points
+                </div>
+                <div className="text-sm text-green-600 dark:text-green-400">
+                  for {burnAmount} {chowSymbol || "CHOW"} tokens
+                </div>
+              </div>
+            )}
 
             {/* Quick Amount Buttons */}
             {isConnected && chowBalance && (
@@ -352,7 +405,7 @@ export const FeedingSection: React.FC<FeedingSectionProps> = ({
             <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 text-sm">
               <div className="flex items-center gap-2 p-2 bg-muted/30 rounded">
                 <Heart className="h-3 w-3 text-red-500" />
-                <span>+10 Health</span>
+                <span>Scaled Health Gain</span>
               </div>
               <div className="flex items-center gap-2 p-2 bg-muted/30 rounded">
                 <Zap className="h-3 w-3 text-purple-500" />
@@ -386,8 +439,10 @@ export const FeedingSection: React.FC<FeedingSectionProps> = ({
             ) : (
               <>
                 <Utensils className="h-4 w-4 mr-2" />
-                Burn {burnAmount || "0"} {chowSymbol || "CHOW"} to Feed{" "}
-                {petName}
+                Burn {burnAmount || "0"} {chowSymbol || "CHOW"}
+                {displayHealthGain !== null && burnAmount && (
+                  <span className="ml-1">for +{displayHealthGain} HP</span>
+                )}
                 <ArrowRight className="h-4 w-4 ml-2" />
               </>
             )}
@@ -409,37 +464,37 @@ export const FeedingSection: React.FC<FeedingSectionProps> = ({
             How Feeding Works
           </CardTitle>
         </CardHeader>
-        <CardContent className="space-y-4">
+        <CardContent>
           <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
             <div className="space-y-4">
               <h4 className="font-medium">🔥 Token Burning Process</h4>
               <div className="space-y-2 text-sm text-muted-foreground">
                 <p>• CHOW tokens are permanently destroyed when burned</p>
                 <p>• Burn triggers automatic pet feeding notification</p>
-                <p>• Pet health increases by +10 points immediately</p>
+                <p>• Health gain is calculated based on amount burned</p>
                 <p>• Total supply of CHOW decreases with each burn</p>
               </div>
             </div>
 
             <div className="space-y-4">
-              <h4 className="font-medium">⚡ Instant Benefits</h4>
+              <h4 className="font-medium">⚡ Health Calculation</h4>
               <div className="space-y-2 text-sm text-muted-foreground">
-                <p>• Health boost happens on-chain automatically</p>
-                <p>• No waiting period or delays</p>
-                <p>• Visible in pet status within seconds</p>
-                <p>• Contributes to community statistics</p>
+                <p>• Health gain scales with tokens burned</p>
+                <p>• Minimum 1 health point per feeding</p>
+                <p>• Maximum 50 health points per feeding</p>
+                <p>• Use preview to see exact health gain</p>
               </div>
             </div>
           </div>
 
-          <Separator />
+          <Separator className="my-4" />
 
           <div className="space-y-3">
             <h4 className="font-medium">📊 Health Mechanics</h4>
             <div className="grid grid-cols-2 md:grid-cols-4 gap-3 text-sm">
               <div className="text-center p-3 bg-green-100 dark:bg-green-900/30 rounded">
                 <div className="font-bold text-green-600 dark:text-green-400">
-                  +10
+                  1-50
                 </div>
                 <div className="text-muted-foreground">Health per feed</div>
               </div>
