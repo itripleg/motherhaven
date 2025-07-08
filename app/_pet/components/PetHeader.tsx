@@ -1,170 +1,181 @@
+// pet/components/PetHeader.tsx
 "use client";
 
 import React from "react";
-import { Badge } from "@/components/ui/badge";
+import { motion } from "framer-motion";
+import { RefreshCw, Heart, Skull, Timer, Activity } from "lucide-react";
 import { Button } from "@/components/ui/button";
-import {
-  Heart,
-  Sparkles,
-  RefreshCw,
-  AlertTriangle,
-  Crown,
-  Clock,
-} from "lucide-react";
+import { Badge } from "@/components/ui/badge";
+import { Card, CardContent } from "@/components/ui/card";
+import { PetHeaderProps, PET_TYPE_EMOJIS, PET_TYPE_NAMES } from "../types";
 
-interface PetHeaderProps {
-  petName: string;
-  petType: number;
-  isAlive: boolean;
-  lastUpdate: Date | null;
-  onRefresh: () => void;
-  isRefreshing: boolean;
-}
-
-export function PetHeader({
+export const PetHeader: React.FC<PetHeaderProps> = ({
   petName,
   petType,
   isAlive,
   lastUpdate,
   onRefresh,
   isRefreshing,
-}: PetHeaderProps) {
-  const getPetTypeName = (type: number): string => {
-    const types = ["Dog", "Cat", "Robot", "Dragon", "Alien"];
-    return types[type] || "Unknown";
+  currentHealth,
+  timeSinceLastFed,
+}) => {
+  const petEmoji = PET_TYPE_EMOJIS[petType] || "🐕";
+  const petTypeName = PET_TYPE_NAMES[petType] || "Dog";
+
+  const formatLastUpdate = (date: Date | null) => {
+    if (!date) return "Never";
+    const now = new Date();
+    const diffMs = now.getTime() - date.getTime();
+    const diffSeconds = Math.floor(diffMs / 1000);
+
+    if (diffSeconds < 60) return "Just now";
+    if (diffSeconds < 3600) return `${Math.floor(diffSeconds / 60)}m ago`;
+    return `${Math.floor(diffSeconds / 3600)}h ago`;
   };
 
-  const getPetEmoji = (type: number): string => {
-    const emojis = ["🐕", "🐱", "🤖", "🐉", "👽"];
-    return emojis[type] || "🐾";
+  const getHealthColor = (health?: number) => {
+    if (!health) return "text-gray-500";
+    if (health >= 70) return "text-green-500";
+    if (health >= 40) return "text-yellow-500";
+    if (health >= 20) return "text-orange-500";
+    return "text-red-500";
   };
 
-  const getStatusBadge = () => {
-    if (isAlive) {
-      return (
-        <Badge className="bg-green-500/20 text-green-400 border-green-500/30 animate-pulse">
-          <Heart className="h-3 w-3 mr-1" />
-          Alive & Well
-        </Badge>
-      );
-    } else {
-      return (
-        <Badge className="bg-red-500/20 text-red-400 border-red-500/30">
-          <AlertTriangle className="h-3 w-3 mr-1" />
-          Needs Revival
-        </Badge>
-      );
-    }
+  const getHealthBadgeVariant = (health?: number) => {
+    if (!health) return "secondary";
+    if (health >= 70) return "default"; // green
+    if (health >= 40) return "secondary"; // yellow
+    return "destructive"; // red
   };
 
   return (
-    <div className="text-center space-y-6">
-      {/* Main Title Section */}
-      <div className="space-y-4">
-        <div className="flex items-center justify-center gap-4">
-          {/* Pet Icon */}
-          <div className="p-4 bg-primary/20 rounded-xl border border-primary/30">
-            <div className="text-4xl">{getPetEmoji(petType)}</div>
-          </div>
+    <motion.div
+      initial={{ opacity: 0, y: -20 }}
+      animate={{ opacity: 1, y: 0 }}
+      transition={{ duration: 0.6 }}
+      className="w-full"
+    >
+      <Card className="bg-white/80 dark:bg-gray-900/80 backdrop-blur-sm border-2 shadow-lg">
+        <CardContent className="p-6">
+          {/* Main Header */}
+          <div className="flex flex-col lg:flex-row lg:items-center lg:justify-between gap-4">
+            {/* Pet Info */}
+            <div className="flex items-center gap-4">
+              <div className="text-6xl">{petEmoji}</div>
+              <div className="space-y-1">
+                <h1 className="text-3xl font-bold tracking-tight">{petName}</h1>
+                <div className="flex items-center gap-2">
+                  <Badge variant="outline" className="text-sm">
+                    {petTypeName}
+                  </Badge>
+                  <Badge
+                    variant={isAlive ? "default" : "destructive"}
+                    className="text-sm"
+                  >
+                    {isAlive ? (
+                      <>
+                        <Heart className="h-3 w-3 mr-1" />
+                        Alive
+                      </>
+                    ) : (
+                      <>
+                        <Skull className="h-3 w-3 mr-1" />
+                        Dead
+                      </>
+                    )}
+                  </Badge>
+                </div>
+              </div>
+            </div>
 
-          {/* Title */}
-          <div>
-            <h1 className="text-4xl md:text-5xl font-bold text-gradient bg-gradient-to-r from-primary via-primary/80 to-primary/60 bg-clip-text text-transparent">
-              {petName}
-            </h1>
-            <p className="text-lg text-muted-foreground mt-2">
-              Our Beloved Community {getPetTypeName(petType)}
-            </p>
-          </div>
+            {/* Quick Stats & Refresh */}
+            <div className="flex flex-col sm:flex-row items-start sm:items-center gap-4">
+              {/* Quick Stats */}
+              <div className="flex flex-col sm:flex-row gap-3 text-sm">
+                {/* Health */}
+                {currentHealth !== undefined && (
+                  <div className="flex items-center gap-2">
+                    <Activity
+                      className={`h-4 w-4 ${getHealthColor(currentHealth)}`}
+                    />
+                    <span className="text-muted-foreground">Health:</span>
+                    <Badge
+                      variant={getHealthBadgeVariant(currentHealth)}
+                      className="font-mono"
+                    >
+                      {currentHealth}/100
+                    </Badge>
+                  </div>
+                )}
 
-          {/* Special Badge */}
-          <div className="p-4 bg-primary/20 rounded-xl border border-primary/30">
-            <Crown className="h-8 w-8 text-primary" />
-          </div>
-        </div>
+                {/* Time Since Fed */}
+                {timeSinceLastFed && (
+                  <div className="flex items-center gap-2">
+                    <Timer className="h-4 w-4 text-blue-500" />
+                    <span className="text-muted-foreground">Last fed:</span>
+                    <span className="font-medium">{timeSinceLastFed}</span>
+                  </div>
+                )}
+              </div>
 
-        {/* Status and Type Badges */}
-        <div className="flex items-center justify-center gap-4 flex-wrap">
-          {getStatusBadge()}
+              {/* Refresh Button */}
+              <div className="flex flex-col items-end gap-2">
+                <Button
+                  onClick={onRefresh}
+                  variant="outline"
+                  size="sm"
+                  disabled={isRefreshing}
+                  className="min-w-[100px]"
+                >
+                  <RefreshCw
+                    className={`h-4 w-4 mr-2 ${
+                      isRefreshing ? "animate-spin" : ""
+                    }`}
+                  />
+                  {isRefreshing ? "Updating..." : "Refresh"}
+                </Button>
 
-          <Badge className="bg-purple-500/20 text-purple-400 border-purple-500/30">
-            <Sparkles className="h-3 w-3 mr-1" />
-            Community Pet
-          </Badge>
-
-          <Badge className="bg-primary/20 text-primary border-primary/30">
-            {getPetTypeName(petType)}
-          </Badge>
-        </div>
-
-        {/* Description */}
-        <div className="max-w-3xl mx-auto">
-          <p className="text-muted-foreground text-lg leading-relaxed">
-            Meet {petName}, our beloved community{" "}
-            {getPetTypeName(petType).toLowerCase()}! Feed them with tokens to
-            keep them happy and healthy.
-            {isAlive
-              ? " Watch them grow, play, and interact with the community!"
-              : " They need your help to come back to life!"}
-          </p>
-        </div>
-      </div>
-
-      {/* Controls Section */}
-      <div className="flex flex-col sm:flex-row items-center justify-center gap-4">
-        {/* Last Update Info */}
-        {lastUpdate && (
-          <div className="flex items-center gap-2 text-sm text-muted-foreground">
-            <Clock className="h-4 w-4" />
-            <span>Last updated: {lastUpdate.toLocaleTimeString()}</span>
-          </div>
-        )}
-
-        {/* Refresh Button */}
-        <Button
-          onClick={onRefresh}
-          variant="outline"
-          size="sm"
-          className="border-border text-foreground hover:bg-secondary transition-all duration-200"
-          disabled={isRefreshing}
-        >
-          <RefreshCw
-            className={`h-4 w-4 mr-2 transition-transform duration-200 ${
-              isRefreshing ? "animate-spin" : "hover:rotate-45"
-            }`}
-          />
-          {isRefreshing ? "Updating..." : "Refresh Status"}
-        </Button>
-      </div>
-
-      {/* Pet Status Alert */}
-      {!isAlive && (
-        <div className="max-w-2xl mx-auto p-4 bg-red-500/10 border border-red-500/30 rounded-lg">
-          <div className="flex items-center justify-center gap-3 text-red-400">
-            <AlertTriangle className="h-5 w-5" />
-            <div className="text-center">
-              <p className="font-semibold">{petName} has passed away 😢</p>
-              <p className="text-sm text-red-400/80 mt-1">
-                Don't worry! They can be revived with AVAX. Scroll down to bring
-                them back to life!
-              </p>
+                {/* Last Update */}
+                <span className="text-xs text-muted-foreground">
+                  Updated: {formatLastUpdate(lastUpdate)}
+                </span>
+              </div>
             </div>
           </div>
-        </div>
-      )}
 
-      {/* Development Notice */}
-      {process.env.NODE_ENV === "development" && (
-        <div className="max-w-2xl mx-auto p-3 bg-orange-500/10 border border-orange-500/30 rounded-lg">
-          <div className="flex items-center justify-center gap-2 text-orange-400 text-sm">
-            <Sparkles className="h-4 w-4" />
-            <span>
-              Development Mode - Contract data will be available after
-              deployment
-            </span>
+          {/* Status Message */}
+          <div className="mt-4 pt-4 border-t border-border/50">
+            <div className="flex items-start gap-3">
+              <div className="text-2xl">{isAlive ? "💭" : "☠️"}</div>
+              <div className="flex-1">
+                <p
+                  className={`text-sm font-medium ${
+                    isAlive
+                      ? "text-blue-700 dark:text-blue-300"
+                      : "text-red-700 dark:text-red-300"
+                  }`}
+                >
+                  {isAlive
+                    ? currentHealth !== undefined
+                      ? currentHealth > 70
+                        ? "I'm feeling great! Thanks for taking care of me! 🐕"
+                        : currentHealth > 40
+                        ? "I could use some food... but I'm hanging in there! 😊"
+                        : currentHealth > 20
+                        ? "I'm getting pretty hungry... please feed me soon! 😟"
+                        : "I'm very weak... I need food urgently! 😰"
+                      : "Woof! I'm doing great thanks to the community! 🐕"
+                    : "I need to be revived... please help me! 💔"}
+                </p>
+                <p className="text-xs text-muted-foreground mt-1">
+                  This is a community pet that lives on the blockchain. Keep me
+                  healthy by burning tokens!
+                </p>
+              </div>
+            </div>
           </div>
-        </div>
-      )}
-    </div>
+        </CardContent>
+      </Card>
+    </motion.div>
   );
-}
+};
