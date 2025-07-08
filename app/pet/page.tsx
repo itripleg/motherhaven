@@ -23,6 +23,8 @@ const PetPage = () => {
   // Get simplified pet data from our custom hook
   const {
     petStatus,
+    extendedPetInfo,
+    revivalInfo,
     currentHealth,
     timeSinceLastFed,
     userFeedingCount,
@@ -31,9 +33,11 @@ const PetPage = () => {
     error,
     refreshData,
     revivePet,
+    renamePet,
     updatePetHealth,
     isWritePending,
     formatTimeSince,
+    isUserCaretaker,
     contractAddress,
   } = usePetContract();
 
@@ -108,12 +112,15 @@ const PetPage = () => {
           animate={{ opacity: 1, y: 0 }}
           transition={{ duration: 0.6 }}
         >
-          {/* @ts-expect-error will fix types next update */}
           <PetHeader
             petName={transformedPetStatus.name}
             petType={transformedPetStatus.petType}
             isAlive={transformedPetStatus.isAlive}
             currentHealth={transformedPetStatus.health}
+            currentCaretaker={extendedPetInfo?.currentCaretaker}
+            deathCount={extendedPetInfo?.deathCount || 0}
+            revivalCost={revivalCost}
+            isUserCaretaker={isUserCaretaker}
           />
         </motion.div>
 

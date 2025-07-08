@@ -12,9 +12,9 @@ import { useToast } from "@/hooks/use-toast";
 // Pet contract address - will be set after deployment
 const PET_CONTRACT_ADDRESS =
   (process.env.NEXT_PUBLIC_PET_CONTRACT_ADDRESS as Address) ||
-  "0x0000000000000000000000000000000000000000";
+  "0x821a3AE43bc36a103c67f6C3B4DFDDF8847457b8"; // Your deployed contract
 
-// Simplified ABI for our basic contract
+// Enhanced ABI for our updated contract
 const PET_CONTRACT_ABI = [
   // Read functions
   {
@@ -26,6 +26,33 @@ const PET_CONTRACT_ABI = [
       { name: "isAlive", type: "bool" },
       { name: "lastFed", type: "uint256" },
       { name: "totalFeedings", type: "uint256" },
+    ],
+    stateMutability: "view",
+    type: "function",
+  },
+  {
+    inputs: [],
+    name: "getPetInfo",
+    outputs: [
+      { name: "name", type: "string" },
+      { name: "health", type: "uint256" },
+      { name: "isAlive", type: "bool" },
+      { name: "lastFed", type: "uint256" },
+      { name: "totalFeedings", type: "uint256" },
+      { name: "deathCount", type: "uint256" },
+      { name: "currentCaretaker", type: "address" },
+    ],
+    stateMutability: "view",
+    type: "function",
+  },
+  {
+    inputs: [],
+    name: "getRevivalInfo",
+    outputs: [
+      { name: "currentCost", type: "uint256" },
+      { name: "nextCost", type: "uint256" },
+      { name: "deathCount", type: "uint256" },
+      { name: "maxCost", type: "uint256" },
     ],
     stateMutability: "view",
     type: "function",
@@ -52,13 +79,6 @@ const PET_CONTRACT_ABI = [
     type: "function",
   },
   {
-    inputs: [],
-    name: "revivalCost",
-    outputs: [{ name: "", type: "uint256" }],
-    stateMutability: "view",
-    type: "function",
-  },
-  {
     inputs: [{ name: "token", type: "address" }],
     name: "supportedTokens",
     outputs: [{ name: "", type: "bool" }],
@@ -74,11 +94,8 @@ const PET_CONTRACT_ABI = [
     type: "function",
   },
   {
-    inputs: [
-      { name: "token", type: "address" },
-      { name: "supported", type: "bool" },
-    ],
-    name: "setSupportedToken",
+    inputs: [{ name: "newName", type: "string" }],
+    name: "renamePet",
     outputs: [],
     stateMutability: "nonpayable",
     type: "function",
@@ -96,6 +113,7 @@ const PET_CONTRACT_ABI = [
     inputs: [
       { indexed: true, name: "feeder", type: "address" },
       { name: "amount", type: "uint256" },
+      { name: "healthGained", type: "uint256" },
       { name: "newHealth", type: "uint256" },
       { name: "timestamp", type: "uint256" },
     ],
@@ -107,6 +125,7 @@ const PET_CONTRACT_ABI = [
     inputs: [
       { name: "timestamp", type: "uint256" },
       { name: "message", type: "string" },
+      { name: "deathCount", type: "uint256" },
     ],
     name: "PetDied",
     type: "event",
@@ -115,15 +134,27 @@ const PET_CONTRACT_ABI = [
     anonymous: false,
     inputs: [
       { indexed: true, name: "reviver", type: "address" },
+      { indexed: true, name: "newOwner", type: "address" },
+      { name: "revivalCost", type: "uint256" },
       { name: "timestamp", type: "uint256" },
+      { name: "deathCount", type: "uint256" },
     ],
     name: "PetRevived",
     type: "event",
   },
+  {
+    anonymous: false,
+    inputs: [
+      { indexed: true, name: "previousCaretaker", type: "address" },
+      { indexed: true, name: "newCaretaker", type: "address" },
+    ],
+    name: "PetCaretakerChanged",
+    type: "event",
+  },
 ] as const;
 
-// Simplified types
-export interface SimplePetStatus {
+// Types
+interface SimplePetStatus {
   name: string;
   health: number;
   isAlive: boolean;
@@ -131,9 +162,28 @@ export interface SimplePetStatus {
   totalFeedings: number;
 }
 
+export interface ExtendedPetStatus {
+  name: string;
+  health: number;
+  isAlive: boolean;
+  lastFed: number;
+  totalFeedings: number;
+  deathCount: number;
+  currentCaretaker: string;
+}
+
+export interface RevivalInfo {
+  currentCost: bigint;
+  nextCost: bigint;
+  deathCount: number;
+  maxCost: bigint;
+}
+
 export interface UsePetContractReturn {
   // Core data
   petStatus: SimplePetStatus | null;
+  extendedPetInfo: ExtendedPetStatus | null;
+  revivalInfo: RevivalInfo | null;
   currentHealth: number | null;
   timeSinceLastFed: number | null;
   userFeedingCount: number | null;
@@ -146,11 +196,13 @@ export interface UsePetContractReturn {
   // Actions
   refreshData: () => Promise<void>;
   revivePet: () => Promise<void>;
+  renamePet: (newName: string) => Promise<void>;
   updatePetHealth: () => Promise<void>;
   isWritePending: boolean;
 
   // Helpers
   formatTimeSince: (seconds: number) => string;
+  isUserCaretaker: boolean;
 
   // Contract info
   contractAddress: string;
@@ -171,21 +223,34 @@ export function usePetContract(): UsePetContractReturn {
     []
   );
 
-  // Read pet status
+  // Read extended pet info (includes caretaker)
   const {
-    data: petStatusData,
-    isLoading: petStatusLoading,
-    error: petStatusError,
-    refetch: refetchPetStatus,
+    data: extendedPetData,
+    isLoading: extendedPetLoading,
+    error: extendedPetError,
+    refetch: refetchExtendedPet,
   } = useReadContract({
     ...petContract,
-    functionName: "getPetStatus",
+    functionName: "getPetInfo",
     query: {
-      refetchInterval: 30000, // Refresh every 30 seconds
+      refetchInterval: 30000,
     },
   });
 
-  // Read current health (includes decay calculation)
+  // Read revival info
+  const {
+    data: revivalData,
+    isLoading: revivalLoading,
+    refetch: refetchRevival,
+  } = useReadContract({
+    ...petContract,
+    functionName: "getRevivalInfo",
+    query: {
+      refetchInterval: 30000,
+    },
+  });
+
+  // Read current health
   const {
     data: currentHealthData,
     isLoading: healthLoading,
@@ -194,7 +259,7 @@ export function usePetContract(): UsePetContractReturn {
     ...petContract,
     functionName: "getCurrentHealth",
     query: {
-      refetchInterval: 10000, // More frequent for real-time health
+      refetchInterval: 10000,
     },
   });
 
@@ -226,12 +291,6 @@ export function usePetContract(): UsePetContractReturn {
     },
   });
 
-  // Read revival cost
-  const { data: revivalCostData } = useReadContract({
-    ...petContract,
-    functionName: "revivalCost",
-  });
-
   // Watch for events
   useWatchContractEvent({
     ...petContract,
@@ -243,7 +302,7 @@ export function usePetContract(): UsePetContractReturn {
         description: "The pet has been fed and is feeling better!",
       });
       setTimeout(() => {
-        refetchPetStatus();
+        refetchExtendedPet();
         refetchHealth();
         refetchUserStats();
       }, 2000);
@@ -261,7 +320,8 @@ export function usePetContract(): UsePetContractReturn {
         variant: "destructive",
       });
       setTimeout(() => {
-        refetchPetStatus();
+        refetchExtendedPet();
+        refetchRevival();
         refetchHealth();
       }, 2000);
     },
@@ -277,17 +337,41 @@ export function usePetContract(): UsePetContractReturn {
         description: "Welcome back! The pet is alive again!",
       });
       setTimeout(() => {
-        refetchPetStatus();
+        refetchExtendedPet();
+        refetchRevival();
         refetchHealth();
       }, 2000);
     },
   });
 
-  // Process pet status data
-  const petStatus = useMemo((): SimplePetStatus | null => {
-    if (!petStatusData) return null;
+  useWatchContractEvent({
+    ...petContract,
+    eventName: "PetCaretakerChanged",
+    onLogs: (logs) => {
+      console.log("👑 Caretaker changed:", logs);
+      toast({
+        title: "👑 New Caretaker!",
+        description: "Pet ownership has been transferred!",
+      });
+      setTimeout(() => {
+        refetchExtendedPet();
+      }, 2000);
+    },
+  });
 
-    const [name, health, isAlive, lastFed, totalFeedings] = petStatusData;
+  // Process extended pet data
+  const extendedPetInfo = useMemo((): ExtendedPetStatus | null => {
+    if (!extendedPetData) return null;
+
+    const [
+      name,
+      health,
+      isAlive,
+      lastFed,
+      totalFeedings,
+      deathCount,
+      currentCaretaker,
+    ] = extendedPetData;
 
     return {
       name,
@@ -295,8 +379,45 @@ export function usePetContract(): UsePetContractReturn {
       isAlive,
       lastFed: Number(lastFed),
       totalFeedings: Number(totalFeedings),
+      deathCount: Number(deathCount),
+      currentCaretaker: currentCaretaker as string,
     };
-  }, [petStatusData]);
+  }, [extendedPetData]);
+
+  // Process pet status data (for backwards compatibility)
+  const petStatus = useMemo((): SimplePetStatus | null => {
+    if (!extendedPetInfo) return null;
+
+    return {
+      name: extendedPetInfo.name,
+      health: extendedPetInfo.health,
+      isAlive: extendedPetInfo.isAlive,
+      lastFed: extendedPetInfo.lastFed,
+      totalFeedings: extendedPetInfo.totalFeedings,
+    };
+  }, [extendedPetInfo]);
+
+  // Process revival info
+  const revivalInfo = useMemo((): RevivalInfo | null => {
+    if (!revivalData) return null;
+
+    const [currentCost, nextCost, deathCount, maxCost] = revivalData;
+
+    return {
+      currentCost,
+      nextCost,
+      deathCount: Number(deathCount),
+      maxCost,
+    };
+  }, [revivalData]);
+
+  // Check if user is caretaker
+  const isUserCaretaker = useMemo(() => {
+    if (!address || !extendedPetInfo?.currentCaretaker) return false;
+    return (
+      address.toLowerCase() === extendedPetInfo.currentCaretaker.toLowerCase()
+    );
+  }, [address, extendedPetInfo?.currentCaretaker]);
 
   // Actions
   const revivePet = useCallback(async () => {
@@ -309,7 +430,7 @@ export function usePetContract(): UsePetContractReturn {
       return;
     }
 
-    if (!revivalCostData) {
+    if (!revivalInfo?.currentCost) {
       toast({
         title: "Revival Cost Unknown",
         description: "Unable to determine revival cost.",
@@ -322,12 +443,13 @@ export function usePetContract(): UsePetContractReturn {
       await writeContract({
         ...petContract,
         functionName: "revivePet",
-        value: revivalCostData,
+        value: revivalInfo.currentCost,
       });
 
       toast({
         title: "Revival Transaction Sent",
-        description: "Your pet revival transaction has been submitted!",
+        description:
+          "Your pet revival transaction has been submitted! You will become the new caretaker.",
       });
     } catch (error) {
       console.error("Revival error:", error);
@@ -337,7 +459,50 @@ export function usePetContract(): UsePetContractReturn {
         variant: "destructive",
       });
     }
-  }, [address, revivalCostData, writeContract, toast, petContract]);
+  }, [address, revivalInfo?.currentCost, writeContract, toast, petContract]);
+
+  const renamePet = useCallback(
+    async (newName: string) => {
+      if (!address) {
+        toast({
+          title: "Wallet Not Connected",
+          description: "Please connect your wallet to rename the pet.",
+          variant: "destructive",
+        });
+        return;
+      }
+
+      if (!isUserCaretaker) {
+        toast({
+          title: "Not Pet Caretaker",
+          description: "Only the current caretaker can rename the pet.",
+          variant: "destructive",
+        });
+        return;
+      }
+
+      try {
+        await writeContract({
+          ...petContract,
+          functionName: "renamePet",
+          args: [newName],
+        });
+
+        toast({
+          title: "Rename Transaction Sent",
+          description: `Renaming pet to "${newName}"!`,
+        });
+      } catch (error) {
+        console.error("Rename error:", error);
+        toast({
+          title: "Rename Failed",
+          description: "Failed to rename pet. Please try again.",
+          variant: "destructive",
+        });
+      }
+    },
+    [address, isUserCaretaker, writeContract, toast, petContract]
+  );
 
   const updatePetHealth = useCallback(async () => {
     try {
@@ -362,12 +527,19 @@ export function usePetContract(): UsePetContractReturn {
 
   const refreshData = useCallback(async () => {
     await Promise.all([
-      refetchPetStatus(),
+      refetchExtendedPet(),
+      refetchRevival(),
       refetchHealth(),
       refetchTime(),
       refetchUserStats(),
     ]);
-  }, [refetchPetStatus, refetchHealth, refetchTime, refetchUserStats]);
+  }, [
+    refetchExtendedPet,
+    refetchRevival,
+    refetchHealth,
+    refetchTime,
+    refetchUserStats,
+  ]);
 
   // Helper function
   const formatTimeSince = useCallback((seconds: number): string => {
@@ -382,18 +554,21 @@ export function usePetContract(): UsePetContractReturn {
 
   // Computed states
   const isLoading =
-    petStatusLoading ||
+    extendedPetLoading ||
+    revivalLoading ||
     healthLoading ||
     timeLoading ||
     (address ? userStatsLoading : false);
-  const error = petStatusError?.message || null;
-  const revivalCost = revivalCostData
-    ? formatUnits(revivalCostData, 18)
-    : "0.1";
+  const error = extendedPetError?.message || null;
+  const revivalCost = revivalInfo?.currentCost
+    ? formatUnits(revivalInfo.currentCost, 18)
+    : "0";
 
   return {
     // Core data
     petStatus,
+    extendedPetInfo,
+    revivalInfo,
     currentHealth: currentHealthData ? Number(currentHealthData) : null,
     timeSinceLastFed: timeSinceLastFedData
       ? Number(timeSinceLastFedData)
@@ -410,11 +585,13 @@ export function usePetContract(): UsePetContractReturn {
     // Actions
     refreshData,
     revivePet,
+    renamePet,
     updatePetHealth,
     isWritePending,
 
     // Helpers
     formatTimeSince,
+    isUserCaretaker,
 
     // Contract info
     contractAddress: PET_CONTRACT_ADDRESS,
