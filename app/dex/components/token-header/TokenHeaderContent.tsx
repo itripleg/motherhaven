@@ -5,9 +5,17 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { AddressComponent } from "@/components/AddressComponent";
 import { Progress } from "@/components/ui/progress";
-import { Crown, User, Edit3, TrendingUp, Target } from "lucide-react";
+import {
+  Crown,
+  User,
+  Camera,
+  TrendingUp,
+  Target,
+  FileText,
+} from "lucide-react";
 import { motion } from "framer-motion";
 import { TokenHeaderData } from "./types";
+import { DescriptionEditor } from "./DescriptionEditor";
 import {
   Tooltip,
   TooltipContent,
@@ -19,8 +27,12 @@ interface TokenHeaderContentProps {
   isCreator?: boolean;
   canEdit?: boolean;
   onEditClick?: () => void;
+  onDescriptionSave?: (description: string) => Promise<boolean>;
+  onDescriptionEdit?: () => void;
+  onDescriptionCancel?: () => void;
   progress?: number;
   className?: string;
+  isEditingDescription?: boolean;
 }
 
 const getStateDisplay = (state?: number) => {
@@ -40,8 +52,12 @@ export const TokenHeaderContent: React.FC<TokenHeaderContentProps> = ({
   isCreator = false,
   canEdit = false,
   onEditClick,
+  onDescriptionSave,
+  onDescriptionEdit,
+  onDescriptionCancel,
   progress = 0,
   className = "",
+  isEditingDescription = false,
 }) => {
   const stateDisplay = getStateDisplay(data.state);
 
@@ -69,14 +85,31 @@ export const TokenHeaderContent: React.FC<TokenHeaderContentProps> = ({
                       variant="ghost"
                       size="icon"
                       onClick={onEditClick}
-                      className="text-primary hover:bg-primary/20 h-7 w-7 border border-primary/30 hover:border-primary/50 transition-all duration-200"
+                      className="text-white hover:text-primary hover:bg-primary/20 h-7 w-7 border border-white/40 hover:border-primary/50 transition-all duration-200"
                     >
-                      <Edit3 className="h-4 w-4" />
+                      <Camera className="h-4 w-4" />
                     </Button>
                   </TooltipTrigger>
                   <TooltipContent>Edit photo position</TooltipContent>
                 </Tooltip>
               )}
+
+              {onDescriptionSave && (
+                <Tooltip>
+                  <TooltipTrigger asChild>
+                    <Button
+                      variant="ghost"
+                      size="icon"
+                      onClick={onDescriptionEdit}
+                      className="text-white hover:text-primary hover:bg-primary/20 h-7 w-7 border border-white/40 hover:border-primary/50 transition-all duration-200"
+                    >
+                      <FileText className="h-4 w-4" />
+                    </Button>
+                  </TooltipTrigger>
+                  <TooltipContent>Edit description</TooltipContent>
+                </Tooltip>
+              )}
+
               <Tooltip>
                 <TooltipTrigger asChild>
                   <div className="p-1.5 bg-primary/20 border border-primary/40 rounded-md">
@@ -113,15 +146,16 @@ export const TokenHeaderContent: React.FC<TokenHeaderContentProps> = ({
             )}
           </h1>
 
-          {data.description ? (
-            <blockquote className="text-white/80 text-lg italic leading-relaxed max-w-2xl">
-              "{data.description}"
-            </blockquote>
-          ) : (
-            <div className="text-white/50 text-lg italic leading-relaxed">
-              "No description provided"
-            </div>
-          )}
+          {/* Description with inline editor */}
+          <DescriptionEditor
+            description={data.description}
+            isCreator={isCreator}
+            onSave={onDescriptionSave || (async () => false)}
+            showEditButton={false}
+            forceEditing={isEditingDescription}
+            onCancel={onDescriptionCancel}
+            className="max-w-2xl"
+          />
         </div>
 
         {/* Stats Grid */}

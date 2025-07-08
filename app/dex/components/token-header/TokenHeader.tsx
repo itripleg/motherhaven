@@ -1,6 +1,6 @@
 // app/dex/components/token-header/TokenHeader.tsx
 "use client";
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useRef } from "react";
 import { Card } from "@/components/ui/card";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import { useAccount } from "wagmi";
@@ -22,6 +22,10 @@ import {
   type ImagePosition,
   type TokenHeaderData,
 } from "./index";
+import {
+  DescriptionEditor,
+  type DescriptionEditorRef,
+} from "./DescriptionEditor";
 
 interface TokenHeaderProps {
   address: string;
@@ -37,6 +41,7 @@ export const TokenHeader: React.FC<TokenHeaderProps> = ({
   height = HEADER_HEIGHT,
 }) => {
   const [isEditing, setIsEditing] = useState(false);
+  const [isEditingDescription, setIsEditingDescription] = useState(false);
   const [position, setPosition] = useState<ImagePosition>({
     x: 0,
     y: 0,
@@ -155,6 +160,8 @@ export const TokenHeader: React.FC<TokenHeaderProps> = ({
         description: "Token description updated successfully",
       });
 
+      // Close the editor after successful save
+      setIsEditingDescription(false);
       return true;
     } catch (error) {
       console.error("Error updating description:", error);
@@ -165,6 +172,16 @@ export const TokenHeader: React.FC<TokenHeaderProps> = ({
       });
       return false;
     }
+  };
+
+  // Function to trigger description editing
+  const handleDescriptionEdit = () => {
+    setIsEditingDescription(true);
+  };
+
+  // Function to cancel description editing
+  const handleDescriptionCancel = () => {
+    setIsEditingDescription(false);
   };
 
   if (loading || !token) {
@@ -224,10 +241,13 @@ export const TokenHeader: React.FC<TokenHeaderProps> = ({
                 isCreator={isCreator}
                 canEdit={!!token.imageUrl}
                 onEditClick={() => setIsEditing(true)}
+                onDescriptionEdit={handleDescriptionEdit}
+                onDescriptionCancel={handleDescriptionCancel}
+                progress={progress}
+                isEditingDescription={isEditingDescription}
                 onDescriptionSave={
                   isCreator ? handleDescriptionSave : undefined
                 }
-                progress={progress}
               />
             </motion.div>
           )}
