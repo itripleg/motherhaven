@@ -1,0 +1,564 @@
+[33mcommit 307fb25da7263b4e561192b14bb3f27ac3c57012[m[33m ([m[1;36mHEAD[m[33m -> [m[1;32mmain[m[33m, [m[1;31morigin/main[m[33m, [m[1;31morigin/HEAD[m[33m)[m
+Author: Joshua Bell <joshua.bell.828@gmail.com>
+Date:   Mon Jul 7 20:34:00 2025 -0400
+
+    sticky chat
+
+[33mcommit b9f19add07b59b9afbd04bd252752b2002ac5e7a[m
+Author: Joshua Bell <53708491+itripleg@users.noreply.github.com>
+Date:   Mon Jul 7 17:37:32 2025 -0400
+
+    Update my-menu.tsx
+
+[33mcommit b05074faca8fa8bd546e93552d9277e90f639de6[m
+Author: Josh Bell <joshua.bell.828@gmail.com>
+Date:   Mon Jul 7 17:02:57 2025 -0400
+
+    style syncing token page
+
+[33mcommit 589aa17f4c5accf7c13ca62bb266c01aee3623ec[m[33m ([m[1;31morigin/grandfactory[m[33m, [m[1;32mgrandfactory[m[33m)[m
+Author: Josh Bell <joshua.bell.828@gmail.com>
+Date:   Mon Jul 7 11:52:35 2025 -0400
+
+    building grand factory
+
+[33mcommit cfc3bab873f3b8177a7196244e9b53c13f06850e[m
+Author: Josh Bell <joshua.bell.828@gmail.com>
+Date:   Mon Jul 7 11:34:54 2025 -0400
+
+    updated trade card
+
+[33mcommit e473f1ef907bc52e7f3af9b26a6198c9c233f3a5[m
+Author: Joshua Bell <joshua.bell.828@gmail.com>
+Date:   Mon Jul 7 08:42:04 2025 -0400
+
+    api and contract updates, may be broken
+
+[33mcommit 17c9b594c44288b175590258b04c19d6e78f53c0[m
+Author: Joshua Bell <joshua.bell.828@gmail.com>
+Date:   Sat Jul 5 01:20:31 2025 -0400
+
+    restore pages update
+
+[33mcommit b2c11ca77326a8fdb18293f2bea6f850fae14e41[m
+Author: Joshua Bell <joshua.bell.828@gmail.com>
+Date:   Fri Jul 4 23:26:50 2025 -0400
+
+    tx error checking, still bugged
+
+[33mcommit 7ffb2eccf67ca5956de976805ccdbe87079129ab[m
+Author: Joshua Bell <joshua.bell.828@gmail.com>
+Date:   Fri Jul 4 22:58:22 2025 -0400
+
+    bot enhancements...maybe
+
+[33mcommit 74a52d583b4dea9984a353652102675ab5cdd3a4[m
+Author: Joshua Bell <joshua.bell.828@gmail.com>
+Date:   Fri Jul 4 20:32:22 2025 -0400
+
+    ux/ui
+
+[33mcommit 945ba867d32845228f62f741d20eb4f684b87582[m
+Author: Joshua Bell <joshua.bell.828@gmail.com>
+Date:   Fri Jul 4 19:50:55 2025 -0400
+
+    alpha dashboard
+
+[33mcommit 1fb167052fe6ccd86072e3a786f557ad97e361c1[m
+Author: Joshua Bell <joshua.bell.828@gmail.com>
+Date:   Fri Jul 4 19:27:48 2025 -0400
+
+    new dashboard
+
+[33mcommit a74a9cb0ae4f320f793e2cbb2b3c6043af7c85b4[m
+Author: Joshua Bell <joshua.bell.828@gmail.com>
+Date:   Fri Jul 4 19:12:48 2025 -0400
+
+    quick themes
+
+[33mcommit f99df78a556a4d9643b5cb48baa6a7d12e97b257[m
+Author: Joshua Bell <joshua.bell.828@gmail.com>
+Date:   Fri Jul 4 18:52:01 2025 -0400
+
+    ux/ui
+
+[33mcommit f8d6d72a44f2240ec67cb014438fc273af375fa2[m
+Author: Joshua Bell <joshua.bell.828@gmail.com>
+Date:   Fri Jul 4 17:39:52 2025 -0400
+
+    factory page final
+
+[33mcommit 3293ee13c902a3f4adb7f2a296581aebacbbb730[m
+Author: Joshua Bell <joshua.bell.828@gmail.com>
+Date:   Fri Jul 4 17:16:26 2025 -0400
+
+    token factory revamp
+
+[33mcommit 89b9ffa7385a4da3c4e8365e4c171944a739f00a[m
+Author: Joshua Bell <joshua.bell.828@gmail.com>
+Date:   Fri Jul 4 15:24:56 2025 -0400
+
+    fix token page
+
+[33mcommit 5eb0fd2701cc629a661645dc81434793492bed5a[m
+Author: Joshua Bell <joshua.bell.828@gmail.com>
+Date:   Fri Jul 4 14:05:13 2025 -0400
+
+    big changes after contract update
+
+[33mcommit 0cf3a1cb8331faf0ee6558792bafc11b9f43747a[m
+Author: Joshua Bell <joshua.bell.828@gmail.com>
+Date:   Fri Jul 4 13:33:09 2025 -0400
+
+    remove more files
+
+[33mcommit 4843399fbc0a3a5cbeaed8bc9044c8aa7d665735[m
+Author: Joshua Bell <joshua.bell.828@gmail.com>
+Date:   Fri Jul 4 13:32:11 2025 -0400
+
+    factory migration
+
+[33mcommit 2ad60b017cfe61e27784adfca5a6cc578e34986d[m
+Author: Joshua Bell <joshua.bell.828@gmail.com>
+Date:   Fri Jul 4 12:02:49 2025 -0400
+
+    Contract updates
+
+[33mcommit a116c05795780d8e798b1a80089ce107748f8bdf[m
+Author: Joshua Bell <joshua.bell.828@gmail.com>
+Date:   Thu Jul 3 17:23:27 2025 -0400
+
+    ux/ui prepping column selector
+
+[33mcommit 2eca84e4c16cc222d9fef68bae07cf1206fe52dc[m
+Author: Joshua Bell <joshua.bell.828@gmail.com>
+Date:   Thu Jul 3 16:24:53 2025 -0400
+
+    ux/ui
+
+[33mcommit 39b2a1f4b471d2357c148907ca03058aec242360[m
+Author: Joshua Bell <joshua.bell.828@gmail.com>
+Date:   Thu Jul 3 16:12:14 2025 -0400
+
+    persistent filters
+
+[33mcommit 73a158bc836addd577858b93766d628cc9e88a43[m
+Author: Joshua Bell <joshua.bell.828@gmail.com>
+Date:   Thu Jul 3 16:04:43 2025 -0400
+
+    sorting fix?
+
+[33mcommit 6a742051e3072fea14d6adefe9f54c61963eaf51[m
+Author: Joshua Bell <joshua.bell.828@gmail.com>
+Date:   Thu Jul 3 15:54:52 2025 -0400
+
+    filtering and sort
+
+[33mcommit fef9209ebb343e0c7a5fa5b0e118afd293e9c8cd[m
+Author: Joshua Bell <joshua.bell.828@gmail.com>
+Date:   Thu Jul 3 14:11:02 2025 -0400
+
+    always scrollbar
+
+[33mcommit 65868901548bc20a4f72bfee9b6e5a6f095c7a6e[m
+Author: Joshua Bell <joshua.bell.828@gmail.com>
+Date:   Thu Jul 3 14:03:32 2025 -0400
+
+    fixed themes
+
+[33mcommit 00fbbf5921838669fc3d9b334fd469de371b92a5[m
+Author: Joshua Bell <joshua.bell.828@gmail.com>
+Date:   Thu Jul 3 12:53:21 2025 -0400
+
+    beta theme switcher
+
+[33mcommit 3aee5b98284f6cdb18f356773e33b6b726afa790[m
+Author: Josh Bell <joshua.bell.828@gmail.com>
+Date:   Wed Jul 2 17:19:42 2025 -0400
+
+    added factory constants to types to speed up api
+
+[33mcommit d16747aa07aeed5d20797935b3d6cd3f608e6a8a[m
+Author: Josh Bell <joshua.bell.828@gmail.com>
+Date:   Wed Jul 2 16:44:29 2025 -0400
+
+    update token types and api
+
+[33mcommit 5c9e854152873c2b5d241f724c8266592f9f11f4[m
+Author: Josh Bell <joshua.bell.828@gmail.com>
+Date:   Wed Jul 2 15:58:57 2025 -0400
+
+    API update!
+
+[33mcommit 282ecc9f021e57186ba6fef76b6485c3506821bd[m
+Author: Josh Bell <joshua.bell.828@gmail.com>
+Date:   Wed Jul 2 15:42:59 2025 -0400
+
+    chart fixes
+
+[33mcommit 7ed6a8b7ceb287896b45c988559972a70a7897ae[m
+Author: Josh Bell <joshua.bell.828@gmail.com>
+Date:   Wed Jul 2 14:05:34 2025 -0400
+
+    debug fixed?
+
+[33mcommit d841c29cee9dad01119d5c48a05010830de0ff6b[m
+Merge: 4be30d6 30859e8
+Author: Joshua Bell <53708491+itripleg@users.noreply.github.com>
+Date:   Tue Jul 1 20:06:24 2025 -0400
+
+    Merge pull request #8 from itripleg/debug
+
+[33mcommit 30859e84621fa765f24409e0dc017da24d7412f1[m[33m ([m[1;31morigin/debug[m[33m, [m[1;32mdebug[m[33m)[m
+Author: Josh Bell <joshua.bell.828@gmail.com>
+Date:   Tue Jul 1 19:45:50 2025 -0400
+
+    debug is broken
+
+[33mcommit 9160a2d3e4855860ab88ee036adec2aa70f4debd[m
+Author: Josh Bell <joshua.bell.828@gmail.com>
+Date:   Tue Jul 1 17:37:13 2025 -0400
+
+    fixing debug
+
+[33mcommit ccbc21d7d596d1680f13e3382e34395183b6228f[m
+Author: Josh Bell <joshua.bell.828@gmail.com>
+Date:   Tue Jul 1 17:04:24 2025 -0400
+
+    broken more hooks
+
+[33mcommit e52668a181c9879f9276af8d9e5a98dca29d972c[m
+Author: Josh Bell <joshua.bell.828@gmail.com>
+Date:   Tue Jul 1 16:24:57 2025 -0400
+
+    broken hooks again
+
+[33mcommit d0e4c774ccfda866ee9cf13d1db2ee149d974c7f[m
+Author: Josh Bell <joshua.bell.828@gmail.com>
+Date:   Tue Jul 1 14:58:47 2025 -0400
+
+    added enhanced debug runner
+
+[33mcommit dfe3141d006ff3bb193c5e87cbb6860d1a0e6158[m
+Author: Josh Bell <joshua.bell.828@gmail.com>
+Date:   Tue Jul 1 14:39:12 2025 -0400
+
+    even more debug?
+
+[33mcommit dcf32cee47f77abe7ac7207c85f6a543672a373b[m
+Author: Josh Bell <joshua.bell.828@gmail.com>
+Date:   Tue Jul 1 14:11:30 2025 -0400
+
+    more debug
+
+[33mcommit b2ab7601119d3fdc74ac177e19ac0a2b47550b5b[m
+Author: Josh Bell <joshua.bell.828@gmail.com>
+Date:   Tue Jul 1 12:22:47 2025 -0400
+
+    added detailed debug
+
+[33mcommit 4be30d62e936c02d9be1629883b90de951df326d[m
+Author: Josh Bell <joshua.bell.828@gmail.com>
+Date:   Tue Jul 1 09:53:42 2025 -0400
+
+    removing files
+
+[33mcommit 176765b0538244ce97e06136c4bb56a34260eaa1[m
+Author: Josh Bell <joshua.bell.828@gmail.com>
+Date:   Mon Jun 30 13:57:21 2025 -0400
+
+    ux/ui improvements
+
+[33mcommit cb6d33e5218a8bf224443d870ba26cffe6e1c967[m[33m ([m[1;31morigin/image-editing[m[33m, [m[1;32mimage-editing[m[33m)[m
+Author: Josh Bell <joshua.bell.828@gmail.com>
+Date:   Mon Jun 30 13:33:10 2025 -0400
+
+    added image positioning
+
+[33mcommit 7b4843fc45dfc9cdb757664ad0036f1f6e65e597[m
+Author: Joshua Bell <joshua.bell.828@gmail.com>
+Date:   Mon Jun 30 09:28:19 2025 -0400
+
+    attempting image positioning
+
+[33mcommit 5c3659c0ece1e97a9b97ac3afdcdb9c73ef06497[m[33m ([m[1;32mlist[m[33m)[m
+Author: Joshua Bell <joshua.bell.828@gmail.com>
+Date:   Sun Jun 29 22:54:52 2025 -0400
+
+    unifying style
+
+[33mcommit f2f1b39ab1e5ec8501752f4287ec5d22d026f256[m
+Author: Joshua Bell <joshua.bell.828@gmail.com>
+Date:   Sun Jun 29 21:07:12 2025 -0400
+
+    unifying style
+
+[33mcommit bc60edfb9229a34ea71a2096faf703562d7919fa[m
+Author: Josh Bell <joshua.bell.828@gmail.com>
+Date:   Fri Jun 27 19:53:46 2025 -0400
+
+    additional bot
+
+[33mcommit c5b40e91ff299a3ffc67cefca4648e9bf2a83c6a[m
+Author: Josh Bell <joshua.bell.828@gmail.com>
+Date:   Fri Jun 27 18:56:32 2025 -0400
+
+    Game contract
+
+[33mcommit d6c444d015b17e99cabb3e9b35db7cfc3baf5242[m
+Author: Josh Bell <joshua.bell.828@gmail.com>
+Date:   Fri Jun 27 18:54:47 2025 -0400
+
+    error checking for game bot
+
+[33mcommit d7753e980b42084f215b5857186a5b7df53be1be[m
+Merge: 72503b2 240a1a8
+Author: Josh Bell <joshua.bell.828@gmail.com>
+Date:   Fri Jun 27 18:30:28 2025 -0400
+
+    Merge branch 'main' of https://github.com/itripleg/motherhaven
+
+[33mcommit 72503b26989a49f3befdbd1048bedc602a1cd5f8[m
+Author: Josh Bell <joshua.bell.828@gmail.com>
+Date:   Fri Jun 27 18:29:03 2025 -0400
+
+    adding first game
+
+[33mcommit 240a1a893c2616e06a9fd5702fe5a16b992b256b[m
+Author: Joshua Bell <joshua.bell.828@gmail.com>
+Date:   Thu Jun 26 17:27:59 2025 -0400
+
+    unified token decimal precision
+
+[33mcommit d11336256e83401b662961dc39288fda50ff19ee[m
+Author: Josh Bell <joshua.bell.828@gmail.com>
+Date:   Wed Jun 25 19:26:20 2025 -0400
+
+    opacity
+
+[33mcommit 461e3bbb96b00e2475c95704fb802b2609ae5f22[m
+Author: Josh Bell <joshua.bell.828@gmail.com>
+Date:   Wed Jun 25 19:23:25 2025 -0400
+
+    added bot dev mode
+
+[33mcommit 85c24a4579c1788912ce1ae82917d9ceb08744ac[m
+Author: Josh Bell <joshua.bell.828@gmail.com>
+Date:   Wed Jun 25 18:30:15 2025 -0400
+
+    ux/ui and data fixes!
+
+[33mcommit 4ef7983a24ec5f489e2d48ee86143f3a9970c9b9[m
+Author: Josh Bell <joshua.bell.828@gmail.com>
+Date:   Wed Jun 25 16:56:36 2025 -0400
+
+    bot details
+
+[33mcommit 6c65a6daf8b35e1bd9421fe39bfe0518552ce153[m
+Author: Josh Bell <joshua.bell.828@gmail.com>
+Date:   Wed Jun 25 16:19:09 2025 -0400
+
+    bot actions update
+
+[33mcommit d7c1ac60a3795f90352d981610ade9bc17e00927[m
+Author: Josh Bell <joshua.bell.828@gmail.com>
+Date:   Wed Jun 25 13:24:07 2025 -0400
+
+    bot actions fix
+
+[33mcommit fe63166c5cfe312843629598daa15b4686eeaf7e[m
+Author: Josh Bell <joshua.bell.828@gmail.com>
+Date:   Wed Jun 25 12:56:34 2025 -0400
+
+    modularize bots pages
+
+[33mcommit c9fc1327b8cf96c2007b6f849b1de04df5c853d0[m
+Author: Josh Bell <joshua.bell.828@gmail.com>
+Date:   Tue Jun 24 18:02:21 2025 -0400
+
+    update TokenFactory
+
+[33mcommit ca436adcdfd9b152fdd7623d3da98700aaa5af09[m
+Author: Josh Bell <joshua.bell.828@gmail.com>
+Date:   Tue Jun 24 13:42:51 2025 -0400
+
+    bots!
+
+[33mcommit fd32c13dc596108fda330ee6b8da109f89776a9a[m
+Author: Josh Bell <joshua.bell.828@gmail.com>
+Date:   Mon Jun 23 18:42:57 2025 -0400
+
+    real time token cards + BOT!!!
+
+[33mcommit 2ed19ff9e044249d9acfc00407688f3e07a993b4[m
+Author: Josh Bell <joshua.bell.828@gmail.com>
+Date:   Mon Jun 23 17:18:54 2025 -0400
+
+    idk i think it all works
+
+[33mcommit 95c8b9a5ad8190b9574bf986931e3ce463baf34d[m
+Author: Josh Bell <joshua.bell.828@gmail.com>
+Date:   Mon Jun 23 16:53:26 2025 -0400
+
+    mostly working
+
+[33mcommit 5f25cece5970d9fb1be77fbaa522df52c3b619c8[m
+Author: Josh Bell <joshua.bell.828@gmail.com>
+Date:   Mon Jun 23 16:17:53 2025 -0400
+
+    ux/ui improvements
+
+[33mcommit f2c9916a670f11acbb1850c7112f83a1e5dc1b40[m
+Author: Josh Bell <joshua.bell.828@gmail.com>
+Date:   Mon Jun 23 15:10:34 2025 -0400
+
+    mobile user settings ux improvement
+
+[33mcommit 1f2409a2c7e0e33705fba1a0dc2a348409c8665f[m
+Author: Josh Bell <joshua.bell.828@gmail.com>
+Date:   Mon Jun 23 15:04:35 2025 -0400
+
+    new chat ui
+
+[33mcommit da36d55051302acc786902f0fb64039f25a6a14b[m
+Author: Josh Bell <joshua.bell.828@gmail.com>
+Date:   Mon Jun 23 14:10:41 2025 -0400
+
+    build fix
+
+[33mcommit 14d927bfe62d3d1fcab765e934df16557fcf388b[m
+Author: Josh Bell <joshua.bell.828@gmail.com>
+Date:   Mon Jun 23 13:54:42 2025 -0400
+
+    optimistic event watcher
+
+[33mcommit 000d36cb10965fd5cde3bd4ec67fd2f8210769c0[m
+Author: Josh Bell <joshua.bell.828@gmail.com>
+Date:   Mon Jun 23 13:19:07 2025 -0400
+
+    added polling
+
+[33mcommit 4f30d6310b538a92ffb037454e55b9cfc3a1ca28[m
+Author: Josh Bell <joshua.bell.828@gmail.com>
+Date:   Mon Jun 23 12:59:46 2025 -0400
+
+    reduced complexity
+
+[33mcommit d737db01d2a49b4a51cc22fa0395e7c8e0212423[m
+Author: Josh Bell <joshua.bell.828@gmail.com>
+Date:   Mon Jun 23 12:04:49 2025 -0400
+
+    should build
+
+[33mcommit a79d68794116b17611af357388f43e9852366c41[m
+Author: Josh Bell <joshua.bell.828@gmail.com>
+Date:   Mon Jun 23 11:54:38 2025 -0400
+
+    debug mode working
+
+[33mcommit 7808e76caf9c83c0b5b9fa3b4cc7aabff3df4884[m
+Author: Joshua Bell <joshua.bell.828@gmail.com>
+Date:   Sun Jun 22 20:21:11 2025 -0400
+
+    not sure whats broken now
+
+[33mcommit ba26a3d4b0e2da2a40c09be75b427aa1dc1c8eb7[m
+Merge: 0dadb8e fe09884
+Author: Joshua Bell <joshua.bell.828@gmail.com>
+Date:   Sun Jun 22 20:14:50 2025 -0400
+
+    Merge branch 'main' of https://github.com/itripleg/motherhaven
+
+[33mcommit fe09884cb76ff878c8edab37ab758a7d8a47d7e8[m
+Author: Joshua Bell <53708491+itripleg@users.noreply.github.com>
+Date:   Sun Jun 22 19:45:35 2025 -0400
+
+    Update RandomTypingGame.tsx
+    
+    &apos;
+
+[33mcommit 0dadb8ee05fbb8d3c6c54fb9c6d8443a93ee8706[m
+Author: Joshua Bell <joshua.bell.828@gmail.com>
+Date:   Sun Jun 22 19:32:14 2025 -0400
+
+    fingers crossed
+
+[33mcommit f1fc5738824b6ab0511a6411f4e252e2d06cdec1[m
+Author: Joshua Bell <joshua.bell.828@gmail.com>
+Date:   Sun Jun 22 16:50:43 2025 -0400
+
+    major improvements
+
+[33mcommit 0265284ff7668160c6c83dbd76422505ee44e781[m
+Author: Joshua Bell <joshua.bell.828@gmail.com>
+Date:   Sun Jun 22 15:04:43 2025 -0400
+
+    lots of changes should hopefully fix integral calculations
+
+[33mcommit d0b8316e57d851fae0573b6091e91c5993d11b72[m[33m ([m[1;31morigin/new-branch-name[m[33m)[m
+Author: Joshua Bell <joshua.bell.828@gmail.com>
+Date:   Sat Jun 21 01:47:01 2025 -0400
+
+    minor but maybe breaking
+
+[33mcommit 2e2864065df979fbd406807a7d6e04efd6a2e9a0[m
+Author: Joshua Bell <53708491+itripleg@users.noreply.github.com>
+Date:   Fri Jun 20 17:04:41 2025 -0400
+
+    Update VettedFactory.sol
+    
+    sell function should now deduct the fee from final proceeds rather than the collaterall fixing the not enough collateral bug
+
+[33mcommit 2a86690d3cf6e379d124b52263e9184da791593e[m
+Author: Josh Bell <joshua.bell.828@gmail.com>
+Date:   Tue Dec 17 17:06:41 2024 -0500
+
+    added faucet
+
+[33mcommit 2cb6c4f7d2115a58b62875d9bda3e3aa774861e1[m
+Merge: 07e5ec2 f6859a8
+Author: Joshua Bell <53708491+itripleg@users.noreply.github.com>
+Date:   Tue Dec 17 15:14:24 2024 -0500
+
+    Merge pull request #7 from itripleg/toomuchaistuff
+    
+    removed kinde auth
+
+[33mcommit f6859a8f625d5a1853555a018b97e59a349cea3a[m[33m ([m[1;31morigin/toomuchaistuff[m[33m)[m
+Author: Josh Bell <joshua.bell.828@gmail.com>
+Date:   Tue Dec 17 14:57:49 2024 -0500
+
+    removed kinde auth
+
+[33mcommit 07e5ec241e5ace4fa95e2169152db978493a7192[m
+Merge: 3f9e0a9 8630a2e
+Author: Joshua Bell <53708491+itripleg@users.noreply.github.com>
+Date:   Tue Dec 17 13:55:51 2024 -0500
+
+    Merge pull request #6 from itripleg/toomuchaistuff
+    
+    Toomuchaistuff
+
+[33mcommit 8630a2e3bb3fa7ec7cd31748c5ff2c4618eebb5d[m
+Author: Josh Bell <joshua.bell.828@gmail.com>
+Date:   Tue Dec 17 13:51:26 2024 -0500
+
+    fix GET response
+
+[33mcommit 03cc9b9b4864f7665cbae9bcae92c854651c1d76[m
+Author: Josh Bell <joshua.bell.828@gmail.com>
+Date:   Tue Dec 17 13:46:23 2024 -0500
+
+    small updates in prep for fixing contract sell
+
+[33mcommit bf530a95735694e6a29b289daf5334ab47785a82[m
+Author: Joshua Bell <joshua.bell.828@gmail.com>
+Date:   Tue Dec 17 10:30:37 2024 -0500
+
+    balance lookup and tokens created
+
+[33mcommit 78ae48a5f5dee5eed430f182bebe49ee329c5296[m
+Author: Joshua Bell <joshua.bell.828@gmail.com>
+Date:   Tue Dec 17 01:41:00 2024 -0500
+
+    buildable
