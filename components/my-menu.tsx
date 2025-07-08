@@ -43,6 +43,7 @@ import {
   GamepadIcon,
   Palette,
   Check,
+  Heart,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useAccount, useDisconnect } from "wagmi";
@@ -82,6 +83,12 @@ const navItems: NavItem[] = [
     description: "Create tokens",
   },
   {
+    href: "/pet",
+    label: "Community Pet",
+    icon: <Heart className="h-4 w-4" />,
+    description: "Feed & care for Testy",
+  },
+  {
     href: "/bots",
     label: "Bots",
     icon: <Bot className="h-4 w-4" />,
@@ -99,7 +106,6 @@ const navItems: NavItem[] = [
     icon: <Droplets className="h-4 w-4" />,
     description: "Get test tokens",
   },
-
   {
     href: "/roadmap",
     label: "Road to Riches",
@@ -218,6 +224,11 @@ export default function MyMenu() {
       ); // /dex/[tokenAddress]
     }
 
+    // Pet page matches /pet exactly
+    if (href === "/pet") {
+      return pathname === "/pet";
+    }
+
     return false;
   };
 
@@ -247,6 +258,16 @@ export default function MyMenu() {
         label: "DEX • Token Page",
         icon: <ArrowLeftRight className="h-4 w-4" />,
         description: "Trading pair",
+      };
+    }
+
+    // If on pet page, show pet info
+    if (pathname === "/pet") {
+      return {
+        ...baseItem,
+        label: "Community Pet",
+        icon: <Heart className="h-4 w-4" />,
+        description: "Caring for Testy",
       };
     }
 
