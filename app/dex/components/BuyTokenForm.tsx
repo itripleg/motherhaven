@@ -460,7 +460,7 @@ export function BuyTokenForm({ onAmountChange, maxAmount }: any) {
           </div>
         )}
 
-        {process.env.NODE_ENV === "development" && (
+        {/* {process.env.NODE_ENV === "development" && (
           <div className="mt-4 p-3 bg-secondary/20 border border-border rounded-md">
             <p className="text-foreground font-medium text-sm mb-2">
               Debug Info:
@@ -473,7 +473,7 @@ export function BuyTokenForm({ onAmountChange, maxAmount }: any) {
               <div>Slippage: {slippageTolerance}%</div>
             </div>
           </div>
-        )}
+        )} */}
       </form>
     </>
   );

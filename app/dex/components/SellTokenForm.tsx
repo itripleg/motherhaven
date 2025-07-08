@@ -527,7 +527,7 @@ export function SellTokenForm({
         </div>
       )}
 
-      {process.env.NODE_ENV === "development" && (
+      {/* {process.env.NODE_ENV === "development" && (
         <div className="mt-4 p-3 bg-secondary/20 border border-border rounded-md">
           <p className="text-foreground font-medium text-sm mb-2">
             Debug Info:
@@ -550,7 +550,7 @@ export function SellTokenForm({
             <div>Slippage: {slippageTolerance}%</div>
           </div>
         </div>
-      )}
+      )} */}
 
       {receiptDetails.tokensSold && (
         <div className="mt-4 p-3 bg-primary/10 border border-primary/20 rounded-lg">
