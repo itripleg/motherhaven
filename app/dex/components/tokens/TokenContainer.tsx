@@ -25,7 +25,16 @@ import {
   PopoverTrigger,
 } from "@/components/ui/popover";
 import { Badge } from "@/components/ui/badge";
-import { SortAsc, SortDesc, RefreshCw, ChevronDown, Check } from "lucide-react";
+import {
+  SortAsc,
+  SortDesc,
+  RefreshCw,
+  ChevronDown,
+  Check,
+  Grid3X3,
+  LayoutGrid,
+  Grid2X2,
+} from "lucide-react";
 import { cn } from "@/lib/utils";
 
 interface TokenContainerProps {
@@ -72,11 +81,15 @@ interface DropdownOption {
   label: string;
 }
 
+// Grid layout type
+type GridLayout = 3 | 4 | 5;
+
 // localStorage keys
 const STORAGE_KEYS = {
   FILTER: "token-container-filter",
   SORT_BY: "token-container-sort-by",
   SORT_DIRECTION: "token-container-sort-direction",
+  GRID_LAYOUT: "token-container-grid-layout",
 } as const;
 
 // Helper functions for localStorage
@@ -164,6 +177,49 @@ const PopoverDropdown = ({
   );
 };
 
+// Grid Layout Button Component
+const GridLayoutButton = ({
+  currentLayout,
+  onLayoutChange,
+}: {
+  currentLayout: GridLayout;
+  onLayoutChange: (layout: GridLayout) => void;
+}) => {
+  const layouts: {
+    value: GridLayout;
+    icon: React.ComponentType<any>;
+    label: string;
+  }[] = [
+    { value: 3, icon: Grid3X3, label: "3 Columns" },
+    { value: 4, icon: LayoutGrid, label: "4 Columns" },
+    { value: 5, icon: Grid2X2, label: "5 Columns" },
+  ];
+
+  const currentLayoutConfig =
+    layouts.find((l) => l.value === currentLayout) || layouts[0];
+  const CurrentIcon = currentLayoutConfig.icon;
+
+  const cycleLayout = () => {
+    const currentIndex = layouts.findIndex((l) => l.value === currentLayout);
+    const nextIndex = (currentIndex + 1) % layouts.length;
+    onLayoutChange(layouts[nextIndex].value);
+  };
+
+  return (
+    <div className="w-[40px]">
+      <Button
+        variant="outline"
+        size="sm"
+        onClick={cycleLayout}
+        className="w-full h-9 p-0"
+        title={`Current: ${currentLayoutConfig.label}. Click to cycle.`}
+      >
+        <CurrentIcon className="h-4 w-4" />
+      </Button>
+    </div>
+  );
+};
+
 // Convert TokenListItem to Token
 const convertToToken = (item: TokenListItem): Token => {
   return {
@@ -223,6 +279,13 @@ export const TokenContainer: React.FC<TokenContainerProps> = ({
       : SortDirection.DESC;
   });
 
+  // Add grid layout state
+  const [gridLayout, setGridLayout] = useState<GridLayout>(() => {
+    const saved = loadFromStorage(STORAGE_KEYS.GRID_LAYOUT, "3");
+    const layout = parseInt(saved) as GridLayout;
+    return [3, 4, 5].includes(layout) ? layout : 3;
+  });
+
   const [tokens, setTokens] = useState<Token[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -250,6 +313,10 @@ export const TokenContainer: React.FC<TokenContainerProps> = ({
   useEffect(() => {
     saveToStorage(STORAGE_KEYS.SORT_DIRECTION, sortDirection);
   }, [sortDirection]);
+
+  useEffect(() => {
+    saveToStorage(STORAGE_KEYS.GRID_LAYOUT, gridLayout.toString());
+  }, [gridLayout]);
 
   // Enhanced trending calculation
   const calculateTrendingScore = React.useCallback((item: TokenListItem) => {
@@ -543,7 +610,7 @@ export const TokenContainer: React.FC<TokenContainerProps> = ({
 
   return (
     <div className="space-y-6">
-      {/* Controls bar with Popover dropdown */}
+      {/* Controls bar with Grid Layout Toggle */}
       <div className="flex items-center justify-between gap-4 min-h-[40px]">
         <div className="flex items-center gap-3 flex-shrink-0">
           {/* Show active search */}
@@ -560,6 +627,12 @@ export const TokenContainer: React.FC<TokenContainerProps> = ({
         </div>
 
         <div className="flex items-center gap-2 flex-shrink-0">
+          {/* Grid Layout Toggle */}
+          <GridLayoutButton
+            currentLayout={gridLayout}
+            onLayoutChange={setGridLayout}
+          />
+
           {/* Popover Sort Dropdown */}
           <div className="w-[140px]">
             <PopoverDropdown
@@ -611,7 +684,7 @@ export const TokenContainer: React.FC<TokenContainerProps> = ({
 
       {/* Results with Fade-out Effect */}
       {loading ? (
-        <div className="flex justify-center items-center min-h-[200px]">
+        <div className="flex justify-center items-center min-h-[200px] ">
           <div className="animate-pulse flex items-center gap-2">
             <RefreshCw className="h-4 w-4 animate-spin" />
             Loading tokens...
@@ -625,19 +698,9 @@ export const TokenContainer: React.FC<TokenContainerProps> = ({
           </Button>
         </div>
       ) : (
-        <div className="relative">
-          {/* Token Grid with Fade-out Effect */}
-          <div
-            className="token-grid-container"
-            style={{
-              maskImage:
-                "linear-gradient(to bottom, rgb(0, 0, 0) 0%, rgb(0, 0, 0) 85%, transparent 100%)",
-              WebkitMaskImage:
-                "linear-gradient(to bottom, rgb(0, 0, 0) 0%, rgb(0, 0, 0) 85%, transparent 100%)",
-            }}
-          >
-            <TokenGrid tokens={tokens} />
-          </div>
+        // Remove the constraining div and allow TokenGrid to handle its own layout
+        <div className="">
+          <TokenGrid tokens={tokens} gridLayout={gridLayout} />
         </div>
       )}
     </div>
