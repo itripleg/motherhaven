@@ -1,4 +1,4 @@
-// components/tokens/TokenTabs.tsx - Updated to work with activeCategory prop
+// components/tokens/TokenTabs.tsx - Mobile-friendly version
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { FilterBy } from "@/final-hooks/useTokenList";
 
@@ -37,14 +37,29 @@ export const TokenTabs = ({
     <Tabs
       value={getTabValue(activeCategory)}
       onValueChange={handleTabChange}
-      className="mb-8"
+      className="mb-8 opacity-80"
     >
-      <TabsList className="grid w-full grid-cols-5">
-        <TabsTrigger value="all">All Tokens</TabsTrigger>
-        <TabsTrigger value="new">New (24h)</TabsTrigger>
-        <TabsTrigger value="trading">Trading</TabsTrigger>
-        <TabsTrigger value="trending">Trending</TabsTrigger>
-        <TabsTrigger value="goal">Goal Reached</TabsTrigger>
+      <TabsList className="grid w-full grid-cols-5 h-auto">
+        <TabsTrigger value="all" className="text-xs sm:text-sm px-2 py-2">
+          <span className="hidden sm:inline">All Tokens</span>
+          <span className="sm:hidden">All</span>
+        </TabsTrigger>
+        <TabsTrigger value="new" className="text-xs sm:text-sm px-2 py-2">
+          <span className="hidden sm:inline">New (24h)</span>
+          <span className="sm:hidden">New</span>
+        </TabsTrigger>
+        <TabsTrigger value="trading" className="text-xs sm:text-sm px-2 py-2">
+          <span className="hidden sm:inline">Trading</span>
+          <span className="sm:hidden">Trading</span>
+        </TabsTrigger>
+        <TabsTrigger value="trending" className="text-xs sm:text-sm px-2 py-2">
+          <span className="hidden sm:inline">Trending</span>
+          <span className="sm:hidden">Trend</span>
+        </TabsTrigger>
+        <TabsTrigger value="goal" className="text-xs sm:text-sm px-2 py-2">
+          <span className="hidden sm:inline">Goal Reached</span>
+          <span className="sm:hidden">Goal</span>
+        </TabsTrigger>
       </TabsList>
     </Tabs>
   );

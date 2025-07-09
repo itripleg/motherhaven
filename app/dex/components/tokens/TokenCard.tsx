@@ -121,7 +121,7 @@ export const TokenCard = ({ token, price, rawPrice }: TokenCardProps) => {
         layout
       >
         <Card
-          className="h-full relative overflow-hidden group cursor-pointer"
+          className="h-full relative overflow-hidden group cursor-pointer border-primary/40"
           onClick={() => router.push(`/dex/${token.address}`)}
         >
           {/* Background Image Layer */}
