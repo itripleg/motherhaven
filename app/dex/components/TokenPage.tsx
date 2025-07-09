@@ -18,6 +18,7 @@ import {
   Activity,
   Sparkles,
 } from "lucide-react";
+import { TokenDataProvider } from "@/contexts/TokenDataProvider";
 
 interface TokenPageProps {
   tokenAddress: string;
@@ -117,138 +118,140 @@ export default function TokenPage({ tokenAddress }: TokenPageProps) {
   // Main component render
   return (
     <TradesProvider>
-      <div className="min-h-screen">
-        <div className="container mx-auto pt-20 p-4">
-          {/* Token Header */}
-          <motion.div
-            initial={{ opacity: 0, y: -20 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ duration: 0.6 }}
-          >
-            <TokenHeader address={token.address} />
-          </motion.div>
-
-          {/* Main Grid Layout */}
-          <div className="grid grid-cols-1 xl:grid-cols-4 gap-8 mt-8">
-            {/* Left Column - Charts and Trading */}
+      <TokenDataProvider tokenAddress={token.address}>
+        <div className="min-h-screen">
+          <div className="container mx-auto pt-20 p-4">
+            {/* Token Header */}
             <motion.div
-              initial={{ opacity: 0, x: -20 }}
-              animate={{ opacity: 1, x: 0 }}
-              transition={{ duration: 0.6, delay: 0.2 }}
-              className="xl:col-span-3 space-y-8"
+              initial={{ opacity: 0, y: -20 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ duration: 0.6 }}
             >
-              {/* Price Charts */}
-              <div className="space-y-4">
-                <div className="flex items-center gap-3 mb-2">
-                  <div className="p-2 rounded-lg bg-primary/20 border border-primary/30">
-                    <BarChart3 className="h-5 w-5 text-primary" />
-                  </div>
-                  <div>
-                    <h2 className="text-xl font-bold text-foreground">
-                      Price Analysis
-                    </h2>
-                    <p className="text-sm text-muted-foreground">
-                      Real-time market data and trends
-                    </p>
-                  </div>
-                </div>
-                <TokenPriceCharts address={token.address} />
-              </div>
-
-              {/* Trading Interface */}
-              <div className="space-y-4">
-                <div className="flex items-center gap-3 mb-2">
-                  <div className="p-2 rounded-lg bg-primary/20 border border-primary/30">
-                    <TrendingUp className="h-5 w-5 text-primary" />
-                  </div>
-                  <div>
-                    <h2 className="text-xl font-bold text-foreground">
-                      Trade {token.symbol}
-                    </h2>
-                    <p className="text-sm text-muted-foreground">
-                      Buy and sell with instant execution
-                    </p>
-                  </div>
-                </div>
-                <TokenTradeCard
-                  address={tokenAddress}
-                  tokenData={token}
-                  isConnected={isConnected}
-                />
-              </div>
+              <TokenHeader address={token.address} />
             </motion.div>
 
-            {/* Right Sidebar - Desktop Only */}
-            <motion.div
-              initial={{ opacity: 0, x: 20 }}
-              animate={{ opacity: 1, x: 0 }}
-              transition={{ duration: 0.6, delay: 0.4 }}
-              className="hidden xl:flex xl:flex-col gap-6"
-            >
-              {/* THE KEY: Single sticky container with proper top spacing */}
-              <div className="sticky top-6 space-y-6 h-fit">
-                {/* Chat Section */}
-                <div className="space-y-3">
-                  <div className="flex items-center gap-3">
+            {/* Main Grid Layout */}
+            <div className="grid grid-cols-1 xl:grid-cols-4 gap-8 mt-8">
+              {/* Left Column - Charts and Trading */}
+              <motion.div
+                initial={{ opacity: 0, x: -20 }}
+                animate={{ opacity: 1, x: 0 }}
+                transition={{ duration: 0.6, delay: 0.2 }}
+                className="xl:col-span-3 space-y-8"
+              >
+                {/* Price Charts */}
+                <div className="space-y-4">
+                  <div className="flex items-center gap-3 mb-2">
                     <div className="p-2 rounded-lg bg-primary/20 border border-primary/30">
-                      <MessageCircle className="h-4 w-4 text-primary" />
+                      <BarChart3 className="h-5 w-5 text-primary" />
                     </div>
                     <div>
-                      <h3 className="font-semibold text-foreground">
-                        Community Chat
-                      </h3>
-                      <p className="text-xs text-muted-foreground">
-                        Join the conversation
-                      </p>
-                    </div>
-                    <motion.div
-                      animate={{ scale: [1, 1.2, 1] }}
-                      transition={{ duration: 2, repeat: Infinity }}
-                      className="ml-auto"
-                    >
-                      <Sparkles className="h-4 w-4 text-primary" />
-                    </motion.div>
-                  </div>
-                  <div className="h-[450px] unified-card rounded-xl border-primary/20 overflow-hidden">
-                    <ChatComponent
-                      tokenAddress={token.address}
-                      creatorAddress={token.creator}
-                    />
-                  </div>
-                </div>
-
-                {/* Recent Trades Section */}
-                <div className="space-y-3">
-                  <div className="flex items-center gap-3">
-                    <div className="p-2 rounded-lg bg-primary/20 border border-primary/30">
-                      <Activity className="h-4 w-4 text-primary" />
-                    </div>
-                    <div>
-                      <h3 className="font-semibold text-foreground">
-                        Recent Trades
-                      </h3>
-                      <p className="text-xs text-muted-foreground">
-                        Live market activity
+                      <h2 className="text-xl font-bold text-foreground">
+                        Price Analysis
+                      </h2>
+                      <p className="text-sm text-muted-foreground">
+                        Real-time market data and trends
                       </p>
                     </div>
                   </div>
-                  <div className="h-[400px] unified-card rounded-xl border-primary/20 overflow-hidden">
-                    <RecentTrades tokenAddress={token.address} />
+                  <TokenPriceCharts address={token.address} />
+                </div>
+
+                {/* Trading Interface */}
+                <div className="space-y-4">
+                  <div className="flex items-center gap-3 mb-2">
+                    <div className="p-2 rounded-lg bg-primary/20 border border-primary/30">
+                      <TrendingUp className="h-5 w-5 text-primary" />
+                    </div>
+                    <div>
+                      <h2 className="text-xl font-bold text-foreground">
+                        Trade {token.symbol}
+                      </h2>
+                      <p className="text-sm text-muted-foreground">
+                        Buy and sell with instant execution
+                      </p>
+                    </div>
+                  </div>
+                  <TokenTradeCard
+                    address={tokenAddress}
+                    tokenData={token}
+                    isConnected={isConnected}
+                  />
+                </div>
+              </motion.div>
+
+              {/* Right Sidebar - Desktop Only */}
+              <motion.div
+                initial={{ opacity: 0, x: 20 }}
+                animate={{ opacity: 1, x: 0 }}
+                transition={{ duration: 0.6, delay: 0.4 }}
+                className="hidden xl:flex xl:flex-col gap-6"
+              >
+                {/* THE KEY: Single sticky container with proper top spacing */}
+                <div className="sticky top-6 space-y-6 h-fit">
+                  {/* Chat Section */}
+                  <div className="space-y-3">
+                    <div className="flex items-center gap-3">
+                      <div className="p-2 rounded-lg bg-primary/20 border border-primary/30">
+                        <MessageCircle className="h-4 w-4 text-primary" />
+                      </div>
+                      <div>
+                        <h3 className="font-semibold text-foreground">
+                          Community Chat
+                        </h3>
+                        <p className="text-xs text-muted-foreground">
+                          Join the conversation
+                        </p>
+                      </div>
+                      <motion.div
+                        animate={{ scale: [1, 1.2, 1] }}
+                        transition={{ duration: 2, repeat: Infinity }}
+                        className="ml-auto"
+                      >
+                        <Sparkles className="h-4 w-4 text-primary" />
+                      </motion.div>
+                    </div>
+                    <div className="h-[450px] unified-card rounded-xl border-primary/20 overflow-hidden">
+                      <ChatComponent
+                        tokenAddress={token.address}
+                        creatorAddress={token.creator}
+                      />
+                    </div>
+                  </div>
+
+                  {/* Recent Trades Section */}
+                  <div className="space-y-3">
+                    <div className="flex items-center gap-3">
+                      <div className="p-2 rounded-lg bg-primary/20 border border-primary/30">
+                        <Activity className="h-4 w-4 text-primary" />
+                      </div>
+                      <div>
+                        <h3 className="font-semibold text-foreground">
+                          Recent Trades
+                        </h3>
+                        <p className="text-xs text-muted-foreground">
+                          Live market activity
+                        </p>
+                      </div>
+                    </div>
+                    <div className="h-[400px] unified-card rounded-xl border-primary/20 overflow-hidden">
+                      <RecentTrades tokenAddress={token.address} />
+                    </div>
                   </div>
                 </div>
-              </div>
-            </motion.div>
-          </div>
+              </motion.div>
+            </div>
 
-          {/* Mobile Chat Modal */}
-          <div className="xl:hidden">
-            <MobileChatModal
-              tokenAddress={token.address}
-              creatorAddress={token.creator}
-            />
+            {/* Mobile Chat Modal */}
+            <div className="xl:hidden">
+              <MobileChatModal
+                tokenAddress={token.address}
+                creatorAddress={token.creator}
+              />
+            </div>
           </div>
         </div>
-      </div>
+      </TokenDataProvider>
     </TradesProvider>
   );
 }

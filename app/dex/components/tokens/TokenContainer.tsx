@@ -628,10 +628,12 @@ export const TokenContainer: React.FC<TokenContainerProps> = ({
 
         <div className="flex items-center gap-2 flex-shrink-0">
           {/* Grid Layout Toggle */}
-          <GridLayoutButton
-            currentLayout={gridLayout}
-            onLayoutChange={setGridLayout}
-          />
+          <div className="hidden md:block">
+            <GridLayoutButton
+              currentLayout={gridLayout}
+              onLayoutChange={setGridLayout}
+            />
+          </div>
 
           {/* Popover Sort Dropdown */}
           <div className="w-[140px]">
