@@ -1,5 +1,6 @@
 import { Metadata } from "next";
 import "./pet-styles.css";
+import { PetEventWatcher } from "./components/PetEventWatcher";
 
 export const metadata: Metadata = {
   title: "Community Pet | Testy the Dog",
@@ -44,5 +45,10 @@ interface PetLayoutProps {
 }
 
 export default function PetLayout({ children }: PetLayoutProps) {
-  return <div className="pet-layout p-200">{children}</div>;
+  return (
+    <div className="pet-layout p-200">
+      <PetEventWatcher />
+      {children}
+    </div>
+  );
 }

@@ -10,18 +10,26 @@ const ALCHEMY_RPC_URL =
 
 // Create the transport configuration
 const avalancheFujiTransport = {
-  43113: http(ALCHEMY_RPC_URL),
+  43113: http(ALCHEMY_RPC_URL, {
+    batch: {
+      batchSize: 1000,
+      wait: 150,
+    },
+  }),
 };
 
-// Create wagmi config
+// Create wagmi config with optimized polling
 export const config = createConfig({
   chains: [avalancheFuji],
   connectors: [metaMask()],
   transports: avalancheFujiTransport,
+  pollingInterval: 30000, // 30 seconds instead of default 4 seconds
+  syncConnectedChain: false, // Disable automatic chain sync
 });
 
 // Create and export a public client instance using viem directly
 export const publicClient = createPublicClient({
   chain: avalancheFuji,
   transport: viemHttp(ALCHEMY_RPC_URL),
+  pollingInterval: 30000, // 30 seconds
 });
