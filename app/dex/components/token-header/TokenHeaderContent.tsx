@@ -63,21 +63,24 @@ export const TokenHeaderContent: React.FC<TokenHeaderContentProps> = ({
 
   return (
     <div
-      className={`relative z-10 flex flex-col justify-between h-full p-6 ${className}`}
+      className={`relative z-10 flex flex-col justify-between h-full p-4 lg:p-6 ${className}`}
     >
       {/* Top Bar */}
-      <div className="flex justify-between items-start">
-        <AddressComponent hash={data.address} type="address" />
-        <div className="flex items-center gap-3">
+      <div className="flex justify-between items-start mb-4 lg:mb-0">
+        <div className="min-w-0 flex-1">
+          <AddressComponent hash={data.address} type="address" />
+        </div>
+
+        <div className="flex items-center gap-2 lg:gap-3 ml-2 flex-shrink-0">
           <Badge
-            className={`${stateDisplay.color} text-white border-0`}
+            className={`${stateDisplay.color} text-white border-0 text-xs lg:text-sm`}
             variant="outline"
           >
             {stateDisplay.text}
           </Badge>
 
           {isCreator && (
-            <div className="flex items-center gap-2 p-1.5 bg-black/30 border border-primary/40 rounded-lg backdrop-blur-sm">
+            <div className="flex items-center gap-1 lg:gap-2 p-1 lg:p-1.5 bg-black/30 border border-primary/40 rounded-lg backdrop-blur-sm">
               {canEdit && data.imageUrl && onEditClick && (
                 <Tooltip>
                   <TooltipTrigger asChild>
@@ -85,9 +88,9 @@ export const TokenHeaderContent: React.FC<TokenHeaderContentProps> = ({
                       variant="ghost"
                       size="icon"
                       onClick={onEditClick}
-                      className="text-white hover:text-primary hover:bg-primary/20 h-7 w-7 border border-white/40 hover:border-primary/50 transition-all duration-200"
+                      className="text-white hover:text-primary hover:bg-primary/20 h-6 w-6 lg:h-7 lg:w-7 border border-white/40 hover:border-primary/50 transition-all duration-200"
                     >
-                      <Camera className="h-4 w-4" />
+                      <Camera className="h-3 w-3 lg:h-4 lg:w-4" />
                     </Button>
                   </TooltipTrigger>
                   <TooltipContent>Edit photo position</TooltipContent>
@@ -101,9 +104,9 @@ export const TokenHeaderContent: React.FC<TokenHeaderContentProps> = ({
                       variant="ghost"
                       size="icon"
                       onClick={onDescriptionEdit}
-                      className="text-white hover:text-primary hover:bg-primary/20 h-7 w-7 border border-white/40 hover:border-primary/50 transition-all duration-200"
+                      className="text-white hover:text-primary hover:bg-primary/20 h-6 w-6 lg:h-7 lg:w-7 border border-white/40 hover:border-primary/50 transition-all duration-200"
                     >
-                      <FileText className="h-4 w-4" />
+                      <FileText className="h-3 w-3 lg:h-4 lg:w-4" />
                     </Button>
                   </TooltipTrigger>
                   <TooltipContent>Edit description</TooltipContent>
@@ -112,8 +115,8 @@ export const TokenHeaderContent: React.FC<TokenHeaderContentProps> = ({
 
               <Tooltip>
                 <TooltipTrigger asChild>
-                  <div className="p-1.5 bg-primary/20 border border-primary/40 rounded-md">
-                    <Crown className="h-4 w-4 text-primary" />
+                  <div className="p-1 lg:p-1.5 bg-primary/20 border border-primary/40 rounded-md">
+                    <Crown className="h-3 w-3 lg:h-4 lg:w-4 text-primary" />
                   </div>
                 </TooltipTrigger>
                 <TooltipContent>You are the creator</TooltipContent>
@@ -124,8 +127,8 @@ export const TokenHeaderContent: React.FC<TokenHeaderContentProps> = ({
           {!isCreator && data.creator && (
             <Tooltip>
               <TooltipTrigger asChild>
-                <div className="p-1.5 bg-gray-500/20 border border-gray-400/30 rounded-md">
-                  <User className="h-4 w-4 text-gray-300" />
+                <div className="p-1 lg:p-1.5 bg-gray-500/20 border border-gray-400/30 rounded-md">
+                  <User className="h-3 w-3 lg:h-4 lg:w-4 text-gray-300" />
                 </div>
               </TooltipTrigger>
               <TooltipContent>Created by: {data.creator}</TooltipContent>
@@ -135,12 +138,12 @@ export const TokenHeaderContent: React.FC<TokenHeaderContentProps> = ({
       </div>
 
       {/* Token Info */}
-      <div className="space-y-6">
-        <div className="space-y-3">
-          <h1 className="text-4xl font-bold text-white leading-tight">
+      <div className="space-y-4 lg:space-y-6 flex-1">
+        <div className="space-y-2 lg:space-y-3">
+          <h1 className="text-2xl lg:text-4xl font-bold text-white leading-tight">
             {data.name}
             {data.symbol && (
-              <span className="text-2xl text-white/70 ml-3">
+              <span className="text-lg lg:text-2xl text-white/70 ml-2 lg:ml-3">
                 ({data.symbol})
               </span>
             )}
@@ -158,37 +161,107 @@ export const TokenHeaderContent: React.FC<TokenHeaderContentProps> = ({
           />
         </div>
 
-        {/* Stats Grid */}
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-          {data.currentPrice && (
-            <div className="backdrop-blur-sm bg-white/10 p-4 rounded-xl border border-white/20">
-              <div className="flex items-center gap-2 mb-2">
-                <TrendingUp className="h-4 w-4 text-white" />
-                <span className="text-white/80 text-sm">Current Price</span>
-              </div>
-              <p className="text-white text-xl font-bold">
-                {data.currentPrice}{" "}
-                <span className="text-white/70 text-base">AVAX</span>
-              </p>
-            </div>
-          )}
+        {/* Combined Stats for Mobile, Separate for Desktop */}
+        {data.currentPrice && data.fundingGoal && data.fundingGoal !== "0" ? (
+          // Both price and progress exist
+          <>
+            {/* Mobile: Combined Card */}
+            <div className="block lg:hidden">
+              <div className="backdrop-blur-sm bg-white/10 p-3 rounded-lg border border-white/20 space-y-3">
+                {/* Price Section */}
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center gap-2">
+                    <TrendingUp className="h-4 w-4 text-white" />
+                    <span className="text-white/80 text-sm">Price</span>
+                  </div>
+                  <div className="text-right">
+                    <p className="text-white text-lg font-bold">
+                      {data.currentPrice}{" "}
+                      <span className="text-white/70 text-sm">AVAX</span>
+                    </p>
+                  </div>
+                </div>
 
-          {data.fundingGoal && data.fundingGoal !== "0" && (
-            <div className="backdrop-blur-sm bg-white/10 p-4 rounded-xl border border-white/20">
-              <div className="flex items-center gap-2 mb-2">
-                <Target className="h-4 w-4 text-white" />
-                <span className="text-white/80 text-sm">Funding Progress</span>
+                {/* Divider */}
+                <hr className="border-white/20" />
+
+                {/* Progress Section */}
+                <div>
+                  <div className="flex items-center gap-2 mb-2">
+                    <Target className="h-4 w-4 text-white" />
+                    <span className="text-white/80 text-sm">Funding</span>
+                  </div>
+                  <div className="space-y-2">
+                    <Progress value={progress} className="h-2" />
+                    <div className="flex justify-between text-xs text-white/80">
+                      <span>{progress.toFixed(1)}%</span>
+                      <span>
+                        {data.collateral || "0"} / {data.fundingGoal} AVAX
+                      </span>
+                    </div>
+                  </div>
+                </div>
               </div>
-              <div className="space-y-2">
-                <Progress value={progress} className="h-2" />
-                <p className="text-white text-sm font-semibold">
-                  {progress.toFixed(1)}% • {data.collateral || "0"} /{" "}
-                  {data.fundingGoal} AVAX
+            </div>
+
+            {/* Desktop: Separate Cards */}
+            <div className="hidden lg:grid lg:grid-cols-2 gap-4">
+              <div className="backdrop-blur-sm bg-white/10 p-4 rounded-xl border border-white/20">
+                <div className="flex items-center gap-2 mb-2">
+                  <TrendingUp className="h-4 w-4 text-white" />
+                  <span className="text-white/80 text-sm">Current Price</span>
+                </div>
+                <p className="text-white text-xl font-bold">
+                  {data.currentPrice}{" "}
+                  <span className="text-white/70 text-base">AVAX</span>
                 </p>
               </div>
+
+              <div className="backdrop-blur-sm bg-white/10 p-4 rounded-xl border border-white/20">
+                <div className="flex items-center gap-2 mb-2">
+                  <Target className="h-4 w-4 text-white" />
+                  <span className="text-white/80 text-sm">
+                    Funding Progress
+                  </span>
+                </div>
+                <div className="space-y-2">
+                  <Progress value={progress} className="h-2" />
+                  <p className="text-white text-sm font-semibold">
+                    {progress.toFixed(1)}% • {data.collateral || "0"} /{" "}
+                    {data.fundingGoal} AVAX
+                  </p>
+                </div>
+              </div>
             </div>
-          )}
-        </div>
+          </>
+        ) : data.currentPrice ? (
+          // Only price exists
+          <div className="backdrop-blur-sm bg-white/10 p-3 lg:p-4 rounded-lg lg:rounded-xl border border-white/20 max-w-xs">
+            <div className="flex items-center gap-2 mb-2">
+              <TrendingUp className="h-4 w-4 text-white" />
+              <span className="text-white/80 text-sm">Current Price</span>
+            </div>
+            <p className="text-white text-lg lg:text-xl font-bold">
+              {data.currentPrice}{" "}
+              <span className="text-white/70 text-sm lg:text-base">AVAX</span>
+            </p>
+          </div>
+        ) : data.fundingGoal && data.fundingGoal !== "0" ? (
+          // Only funding progress exists
+          <div className="backdrop-blur-sm bg-white/10 p-3 lg:p-4 rounded-lg lg:rounded-xl border border-white/20 max-w-sm">
+            <div className="flex items-center gap-2 mb-2">
+              <Target className="h-4 w-4 text-white" />
+              <span className="text-white/80 text-sm">Funding Progress</span>
+            </div>
+            <div className="space-y-2">
+              <Progress value={progress} className="h-2" />
+              <p className="text-white text-sm font-semibold">
+                {progress.toFixed(1)}% • {data.collateral || "0"} /{" "}
+                {data.fundingGoal} AVAX
+              </p>
+            </div>
+          </div>
+        ) : null}
       </div>
     </div>
   );
