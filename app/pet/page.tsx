@@ -1,7 +1,7 @@
-// pet/page.tsx
+// pet/page.tsx - Optimized Version
 "use client";
 
-import React, { useState } from "react";
+import React, { useState, useMemo } from "react";
 import { useAccount } from "wagmi";
 import { motion } from "framer-motion";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
@@ -17,19 +17,13 @@ import { PetBackground } from "./components/PetBackground";
 import { LoadingState } from "./components/LoadingState";
 import { ErrorState } from "./components/ErrorState";
 
-const PetPage = () => {
+const OptimizedPetPage = () => {
   const { isConnected } = useAccount();
   const [activeTab, setActiveTab] = useState("status");
 
-  // Get real contract data only
+  // Single consolidated hook call
   const {
-    petStatus,
-    extendedPetInfo,
-    revivalInfo,
-    currentHealth,
-    timeSinceLastFed,
-    userFeedingCount,
-    revivalCost,
+    data,
     isLoading,
     error,
     refreshData,
@@ -39,39 +33,58 @@ const PetPage = () => {
     isWritePending,
     formatTimeSince,
     isUserCaretaker,
+    revivalCost,
     contractAddress,
   } = usePetContract();
 
+  // Memoized derived data to prevent unnecessary recalculations
+  const derivedData = useMemo(() => {
+    if (!data.petInfo) return null;
+
+    const { petInfo, currentHealth, timeSinceLastFed, userFeedingCount } = data;
+
+    // Use current health if available, otherwise stored health
+    const displayHealth =
+      currentHealth !== null ? currentHealth : petInfo.health;
+
+    // Create user stats from contract data
+    const userStats = {
+      feedingCount: userFeedingCount || 0,
+      hasEverFed: (userFeedingCount || 0) > 0,
+    };
+
+    // Create pet stats from contract data
+    const petStats = {
+      totalFeedings: petInfo.totalFeedings,
+      deathCount: petInfo.deathCount,
+    };
+
+    return {
+      displayHealth,
+      userStats,
+      petStats,
+      petInfo,
+      timeSinceLastFed,
+    };
+  }, [data]);
+
   // Loading state
-  if (isLoading && !petStatus) {
+  if (isLoading && !derivedData) {
     return <LoadingState />;
   }
 
   // Error state
-  if (error && !petStatus) {
+  if (error && !derivedData) {
     return <ErrorState error={error} onRetry={refreshData} />;
   }
 
   // No pet data
-  if (!petStatus || !extendedPetInfo) {
+  if (!derivedData) {
     return <ErrorState error="Pet data not available" onRetry={refreshData} />;
   }
 
-  // Create real user stats from contract data
-  const userStats = {
-    feedingCount: userFeedingCount || 0,
-    hasEverFed: (userFeedingCount || 0) > 0,
-  };
-
-  // Create real pet stats from contract data
-  const petStats = {
-    totalFeedings: extendedPetInfo.totalFeedings,
-    deathCount: extendedPetInfo.deathCount,
-  };
-
-  // Use current health if available, otherwise stored health
-  const displayHealth =
-    currentHealth !== null ? currentHealth : extendedPetInfo.health;
+  const { displayHealth, userStats, petStats, petInfo, timeSinceLastFed } =
+    derivedData;
 
   return (
     <div className="min-h-screen animated-bg">
@@ -79,18 +92,18 @@ const PetPage = () => {
       <PetBackground variant="default" intensity="medium" />
 
       <div className="relative z-10 container mx-auto p-6 pt-24 space-y-8">
-        {/* Pet Header - Real Data Only with Rename Function */}
+        {/* Pet Header */}
         <motion.div
           initial={{ opacity: 0, y: -20 }}
           animate={{ opacity: 1, y: 0 }}
           transition={{ duration: 0.6 }}
         >
           <PetHeader
-            petName={extendedPetInfo.name}
-            isAlive={extendedPetInfo.isAlive}
+            petName={petInfo.name}
+            isAlive={petInfo.isAlive}
             currentHealth={displayHealth}
-            currentCaretaker={extendedPetInfo.currentCaretaker}
-            deathCount={extendedPetInfo.deathCount}
+            currentCaretaker={petInfo.currentCaretaker}
+            deathCount={petInfo.deathCount}
             revivalCost={revivalCost}
             isUserCaretaker={isUserCaretaker}
             timeSinceLastFed={timeSinceLastFed}
@@ -145,15 +158,15 @@ const PetPage = () => {
                 transition={{ duration: 0.4 }}
               >
                 <PetStatusCard
-                  extendedPetInfo={extendedPetInfo}
-                  revivalInfo={revivalInfo}
+                  extendedPetInfo={petInfo}
+                  revivalInfo={data.revivalInfo}
                   userStats={userStats}
                   onRevive={revivePet}
                   onUpdateHealth={updatePetHealth}
                   isConnected={isConnected}
                   isWritePending={isWritePending}
                   isUserCaretaker={isUserCaretaker}
-                  currentHealth={currentHealth}
+                  currentHealth={data.currentHealth}
                   timeSinceLastFed={timeSinceLastFed}
                   formatTimeSince={formatTimeSince}
                 />
@@ -179,8 +192,8 @@ const PetPage = () => {
                 transition={{ duration: 0.4 }}
               >
                 <FeedingSection
-                  petName={extendedPetInfo.name}
-                  petIsAlive={extendedPetInfo.isAlive}
+                  petName={petInfo.name}
+                  petIsAlive={petInfo.isAlive}
                   isConnected={isConnected}
                   isWritePending={isWritePending}
                   contractAddress={contractAddress}
@@ -190,7 +203,7 @@ const PetPage = () => {
           </Tabs>
         </motion.div>
 
-        {/* Quick Action Cards - Real Data Only */}
+        {/* Quick Action Cards */}
         <motion.div
           initial={{ opacity: 0, y: 20 }}
           animate={{ opacity: 1, y: 0 }}
@@ -220,10 +233,10 @@ const PetPage = () => {
                   </div>
                 </div>
                 <Badge
-                  variant={extendedPetInfo.isAlive ? "default" : "destructive"}
+                  variant={petInfo.isAlive ? "default" : "destructive"}
                   className="ml-auto"
                 >
-                  {extendedPetInfo.isAlive ? "Alive" : "Dead"}
+                  {petInfo.isAlive ? "Alive" : "Dead"}
                 </Badge>
               </div>
             </CardContent>
@@ -240,7 +253,7 @@ const PetPage = () => {
                 <div>
                   <div className="font-medium">Community</div>
                   <div className="text-sm text-muted-foreground">
-                    {extendedPetInfo.totalFeedings} total feeds
+                    {petInfo.totalFeedings} total feeds
                   </div>
                 </div>
                 <Badge variant="outline" className="ml-auto">
@@ -265,10 +278,10 @@ const PetPage = () => {
                   </div>
                 </div>
                 <Badge
-                  variant={extendedPetInfo.isAlive ? "default" : "secondary"}
+                  variant={petInfo.isAlive ? "default" : "secondary"}
                   className="ml-auto"
                 >
-                  {extendedPetInfo.isAlive ? "Ready" : "Revive First"}
+                  {petInfo.isAlive ? "Ready" : "Revive First"}
                 </Badge>
               </div>
             </CardContent>
@@ -293,7 +306,7 @@ const PetPage = () => {
             <span>•</span>
             <span>Feed gives +1-50 health</span>
             <span>•</span>
-            <span>Deaths: {extendedPetInfo.deathCount}</span>
+            <span>Deaths: {petInfo.deathCount}</span>
           </div>
         </motion.div>
       </div>
@@ -301,4 +314,4 @@ const PetPage = () => {
   );
 };
 
-export default PetPage;
+export default OptimizedPetPage;

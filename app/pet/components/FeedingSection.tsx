@@ -1,7 +1,7 @@
 // pet/components/FeedingSection.tsx
 "use client";
 
-import React, { useState } from "react";
+import React, { useState, useMemo } from "react";
 import { motion } from "framer-motion";
 import {
   Utensils,
@@ -24,13 +24,11 @@ import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Separator } from "@/components/ui/separator";
 import { Input } from "@/components/ui/input";
 import { useToast } from "@/hooks/use-toast";
-import { useAccount, useWriteContract, useReadContract } from "wagmi";
+import { useAccount, useWriteContract, useReadContracts } from "wagmi";
 import { parseUnits, formatUnits, type Address } from "viem";
-import { FeedingSectionProps } from "../types";
 
-// CHOW Token ABI (ERC20 + burn function)
+// CHOW Token ABI (minimal required functions)
 const CHOW_TOKEN_ABI = [
-  // ERC20 functions
   {
     inputs: [{ name: "account", type: "address" }],
     name: "balanceOf",
@@ -59,7 +57,6 @@ const CHOW_TOKEN_ABI = [
     stateMutability: "view",
     type: "function",
   },
-  // Burn function
   {
     inputs: [{ name: "amount", type: "uint256" }],
     name: "burn",
@@ -84,6 +81,14 @@ const PET_CONTRACT_ABI = [
 const CHOW_TOKEN_ADDRESS: Address =
   "0xd701634Bd3572Dd34b8C303D2590a29691a333d3";
 
+interface FeedingSectionProps {
+  petName: string;
+  petIsAlive: boolean;
+  isConnected: boolean;
+  isWritePending: boolean;
+  contractAddress?: string;
+}
+
 export const FeedingSection: React.FC<FeedingSectionProps> = ({
   petName,
   petIsAlive,
@@ -98,50 +103,106 @@ export const FeedingSection: React.FC<FeedingSectionProps> = ({
   const [burnAmount, setBurnAmount] = useState("");
   const [copiedAddress, setCopiedAddress] = useState("");
 
-  // Read CHOW token data
-  const { data: chowBalance } = useReadContract({
-    address: CHOW_TOKEN_ADDRESS,
-    abi: CHOW_TOKEN_ABI,
-    functionName: "balanceOf",
-    args: address ? [address] : undefined,
-    query: { enabled: Boolean(address) },
+  // Consolidate all token-related reads into a single call
+  const tokenContracts = useMemo(() => {
+    const contracts: any[] = [
+      // CHOW token info
+      {
+        address: CHOW_TOKEN_ADDRESS,
+        abi: CHOW_TOKEN_ABI,
+        functionName: "name",
+      },
+      {
+        address: CHOW_TOKEN_ADDRESS,
+        abi: CHOW_TOKEN_ABI,
+        functionName: "symbol",
+      },
+      {
+        address: CHOW_TOKEN_ADDRESS,
+        abi: CHOW_TOKEN_ABI,
+        functionName: "decimals",
+      },
+    ];
+
+    // Add user balance if connected
+    if (address) {
+      contracts.push({
+        address: CHOW_TOKEN_ADDRESS,
+        abi: CHOW_TOKEN_ABI,
+        functionName: "balanceOf",
+        args: [address],
+      });
+    }
+
+    return contracts;
+  }, [address]);
+
+  // Single consolidated read for all token data
+  const { data: tokenData } = useReadContracts({
+    contracts: tokenContracts,
+    query: {
+      enabled: Boolean(address || !isConnected),
+      refetchInterval: 30000, // 30 seconds
+    },
   });
 
-  const { data: chowName } = useReadContract({
-    address: CHOW_TOKEN_ADDRESS,
-    abi: CHOW_TOKEN_ABI,
-    functionName: "name",
-  });
+  // Process token data
+  const processedTokenData = useMemo(() => {
+    if (!tokenData) return null;
 
-  const { data: chowSymbol } = useReadContract({
-    address: CHOW_TOKEN_ADDRESS,
-    abi: CHOW_TOKEN_ABI,
-    functionName: "symbol",
-  });
+    const [nameResult, symbolResult, decimalsResult, balanceResult] = tokenData;
 
-  const { data: chowDecimals } = useReadContract({
-    address: CHOW_TOKEN_ADDRESS,
-    abi: CHOW_TOKEN_ABI,
-    functionName: "decimals",
-  });
+    return {
+      name:
+        nameResult.status === "success"
+          ? String(nameResult.result)
+          : "CHOW Token",
+      symbol:
+        symbolResult.status === "success"
+          ? String(symbolResult.result)
+          : "CHOW",
+      decimals:
+        decimalsResult.status === "success"
+          ? Number(decimalsResult.result)
+          : 18,
+      balance:
+        balanceResult?.status === "success"
+          ? (balanceResult.result as bigint)
+          : null,
+    };
+  }, [tokenData]);
+
+  // Calculate burn amount in wei
+  const burnAmountInWei = useMemo(() => {
+    if (!burnAmount || !processedTokenData || isNaN(parseFloat(burnAmount))) {
+      return BigInt(0);
+    }
+    return parseUnits(burnAmount, processedTokenData.decimals);
+  }, [burnAmount, processedTokenData]);
 
   // Preview health gain for current burn amount
-  const burnAmountInWei =
-    burnAmount && !isNaN(parseFloat(burnAmount))
-      ? parseUnits(burnAmount, chowDecimals || 18)
-      : BigInt(0);
-
-  const { data: healthGainPreview } = useReadContract({
-    address: contractAddress as Address,
-    abi: PET_CONTRACT_ABI,
-    functionName: "previewHealthGain",
-    args: [burnAmountInWei],
+  const { data: healthGainPreview } = useReadContracts({
+    contracts: [
+      {
+        address: contractAddress as Address,
+        abi: PET_CONTRACT_ABI,
+        functionName: "previewHealthGain",
+        args: [burnAmountInWei] as const,
+      },
+    ],
     query: {
       enabled: Boolean(contractAddress && burnAmountInWei > 0),
       refetchOnMount: false,
       refetchOnWindowFocus: false,
     },
   });
+
+  const displayHealthGain = useMemo(() => {
+    if (!healthGainPreview?.[0] || healthGainPreview[0].status !== "success") {
+      return null;
+    }
+    return Number(healthGainPreview[0].result);
+  }, [healthGainPreview]);
 
   const copyToClipboard = async (text: string, label: string) => {
     try {
@@ -189,15 +250,24 @@ export const FeedingSection: React.FC<FeedingSectionProps> = ({
       return;
     }
 
-    try {
-      const decimals = chowDecimals || 18;
-      const amountInWei = parseUnits(burnAmount, decimals);
+    if (!processedTokenData) {
+      toast({
+        title: "Token Data Loading",
+        description: "Please wait for token data to load.",
+        variant: "destructive",
+      });
+      return;
+    }
 
+    try {
       // Check if user has enough balance
-      if (chowBalance && amountInWei > chowBalance) {
+      if (
+        processedTokenData.balance &&
+        burnAmountInWei > processedTokenData.balance
+      ) {
         toast({
           title: "Insufficient Balance",
-          description: `You don't have enough ${chowSymbol || "CHOW"} tokens.`,
+          description: `You don't have enough ${processedTokenData.symbol} tokens.`,
           variant: "destructive",
         });
         return;
@@ -207,16 +277,14 @@ export const FeedingSection: React.FC<FeedingSectionProps> = ({
         address: CHOW_TOKEN_ADDRESS,
         abi: CHOW_TOKEN_ABI,
         functionName: "burn",
-        args: [amountInWei],
+        args: [burnAmountInWei],
       });
 
-      const healthGain = healthGainPreview ? Number(healthGainPreview) : "some";
+      const healthGain = displayHealthGain ? displayHealthGain : "some";
 
       toast({
         title: "🍖 Feeding Transaction Sent!",
-        description: `Burning ${burnAmount} ${
-          chowSymbol || "CHOW"
-        } to give ${petName} +${healthGain} health!`,
+        description: `Burning ${burnAmount} ${processedTokenData.symbol} to give ${petName} +${healthGain} health!`,
       });
 
       setBurnAmount("");
@@ -231,7 +299,7 @@ export const FeedingSection: React.FC<FeedingSectionProps> = ({
   };
 
   const formatBalance = (
-    balance: bigint | undefined,
+    balance: bigint | null,
     decimals: number = 18
   ): string => {
     if (!balance) return "0";
@@ -239,16 +307,14 @@ export const FeedingSection: React.FC<FeedingSectionProps> = ({
   };
 
   const handleQuickAmount = (percentage: number) => {
-    if (chowBalance && chowDecimals) {
-      const maxBalance = parseFloat(formatBalance(chowBalance, chowDecimals));
+    if (processedTokenData?.balance) {
+      const maxBalance = parseFloat(
+        formatBalance(processedTokenData.balance, processedTokenData.decimals)
+      );
       const amount = ((maxBalance * percentage) / 100).toFixed(2);
       setBurnAmount(amount);
     }
   };
-
-  const displayHealthGain = healthGainPreview
-    ? Number(healthGainPreview)
-    : null;
 
   return (
     <div className="space-y-6">
@@ -285,7 +351,9 @@ export const FeedingSection: React.FC<FeedingSectionProps> = ({
             <div className="flex items-center gap-3">
               <Coins className="h-5 w-5 text-primary" />
               <div>
-                <div className="font-semibold">{chowName || "CHOW Token"}</div>
+                <div className="font-semibold">
+                  {processedTokenData?.name || "CHOW Token"}
+                </div>
                 <div className="text-sm text-muted-foreground font-mono">
                   {CHOW_TOKEN_ADDRESS.slice(0, 6)}...
                   {CHOW_TOKEN_ADDRESS.slice(-4)}
@@ -305,16 +373,19 @@ export const FeedingSection: React.FC<FeedingSectionProps> = ({
               </div>
             </div>
 
-            {isConnected && (
+            {isConnected && processedTokenData && (
               <div className="text-right">
                 <div className="text-sm text-muted-foreground">
                   Your Balance
                 </div>
                 <div className="text-xl font-bold">
-                  {formatBalance(chowBalance, chowDecimals)}
+                  {formatBalance(
+                    processedTokenData.balance,
+                    processedTokenData.decimals
+                  )}
                 </div>
                 <div className="text-xs text-muted-foreground">
-                  {chowSymbol || "CHOW"}
+                  {processedTokenData.symbol}
                 </div>
               </div>
             )}
@@ -339,7 +410,7 @@ export const FeedingSection: React.FC<FeedingSectionProps> = ({
             </div>
 
             {/* Quick Amount Buttons */}
-            {isConnected && chowBalance && (
+            {isConnected && processedTokenData?.balance && (
               <div className="grid grid-cols-4 gap-2">
                 <Button
                   variant="outline"
@@ -391,7 +462,7 @@ export const FeedingSection: React.FC<FeedingSectionProps> = ({
                   </div>
                 </div>
                 <div className="text-sm text-green-600 dark:text-green-400 mt-1">
-                  for {burnAmount} {chowSymbol || "CHOW"} tokens
+                  for {burnAmount} {processedTokenData?.symbol || "CHOW"} tokens
                 </div>
               </div>
             )}
@@ -403,13 +474,14 @@ export const FeedingSection: React.FC<FeedingSectionProps> = ({
                 !isConnected ||
                 !petIsAlive ||
                 isBurnPending ||
+                isWritePending ||
                 !burnAmount ||
                 parseFloat(burnAmount) <= 0
               }
               className="w-full themed-button feed-button"
               size="lg"
             >
-              {isBurnPending ? (
+              {isBurnPending || isWritePending ? (
                 <>
                   <Loader2 className="h-4 w-4 mr-2 animate-spin" />
                   Burning Tokens...
@@ -417,7 +489,8 @@ export const FeedingSection: React.FC<FeedingSectionProps> = ({
               ) : (
                 <>
                   <Utensils className="h-4 w-4 mr-2" />
-                  Burn {burnAmount || "0"} {chowSymbol || "CHOW"}
+                  Burn {burnAmount || "0"}{" "}
+                  {processedTokenData?.symbol || "CHOW"}
                   {displayHealthGain !== null && burnAmount && (
                     <span className="ml-2">→ +{displayHealthGain} HP</span>
                   )}
