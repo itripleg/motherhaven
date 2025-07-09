@@ -6,6 +6,7 @@ import { type Address } from "viem";
 import { Loader2, AlertCircle, RefreshCw } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { useRealtimeTokenPrices } from "@/hooks/token/useRealtimeTokenPrices";
+import { useState, useEffect } from "react";
 
 type GridLayout = 3 | 4 | 5;
 
@@ -14,82 +15,53 @@ interface TokenGridProps {
   gridLayout?: GridLayout;
 }
 
+// Configuration for different layouts
+const LAYOUT_CONFIG = {
+  3: {
+    cardWidth: 300,
+    gap: 24,
+    classes: "grid gap-6 p-2 grid-cols-1 md:grid-cols-2 lg:grid-cols-3",
+  },
+  4: { cardWidth: 300, gap: 20, classes: "grid gap-5 p-2" },
+  5: { cardWidth: 300, gap: 16, classes: "grid gap-4 p-2" },
+} as const;
+
 export const TokenGrid = ({ tokens, gridLayout = 3 }: TokenGridProps) => {
-  // Extract token addresses for price fetching
   const tokenAddresses = tokens.map((token) => token.address as Address);
+  const [isTransitioning, setIsTransitioning] = useState(false);
+  const [previousLayout, setPreviousLayout] = useState(gridLayout);
 
-  // Use the new real-time prices hook
-  const { prices, isLoading, error, refreshPrices, lastUpdate } =
-    useRealtimeTokenPrices(tokenAddresses, {
-      refreshInterval: 15000, // 15 seconds
-      eventRefreshDelay: 2000, // 2 seconds after trade events
+  const { prices, isLoading, error, refreshPrices } = useRealtimeTokenPrices(
+    tokenAddresses,
+    {
+      refreshInterval: 15000,
+      eventRefreshDelay: 2000,
       enableEventListening: true,
-    });
-
-  // Calculate breakout based on card size and desired columns
-  const getBreakoutCalculation = (layout: GridLayout) => {
-    // Base card width (exactly what a card naturally wants to be)
-    const baseCardWidth = 300; // Increased to ensure no squishing
-    const gap = layout === 5 ? 16 : layout === 4 ? 20 : 24; // Increased gaps to prevent cramping
-
-    // Calculate the total width needed for the desired number of columns
-    const totalWidth = baseCardWidth * layout + gap * (layout - 1);
-
-    // Add extra padding for hover effects and breathing room
-    const paddingForHover = 40; // Extra space on each side for hover effects
-    const totalWidthWithPadding = totalWidth + paddingForHover * 2;
-
-    return {
-      totalWidth: totalWidthWithPadding,
-      cardWidth: baseCardWidth,
-      gap,
-      hoverPadding: paddingForHover,
-    };
-  };
-
-  // Get grid classes with consistent card sizing
-  const getGridClasses = (layout: GridLayout): string => {
-    const baseClasses = "grid max-h-screen overflow-visible scrollbar-thin";
-
-    // Use CSS Grid with fixed card widths
-    switch (layout) {
-      case 3:
-        return (
-          `${baseClasses} gap-6 p-2` + // Keep original padding for 3-column
-          ` grid-cols-1 md:grid-cols-2 lg:grid-cols-3`
-        );
-      case 4:
-        return `${baseClasses} gap-5 p-6`;
-      case 5:
-        return `${baseClasses} gap-4 p-6`;
-      default:
-        return `${baseClasses} gap-6 p-2 grid-cols-1 md:grid-cols-2 lg:grid-cols-3`;
     }
-  };
+  );
 
-  // Container classes with calculated breakout
-  const getContainerClasses = (layout: GridLayout): string => {
-    if (layout === 3) {
-      // 3 columns - stays within container
-      return "space-y-4 overflow-visible";
+  // Handle layout transitions
+  useEffect(() => {
+    if (gridLayout !== previousLayout) {
+      setIsTransitioning(true);
+      setPreviousLayout(gridLayout);
+      const timer = setTimeout(() => setIsTransitioning(false), 500);
+      return () => clearTimeout(timer);
     }
+  }, [gridLayout, previousLayout]);
 
-    return "space-y-4"; // Base class, positioning handled by inline styles
-  };
+  // Get layout configuration
+  const config = LAYOUT_CONFIG[gridLayout];
 
-  // Get container styles with proper centering
-  const getContainerStyles = (layout: GridLayout): React.CSSProperties => {
-    if (layout === 3) {
-      return {
-        overflow: "visible", // Only add overflow visible for transitions
-      };
-    }
+  // Calculate container styles for breakout layouts (4 & 5 columns)
+  const getContainerStyles = (): React.CSSProperties => {
+    if (gridLayout === 3) return { overflow: "visible", position: "relative" };
 
-    const calc = getBreakoutCalculation(layout);
-
+    const totalWidth =
+      config.cardWidth * gridLayout + config.gap * (gridLayout - 1) + 80; // 80px padding
     return {
       position: "relative",
-      width: `${calc.totalWidth}px`,
+      width: `${totalWidth}px`,
       left: "50%",
       transform: "translateX(-50%)",
       margin: "0 auto",
@@ -97,24 +69,29 @@ export const TokenGrid = ({ tokens, gridLayout = 3 }: TokenGridProps) => {
     };
   };
 
-  // Alternative approach using CSS custom properties for more precise control
-  const getCustomGridStyle = (layout: GridLayout): React.CSSProperties => {
-    const calc = getBreakoutCalculation(layout);
+  // Get grid styles
+  const getGridStyles = (): React.CSSProperties => {
+    if (gridLayout === 3) return {};
 
-    if (layout === 3) {
-      return {
-        gridTemplateColumns: "repeat(auto-fit, minmax(280px, 1fr))", // Responsive for 3 columns
-      };
-    }
-
-    // For 4 and 5 columns, use exact fixed widths to prevent squishing
     return {
-      gridTemplateColumns: `repeat(${layout}, ${calc.cardWidth}px)`,
-      gap: `${calc.gap}px`,
+      gridTemplateColumns: `repeat(${gridLayout}, ${config.cardWidth}px)`,
+      gap: `${config.gap}px`,
       justifyContent: "center",
-      justifyItems: "center", // Center items within their grid cells
+      justifyItems: "center",
     };
   };
+
+  // Apply masking for 3-column layout after transition
+  const shouldApplyMask = gridLayout === 3 && !isTransitioning;
+  const maskStyles = shouldApplyMask
+    ? {
+        maskImage:
+          "linear-gradient(to bottom, rgb(0, 0, 0) 0%, rgb(0, 0, 0) 92%, transparent 100%)",
+        WebkitMaskImage:
+          "linear-gradient(to bottom, rgb(0, 0, 0) 0%, rgb(0, 0, 0) 92%, transparent 100%)",
+        maxHeight: "80vh",
+      }
+    : {};
 
   // Loading state
   if (isLoading && Object.keys(prices).length === 0) {
@@ -128,7 +105,7 @@ export const TokenGrid = ({ tokens, gridLayout = 3 }: TokenGridProps) => {
     );
   }
 
-  // Error state with retry option
+  // Error state
   if (error && Object.keys(prices).length === 0) {
     return (
       <div className="flex flex-col items-center justify-center min-h-[200px] gap-4">
@@ -162,35 +139,19 @@ export const TokenGrid = ({ tokens, gridLayout = 3 }: TokenGridProps) => {
   }
 
   return (
-    <div
-      className="space-y-4"
-      style={{
-        overflow: "visible", // Ensure parent containers don't clip during transitions
-        position: "relative", // Create stacking context for transitions
-      }}
-    >
-      <div
-        style={{
-          ...getContainerStyles(gridLayout),
-          maskImage:
-            gridLayout === 3
-              ? "linear-gradient(to bottom, rgb(0, 0, 0) 0%, rgb(0, 0, 0) 85%, transparent 100%)"
-              : "none",
-          WebkitMaskImage:
-            gridLayout === 3
-              ? "linear-gradient(to bottom, rgb(0, 0, 0) 0%, rgb(0, 0, 0) 85%, transparent 100%)"
-              : "none",
-        }}
-      >
-        {/* Token grid with consistent card sizing */}
+    <div className="space-y-4 overflow-visible relative">
+      <div style={getContainerStyles()}>
         <motion.div
-          className={getGridClasses(gridLayout)}
-          style={{
-            ...getCustomGridStyle(gridLayout),
-          }}
+          className={`${config.classes} overflow-visible`}
+          style={{ ...getGridStyles(), ...maskStyles }}
           initial={{ opacity: 0 }}
           animate={{ opacity: 1 }}
-          transition={{ duration: 0.5 }}
+          transition={{
+            duration: 0.3,
+            type: "spring",
+            stiffness: 300,
+            damping: 25,
+          }}
         >
           {tokens.map((token) => {
             const priceData = prices[token.address.toLowerCase()];
@@ -202,27 +163,21 @@ export const TokenGrid = ({ tokens, gridLayout = 3 }: TokenGridProps) => {
                 layout
                 transition={{
                   layout: {
-                    duration: 0.6,
-                    ease: "easeInOut",
+                    type: "spring",
+                    stiffness: 300,
+                    damping: 25,
+                    mass: 1.5,
                   },
                 }}
-                // Force exact card width to prevent any squishing + ensure no clipping during transitions
                 style={{
-                  width:
-                    gridLayout === 3
-                      ? "auto"
-                      : `${getBreakoutCalculation(gridLayout).cardWidth}px`,
-                  minWidth:
-                    gridLayout === 3
-                      ? "auto"
-                      : `${getBreakoutCalculation(gridLayout).cardWidth}px`,
-                  maxWidth:
-                    gridLayout === 3
-                      ? "none"
-                      : `${getBreakoutCalculation(gridLayout).cardWidth}px`,
-                  flexShrink: 0, // Prevent any shrinking
-                  overflow: "visible", // Ensure card wrapper doesn't clip
-                  zIndex: 1, // Ensure cards are above container bounds during transitions
+                  width: `${config.cardWidth}px`,
+                  minWidth: `${config.cardWidth}px`,
+                  maxWidth: `${config.cardWidth}px`,
+                  flexShrink: 0,
+                  overflow: "visible",
+                  position: "relative",
+                  zIndex: 1,
+                  transform: "translateZ(0)",
                 }}
               >
                 <TokenCard
