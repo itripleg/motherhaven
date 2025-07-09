@@ -3,7 +3,7 @@
 
 import { useState, useEffect, useMemo } from "react";
 import { useWriteContract, useWaitForTransactionReceipt } from "wagmi";
-import { parseEther } from "viem";
+import { parseEther, formatEther } from "viem";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -52,6 +52,10 @@ export function BuyTokenFormOptimized({
     setIsCalculating(true);
     calculateTokensForEth(amount)
       .then(setEstimatedTokensOut)
+      .catch((error) => {
+        console.error("Calculation error:", error);
+        setEstimatedTokensOut("0");
+      })
       .finally(() => setIsCalculating(false));
   }, [amount, calculateTokensForEth, isValidAmount]);
 
@@ -60,12 +64,23 @@ export function BuyTokenFormOptimized({
     onAmountChange?.(amount);
   }, [amount, onAmountChange]);
 
-  // Calculate slippage-protected minimum tokens
+  // Calculate slippage-protected minimum tokens with better number handling
   const minTokensOut = useMemo(() => {
     if (!estimatedTokensOut || estimatedTokensOut === "0") return "0";
-    const estimated = parseFloat(estimatedTokensOut);
-    const slippageMultiplier = (100 - parseFloat(slippageTolerance)) / 100;
-    return (estimated * slippageMultiplier).toFixed(6);
+
+    try {
+      const estimated = parseFloat(estimatedTokensOut);
+      if (isNaN(estimated) || estimated <= 0) return "0";
+
+      const slippageMultiplier = (100 - parseFloat(slippageTolerance)) / 100;
+      const minTokens = estimated * slippageMultiplier;
+
+      // Format to avoid precision issues
+      return minTokens.toFixed(6);
+    } catch (error) {
+      console.error("Error calculating min tokens:", error);
+      return "0";
+    }
   }, [estimatedTokensOut, slippageTolerance]);
 
   // Input validation with instant feedback
@@ -103,14 +118,35 @@ export function BuyTokenFormOptimized({
     }
 
     try {
-      const minTokensBigInt = parseEther(minTokensOut);
+      // Parse the minimum tokens with proper BigInt conversion
+      let minTokensBigInt: bigint;
+      try {
+        // Convert to wei by multiplying by 10^18, but handle as string to avoid precision loss
+        const minTokensFloat = parseFloat(minTokensOut);
+        if (isNaN(minTokensFloat) || minTokensFloat < 0) {
+          throw new Error("Invalid minimum tokens calculation");
+        }
+
+        // Use parseEther for proper conversion
+        minTokensBigInt = parseEther(minTokensOut);
+      } catch (conversionError) {
+        console.error("BigInt conversion error:", conversionError);
+        toast({
+          title: "Calculation Error",
+          description: "Failed to calculate minimum tokens. Please try again.",
+          variant: "destructive",
+        });
+        return;
+      }
+
+      const amountInWei = parseEther(amount);
 
       writeContract({
         abi: FACTORY_ABI,
         address: FACTORY_ADDRESS,
         functionName: "buy",
         args: [token?.address as `0x${string}`, minTokensBigInt],
-        value: parseEther(amount),
+        value: amountInWei,
       });
 
       toast({

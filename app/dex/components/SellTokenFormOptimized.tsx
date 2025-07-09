@@ -106,14 +106,23 @@ export function SellTokenFormOptimized({
     setIsCalculating(true);
     calculateEthForTokens(amount)
       .then(setEstimatedEthOut)
+      .catch((error) => {
+        console.error("Calculation error:", error);
+        setEstimatedEthOut("0");
+      })
       .finally(() => setIsCalculating(false));
   }, [amount, calculateEthForTokens, isValidAmount]);
 
   // Check approval status
   useEffect(() => {
     if (amount && allowance !== undefined) {
-      const amountWei = parseEther(amount);
-      setNeedsApproval(amountWei > allowance);
+      try {
+        const amountWei = parseEther(amount);
+        setNeedsApproval(amountWei > allowance);
+      } catch (error) {
+        console.error("Error checking approval:", error);
+        setNeedsApproval(false);
+      }
     }
   }, [amount, allowance]);
 
@@ -122,12 +131,23 @@ export function SellTokenFormOptimized({
     onAmountChange?.(amount);
   }, [amount, onAmountChange]);
 
-  // Calculate slippage-protected minimum ETH
+  // Calculate slippage-protected minimum ETH with better number handling
   const minEthOut = useMemo(() => {
     if (!estimatedEthOut || estimatedEthOut === "0") return "0";
-    const estimated = parseFloat(estimatedEthOut);
-    const slippageMultiplier = (100 - parseFloat(slippageTolerance)) / 100;
-    return (estimated * slippageMultiplier).toFixed(6);
+
+    try {
+      const estimated = parseFloat(estimatedEthOut);
+      if (isNaN(estimated) || estimated <= 0) return "0";
+
+      const slippageMultiplier = (100 - parseFloat(slippageTolerance)) / 100;
+      const minEth = estimated * slippageMultiplier;
+
+      // Format to avoid precision issues
+      return minEth.toFixed(6);
+    } catch (error) {
+      console.error("Error calculating min ETH:", error);
+      return "0";
+    }
   }, [estimatedEthOut, slippageTolerance]);
 
   // Input validation
@@ -188,8 +208,29 @@ export function SellTokenFormOptimized({
     }
 
     try {
-      const amountWei = parseEther(amount);
-      const minEthWei = parseEther(minEthOut);
+      // Parse amounts with proper BigInt conversion
+      let amountWei: bigint;
+      let minEthWei: bigint;
+
+      try {
+        amountWei = parseEther(amount);
+
+        // Handle minEthOut conversion safely
+        const minEthFloat = parseFloat(minEthOut);
+        if (isNaN(minEthFloat) || minEthFloat < 0) {
+          throw new Error("Invalid minimum ETH calculation");
+        }
+
+        minEthWei = parseEther(minEthOut);
+      } catch (conversionError) {
+        console.error("BigInt conversion error:", conversionError);
+        toast({
+          title: "Calculation Error",
+          description: "Failed to calculate minimum ETH. Please try again.",
+          variant: "destructive",
+        });
+        return;
+      }
 
       writeSellContract({
         abi: FACTORY_ABI,
