@@ -6,7 +6,7 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { Label } from "@/components/ui/label";
 import { X, Upload, Image as ImageIcon } from "lucide-react";
-import { FactoryPreview } from "./FactoryPreview";
+// import { FactoryPreview } from "./FactoryPreview";
 
 interface SimpleImageUploadProps {
   imageFile: File | null;
@@ -130,30 +130,6 @@ export const SimpleImageUpload: React.FC<SimpleImageUploadProps> = ({
           )}
         </CardContent>
       </Card>
-
-      {/* Preview using the new modular component */}
-      <div className="space-y-3">
-        <div className="flex items-center gap-2">
-          <Label className="text-base font-semibold text-foreground">
-            Preview
-          </Label>
-          <span className="text-xs text-muted-foreground">
-            How your token will appear
-          </span>
-        </div>
-
-        <FactoryPreview
-          tokenName={tokenName}
-          tokenSymbol={tokenSymbol}
-          description={description}
-          imageFile={imageFile}
-          height="h-48 lg:h-56"
-        />
-
-        <p className="text-xs text-muted-foreground text-center">
-          You can adjust the image position after token creation
-        </p>
-      </div>
     </div>
   );
 };

@@ -54,7 +54,7 @@ export function MobileMenu() {
               </Button>
             </DropdownMenuTrigger>
             <DropdownMenuContent
-              className="w-64 rounded-xl z-[110]"
+              className="rounded-xl border-primary/20 bg-background/95 backdrop-blur-md shadow-xl z-[110] w-64"
               align="end"
             >
               <ThemeMenu />
@@ -77,31 +77,29 @@ export function MobileMenu() {
             </Button>
           </DropdownMenuTrigger>
 
-          <DropdownMenuContent className="w-80 rounded-xl z-[110]">
-            <DropdownMenuLabel>Navigation</DropdownMenuLabel>
-            <DropdownMenuSeparator />
+          <DropdownMenuContent className="w-80 rounded-xl border-primary/20 bg-background/95 backdrop-blur-md shadow-xl z-[110]">
+            <DropdownMenuLabel className="px-3 py-2">
+              Navigation
+            </DropdownMenuLabel>
+            <DropdownMenuSeparator className="border-primary/10" />
 
             {navItems.map((item) => (
-              <DropdownMenuItem key={item.href}>
+              <DropdownMenuItem
+                key={item.href}
+                className="p-0 focus:bg-transparent"
+              >
                 <Link
                   href={item.href}
                   className={cn(
-                    "flex items-center gap-3 p-3 w-full",
-                    isActiveRoute(item.href, pathname) &&
-                      "bg-primary/10 text-primary"
+                    "flex items-center gap-3 cursor-pointer rounded-lg px-3 py-2 w-full",
+                    "transition-colors duration-200",
+                    isActiveRoute(item.href, pathname)
+                      ? "bg-primary/10 text-primary"
+                      : "hover:bg-accent"
                   )}
                 >
-                  <div
-                    className={cn(
-                      "flex h-8 w-8 items-center justify-center rounded-lg",
-                      isActiveRoute(item.href, pathname)
-                        ? "bg-primary/20"
-                        : "bg-muted/50"
-                    )}
-                  >
-                    <Icon name={item.iconName} />
-                  </div>
-                  <div>
+                  <Icon name={item.iconName} />
+                  <div className="flex-1">
                     <div className="font-medium">{item.label}</div>
                     {item.description && (
                       <div className="text-xs text-muted-foreground">
@@ -139,20 +137,32 @@ export function MobileMenu() {
                 </DropdownMenuTrigger>
                 <DropdownMenuContent
                   align="end"
-                  className="w-56 rounded-xl z-[110]"
+                  className="w-56 rounded-xl border-primary/20 bg-background/95 backdrop-blur-md shadow-xl z-[110]"
                 >
-                  <DropdownMenuLabel>Account Actions</DropdownMenuLabel>
-                  <DropdownMenuSeparator />
+                  <DropdownMenuLabel className="px-3 py-2">
+                    Account Actions
+                  </DropdownMenuLabel>
+                  <DropdownMenuSeparator className="border-primary/10" />
 
                   {/* User Menu Items */}
                   {userMenuItems.map((item) => (
-                    <DropdownMenuItem key={item.href} asChild>
+                    <DropdownMenuItem
+                      key={item.href}
+                      asChild
+                      className="p-0 focus:bg-transparent"
+                    >
                       <Link
                         href={item.href}
-                        className="flex items-center gap-3 w-full"
+                        className={cn(
+                          "flex items-center gap-3 cursor-pointer rounded-lg px-3 py-2 w-full",
+                          "transition-colors duration-200",
+                          isActiveRoute(item.href, pathname)
+                            ? "bg-primary/10 text-primary"
+                            : "hover:bg-accent"
+                        )}
                       >
                         <Icon name={item.iconName} />
-                        <div>
+                        <div className="flex-1">
                           <div className="font-medium">{item.label}</div>
                           {item.description && (
                             <div className="text-xs text-muted-foreground">
@@ -164,7 +174,7 @@ export function MobileMenu() {
                     </DropdownMenuItem>
                   ))}
 
-                  <DropdownMenuSeparator />
+                  <DropdownMenuSeparator className="border-border/50" />
                   <UserAccountMenu pathname={pathname} />
                 </DropdownMenuContent>
               </DropdownMenu>

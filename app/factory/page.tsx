@@ -394,13 +394,13 @@ export default function FactoryPage() {
       {backgroundImage && (
         <div className="fixed inset-0 z-0">
           <div
-            className="absolute inset-0 bg-cover bg-center opacity-80"
+            className="absolute inset-0 bg-cover bg-center opacity-100"
             style={{
               backgroundImage: `url(${backgroundImage})`,
               filter: "blur(2px)",
             }}
           />
-          <div className="absolute inset-0 bg-gradient-to-br from-background/90 via-background/95 to-background/90" />
+          <div className="absolute inset-0 bg-gradient-to-br from-background/85 via-background/90 to-background/85" />
         </div>
       )}
 
@@ -421,15 +421,26 @@ export default function FactoryPage() {
             animate={{ opacity: 1, y: 0 }}
             transition={{ delay: 0.2 }}
           >
-            <FactoryProgress
-              completionPercentage={getCompletionPercentage()}
-              activeTab={activeTab}
-              onTabChange={setActiveTab}
-              isFormValid={isFormValid}
-            />
+            <motion.div
+              initial={{ opacity: 0, y: 20 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ delay: 0.2 }}
+            >
+              <FactoryProgress
+                completionPercentage={getCompletionPercentage()}
+                activeTab={activeTab}
+                onTabChange={setActiveTab}
+                isFormValid={isFormValid}
+                tokenInfo={{
+                  name: tokenInfo.name,
+                  ticker: tokenInfo.ticker,
+                  image: tokenInfo.image,
+                }}
+              />
+            </motion.div>
           </motion.div>
 
-          {/* Main Content Tabs - Now just content */}
+          {/* Main Content Tabs  */}
           <motion.div
             initial={{ opacity: 0, y: 20 }}
             animate={{ opacity: 1, y: 0 }}

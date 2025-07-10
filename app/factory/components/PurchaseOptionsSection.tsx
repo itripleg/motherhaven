@@ -139,7 +139,7 @@ export const PurchaseOptionsSection: React.FC<PurchaseOptionsSectionProps> = ({
             </div>
 
             {/* Estimated tokens */}
-            {purchaseOption.amount && parseFloat(purchaseOption.amount) > 0 && (
+            {/* {purchaseOption.amount && parseFloat(purchaseOption.amount) > 0 && (
               <div className="p-3 bg-primary/10 border border-primary/20 rounded-lg">
                 <div className="flex items-center justify-between mb-2">
                   <span className="text-sm font-medium text-foreground">
@@ -153,13 +153,12 @@ export const PurchaseOptionsSection: React.FC<PurchaseOptionsSectionProps> = ({
                   Based on initial price of {FACTORY_CONSTANTS.INITIAL_PRICE}{" "}
                   AVAX per token
                   <br />
-                  (Final amount may vary due to slippage)
                 </div>
               </div>
-            )}
+            )} */}
 
             {/* Minimum tokens out (slippage protection) */}
-            <div>
+            {/* <div className="">
               <Label htmlFor="minTokensOut" className="text-foreground">
                 Minimum Tokens Expected (Slippage Protection)
               </Label>
@@ -176,10 +175,10 @@ export const PurchaseOptionsSection: React.FC<PurchaseOptionsSectionProps> = ({
               <div className="text-xs text-muted-foreground mt-1">
                 Set to 0 to disable slippage protection (not recommended)
               </div>
-            </div>
+            </div> */}
 
             {/* Auto-fill suggestion */}
-            {estimatedTokens !== "0" && (
+            {/* {estimatedTokens !== "0" && (
               <Button
                 type="button"
                 variant="outline"
@@ -194,15 +193,15 @@ export const PurchaseOptionsSection: React.FC<PurchaseOptionsSectionProps> = ({
                 Set to {(parseFloat(estimatedTokens) * 0.99).toFixed(2)} (99% of
                 estimated)
               </Button>
-            )}
+            )} */}
 
             {/* Warning */}
             <div className="flex items-start gap-2 p-3 bg-secondary/50 border border-border rounded-lg">
               <Info className="h-4 w-4 text-muted-foreground mt-0.5" />
               <div className="text-xs text-muted-foreground">
                 <strong>Note:</strong> Your purchase will be included in the
-                token creation transaction. This makes you the first trader and
-                helps bootstrap initial liquidity.
+                token creation transaction. This makes you the first buyer and
+                prevents sniping.
               </div>
             </div>
           </div>

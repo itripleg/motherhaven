@@ -17,6 +17,11 @@ interface FactoryProgressProps {
   activeTab: string;
   onTabChange: (tab: string) => void;
   isFormValid: boolean;
+  tokenInfo: {
+    name: string;
+    ticker: string;
+    image: File | null;
+  };
 }
 
 const progressSteps = [
@@ -48,8 +53,26 @@ export function FactoryProgress({
   activeTab,
   onTabChange,
   isFormValid,
+  tokenInfo,
 }: FactoryProgressProps) {
-  const getStepStatus = (threshold: number) => {
+  const getStepStatus = (stepId: string, threshold: number) => {
+    // Tokenomics is always completed since it's pre-configured
+    if (stepId === "tokenomics") return "completed";
+
+    // Token details completion based on actual form data
+    if (stepId === "info") {
+      if (tokenInfo.name && tokenInfo.ticker) return "completed";
+      if (tokenInfo.name || tokenInfo.ticker) return "current";
+      return "pending";
+    }
+
+    // Preview step - can access if form is valid
+    if (stepId === "preview") {
+      if (isFormValid) return "completed";
+      return "pending";
+    }
+
+    // Fallback to threshold-based logic
     if (completionPercentage >= threshold) return "completed";
     if (completionPercentage >= threshold - 25) return "current";
     return "pending";
@@ -66,9 +89,10 @@ export function FactoryProgress({
   const getProgressMessage = () => {
     if (completionPercentage === 100) return "🚀 Ready for launch!";
     if (completionPercentage >= 75) return "📋 Almost there! Review your token";
-    if (completionPercentage >= 50) return "💰 Configure tokenomics";
-    if (completionPercentage >= 25) return "✨ Add more details";
-    return "🏗️ Start building your token";
+    if (completionPercentage >= 50) return "✨ Add token details to continue";
+    if (tokenInfo.name || tokenInfo.ticker)
+      return "✨ Complete your token details";
+    return "🏗️ Start by adding your token name and symbol";
   };
 
   const canAccessTab = (tabId: string) => {
@@ -171,7 +195,7 @@ export function FactoryProgress({
         {/* Clickable Step Indicators */}
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
           {progressSteps.map((step, index) => {
-            const status = getStepStatus(step.threshold);
+            const status = getStepStatus(step.id, step.threshold);
             const StepIcon = step.icon;
             const isActive = activeTab === step.id;
             const canAccess = canAccessTab(step.id);
@@ -290,8 +314,8 @@ export function FactoryProgress({
                   />
                 )}
 
-                {/* Current Step Pulse */}
-                {status === "current" && !isActive && (
+                {/* Current Step Pulse - Only for token details when incomplete */}
+                {status === "current" && !isActive && step.id === "info" && (
                   <motion.div
                     className="absolute -inset-1 bg-primary/20 rounded-lg border border-primary/40"
                     animate={{ opacity: [0.5, 1, 0.5] }}
@@ -343,14 +367,15 @@ export function FactoryProgress({
               <div className="text-sm">
                 <p className="text-foreground font-medium mb-1">💡 Quick Tip</p>
                 <p className="text-muted-foreground">
-                  {completionPercentage === 0 &&
+                  {!tokenInfo.name &&
+                    !tokenInfo.ticker &&
                     "Start by giving your token a memorable name and symbol."}
-                  {completionPercentage === 25 &&
-                    "Add a compelling description to attract investors."}
-                  {completionPercentage === 50 &&
-                    "Upload an eye-catching image to make your token stand out."}
-                  {completionPercentage === 75 &&
-                    "Review all details carefully before launching."}
+                  {(tokenInfo.name || tokenInfo.ticker) &&
+                    !isFormValid &&
+                    "Complete both token name and symbol to continue."}
+                  {isFormValid &&
+                    completionPercentage < 100 &&
+                    "Great! Now you can review your token in the preview tab."}
                 </p>
               </div>
             </div>

@@ -1,3 +1,4 @@
+// app/factory/components/FactoryHeader.tsx
 import { motion } from "framer-motion";
 import {
   Rocket,
@@ -27,8 +28,8 @@ export function FactoryHeader({ platformStats }: FactoryHeaderProps) {
     <div className="text-center space-y-8">
       {/* Main Hero Section */}
       <div className="relative">
-        {/* Floating Icons Animation */}
-        <div className="absolute inset-0 pointer-events-none">
+        {/* Floating Icons Animation - Hidden on mobile for cleaner look */}
+        <div className="absolute inset-0 pointer-events-none hidden md:block">
           <motion.div
             animate={{
               rotate: [0, 360],
@@ -83,54 +84,17 @@ export function FactoryHeader({ platformStats }: FactoryHeaderProps) {
             transition={{ duration: 0.8, ease: "easeOut" }}
             className="inline-flex items-center justify-center gap-6 mb-8"
           >
-            {/* Left Icon */}
-            {/* <motion.div
-              animate={{ rotate: [0, 5, -5, 0] }}
-              transition={{
-                duration: 3,
-                repeat: Infinity,
-                ease: "easeInOut",
-              }}
-              className="p-4 unified-card border-primary/30 bg-primary/10"
-            >
-              <Rocket className="h-12 w-12 text-primary" />
-            </motion.div> */}
-
             {/* Title */}
             <div className="text-center">
               <motion.h1
                 initial={{ y: 20, opacity: 0 }}
                 animate={{ y: 0, opacity: 1 }}
                 transition={{ delay: 0.2, duration: 0.8 }}
-                className="text-6xl md:text-7xl font-bold text-gradient bg-gradient-to-r from-primary via-primary/80 to-primary/60 bg-clip-text text-transparent"
+                className="text-4xl md:text-6xl lg:text-7xl font-bold text-gradient bg-gradient-to-r from-primary via-primary/80 to-primary/60 bg-clip-text text-transparent"
               >
                 Token Factory
               </motion.h1>
-              {/* <motion.p
-                initial={{ y: 20, opacity: 0 }}
-                animate={{ y: 0, opacity: 1 }}
-                transition={{ delay: 0.4, duration: 0.8 }}
-                className="text-xl md:text-2xl text-muted-foreground mt-3 font-medium"
-              >
-                Create the next big thing in DeFi
-              </motion.p> */}
             </div>
-
-            {/* Right Icon */}
-            {/* <motion.div
-              animate={{
-                scale: [1, 1.1, 1],
-                rotate: [0, 10, -10, 0],
-              }}
-              transition={{
-                duration: 4,
-                repeat: Infinity,
-                ease: "easeInOut",
-              }}
-              className="p-4 unified-card border-primary/30 bg-primary/10"
-            >
-              <Sparkles className="h-12 w-12 text-primary" />
-            </motion.div> */}
           </motion.div>
 
           {/* Subtitle with Glow Effect */}
@@ -141,7 +105,7 @@ export function FactoryHeader({ platformStats }: FactoryHeaderProps) {
             className="relative"
           >
             <div className="absolute inset-0 bg-gradient-to-r from-primary/20 via-primary/10 to-primary/20 blur-xl rounded-full" />
-            <p className="relative text-lg text-foreground/80 max-w-2xl mx-auto leading-relaxed">
+            <p className="relative text-sm md:text-lg text-foreground/80 max-w-2xl mx-auto leading-relaxed px-4">
               Launch your token in minutes with our no-code platform.
               <span className="text-primary font-semibold"> Fair launch</span>,
               <span className="text-primary font-semibold">
@@ -159,12 +123,12 @@ export function FactoryHeader({ platformStats }: FactoryHeaderProps) {
         </div>
       </div>
 
-      {/* Feature Pills */}
+      {/* Feature Pills - Hidden on mobile for cleaner mobile experience */}
       <motion.div
         initial={{ y: 40, opacity: 0 }}
         animate={{ y: 0, opacity: 1 }}
         transition={{ delay: 0.8, duration: 0.8 }}
-        className="flex flex-wrap items-center justify-center gap-4 md:gap-8"
+        className="hidden md:flex flex-wrap items-center justify-center gap-4 md:gap-8"
       >
         {[
           {
@@ -203,21 +167,23 @@ export function FactoryHeader({ platformStats }: FactoryHeaderProps) {
         ))}
       </motion.div>
 
-      {/* Real Platform Stats */}
+      {/* Real Platform Stats - Optimized for mobile */}
       <motion.div
         initial={{ y: 40, opacity: 0 }}
         animate={{ y: 0, opacity: 1 }}
         transition={{ delay: 1.2, duration: 0.8 }}
-        className="grid grid-cols-3 gap-8 max-w-md mx-auto"
+        className="grid grid-cols-3 gap-4 md:gap-8 max-w-xs md:max-w-md mx-auto"
       >
         {platformStats.loading
           ? // Loading state
             [...Array(3)].map((_, index) => (
               <div key={index} className="text-center">
                 <div className="flex items-center justify-center mb-2">
-                  <Loader2 className="h-6 w-6 text-primary animate-spin" />
+                  <Loader2 className="h-5 w-5 md:h-6 md:w-6 text-primary animate-spin" />
                 </div>
-                <div className="text-sm text-muted-foreground">Loading...</div>
+                <div className="text-xs md:text-sm text-muted-foreground">
+                  Loading...
+                </div>
               </div>
             ))
           : // Real stats
@@ -255,25 +221,25 @@ export function FactoryHeader({ platformStats }: FactoryHeaderProps) {
                 }}
                 className="text-center"
               >
-                <div className="text-2xl font-bold text-primary">
+                <div className="text-xl md:text-2xl font-bold text-primary">
                   {stat.formatValue(stat.value)}
                   <span className="text-primary/70">{stat.suffix}</span>
                 </div>
-                <div className="text-sm text-muted-foreground mt-1">
+                <div className="text-xs md:text-sm text-muted-foreground mt-1">
                   {stat.label}
                 </div>
               </motion.div>
             ))}
       </motion.div>
 
-      {/* Call-to-Action Hint */}
+      {/* Call-to-Action Hint - Simplified for mobile */}
       <motion.div
         initial={{ y: 30, opacity: 0 }}
         animate={{ y: 0, opacity: 1 }}
         transition={{ delay: 1.6, duration: 0.8 }}
         className="relative"
       >
-        <div className="inline-flex items-center gap-2 px-4 py-2 bg-primary/10 border border-primary/20 rounded-full">
+        <div className="inline-flex items-center gap-2 px-3 md:px-4 py-2 bg-primary/10 border border-primary/20 rounded-full">
           <motion.div
             animate={{ scale: [1, 1.2, 1] }}
             transition={{
@@ -284,7 +250,7 @@ export function FactoryHeader({ platformStats }: FactoryHeaderProps) {
           >
             <div className="w-2 h-2 bg-primary rounded-full" />
           </motion.div>
-          <span className="text-sm text-primary font-medium">
+          <span className="text-xs md:text-sm text-primary font-medium">
             Ready to launch your token?
           </span>
         </div>
