@@ -1,4 +1,4 @@
-// contexts/TokenDataProvider.tsx - DEBUG VERSION
+// contexts/TokenDataProvider.tsx - FIXED MAX AMOUNT HANDLING
 "use client";
 
 import React, {
@@ -9,70 +9,65 @@ import React, {
   useCallback,
   useRef,
 } from "react";
-import { useAccount, useBalance, useReadContracts } from "wagmi";
-import { Address, formatUnits, parseEther } from "viem";
-import { FACTORY_ADDRESS, FACTORY_ABI, Token } from "@/types";
+import { useAccount, useBalance } from "wagmi";
+import { Address } from "viem";
+import { Token } from "@/types";
 import { useTokenData } from "@/final-hooks/useTokenData";
+import { useAggregatedContractCalls } from "@/hooks/useAggregatedContractCalls";
 import { tokenEventEmitter } from "@/components/EventWatcher";
 import { useToast } from "@/hooks/use-toast";
 
-// Debug utility function
-function debugLog(message: string, data?: any) {
-  console.log(`[TokenDataProvider] ${message}`, data || "");
-}
-
-function safeFormatUnits(value: any, decimals: number = 18): string {
+// Utility to safely truncate amounts for display and calculations
+function truncateAmount(amount: string, maxDecimals: number = 6): string {
   try {
-    debugLog(`Attempting to format: ${typeof value}`, value);
+    const num = parseFloat(amount);
+    if (isNaN(num) || num <= 0) return "0";
 
-    if (value === null || value === undefined) {
-      debugLog("Value is null/undefined, returning 0");
-      return "0";
-    }
-
-    // Handle string conversion
-    if (typeof value === "string") {
-      debugLog("Converting string to BigInt", value);
-      value = BigInt(value);
-    }
-
-    // Handle number conversion (this might be the issue!)
-    if (typeof value === "number") {
-      debugLog("⚠️  WARNING: Received number, converting to BigInt", value);
-      if (!Number.isInteger(value)) {
-        debugLog("❌ ERROR: Cannot convert float to BigInt", value);
-        throw new Error(`Cannot convert non-integer ${value} to BigInt`);
-      }
-      value = BigInt(Math.floor(value));
-    }
-
-    if (typeof value !== "bigint") {
-      debugLog("❌ ERROR: Value is not BigInt after conversion", typeof value);
-      throw new Error(`Expected BigInt, got ${typeof value}`);
-    }
-
-    const result = formatUnits(value, decimals);
-    debugLog("✅ Successfully formatted", result);
-    return result;
+    // Use toFixed to properly truncate (not round up)
+    return num.toFixed(maxDecimals);
   } catch (error) {
-    debugLog("❌ ERROR in safeFormatUnits", error);
-    console.error("Full error details:", error);
+    console.error("Error truncating amount:", error);
     return "0";
   }
 }
 
-// Types for the context
-interface TokenWalletData {
-  // Token contract data
-  lastPrice: bigint;
-  collateral: bigint;
-  tokenState: number;
-  virtualSupply: bigint;
-  fundingGoal: bigint;
+// Check if amount is valid for calculations (prevents API loops)
+function isValidForCalculation(amount: string): boolean {
+  if (!amount || amount === "0") return false;
 
-  // User wallet data
+  const num = parseFloat(amount);
+  if (isNaN(num) || num <= 0) return false;
+
+  // Check for reasonable decimal places
+  const parts = amount.split(".");
+  if (parts.length > 1 && parts[1].length > 10) {
+    return false; // Too many decimal places
+  }
+
+  return true;
+}
+
+// Enhanced types with aggregated data
+interface TokenWalletData {
+  // Raw BigInt values from aggregated hook
+  raw: {
+    price: bigint;
+    collateral: bigint;
+    virtualSupply: bigint;
+    fundingGoal: bigint;
+    maxSupply: bigint;
+    totalSupply: bigint;
+  };
+
+  // State and configuration
+  tokenState: number;
+  tradingFee: number;
+  decimals: number;
+
+  // User wallet data (original and truncated)
   avaxBalance: string;
   tokenBalance: string;
+  truncatedTokenBalance: string; // For display and max calculations
 
   // Formatted values for display
   formatted: {
@@ -81,13 +76,22 @@ interface TokenWalletData {
     avaxBalance: string;
     tokenBalance: string;
     fundingGoal: string;
+    virtualSupply: string;
+    maxSupply: string;
+    totalSupply: string;
+  };
+
+  // Progress calculations (from aggregated hook)
+  progress: {
+    fundingPercentage: number;
+    isGoalReached: boolean;
+    supplyUtilization: number;
   };
 
   // Trading calculations (cached)
   calculations: {
     [key: string]: {
-      tokensOut: bigint;
-      ethCost: bigint;
+      result: string;
       timestamp: number;
     };
   };
@@ -119,11 +123,11 @@ const TokenDataContext = createContext<TokenDataContextType | undefined>(
   undefined
 );
 
-// Debouncing utility
+// Enhanced debouncing utility with better caching
 class CalculationDebouncer {
   private timeouts: Map<string, NodeJS.Timeout> = new Map();
   private cache: Map<string, { result: any; timestamp: number }> = new Map();
-  private readonly CACHE_DURATION = 10000; // 10 seconds
+  private readonly CACHE_DURATION = 15000; // 15 seconds
   private readonly DEBOUNCE_DELAY = 300; // 300ms
 
   debounce<T>(
@@ -167,6 +171,14 @@ class CalculationDebouncer {
     this.timeouts.forEach((timeout) => clearTimeout(timeout));
     this.timeouts.clear();
   }
+
+  // Get cache stats for debugging
+  getCacheStats() {
+    return {
+      size: this.cache.size,
+      keys: Array.from(this.cache.keys()),
+    };
+  }
 }
 
 interface TokenDataProviderProps {
@@ -183,201 +195,86 @@ export function TokenDataProvider({
   const [data, setData] = useState<TokenWalletData | null>(null);
   const [isCalculating, setIsCalculating] = useState(false);
 
-  debugLog("Provider initialized with tokenAddress", tokenAddress);
-
   // Get token metadata from Firestore
   const { token, isLoading: tokenLoading } = useTokenData(tokenAddress);
+
+  // 🚀 MAIN OPTIMIZATION: Use aggregated contract calls instead of multiple calls
+  const aggregatedData = useAggregatedContractCalls(tokenAddress);
 
   // Debouncer instance
   const debouncerRef = useRef(new CalculationDebouncer());
   const lastEventRef = useRef(0);
 
-  // AVAX Balance
+  // User wallet balances (these still need individual calls)
   const { data: avaxBalance, refetch: refetchAvax } = useBalance({
     address,
-    query: { enabled: !!address },
-  });
-
-  // Token Balance
-  const { data: tokenBalance, refetch: refetchToken } = useBalance({
-    address,
-    token: tokenAddress,
-    query: { enabled: !!address },
-  });
-
-  // Batch contract reads for all essential data
-  const {
-    data: contractData,
-    refetch: refetchContract,
-    isLoading: contractLoading,
-  } = useReadContracts({
-    contracts: [
-      {
-        address: FACTORY_ADDRESS,
-        abi: FACTORY_ABI,
-        functionName: "lastPrice",
-        args: [tokenAddress],
-      },
-      {
-        address: FACTORY_ADDRESS,
-        abi: FACTORY_ABI,
-        functionName: "collateral",
-        args: [tokenAddress],
-      },
-      {
-        address: FACTORY_ADDRESS,
-        abi: FACTORY_ABI,
-        functionName: "getTokenState",
-        args: [tokenAddress],
-      },
-      {
-        address: FACTORY_ADDRESS,
-        abi: FACTORY_ABI,
-        functionName: "virtualSupply",
-        args: [tokenAddress],
-      },
-      {
-        address: FACTORY_ADDRESS,
-        abi: FACTORY_ABI,
-        functionName: "getFundingGoal",
-        args: [tokenAddress],
-      },
-    ],
     query: {
-      enabled: !!tokenAddress,
-      refetchInterval: 30000, // 30 seconds for basic data
-      staleTime: 15000, // Consider stale after 15 seconds
+      enabled: !!address,
+      refetchInterval: 30000, // 30 seconds
+      staleTime: 15000,
     },
   });
 
-  // Process and update data when contract data changes
-  useEffect(() => {
-    if (!contractData || contractLoading) return;
+  const { data: tokenBalance, refetch: refetchToken } = useBalance({
+    address,
+    token: tokenAddress,
+    query: {
+      enabled: !!address,
+      refetchInterval: 30000, // 30 seconds
+      staleTime: 15000,
+    },
+  });
 
-    debugLog("Processing contract data", contractData);
+  // Process and update data when aggregated contract data changes
+  useEffect(() => {
+    if (aggregatedData.isLoading) return;
 
     try {
-      const [priceData, collateralData, stateData, supplyData, goalData] =
-        contractData;
-
-      debugLog("Raw contract results:", {
-        priceData: priceData?.result,
-        collateralData: collateralData?.result,
-        stateData: stateData?.result,
-        supplyData: supplyData?.result,
-        goalData: goalData?.result,
-      });
-
-      // ⚠️ THIS IS LIKELY WHERE THE ERROR HAPPENS
-      // Let's safely extract bigint values with detailed logging
-      const lastPrice = (() => {
-        try {
-          const result = priceData?.result;
-          debugLog("Processing lastPrice", {
-            type: typeof result,
-            value: result,
-          });
-          if (!result) return 0n;
-          return BigInt(result.toString());
-        } catch (error) {
-          debugLog("❌ ERROR processing lastPrice", error);
-          return 0n;
-        }
-      })();
-
-      const collateral = (() => {
-        try {
-          const result = collateralData?.result;
-          debugLog("Processing collateral", {
-            type: typeof result,
-            value: result,
-          });
-          if (!result) return 0n;
-          return BigInt(result.toString());
-        } catch (error) {
-          debugLog("❌ ERROR processing collateral", error);
-          return 0n;
-        }
-      })();
-
-      const tokenState = (() => {
-        try {
-          const result = stateData?.result;
-          debugLog("Processing tokenState", {
-            type: typeof result,
-            value: result,
-          });
-          return result ? Number(result) : 0;
-        } catch (error) {
-          debugLog("❌ ERROR processing tokenState", error);
-          return 0;
-        }
-      })();
-
-      const virtualSupply = (() => {
-        try {
-          const result = supplyData?.result;
-          debugLog("Processing virtualSupply", {
-            type: typeof result,
-            value: result,
-          });
-          if (!result) return 0n;
-          return BigInt(result.toString());
-        } catch (error) {
-          debugLog("❌ ERROR processing virtualSupply", error);
-          return 0n;
-        }
-      })();
-
-      const fundingGoal = (() => {
-        try {
-          const result = goalData?.result;
-          debugLog("Processing fundingGoal", {
-            type: typeof result,
-            value: result,
-          });
-          if (!result) return 0n;
-          return BigInt(result.toString());
-        } catch (error) {
-          debugLog("❌ ERROR processing fundingGoal", error);
-          return 0n;
-        }
-      })();
-
-      debugLog("Processed BigInt values:", {
-        lastPrice: lastPrice.toString(),
-        collateral: collateral.toString(),
-        tokenState,
-        virtualSupply: virtualSupply.toString(),
-        fundingGoal: fundingGoal.toString(),
-      });
+      // Get raw token balance and create truncated version
+      const rawTokenBalance = tokenBalance?.formatted || "0";
+      const truncatedTokenBalance = truncateAmount(rawTokenBalance, 6);
 
       const newData: TokenWalletData = {
-        lastPrice,
-        collateral,
-        tokenState,
-        virtualSupply,
-        fundingGoal,
+        // Use raw data from aggregated hook
+        raw: aggregatedData.raw,
+
+        // State and config from aggregated hook
+        tokenState: aggregatedData.state,
+        tradingFee: aggregatedData.tradingFee,
+        decimals: aggregatedData.decimals,
+
+        // User wallet data (both original and truncated)
         avaxBalance: avaxBalance?.formatted || "0",
-        tokenBalance: tokenBalance?.formatted || "0",
+        tokenBalance: rawTokenBalance,
+        truncatedTokenBalance: truncatedTokenBalance,
+
+        // Formatted values combining aggregated + wallet data
         formatted: {
-          price: safeFormatUnits(lastPrice, 18),
-          collateral: safeFormatUnits(collateral, 18),
+          price: aggregatedData.formatted.price,
+          collateral: aggregatedData.formatted.collateral,
           avaxBalance: avaxBalance?.formatted || "0",
-          tokenBalance: tokenBalance?.formatted || "0",
-          fundingGoal: safeFormatUnits(fundingGoal, 18),
+          tokenBalance: truncateAmount(rawTokenBalance, 4), // Display with 4 decimals
+          fundingGoal: aggregatedData.formatted.fundingGoal,
+          virtualSupply: aggregatedData.formatted.virtualSupply,
+          maxSupply: aggregatedData.formatted.maxSupply,
+          totalSupply: aggregatedData.formatted.totalSupply,
         },
+
+        // Progress calculations from aggregated hook
+        progress: aggregatedData.progress,
+
+        // Preserve existing calculations cache
         calculations: data?.calculations || {},
+
+        // Loading states
         isLoading: false,
         isCalculating,
-        lastUpdated: Date.now(),
+        lastUpdated: aggregatedData.lastUpdated,
       };
 
-      debugLog("Setting new data", newData.formatted);
       setData(newData);
     } catch (error) {
-      debugLog("❌ CRITICAL ERROR processing contract data", error);
-      console.error("Full error stack:", error);
+      console.error("Error processing aggregated contract data:", error);
       toast({
         title: "Data Error",
         description: "Failed to process token data",
@@ -385,8 +282,7 @@ export function TokenDataProvider({
       });
     }
   }, [
-    contractData,
-    contractLoading,
+    aggregatedData,
     avaxBalance,
     tokenBalance,
     isCalculating,
@@ -394,23 +290,63 @@ export function TokenDataProvider({
     toast,
   ]);
 
-  // Smart calculation function with debouncing
+  // Listen for trade events and refresh data
+  useEffect(() => {
+    if (!tokenAddress) return;
+
+    const handleTokenEvent = (event: any) => {
+      const now = Date.now();
+      // Prevent spam updates
+      if (now - lastEventRef.current < 2000) return;
+      lastEventRef.current = now;
+
+      if (["TokensPurchased", "TokensSold"].includes(event.eventName)) {
+        console.log(`🔄 Trade detected for ${tokenAddress}, refreshing...`);
+
+        // Clear calculation cache
+        debouncerRef.current.clearCache();
+
+        // The aggregated hook will automatically refetch due to its refetchInterval
+        // We just need to refresh user balances
+        setTimeout(() => {
+          if (address) {
+            refetchAvax();
+            refetchToken();
+          }
+        }, 1500); // Wait for blockchain state to settle
+      }
+    };
+
+    tokenEventEmitter.addEventListener(
+      tokenAddress.toLowerCase(),
+      handleTokenEvent
+    );
+    return () => {
+      tokenEventEmitter.removeEventListener(
+        tokenAddress.toLowerCase(),
+        handleTokenEvent
+      );
+    };
+  }, [tokenAddress, address, refetchAvax, refetchToken]);
+
+  // Enhanced calculation functions with better error handling
   const calculateTokensForEth = useCallback(
     async (ethAmount: string): Promise<string> => {
       if (!ethAmount || parseFloat(ethAmount) <= 0) return "0";
 
-      const cacheKey = `tokens-for-eth-${ethAmount}`;
+      // Prevent calculation if amount is invalid
+      if (!isValidForCalculation(ethAmount)) {
+        console.warn("Skipping calculation for invalid amount:", ethAmount);
+        return "0";
+      }
+
+      const cacheKey = `tokens-for-eth-${ethAmount}-${tokenAddress}`;
       setIsCalculating(true);
 
       try {
         const result = await debouncerRef.current.debounce(
           cacheKey,
           async () => {
-            debugLog("Making API call for tokens calculation", {
-              ethAmount,
-              tokenAddress,
-            });
-
             const response = await fetch("/api/calculate-tokens", {
               method: "POST",
               headers: { "Content-Type": "application/json" },
@@ -422,11 +358,17 @@ export function TokenDataProvider({
             });
 
             if (!response.ok) {
-              throw new Error(`API error: ${response.status}`);
+              const errorData = await response.json().catch(() => ({}));
+              throw new Error(
+                errorData.error || `API error: ${response.status}`
+              );
             }
 
-            const { data: tokensOut } = await response.json();
-            debugLog("API response for tokens", tokensOut);
+            const { data: tokensOut, success } = await response.json();
+
+            if (!success) {
+              throw new Error("API returned unsuccessful response");
+            }
 
             return tokensOut;
           }
@@ -434,7 +376,7 @@ export function TokenDataProvider({
 
         return result;
       } catch (error) {
-        debugLog("❌ ERROR calculating tokens", error);
+        console.error("Error calculating tokens:", error);
         return "0";
       } finally {
         setIsCalculating(false);
@@ -447,18 +389,19 @@ export function TokenDataProvider({
     async (tokenAmount: string): Promise<string> => {
       if (!tokenAmount || parseFloat(tokenAmount) <= 0) return "0";
 
-      const cacheKey = `eth-for-tokens-${tokenAmount}`;
+      // Prevent calculation if amount is invalid
+      if (!isValidForCalculation(tokenAmount)) {
+        console.warn("Skipping calculation for invalid amount:", tokenAmount);
+        return "0";
+      }
+
+      const cacheKey = `eth-for-tokens-${tokenAmount}-${tokenAddress}`;
       setIsCalculating(true);
 
       try {
         const result = await debouncerRef.current.debounce(
           cacheKey,
           async () => {
-            debugLog("Making API call for ETH calculation", {
-              tokenAmount,
-              tokenAddress,
-            });
-
             const response = await fetch("/api/calculate-tokens", {
               method: "POST",
               headers: { "Content-Type": "application/json" },
@@ -470,11 +413,17 @@ export function TokenDataProvider({
             });
 
             if (!response.ok) {
-              throw new Error(`API error: ${response.status}`);
+              const errorData = await response.json().catch(() => ({}));
+              throw new Error(
+                errorData.error || `API error: ${response.status}`
+              );
             }
 
-            const { data: ethOut } = await response.json();
-            debugLog("API response for ETH", ethOut);
+            const { data: ethOut, success } = await response.json();
+
+            if (!success) {
+              throw new Error("API returned unsuccessful response");
+            }
 
             return ethOut;
           }
@@ -482,7 +431,7 @@ export function TokenDataProvider({
 
         return result;
       } catch (error) {
-        debugLog("❌ ERROR calculating ETH", error);
+        console.error("Error calculating ETH:", error);
         return "0";
       } finally {
         setIsCalculating(false);
@@ -491,7 +440,7 @@ export function TokenDataProvider({
     [tokenAddress]
   );
 
-  // Validation functions
+  // FIXED: Enhanced validation functions that use truncated amounts
   const isValidAmount = useCallback(
     (amount: string, type: "buy" | "sell"): boolean => {
       if (!data || !amount) return false;
@@ -501,9 +450,13 @@ export function TokenDataProvider({
 
       if (type === "buy") {
         const maxAvax = parseFloat(data.formatted.avaxBalance);
-        return amountNum <= maxAvax * 0.99; // Leave some for gas
+        if (amountNum > maxAvax) return false;
+        // Leave some for gas (more sophisticated calculation)
+        const gasBuffer = Math.max(0.001, maxAvax * 0.01); // 1% or 0.001 AVAX minimum
+        return amountNum <= maxAvax - gasBuffer;
       } else {
-        const maxTokens = parseFloat(data.formatted.tokenBalance);
+        // FIXED: Use truncated token balance for validation
+        const maxTokens = parseFloat(data.truncatedTokenBalance);
         return amountNum <= maxTokens;
       }
     },
@@ -513,23 +466,32 @@ export function TokenDataProvider({
   const getMaxBuyAmount = useCallback((): string => {
     if (!data) return "0";
     const maxAvax = parseFloat(data.formatted.avaxBalance);
-    return (maxAvax * 0.95).toFixed(6); // Leave 5% for gas
+    const gasBuffer = Math.max(0.001, maxAvax * 0.01); // Dynamic gas buffer
+    const maxBuy = Math.max(0, maxAvax - gasBuffer);
+    return maxBuy.toFixed(6);
   }, [data]);
 
+  // FIXED: Return truncated token balance for max sell
   const getMaxSellAmount = useCallback((): string => {
     if (!data) return "0";
-    return data.formatted.tokenBalance;
+    // Return the pre-truncated balance to avoid validation mismatches
+    return data.truncatedTokenBalance;
   }, [data]);
 
-  // Manual refresh function
+  // Manual refresh function (now simpler due to aggregated hook)
   const refresh = useCallback(() => {
     debouncerRef.current.clearCache();
-    refetchContract();
+
+    // Refresh user balances (aggregated hook refreshes automatically)
     if (address) {
       refetchAvax();
       refetchToken();
     }
-  }, [refetchContract, refetchAvax, refetchToken, address]);
+
+    // Log cache stats for debugging
+    const cacheStats = debouncerRef.current.getCacheStats();
+    console.log("Cache cleared. Stats:", cacheStats);
+  }, [refetchAvax, refetchToken, address]);
 
   const contextValue: TokenDataContextType = {
     data,
@@ -558,4 +520,25 @@ export function useTokenDataContext(): TokenDataContextType {
     );
   }
   return context;
+}
+
+// Enhanced debugging helper (optional - can remove in production)
+export function useTokenDataDebug() {
+  const context = useTokenDataContext();
+
+  return {
+    hasData: !!context.data,
+    isLoading: context.data?.isLoading ?? true,
+    isCalculating: context.data?.isCalculating ?? false,
+    lastUpdated: context.data?.lastUpdated ?? 0,
+    cacheSize: context.data?.calculations
+      ? Object.keys(context.data.calculations).length
+      : 0,
+    fundingProgress: context.data?.progress.fundingPercentage ?? 0,
+    isGoalReached: context.data?.progress.isGoalReached ?? false,
+    // Debug token balance info
+    rawTokenBalance: context.data?.tokenBalance ?? "0",
+    truncatedTokenBalance: context.data?.truncatedTokenBalance ?? "0",
+    displayTokenBalance: context.data?.formatted.tokenBalance ?? "0",
+  };
 }

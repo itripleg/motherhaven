@@ -1,9 +1,9 @@
-// app/dex/components/BuyTokenFormOptimized.tsx
+// app/dex/components/BuyTokenFormOptimized.tsx - FIXED DEBOUNCING
 "use client";
 
-import { useState, useEffect, useMemo } from "react";
+import { useState, useEffect, useMemo, useRef, useCallback } from "react";
 import { useWriteContract, useWaitForTransactionReceipt } from "wagmi";
-import { parseEther, formatEther } from "viem";
+import { parseEther } from "viem";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -11,6 +11,22 @@ import { useToast } from "@/hooks/use-toast";
 import { AddressComponent } from "@/components/AddressComponent";
 import { FACTORY_ABI, FACTORY_ADDRESS } from "@/types";
 import { useTokenDataContext } from "@/contexts/TokenDataProvider";
+
+// Utility to check if amount is valid for calculations
+function isValidCalculationAmount(amount: string): boolean {
+  if (!amount || amount === "0") return false;
+
+  const num = parseFloat(amount);
+  if (isNaN(num) || num <= 0) return false;
+
+  // Check for reasonable decimal places (max 18 but practically max 8-10)
+  const parts = amount.split(".");
+  if (parts.length > 1 && parts[1].length > 10) {
+    return false; // Too many decimal places
+  }
+
+  return true;
+}
 
 interface BuyTokenFormOptimizedProps {
   onAmountChange?: (amount: string) => void;
@@ -23,12 +39,17 @@ export function BuyTokenFormOptimized({
   const [slippageTolerance, setSlippageTolerance] = useState("1");
   const [estimatedTokensOut, setEstimatedTokensOut] = useState("0");
   const [isCalculating, setIsCalculating] = useState(false);
+  const [calculationError, setCalculationError] = useState<string | null>(null);
 
   const { toast } = useToast();
 
   // Get optimized data from context
   const { data, token, calculateTokensForEth, isValidAmount, getMaxBuyAmount } =
     useTokenDataContext();
+
+  // Debouncing refs
+  const debounceTimeoutRef = useRef<NodeJS.Timeout | null>(null);
+  const lastCalculationRef = useRef<string>("");
 
   const {
     data: transactionData,
@@ -42,22 +63,73 @@ export function BuyTokenFormOptimized({
       hash: transactionData,
     });
 
-  // Debounced calculation using context method
-  useEffect(() => {
-    if (!amount || !isValidAmount(amount, "buy")) {
-      setEstimatedTokensOut("0");
-      return;
-    }
+  // 🚀 FIXED: Debounced calculation function
+  const debouncedCalculateTokens = useCallback(
+    (inputAmount: string) => {
+      // Clear any existing timeout
+      if (debounceTimeoutRef.current) {
+        clearTimeout(debounceTimeoutRef.current);
+        debounceTimeoutRef.current = null;
+      }
 
-    setIsCalculating(true);
-    calculateTokensForEth(amount)
-      .then(setEstimatedTokensOut)
-      .catch((error) => {
-        console.error("Calculation error:", error);
+      // Clear previous states
+      setCalculationError(null);
+
+      // Quick validation checks
+      if (!inputAmount || !isValidAmount(inputAmount, "buy")) {
         setEstimatedTokensOut("0");
-      })
-      .finally(() => setIsCalculating(false));
-  }, [amount, calculateTokensForEth, isValidAmount]);
+        setIsCalculating(false);
+        return;
+      }
+
+      // Additional validation for calculation amount
+      if (!isValidCalculationAmount(inputAmount)) {
+        setCalculationError("Amount has too many decimal places");
+        setEstimatedTokensOut("0");
+        setIsCalculating(false);
+        return;
+      }
+
+      // Don't make API call if amount hasn't changed
+      if (inputAmount === lastCalculationRef.current) {
+        return;
+      }
+
+      // Set calculating state immediately for user feedback
+      setIsCalculating(true);
+
+      // Set up debounced calculation
+      debounceTimeoutRef.current = setTimeout(async () => {
+        try {
+          lastCalculationRef.current = inputAmount;
+          console.log(`🔄 Making BUY API call for: ${inputAmount} AVAX`);
+
+          const result = await calculateTokensForEth(inputAmount);
+          setEstimatedTokensOut(result);
+          setCalculationError(null);
+        } catch (error) {
+          console.error("Calculation error:", error);
+          setEstimatedTokensOut("0");
+          setCalculationError("Failed to calculate token amount");
+        } finally {
+          setIsCalculating(false);
+        }
+      }, 500); // 500ms delay - same as sell form
+    },
+    [calculateTokensForEth, isValidAmount]
+  );
+
+  // Trigger calculation when amount changes
+  useEffect(() => {
+    debouncedCalculateTokens(amount);
+
+    // Cleanup timeout on unmount
+    return () => {
+      if (debounceTimeoutRef.current) {
+        clearTimeout(debounceTimeoutRef.current);
+      }
+    };
+  }, [amount, debouncedCalculateTokens]);
 
   // Notify parent of amount changes
   useEffect(() => {
@@ -100,6 +172,11 @@ export function BuyTokenFormOptimized({
 
     if (amountNum > maxAvax * 0.95) {
       return { valid: false, message: "Leave some AVAX for gas fees" };
+    }
+
+    // Check for too many decimal places
+    if (!isValidCalculationAmount(amount)) {
+      return { valid: false, message: "Too many decimal places" };
     }
 
     return { valid: true, message: "" };
@@ -165,7 +242,27 @@ export function BuyTokenFormOptimized({
 
   const handleMaxClick = () => {
     const maxAmount = getMaxBuyAmount();
+    console.log(`Max click: setting amount to ${maxAmount} AVAX`);
     setAmount(maxAmount);
+  };
+
+  // Handle input changes with truncation and immediate visual feedback
+  const handleAmountChange = (value: string) => {
+    // Allow user to type, but truncate if they paste something with too many decimals
+    const parts = value.split(".");
+    if (parts.length > 1 && parts[1].length > 10) {
+      // Truncate to 10 decimal places max during typing
+      const truncated = `${parts[0]}.${parts[1].slice(0, 10)}`;
+      setAmount(truncated);
+    } else {
+      setAmount(value);
+    }
+
+    // Clear previous calculation immediately for better UX
+    if (value !== amount) {
+      setEstimatedTokensOut("0");
+      setCalculationError(null);
+    }
   };
 
   // Loading state
@@ -203,7 +300,7 @@ export function BuyTokenFormOptimized({
             id="amount"
             type="number"
             value={amount}
-            onChange={(e) => setAmount(e.target.value)}
+            onChange={(e) => handleAmountChange(e.target.value)}
             onWheel={(e) => e.currentTarget.blur()}
             className={`text-center pr-16 ${
               !validation.valid && amount ? "border-destructive" : ""
@@ -224,6 +321,9 @@ export function BuyTokenFormOptimized({
         </div>
         {!validation.valid && amount && (
           <p className="text-xs text-destructive">{validation.message}</p>
+        )}
+        {calculationError && (
+          <p className="text-xs text-orange-400">{calculationError}</p>
         )}
       </div>
 
@@ -256,7 +356,7 @@ export function BuyTokenFormOptimized({
       </div>
 
       {/* Transaction Preview */}
-      {amount && validation.valid && (
+      {amount && validation.valid && !calculationError && (
         <div className="p-3 bg-primary/10 border border-primary/20 rounded-lg space-y-2">
           <div className="flex justify-between text-sm">
             <span>Estimated Tokens:</span>
@@ -295,7 +395,8 @@ export function BuyTokenFormOptimized({
           !validation.valid ||
           !amount ||
           parseFloat(amount) <= 0 ||
-          isCalculating
+          isCalculating ||
+          calculationError !== null
         }
       >
         {isPending ? "Processing..." : "Buy Tokens"}
