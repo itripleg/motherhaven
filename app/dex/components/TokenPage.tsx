@@ -1,15 +1,17 @@
+// app/dex/components/TokenPage.tsx
 "use client";
-import React from "react";
+import React, { useState, useEffect } from "react";
 import { TokenHeaderStyled as TokenHeader } from "../components/TokenHeaderStyled";
 import { TokenPriceCharts } from "../components/TokenPriceCharts";
-import { TokenTradeCard } from "../components/TokenTradeCard";
+import { BuyTokenFormOptimized } from "../components/BuyTokenFormOptimized";
+import { SellTokenFormOptimized } from "../components/SellTokenFormOptimized";
 import { ChatComponent } from "../components/ChatComponent";
 import { MobileChatModal } from "../components/MobileChatModal";
 import RecentTrades from "../components/RecentTrades";
 import { useTokenData } from "@/final-hooks/useTokenData";
 import { TradesProvider } from "@/contexts/TradesContext";
 import { Address } from "viem";
-import { useAccount } from "wagmi";
+import { useAccount, useConnect } from "wagmi";
 import { motion, AnimatePresence } from "framer-motion";
 import {
   TrendingUp,
@@ -17,12 +19,163 @@ import {
   MessageCircle,
   Activity,
   Sparkles,
+  ArrowUpRight,
+  ArrowDownLeft,
+  Wallet,
+  CreditCard,
+  ShieldCheck,
 } from "lucide-react";
 import { TokenDataProvider } from "@/contexts/TokenDataProvider";
+import { Card, CardContent } from "@/components/ui/card";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { Button } from "@/components/ui/button";
+import { Badge } from "@/components/ui/badge";
+import { TokenState } from "@/types";
 
 interface TokenPageProps {
   tokenAddress: string;
 }
+
+// Optimized Trading Card Component - This replaces the old TokenTradeCard
+const OptimizedTokenTradeCard = ({
+  tokenData,
+  isConnected,
+}: {
+  tokenData: any;
+  isConnected: boolean;
+}) => {
+  const [activeTab, setActiveTab] = useState("buy");
+  const { connect, connectors } = useConnect();
+
+  // Check if token is in goal reached state
+  const isGoalReached = tokenData?.currentState === TokenState.GOAL_REACHED;
+  const isTrading =
+    tokenData?.currentState === TokenState.TRADING ||
+    tokenData?.currentState === TokenState.RESUMED;
+
+  const renderConnectWallet = () => (
+    <motion.div
+      initial={{ opacity: 0, scale: 0.95 }}
+      animate={{ opacity: 1, scale: 1 }}
+      transition={{ duration: 0.5 }}
+      className="text-center py-8 space-y-6"
+    >
+      <div className="space-y-3">
+        <div className="text-4xl">👋</div>
+        <h3 className="text-xl font-bold text-foreground">
+          Connect Your Wallet
+        </h3>
+        <p className="text-muted-foreground max-w-sm mx-auto">
+          Connect your wallet to start trading {tokenData?.symbol || "tokens"}
+        </p>
+      </div>
+
+      <div className="flex flex-col gap-3 max-w-xs mx-auto">
+        {connectors.map((connector) => (
+          <motion.div
+            key={connector.id}
+            whileHover={{ scale: 1.02 }}
+            whileTap={{ scale: 0.98 }}
+          >
+            <Button
+              onClick={() => connect({ connector })}
+              className="w-full btn-primary py-3 font-medium"
+            >
+              <CreditCard className="h-4 w-4 mr-2" />
+              Connect {connector.name}
+            </Button>
+          </motion.div>
+        ))}
+      </div>
+
+      <div className="p-3 bg-primary/10 rounded-lg border border-primary/20 max-w-sm mx-auto">
+        <div className="flex items-center gap-2 text-sm text-primary">
+          <ShieldCheck className="h-4 w-4" />
+          <span>Secure • Non-custodial</span>
+        </div>
+      </div>
+    </motion.div>
+  );
+
+  const renderGoalReachedState = () => (
+    <motion.div
+      initial={{ opacity: 0, scale: 0.95 }}
+      animate={{ opacity: 1, scale: 1 }}
+      transition={{ duration: 0.5 }}
+      className="text-center space-y-6 p-8"
+    >
+      <div className="space-y-4">
+        <motion.div
+          initial={{ y: 20, opacity: 0 }}
+          animate={{ y: 0, opacity: 1 }}
+          transition={{ delay: 0.2 }}
+        >
+          <div className="text-5xl mb-4">🎉</div>
+          <h3 className="text-2xl font-bold text-green-400 mb-2">
+            Funding Goal Reached!
+          </h3>
+          <p className="text-muted-foreground max-w-md mx-auto">
+            This token has successfully reached its funding goal of{" "}
+            <span className="font-semibold text-green-400">
+              {tokenData?.fundingGoal || "0"} AVAX
+            </span>
+            . Trading is temporarily halted.
+          </p>
+        </motion.div>
+      </div>
+    </motion.div>
+  );
+
+  const renderTradingInterface = () => (
+    <div className="space-y-6">
+      {/* Trading Tabs */}
+      <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
+        <TabsList className="grid w-full grid-cols-2 mb-6 bg-secondary/30">
+          <TabsTrigger
+            value="buy"
+            className="data-[state=active]:bg-green-500/20 data-[state=active]:text-green-400 transition-all duration-200"
+          >
+            <ArrowUpRight className="h-4 w-4 mr-2" />
+            Buy
+          </TabsTrigger>
+          <TabsTrigger
+            value="sell"
+            className="data-[state=active]:bg-red-500/20 data-[state=active]:text-red-400 transition-all duration-200"
+          >
+            <ArrowDownLeft className="h-4 w-4 mr-2" />
+            Sell
+          </TabsTrigger>
+        </TabsList>
+
+        <TabsContent value="buy" className="mt-0 space-y-4">
+          <BuyTokenFormOptimized />
+        </TabsContent>
+
+        <TabsContent value="sell" className="mt-0 space-y-4">
+          <SellTokenFormOptimized />
+        </TabsContent>
+      </Tabs>
+    </div>
+  );
+
+  return (
+    <Card className="unified-card border-primary/20 overflow-hidden">
+      <CardContent className="p-6">
+        <AnimatePresence mode="wait">
+          {isGoalReached ? (
+            <motion.div key="goal-reached">
+              {renderGoalReachedState()}
+            </motion.div>
+          ) : isTrading && isConnected ? (
+            <motion.div key="trading">{renderTradingInterface()}</motion.div>
+          ) : (
+            <motion.div key="connect">{renderConnectWallet()}</motion.div>
+          )}
+        </AnimatePresence>
+      </CardContent>
+    </Card>
+  );
+};
 
 export default function TokenPage({ tokenAddress }: TokenPageProps) {
   const { isConnected } = useAccount();
@@ -157,7 +310,7 @@ export default function TokenPage({ tokenAddress }: TokenPageProps) {
                   <TokenPriceCharts address={token.address} />
                 </div>
 
-                {/* Trading Interface */}
+                {/* Trading Interface - Using Optimized Component */}
                 <div className="space-y-4">
                   <div className="flex items-center gap-3 mb-2">
                     <div className="p-2 rounded-lg bg-primary/20 border border-primary/30">
@@ -172,8 +325,9 @@ export default function TokenPage({ tokenAddress }: TokenPageProps) {
                       </p>
                     </div>
                   </div>
-                  <TokenTradeCard
-                    address={tokenAddress}
+
+                  {/* THE KEY CHANGE: Using OptimizedTokenTradeCard instead of TokenTradeCard */}
+                  <OptimizedTokenTradeCard
                     tokenData={token}
                     isConnected={isConnected}
                   />
@@ -187,7 +341,7 @@ export default function TokenPage({ tokenAddress }: TokenPageProps) {
                 transition={{ duration: 0.6, delay: 0.4 }}
                 className="hidden xl:flex xl:flex-col gap-6"
               >
-                {/* THE KEY: Single sticky container with proper top spacing */}
+                {/* Single sticky container with proper top spacing */}
                 <div className="sticky top-6 space-y-6 h-fit">
                   {/* Chat Section */}
                   <div className="space-y-3">

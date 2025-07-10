@@ -1,4 +1,4 @@
-// contexts/TokenDataProvider.tsx
+// contexts/TokenDataProvider.tsx - DEBUG VERSION
 "use client";
 
 import React, {
@@ -15,6 +15,51 @@ import { FACTORY_ADDRESS, FACTORY_ABI, Token } from "@/types";
 import { useTokenData } from "@/final-hooks/useTokenData";
 import { tokenEventEmitter } from "@/components/EventWatcher";
 import { useToast } from "@/hooks/use-toast";
+
+// Debug utility function
+function debugLog(message: string, data?: any) {
+  console.log(`[TokenDataProvider] ${message}`, data || "");
+}
+
+function safeFormatUnits(value: any, decimals: number = 18): string {
+  try {
+    debugLog(`Attempting to format: ${typeof value}`, value);
+
+    if (value === null || value === undefined) {
+      debugLog("Value is null/undefined, returning 0");
+      return "0";
+    }
+
+    // Handle string conversion
+    if (typeof value === "string") {
+      debugLog("Converting string to BigInt", value);
+      value = BigInt(value);
+    }
+
+    // Handle number conversion (this might be the issue!)
+    if (typeof value === "number") {
+      debugLog("⚠️  WARNING: Received number, converting to BigInt", value);
+      if (!Number.isInteger(value)) {
+        debugLog("❌ ERROR: Cannot convert float to BigInt", value);
+        throw new Error(`Cannot convert non-integer ${value} to BigInt`);
+      }
+      value = BigInt(Math.floor(value));
+    }
+
+    if (typeof value !== "bigint") {
+      debugLog("❌ ERROR: Value is not BigInt after conversion", typeof value);
+      throw new Error(`Expected BigInt, got ${typeof value}`);
+    }
+
+    const result = formatUnits(value, decimals);
+    debugLog("✅ Successfully formatted", result);
+    return result;
+  } catch (error) {
+    debugLog("❌ ERROR in safeFormatUnits", error);
+    console.error("Full error details:", error);
+    return "0";
+  }
+}
 
 // Types for the context
 interface TokenWalletData {
@@ -138,6 +183,8 @@ export function TokenDataProvider({
   const [data, setData] = useState<TokenWalletData | null>(null);
   const [isCalculating, setIsCalculating] = useState(false);
 
+  debugLog("Provider initialized with tokenAddress", tokenAddress);
+
   // Get token metadata from Firestore
   const { token, isLoading: tokenLoading } = useTokenData(tokenAddress);
 
@@ -207,24 +254,103 @@ export function TokenDataProvider({
   useEffect(() => {
     if (!contractData || contractLoading) return;
 
+    debugLog("Processing contract data", contractData);
+
     try {
       const [priceData, collateralData, stateData, supplyData, goalData] =
         contractData;
 
-      // Safely extract bigint values
-      const lastPrice = priceData?.result
-        ? BigInt(priceData.result.toString())
-        : 0n;
-      const collateral = collateralData?.result
-        ? BigInt(collateralData.result.toString())
-        : 0n;
-      const tokenState = stateData?.result ? Number(stateData.result) : 0;
-      const virtualSupply = supplyData?.result
-        ? BigInt(supplyData.result.toString())
-        : 0n;
-      const fundingGoal = goalData?.result
-        ? BigInt(goalData.result.toString())
-        : 0n;
+      debugLog("Raw contract results:", {
+        priceData: priceData?.result,
+        collateralData: collateralData?.result,
+        stateData: stateData?.result,
+        supplyData: supplyData?.result,
+        goalData: goalData?.result,
+      });
+
+      // ⚠️ THIS IS LIKELY WHERE THE ERROR HAPPENS
+      // Let's safely extract bigint values with detailed logging
+      const lastPrice = (() => {
+        try {
+          const result = priceData?.result;
+          debugLog("Processing lastPrice", {
+            type: typeof result,
+            value: result,
+          });
+          if (!result) return 0n;
+          return BigInt(result.toString());
+        } catch (error) {
+          debugLog("❌ ERROR processing lastPrice", error);
+          return 0n;
+        }
+      })();
+
+      const collateral = (() => {
+        try {
+          const result = collateralData?.result;
+          debugLog("Processing collateral", {
+            type: typeof result,
+            value: result,
+          });
+          if (!result) return 0n;
+          return BigInt(result.toString());
+        } catch (error) {
+          debugLog("❌ ERROR processing collateral", error);
+          return 0n;
+        }
+      })();
+
+      const tokenState = (() => {
+        try {
+          const result = stateData?.result;
+          debugLog("Processing tokenState", {
+            type: typeof result,
+            value: result,
+          });
+          return result ? Number(result) : 0;
+        } catch (error) {
+          debugLog("❌ ERROR processing tokenState", error);
+          return 0;
+        }
+      })();
+
+      const virtualSupply = (() => {
+        try {
+          const result = supplyData?.result;
+          debugLog("Processing virtualSupply", {
+            type: typeof result,
+            value: result,
+          });
+          if (!result) return 0n;
+          return BigInt(result.toString());
+        } catch (error) {
+          debugLog("❌ ERROR processing virtualSupply", error);
+          return 0n;
+        }
+      })();
+
+      const fundingGoal = (() => {
+        try {
+          const result = goalData?.result;
+          debugLog("Processing fundingGoal", {
+            type: typeof result,
+            value: result,
+          });
+          if (!result) return 0n;
+          return BigInt(result.toString());
+        } catch (error) {
+          debugLog("❌ ERROR processing fundingGoal", error);
+          return 0n;
+        }
+      })();
+
+      debugLog("Processed BigInt values:", {
+        lastPrice: lastPrice.toString(),
+        collateral: collateral.toString(),
+        tokenState,
+        virtualSupply: virtualSupply.toString(),
+        fundingGoal: fundingGoal.toString(),
+      });
 
       const newData: TokenWalletData = {
         lastPrice,
@@ -235,11 +361,11 @@ export function TokenDataProvider({
         avaxBalance: avaxBalance?.formatted || "0",
         tokenBalance: tokenBalance?.formatted || "0",
         formatted: {
-          price: formatUnits(lastPrice, 18),
-          collateral: formatUnits(collateral, 18),
+          price: safeFormatUnits(lastPrice, 18),
+          collateral: safeFormatUnits(collateral, 18),
           avaxBalance: avaxBalance?.formatted || "0",
           tokenBalance: tokenBalance?.formatted || "0",
-          fundingGoal: formatUnits(fundingGoal, 18),
+          fundingGoal: safeFormatUnits(fundingGoal, 18),
         },
         calculations: data?.calculations || {},
         isLoading: false,
@@ -247,9 +373,11 @@ export function TokenDataProvider({
         lastUpdated: Date.now(),
       };
 
+      debugLog("Setting new data", newData.formatted);
       setData(newData);
     } catch (error) {
-      console.error("Error processing contract data:", error);
+      debugLog("❌ CRITICAL ERROR processing contract data", error);
+      console.error("Full error stack:", error);
       toast({
         title: "Data Error",
         description: "Failed to process token data",
@@ -266,45 +394,6 @@ export function TokenDataProvider({
     toast,
   ]);
 
-  // Listen for trade events and refresh data
-  useEffect(() => {
-    if (!tokenAddress) return;
-
-    const handleTokenEvent = (event: any) => {
-      const now = Date.now();
-      // Prevent spam updates
-      if (now - lastEventRef.current < 2000) return;
-      lastEventRef.current = now;
-
-      if (["TokensPurchased", "TokensSold"].includes(event.eventName)) {
-        console.log(`🔄 Trade detected for ${tokenAddress}, refreshing...`);
-
-        // Clear calculation cache
-        debouncerRef.current.clearCache();
-
-        // Refresh contract data and balances
-        setTimeout(() => {
-          refetchContract();
-          if (address) {
-            refetchAvax();
-            refetchToken();
-          }
-        }, 1500); // Wait for blockchain state to settle
-      }
-    };
-
-    tokenEventEmitter.addEventListener(
-      tokenAddress.toLowerCase(),
-      handleTokenEvent
-    );
-    return () => {
-      tokenEventEmitter.removeEventListener(
-        tokenAddress.toLowerCase(),
-        handleTokenEvent
-      );
-    };
-  }, [tokenAddress, address, refetchContract, refetchAvax, refetchToken]);
-
   // Smart calculation function with debouncing
   const calculateTokensForEth = useCallback(
     async (ethAmount: string): Promise<string> => {
@@ -317,7 +406,12 @@ export function TokenDataProvider({
         const result = await debouncerRef.current.debounce(
           cacheKey,
           async () => {
-            const { data: tokensOut } = await fetch("/api/calculate-tokens", {
+            debugLog("Making API call for tokens calculation", {
+              ethAmount,
+              tokenAddress,
+            });
+
+            const response = await fetch("/api/calculate-tokens", {
               method: "POST",
               headers: { "Content-Type": "application/json" },
               body: JSON.stringify({
@@ -325,15 +419,22 @@ export function TokenDataProvider({
                 ethAmount,
                 type: "buy",
               }),
-            }).then((res) => res.json());
+            });
 
-            return formatUnits(BigInt(tokensOut), 18);
+            if (!response.ok) {
+              throw new Error(`API error: ${response.status}`);
+            }
+
+            const { data: tokensOut } = await response.json();
+            debugLog("API response for tokens", tokensOut);
+
+            return tokensOut;
           }
         );
 
         return result;
       } catch (error) {
-        console.error("Error calculating tokens:", error);
+        debugLog("❌ ERROR calculating tokens", error);
         return "0";
       } finally {
         setIsCalculating(false);
@@ -353,7 +454,12 @@ export function TokenDataProvider({
         const result = await debouncerRef.current.debounce(
           cacheKey,
           async () => {
-            const { data: ethOut } = await fetch("/api/calculate-tokens", {
+            debugLog("Making API call for ETH calculation", {
+              tokenAmount,
+              tokenAddress,
+            });
+
+            const response = await fetch("/api/calculate-tokens", {
               method: "POST",
               headers: { "Content-Type": "application/json" },
               body: JSON.stringify({
@@ -361,15 +467,22 @@ export function TokenDataProvider({
                 tokenAmount,
                 type: "sell",
               }),
-            }).then((res) => res.json());
+            });
 
-            return formatUnits(BigInt(ethOut), 18);
+            if (!response.ok) {
+              throw new Error(`API error: ${response.status}`);
+            }
+
+            const { data: ethOut } = await response.json();
+            debugLog("API response for ETH", ethOut);
+
+            return ethOut;
           }
         );
 
         return result;
       } catch (error) {
-        console.error("Error calculating ETH:", error);
+        debugLog("❌ ERROR calculating ETH", error);
         return "0";
       } finally {
         setIsCalculating(false);
@@ -446,47 +559,3 @@ export function useTokenDataContext(): TokenDataContextType {
   }
   return context;
 }
-
-// Usage example:
-/*
-// In your token page component:
-<TokenDataProvider tokenAddress={tokenAddress}>
-  <TokenTradeCard />
-  <TokenHeader />
-  <RecentTrades />
-</TokenDataProvider>
-
-// In your components:
-function TokenTradeCard() {
-  const { 
-    data, 
-    calculateTokensForEth, 
-    isValidAmount, 
-    getMaxBuyAmount 
-  } = useTokenDataContext();
-  
-  const [amount, setAmount] = useState("");
-  const [estimatedTokens, setEstimatedTokens] = useState("0");
-  
-  // Debounced calculation
-  useEffect(() => {
-    if (amount && isValidAmount(amount, 'buy')) {
-      calculateTokensForEth(amount).then(setEstimatedTokens);
-    }
-  }, [amount, calculateTokensForEth, isValidAmount]);
-  
-  return (
-    <div>
-      <input 
-        value={amount}
-        onChange={(e) => setAmount(e.target.value)}
-        placeholder="0.0"
-      />
-      <button onClick={() => setAmount(getMaxBuyAmount())}>
-        Max
-      </button>
-      <div>Estimated tokens: {estimatedTokens}</div>
-    </div>
-  );
-}
-*/
