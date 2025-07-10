@@ -12,6 +12,7 @@ import {
   TrendingUp,
   Target,
   FileText,
+  Map,
 } from "lucide-react";
 import { motion } from "framer-motion";
 import { TokenHeaderData } from "./types";
@@ -30,6 +31,7 @@ interface TokenHeaderContentProps {
   onDescriptionSave?: (description: string) => Promise<boolean>;
   onDescriptionEdit?: () => void;
   onDescriptionCancel?: () => void;
+  onRoadmapClick?: () => void;
   progress?: number;
   className?: string;
   isEditingDescription?: boolean;
@@ -55,6 +57,7 @@ export const TokenHeaderContent: React.FC<TokenHeaderContentProps> = ({
   onDescriptionSave,
   onDescriptionEdit,
   onDescriptionCancel,
+  onRoadmapClick,
   progress = 0,
   className = "",
   isEditingDescription = false,
@@ -110,6 +113,22 @@ export const TokenHeaderContent: React.FC<TokenHeaderContentProps> = ({
                     </Button>
                   </TooltipTrigger>
                   <TooltipContent>Edit description</TooltipContent>
+                </Tooltip>
+              )}
+
+              {onRoadmapClick && (
+                <Tooltip>
+                  <TooltipTrigger asChild>
+                    <Button
+                      variant="ghost"
+                      size="icon"
+                      onClick={onRoadmapClick}
+                      className="text-white hover:text-primary hover:bg-primary/20 h-6 w-6 lg:h-7 lg:w-7 border border-white/40 hover:border-primary/50 transition-all duration-200"
+                    >
+                      <Map className="h-3 w-3 lg:h-4 lg:w-4" />
+                    </Button>
+                  </TooltipTrigger>
+                  <TooltipContent>Manage roadmap</TooltipContent>
                 </Tooltip>
               )}
 

@@ -31,6 +31,7 @@ interface TokenHeaderProps {
   address: string;
   className?: string;
   height?: string;
+  onRoadmapClick?: () => void;
 }
 
 const HEADER_HEIGHT = "h-80";
