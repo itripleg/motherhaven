@@ -19,6 +19,8 @@ import { FactoryProgress } from "./components/FactoryProgress";
 import { FactoryTabs } from "./components/FactoryTabs";
 import { FactoryLaunchSection } from "./components/FactoryLaunchSection";
 
+import { ImagePosition } from "./components/editor/types"; // Add this import
+
 interface PurchaseOption {
   enabled: boolean;
   amount: string;
@@ -29,15 +31,19 @@ interface TokenCreationInfo {
   name: string;
   ticker: string;
   image: File | null;
+  imagePosition?: ImagePosition; // Add this field
+  description?: string; // Add this field
   burnManager?: `0x${string}`;
   purchase: PurchaseOption;
 }
 
-// Default values
+// Update the default values to include the new fields
 const DEFAULT_TOKEN_INFO: TokenCreationInfo = {
   name: "",
   ticker: "",
   image: null,
+  imagePosition: { x: 0, y: 0, scale: 1, rotation: 0, fit: "cover" }, // Add default
+  description: "", // Add default
   burnManager: undefined,
   purchase: {
     enabled: false,
