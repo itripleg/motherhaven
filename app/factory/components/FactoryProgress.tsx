@@ -29,7 +29,7 @@ const progressSteps = [
     id: "info",
     label: "Token Details",
     icon: Lightbulb,
-    description: "Name, symbol & image",
+    description: "Name & symbol",
     threshold: 25,
   },
   {
@@ -41,9 +41,9 @@ const progressSteps = [
   },
   {
     id: "preview",
-    label: "Preview",
+    label: "Customize",
     icon: Star,
-    description: "Review & verify",
+    description: "Image & description",
     threshold: 75,
   },
 ];
@@ -66,7 +66,7 @@ export function FactoryProgress({
       return "pending";
     }
 
-    // Preview step - can access if form is valid
+    // Preview/Customize step - can access if form is valid
     if (stepId === "preview") {
       if (isFormValid) return "completed";
       return "pending";
@@ -88,8 +88,10 @@ export function FactoryProgress({
 
   const getProgressMessage = () => {
     if (completionPercentage === 100) return "🚀 Ready for launch!";
-    if (completionPercentage >= 75) return "📋 Almost there! Review your token";
-    if (completionPercentage >= 50) return "✨ Add token details to continue";
+    if (completionPercentage >= 75)
+      return "🎨 Customize your token's appearance";
+    if (completionPercentage >= 50)
+      return "✨ Add token name and symbol to continue";
     if (tokenInfo.name || tokenInfo.ticker)
       return "✨ Complete your token details";
     return "🏗️ Start by adding your token name and symbol";
@@ -369,13 +371,13 @@ export function FactoryProgress({
                 <p className="text-muted-foreground">
                   {!tokenInfo.name &&
                     !tokenInfo.ticker &&
-                    "Start by giving your token a memorable name and symbol."}
+                    "Start by giving your token a name and symbol in the Token Details tab."}
                   {(tokenInfo.name || tokenInfo.ticker) &&
                     !isFormValid &&
-                    "Complete both token name and symbol to continue."}
+                    "Complete both token name and symbol to unlock customization options."}
                   {isFormValid &&
                     completionPercentage < 100 &&
-                    "Great! Now you can review your token in the preview tab."}
+                    "Great! Now you can upload images and add descriptions in the Customize tab."}
                 </p>
               </div>
             </div>

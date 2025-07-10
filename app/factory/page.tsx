@@ -19,7 +19,7 @@ import { FactoryProgress } from "./components/FactoryProgress";
 import { FactoryTabs } from "./components/FactoryTabs";
 import { FactoryLaunchSection } from "./components/FactoryLaunchSection";
 
-import { ImagePosition } from "./components/editor/types"; // Add this import
+import { ImagePosition } from "./components/editor/types";
 
 interface PurchaseOption {
   enabled: boolean;
@@ -31,22 +31,21 @@ interface TokenCreationInfo {
   name: string;
   ticker: string;
   image: File | null;
-  imagePosition?: ImagePosition; // Add this field
-  description?: string; // Add this field
+  imagePosition?: ImagePosition;
+  description?: string;
   burnManager?: `0x${string}`;
   purchase: PurchaseOption;
 }
 
-// Update the default values to include the new fields
 const DEFAULT_TOKEN_INFO: TokenCreationInfo = {
   name: "",
   ticker: "",
   image: null,
-  imagePosition: { x: 0, y: 0, scale: 1, rotation: 0, fit: "cover" }, // Add default
-  description: "", // Add default
+  imagePosition: { x: 0, y: 0, scale: 1, rotation: 0, fit: "cover" },
+  description: "",
   burnManager: undefined,
   purchase: {
-    enabled: false,
+    enabled: true,
     amount: "",
     minTokensOut: "0",
   },
@@ -69,6 +68,11 @@ export default function FactoryPage() {
   // Token creation state
   const [tokenInfo, setTokenInfo] =
     useState<TokenCreationInfo>(DEFAULT_TOKEN_INFO);
+
+  // Debug state changes
+  useEffect(() => {
+    console.log("Main page tokenInfo state changed:", tokenInfo);
+  }, [tokenInfo]);
 
   // Real tokenomics from factory config and constants
   const tokenomics = factoryConfig
@@ -117,6 +121,15 @@ export default function FactoryPage() {
     useWaitForTransactionReceipt({
       hash: transactionData,
     });
+
+  // Handle token info changes with proper typing
+  const handleTokenInfoChange = useCallback(
+    (updatedInfo: TokenCreationInfo) => {
+      console.log("handleTokenInfoChange called with:", updatedInfo);
+      setTokenInfo(updatedInfo);
+    },
+    []
+  );
 
   // Fetch real platform statistics
   useEffect(() => {
@@ -427,23 +440,17 @@ export default function FactoryPage() {
             animate={{ opacity: 1, y: 0 }}
             transition={{ delay: 0.2 }}
           >
-            <motion.div
-              initial={{ opacity: 0, y: 20 }}
-              animate={{ opacity: 1, y: 0 }}
-              transition={{ delay: 0.2 }}
-            >
-              <FactoryProgress
-                completionPercentage={getCompletionPercentage()}
-                activeTab={activeTab}
-                onTabChange={setActiveTab}
-                isFormValid={isFormValid}
-                tokenInfo={{
-                  name: tokenInfo.name,
-                  ticker: tokenInfo.ticker,
-                  image: tokenInfo.image,
-                }}
-              />
-            </motion.div>
+            <FactoryProgress
+              completionPercentage={getCompletionPercentage()}
+              activeTab={activeTab}
+              onTabChange={setActiveTab}
+              isFormValid={isFormValid}
+              tokenInfo={{
+                name: tokenInfo.name,
+                ticker: tokenInfo.ticker,
+                image: tokenInfo.image,
+              }}
+            />
           </motion.div>
 
           {/* Main Content Tabs  */}
@@ -455,7 +462,7 @@ export default function FactoryPage() {
             <FactoryTabs
               activeTab={activeTab}
               tokenInfo={tokenInfo}
-              onTokenInfoChange={setTokenInfo}
+              onTokenInfoChange={handleTokenInfoChange}
               tokenomics={tokenomics}
               backgroundImage={backgroundImage}
               factoryConfig={factoryConfig}

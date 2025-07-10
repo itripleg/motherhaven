@@ -5,9 +5,9 @@ import type React from "react";
 import { useState, useCallback } from "react";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { Textarea } from "@/components/ui/textarea";
 import { isAddress } from "viem";
 import { useBalance, useAccount } from "wagmi";
-import { SimpleImageUpload } from "./SimpleImageUpload";
 import { PurchaseOptionsSection } from "./PurchaseOptionsSection";
 
 interface PurchaseOption {
@@ -19,6 +19,7 @@ interface PurchaseOption {
 interface TokenInfo {
   name: string;
   ticker: string;
+  description?: string;
   image: File | null;
   burnManager?: `0x${string}`;
   purchase: PurchaseOption;
@@ -40,7 +41,7 @@ export function TokenInfoForm({
   const { data: balanceData } = useBalance({ address });
 
   const handleChange = useCallback(
-    (e: React.ChangeEvent<HTMLInputElement>) => {
+    (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) => {
       const { name, value } = e.target;
 
       if (name === "burnManager") {
@@ -71,90 +72,85 @@ export function TokenInfoForm({
     [tokenInfo, onTokenInfoChange]
   );
 
-  const handleImageChange = useCallback(
-    (image: File | null) => {
-      onTokenInfoChange({ ...tokenInfo, image });
-    },
-    [tokenInfo, onTokenInfoChange]
-  );
-
   return (
     <div className="space-y-6">
-      {/* Basic Token Info */}
-      <div className="grid w-full items-center gap-4">
-        <div>
-          <Label htmlFor="name" className="text-foreground">
-            Token Name *
-          </Label>
-          <Input
-            id="name"
-            name="name"
-            value={tokenInfo.name}
-            onChange={handleChange}
-            placeholder="My Awesome Token"
-            maxLength={32}
-            required
-            className="bg-background border-border focus:border-primary focus:ring-primary focus:ring-1 focus:ring-offset-0 focus-visible:ring-primary focus-visible:border-primary"
-          />
-          <div className="text-xs text-muted-foreground mt-1">
-            Max 32 characters
-          </div>
-        </div>
+      {/* Token Name */}
+      <div>
+        <Label htmlFor="name" className="text-foreground">
+          Token Name *
+        </Label>
+        <Input
+          id="name"
+          name="name"
+          value={tokenInfo.name}
+          onChange={handleChange}
+          placeholder="My Awesome Token"
+          maxLength={32}
+          required
+          className="mt-2"
+        />
+      </div>
 
-        <div>
-          <Label htmlFor="ticker" className="text-foreground">
-            Symbol *
-          </Label>
-          <Input
-            id="ticker"
-            name="ticker"
-            value={tokenInfo.ticker}
-            onChange={handleChange}
-            placeholder="MAT"
-            maxLength={8}
-            style={{ textTransform: "uppercase" }}
-            required
-            className="bg-background border-border focus:border-primary focus:ring-primary focus:ring-1 focus:ring-offset-0 focus-visible:ring-primary focus-visible:border-primary"
-          />
-          <div className="text-xs text-muted-foreground mt-1">
-            Max 8 characters
-          </div>
-        </div>
+      {/* Token Symbol */}
+      <div>
+        <Label htmlFor="ticker" className="text-foreground">
+          Symbol *
+        </Label>
+        <Input
+          id="ticker"
+          name="ticker"
+          value={tokenInfo.ticker}
+          onChange={handleChange}
+          placeholder="MAT"
+          maxLength={8}
+          style={{ textTransform: "uppercase" }}
+          required
+          className="mt-2"
+        />
+      </div>
 
-        <div>
-          <Label htmlFor="burnManager" className="text-foreground">
-            Burn Manager (Optional)
-          </Label>
-          <Input
-            id="burnManager"
-            name="burnManager"
-            value={tokenInfo.burnManager || ""}
-            onChange={handleChange}
-            placeholder="0x... (leave empty for none)"
-            className={`bg-background border-border focus:ring-1 focus:ring-offset-0 focus-visible:ring-offset-0 ${
-              burnManagerError
-                ? "border-destructive focus:border-destructive focus:ring-destructive focus-visible:border-destructive focus-visible:ring-destructive"
-                : "focus:border-primary focus:ring-primary focus-visible:border-primary focus-visible:ring-primary"
-            }`}
-          />
-          {burnManagerError && (
-            <p className="text-sm text-destructive mt-1">{burnManagerError}</p>
-          )}
-          <div className="text-xs text-muted-foreground mt-1">
-            Address with burn privileges
-          </div>
+      {/* Description */}
+      <div>
+        <Label htmlFor="description" className="text-foreground">
+          Description (Optional)
+        </Label>
+        <Textarea
+          id="description"
+          name="description"
+          value={tokenInfo.description || ""}
+          onChange={handleChange}
+          placeholder="Describe your token..."
+          maxLength={280}
+          className="mt-2 min-h-[100px]"
+        />
+        <div className="text-xs text-muted-foreground mt-1">
+          {(tokenInfo.description || "").length}/280
         </div>
       </div>
 
-      {/* Image Upload Component */}
-      <SimpleImageUpload
-        imageFile={tokenInfo.image}
-        onImageChange={handleImageChange}
-        tokenName={tokenInfo.name || "Your Token"}
-        tokenSymbol={tokenInfo.ticker || "TOKEN"}
-      />
+      {/* Burn Manager */}
+      <div>
+        <Label htmlFor="burnManager" className="text-foreground">
+          Burn Manager (Optional)
+        </Label>
+        <Input
+          id="burnManager"
+          name="burnManager"
+          value={tokenInfo.burnManager || ""}
+          onChange={handleChange}
+          placeholder="0x... (leave empty for none)"
+          className={`mt-2 ${
+            burnManagerError
+              ? "border-destructive focus:border-destructive"
+              : ""
+          }`}
+        />
+        {burnManagerError && (
+          <p className="text-sm text-destructive mt-1">{burnManagerError}</p>
+        )}
+      </div>
 
-      {/* Purchase Options Component */}
+      {/* Purchase Options */}
       <PurchaseOptionsSection
         purchaseOption={tokenInfo.purchase}
         onPurchaseChange={handlePurchaseChange}

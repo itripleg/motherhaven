@@ -71,7 +71,7 @@ export function FactoryTabs({
   const getTabStatus = (tabId: string) => {
     switch (tabId) {
       case "info":
-        if (tokenInfo.name && tokenInfo.ticker && tokenInfo.image) {
+        if (tokenInfo.name && tokenInfo.ticker) {
           return "complete";
         } else if (tokenInfo.name || tokenInfo.ticker) {
           return "partial";
@@ -88,6 +88,7 @@ export function FactoryTabs({
 
   // Handle image position changes
   const handleImagePositionChange = (position: ImagePosition) => {
+    console.log("handleImagePositionChange called with:", position);
     onTokenInfoChange({
       ...tokenInfo,
       imagePosition: position,
@@ -96,18 +97,33 @@ export function FactoryTabs({
 
   // Handle description changes
   const handleDescriptionChange = (description: string) => {
+    console.log("handleDescriptionChange called with:", description);
     onTokenInfoChange({
       ...tokenInfo,
       description,
     });
   };
 
-  // Handle token info changes (for basic form fields)
+  // Handle token info changes (for basic form fields) - PRESERVE existing image and other fields
   const handleTokenInfoFormChange = (basicTokenInfo: TokenCreationInfo) => {
+    console.log("handleTokenInfoFormChange called with:", basicTokenInfo);
+    // IMPORTANT: Don't override image, imagePosition, or description from the preview tab
     onTokenInfoChange({
-      ...basicTokenInfo,
+      ...tokenInfo, // Keep existing image, imagePosition, description
+      ...basicTokenInfo, // Update the basic form fields
+      // Explicitly preserve these fields that come from the preview tab
+      image: tokenInfo.image,
       imagePosition: tokenInfo.imagePosition,
       description: tokenInfo.description,
+    });
+  };
+
+  // Handle image changes from the preview tab
+  const handleImageChange = (file: File | null) => {
+    console.log("handleImageChange called with:", file);
+    onTokenInfoChange({
+      ...tokenInfo,
+      image: file,
     });
   };
 
@@ -121,7 +137,7 @@ export function FactoryTabs({
           exit={{ opacity: 0, y: -20 }}
           transition={{ duration: 0.3 }}
         >
-          {/* Token Information Tab */}
+          {/* Token Information Tab - Simplified to just basic info */}
           {activeTab === "info" && (
             <Card className="unified-card border-primary/20">
               <CardHeader className="text-center border-b border-border/50">
@@ -135,7 +151,7 @@ export function FactoryTabs({
                   )}
                 </CardTitle>
                 <CardDescription className="text-base">
-                  Give your token personality and make it unforgettable
+                  Start with the essentials - your token's name and symbol
                 </CardDescription>
               </CardHeader>
               <CardContent className="p-8">
@@ -326,25 +342,23 @@ export function FactoryTabs({
             </Card>
           )}
 
-          {/* Preview Tab */}
+          {/* Preview Tab - Now handles all visual customization */}
           {activeTab === "preview" && (
             <Card className="unified-card border-primary/20">
               <CardHeader className="text-center border-b border-border/50">
                 <CardTitle className="flex items-center justify-center gap-3 text-2xl">
                   <Star className="h-7 w-7 text-primary" />
-                  Token Preview & Visual Editor
+                  Customize & Preview
                   <Badge className="bg-blue-500/20 text-blue-400 border-blue-400/30">
                     <Eye className="h-3 w-3 mr-1" />
                     Live Preview
                   </Badge>
                 </CardTitle>
                 <CardDescription className="text-base">
-                  Upload your image, edit positioning, add description, and see
-                  exactly how your token will appear
+                  Upload image and see how your token will appear
                 </CardDescription>
               </CardHeader>
-              <CardContent className="p-8 space-y-8">
-                {/* Token Header Preview with Editor - Combined like main dex */}
+              <CardContent className="p-8">
                 <FactoryImageUploadWithEditor
                   imageFile={tokenInfo.image}
                   imagePosition={
@@ -357,184 +371,12 @@ export function FactoryTabs({
                     }
                   }
                   description={tokenInfo.description || ""}
-                  onImageChange={(file) => {
-                    console.log("FactoryTabs received image change:", file);
-                    onTokenInfoChange({ ...tokenInfo, image: file });
-                  }}
+                  onImageChange={handleImageChange}
                   onPositionChange={handleImagePositionChange}
                   onDescriptionChange={handleDescriptionChange}
                   tokenName={tokenInfo.name || "Your Token"}
                   tokenSymbol={tokenInfo.ticker || "TOKEN"}
                 />
-                <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
-                  {/* Token Details */}
-                  <div className="space-y-4">
-                    <h4 className="font-semibold text-foreground flex items-center gap-2">
-                      <Settings className="h-5 w-5 text-primary" />
-                      Token Details
-                    </h4>
-                    <div className="space-y-3">
-                      {[
-                        {
-                          label: "Name",
-                          value: tokenInfo.name || "Not set",
-                          status: !!tokenInfo.name,
-                        },
-                        {
-                          label: "Symbol",
-                          value: tokenInfo.ticker || "Not set",
-                          status: !!tokenInfo.ticker,
-                        },
-                        {
-                          label: "Image",
-                          value: tokenInfo.image
-                            ? "✓ Uploaded"
-                            : "Not uploaded",
-                          status: !!tokenInfo.image,
-                        },
-                        {
-                          label: "Description",
-                          value: tokenInfo.description
-                            ? "✓ Added"
-                            : "Not added",
-                          status: !!tokenInfo.description,
-                        },
-                        {
-                          label: "Purchase Option",
-                          value: tokenInfo.purchase.enabled
-                            ? `${tokenInfo.purchase.amount} AVAX`
-                            : "Not enabled",
-                          status: tokenInfo.purchase.enabled,
-                        },
-                      ].map((item) => (
-                        <div
-                          key={item.label}
-                          className="flex justify-between items-center p-3 bg-secondary/30 rounded-lg"
-                        >
-                          <span className="text-muted-foreground">
-                            {item.label}:
-                          </span>
-                          <div className="flex items-center gap-2">
-                            <span
-                              className={`font-medium ${
-                                item.status
-                                  ? "text-foreground"
-                                  : "text-muted-foreground"
-                              }`}
-                            >
-                              {item.value}
-                            </span>
-                            {item.status ? (
-                              <CheckCircle className="h-4 w-4 text-green-400" />
-                            ) : (
-                              <AlertCircle className="h-4 w-4 text-yellow-400" />
-                            )}
-                          </div>
-                        </div>
-                      ))}
-                    </div>
-                  </div>
-
-                  {/* Economics Summary */}
-                  <div className="space-y-4">
-                    <h4 className="font-semibold text-foreground flex items-center gap-2">
-                      <DollarSign className="h-5 w-5 text-primary" />
-                      Economics
-                    </h4>
-                    <div className="space-y-3">
-                      {[
-                        {
-                          label: "Funding Goal",
-                          value: `${tokenomics.fundingGoal} AVAX`,
-                        },
-                        {
-                          label: "Max Supply",
-                          value: tokenomics.maxSupply.toLocaleString(),
-                        },
-                        {
-                          label: "Initial Price",
-                          value: `${tokenomics.initialPrice.toFixed(8)} AVAX`,
-                        },
-                        {
-                          label: "Bonding Curve",
-                          value:
-                            tokenomics.bondingCurve.charAt(0).toUpperCase() +
-                            tokenomics.bondingCurve.slice(1),
-                        },
-                      ].map((item) => (
-                        <div
-                          key={item.label}
-                          className="flex justify-between items-center p-3 bg-secondary/30 rounded-lg"
-                        >
-                          <span className="text-muted-foreground">
-                            {item.label}:
-                          </span>
-                          <span className="font-medium text-foreground">
-                            {item.value}
-                          </span>
-                        </div>
-                      ))}
-                    </div>
-                  </div>
-                </div>
-
-                {/* Readiness Check */}
-                <div className="p-6 unified-card border-primary/20 bg-primary/5">
-                  <div className="flex items-start gap-3">
-                    <CheckCircle className="h-6 w-6 text-primary mt-0.5 flex-shrink-0" />
-                    <div>
-                      <h4 className="font-semibold text-foreground mb-2">
-                        Launch Readiness Check
-                      </h4>
-                      <div className="grid grid-cols-1 md:grid-cols-2 gap-3 text-sm">
-                        <div className="flex items-center gap-2">
-                          {tokenInfo.name ? (
-                            <CheckCircle className="h-4 w-4 text-green-400" />
-                          ) : (
-                            <AlertCircle className="h-4 w-4 text-yellow-400" />
-                          )}
-                          <span>Token name provided</span>
-                        </div>
-                        <div className="flex items-center gap-2">
-                          {tokenInfo.ticker ? (
-                            <CheckCircle className="h-4 w-4 text-green-400" />
-                          ) : (
-                            <AlertCircle className="h-4 w-4 text-yellow-400" />
-                          )}
-                          <span>Symbol configured</span>
-                        </div>
-                        <div className="flex items-center gap-2">
-                          {tokenInfo.image ? (
-                            <CheckCircle className="h-4 w-4 text-green-400" />
-                          ) : (
-                            <AlertCircle className="h-4 w-4 text-yellow-400" />
-                          )}
-                          <span>Image uploaded (optional)</span>
-                        </div>
-                        <div className="flex items-center gap-2">
-                          {tokenInfo.description ? (
-                            <CheckCircle className="h-4 w-4 text-green-400" />
-                          ) : (
-                            <AlertCircle className="h-4 w-4 text-yellow-400" />
-                          )}
-                          <span>Description added (optional)</span>
-                        </div>
-                        <div className="flex items-center gap-2">
-                          <CheckCircle className="h-4 w-4 text-green-400" />
-                          <span>Economics configured</span>
-                        </div>
-                        <div className="flex items-center gap-2">
-                          {tokenInfo.imagePosition ? (
-                            <CheckCircle className="h-4 w-4 text-green-400" />
-                          ) : (
-                            <AlertCircle className="h-4 w-4 text-yellow-400" />
-                          )}
-                          <span>Image position set (optional)</span>
-                        </div>
-                      </div>
-                    </div>
-                  </div>
-                </div>
               </CardContent>
             </Card>
           )}
