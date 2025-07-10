@@ -40,6 +40,7 @@ export const TokenHeader: React.FC<TokenHeaderProps> = ({
   address,
   className = "",
   height = HEADER_HEIGHT,
+  onRoadmapClick,
 }) => {
   const [isEditing, setIsEditing] = useState(false);
   const [isEditingDescription, setIsEditingDescription] = useState(false);
@@ -185,6 +186,8 @@ export const TokenHeader: React.FC<TokenHeaderProps> = ({
     setIsEditingDescription(false);
   };
 
+  console.log("TokenHeader - received onRoadmapClick:", !!onRoadmapClick);
+
   if (loading || !token) {
     return (
       <Card
@@ -244,6 +247,7 @@ export const TokenHeader: React.FC<TokenHeaderProps> = ({
                 onEditClick={() => setIsEditing(true)}
                 onDescriptionEdit={handleDescriptionEdit}
                 onDescriptionCancel={handleDescriptionCancel}
+                onRoadmapClick={onRoadmapClick}
                 progress={progress}
                 isEditingDescription={isEditingDescription}
                 onDescriptionSave={

@@ -82,66 +82,81 @@ export const TokenHeaderContent: React.FC<TokenHeaderContentProps> = ({
             {stateDisplay.text}
           </Badge>
 
-          {isCreator && (
-            <div className="flex items-center gap-1 lg:gap-2 p-1 lg:p-1.5 bg-black/30 border border-primary/40 rounded-lg backdrop-blur-sm">
-              {canEdit && data.imageUrl && onEditClick && (
+          {/* Icon group - always visible */}
+          <div className="flex items-center gap-1 lg:gap-2 p-1 lg:p-1.5 bg-black/30 border border-white/40 rounded-lg backdrop-blur-sm">
+            {/* Roadmap icon - always visible, functional for creators, read-only for others */}
+            <Tooltip>
+              <TooltipTrigger asChild>
+                <Button
+                  variant="ghost"
+                  size="icon"
+                  onClick={() => {
+                    console.log(
+                      "Roadmap button clicked, isCreator:",
+                      isCreator,
+                      "onRoadmapClick:",
+                      !!onRoadmapClick
+                    );
+                    if (onRoadmapClick) {
+                      onRoadmapClick();
+                    }
+                  }}
+                  className="text-white hover:text-primary hover:bg-primary/20 h-6 w-6 lg:h-7 lg:w-7 border border-white/40 hover:border-primary/50 transition-all duration-200"
+                >
+                  <Map className="h-3 w-3 lg:h-4 lg:w-4" />
+                </Button>
+              </TooltipTrigger>
+              <TooltipContent>
+                {isCreator ? "Manage roadmap" : "View roadmap"}
+              </TooltipContent>
+            </Tooltip>
+
+            {/* Creator-only controls */}
+            {isCreator && (
+              <>
+                {canEdit && data.imageUrl && onEditClick && (
+                  <Tooltip>
+                    <TooltipTrigger asChild>
+                      <Button
+                        variant="ghost"
+                        size="icon"
+                        onClick={onEditClick}
+                        className="text-white hover:text-primary hover:bg-primary/20 h-6 w-6 lg:h-7 lg:w-7 border border-white/40 hover:border-primary/50 transition-all duration-200"
+                      >
+                        <Camera className="h-3 w-3 lg:h-4 lg:w-4" />
+                      </Button>
+                    </TooltipTrigger>
+                    <TooltipContent>Edit photo position</TooltipContent>
+                  </Tooltip>
+                )}
+
+                {onDescriptionSave && (
+                  <Tooltip>
+                    <TooltipTrigger asChild>
+                      <Button
+                        variant="ghost"
+                        size="icon"
+                        onClick={onDescriptionEdit}
+                        className="text-white hover:text-primary hover:bg-primary/20 h-6 w-6 lg:h-7 lg:w-7 border border-white/40 hover:border-primary/50 transition-all duration-200"
+                      >
+                        <FileText className="h-3 w-3 lg:h-4 lg:w-4" />
+                      </Button>
+                    </TooltipTrigger>
+                    <TooltipContent>Edit description</TooltipContent>
+                  </Tooltip>
+                )}
+
                 <Tooltip>
                   <TooltipTrigger asChild>
-                    <Button
-                      variant="ghost"
-                      size="icon"
-                      onClick={onEditClick}
-                      className="text-white hover:text-primary hover:bg-primary/20 h-6 w-6 lg:h-7 lg:w-7 border border-white/40 hover:border-primary/50 transition-all duration-200"
-                    >
-                      <Camera className="h-3 w-3 lg:h-4 lg:w-4" />
-                    </Button>
+                    <div className="p-1 lg:p-1.5 bg-primary/20 border border-primary/40 rounded-md">
+                      <Crown className="h-3 w-3 lg:h-4 lg:w-4 text-primary" />
+                    </div>
                   </TooltipTrigger>
-                  <TooltipContent>Edit photo position</TooltipContent>
+                  <TooltipContent>You are the creator</TooltipContent>
                 </Tooltip>
-              )}
-
-              {onDescriptionSave && (
-                <Tooltip>
-                  <TooltipTrigger asChild>
-                    <Button
-                      variant="ghost"
-                      size="icon"
-                      onClick={onDescriptionEdit}
-                      className="text-white hover:text-primary hover:bg-primary/20 h-6 w-6 lg:h-7 lg:w-7 border border-white/40 hover:border-primary/50 transition-all duration-200"
-                    >
-                      <FileText className="h-3 w-3 lg:h-4 lg:w-4" />
-                    </Button>
-                  </TooltipTrigger>
-                  <TooltipContent>Edit description</TooltipContent>
-                </Tooltip>
-              )}
-
-              {onRoadmapClick && (
-                <Tooltip>
-                  <TooltipTrigger asChild>
-                    <Button
-                      variant="ghost"
-                      size="icon"
-                      onClick={onRoadmapClick}
-                      className="text-white hover:text-primary hover:bg-primary/20 h-6 w-6 lg:h-7 lg:w-7 border border-white/40 hover:border-primary/50 transition-all duration-200"
-                    >
-                      <Map className="h-3 w-3 lg:h-4 lg:w-4" />
-                    </Button>
-                  </TooltipTrigger>
-                  <TooltipContent>Manage roadmap</TooltipContent>
-                </Tooltip>
-              )}
-
-              <Tooltip>
-                <TooltipTrigger asChild>
-                  <div className="p-1 lg:p-1.5 bg-primary/20 border border-primary/40 rounded-md">
-                    <Crown className="h-3 w-3 lg:h-4 lg:w-4 text-primary" />
-                  </div>
-                </TooltipTrigger>
-                <TooltipContent>You are the creator</TooltipContent>
-              </Tooltip>
-            </div>
-          )}
+              </>
+            )}
+          </div>
 
           {!isCreator && data.creator && (
             <Tooltip>
