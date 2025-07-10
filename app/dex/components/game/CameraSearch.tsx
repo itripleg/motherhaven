@@ -4,7 +4,7 @@ import { motion, AnimatePresence } from "framer-motion";
 import { useState } from "react";
 import { moveCamPosition } from "@/hooks/CamTools";
 import { Skull } from "lucide-react";
-import { TokenCard } from "@/app/dex/components/tokens/TokenCard";
+import { TokenCard } from "@/app/dex/components/core/TokenCard";
 import OuijAi from "@/components-3d/Ouija/OuijaAndFletcha";
 
 interface CameraSearchProps {

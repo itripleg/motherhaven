@@ -16,7 +16,7 @@ import {
 } from "lucide-react";
 // FINAL-HOOKS: Updated import to use consolidated final-hooks
 import { useTrades } from "@/final-hooks/useTrades";
-import RechartsLineChart from "@/app/dex/components/charts/RechartsLineChart";
+import RechartsLineChart from "@/app/dex/components/trading/RechartsLineChart";
 import { formatDistanceToNow, parseISO } from "date-fns";
 
 interface ChartVerificationProps {

@@ -24,7 +24,7 @@ export const navItems: NavItem[] = [
     description: "Trade tokens",
   },
   {
-    href: "/dex/factory",
+    href: "/factory",
     label: "Token Factory",
     iconName: "Factory",
     description: "Create tokens",

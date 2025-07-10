@@ -1,4 +1,4 @@
-// app/dex/factory/components/SimpleImageUpload.tsx
+// app/dex/components/token-header/SimpleImageUpload.tsx - Fixed Import
 "use client";
 
 import React, { useState, useRef } from "react";
@@ -6,7 +6,6 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { Label } from "@/components/ui/label";
 import { X, Upload, Image as ImageIcon } from "lucide-react";
-import { FactoryPreview } from "../../components/token-header/FactoryPreview";
 
 interface SimpleImageUploadProps {
   imageFile: File | null;
@@ -15,6 +14,61 @@ interface SimpleImageUploadProps {
   tokenSymbol?: string;
   description?: string;
 }
+
+// Simple preview component (no need for full FactoryPreview in DEX context)
+const SimplePreview: React.FC<{
+  imageFile: File | null;
+  tokenName: string;
+  tokenSymbol: string;
+  description?: string;
+}> = ({ imageFile, tokenName, tokenSymbol, description }) => {
+  const [previewUrl, setPreviewUrl] = React.useState<string | null>(null);
+
+  React.useEffect(() => {
+    if (!imageFile) {
+      setPreviewUrl(null);
+      return;
+    }
+
+    const reader = new FileReader();
+    reader.onloadend = () => setPreviewUrl(reader.result as string);
+    reader.readAsDataURL(imageFile);
+
+    return () => {
+      if (previewUrl) {
+        URL.revokeObjectURL(previewUrl);
+      }
+    };
+  }, [imageFile, previewUrl]);
+
+  return (
+    <div className="relative h-48 lg:h-56 rounded-xl border border-primary/20 overflow-hidden bg-gradient-to-br from-primary/5 to-primary/10">
+      {previewUrl && (
+        <div
+          className="absolute inset-0 bg-cover bg-center"
+          style={{ backgroundImage: `url(${previewUrl})` }}
+        />
+      )}
+      <div className="absolute inset-0 bg-gradient-to-b from-black/50 via-black/30 to-black/60" />
+
+      <div className="relative z-10 p-4 h-full flex flex-col justify-center">
+        <div className="space-y-2">
+          <h3 className="text-lg font-bold text-white">
+            {tokenName || "Your Token"}
+            {tokenSymbol && (
+              <span className="text-sm text-white/70 ml-2">${tokenSymbol}</span>
+            )}
+          </h3>
+          {description && (
+            <p className="text-white/80 text-sm line-clamp-2">
+              &quot;{description}&quot;
+            </p>
+          )}
+        </div>
+      </div>
+    </div>
+  );
+};
 
 export const SimpleImageUpload: React.FC<SimpleImageUploadProps> = ({
   imageFile,
@@ -131,7 +185,7 @@ export const SimpleImageUpload: React.FC<SimpleImageUploadProps> = ({
         </CardContent>
       </Card>
 
-      {/* Preview using the new modular component */}
+      {/* Preview */}
       <div className="space-y-3">
         <div className="flex items-center gap-2">
           <Label className="text-base font-semibold text-foreground">
@@ -142,12 +196,11 @@ export const SimpleImageUpload: React.FC<SimpleImageUploadProps> = ({
           </span>
         </div>
 
-        <FactoryPreview
+        <SimplePreview
+          imageFile={imageFile}
           tokenName={tokenName}
           tokenSymbol={tokenSymbol}
           description={description}
-          imageFile={imageFile}
-          height="h-48 lg:h-56"
         />
 
         <p className="text-xs text-muted-foreground text-center">

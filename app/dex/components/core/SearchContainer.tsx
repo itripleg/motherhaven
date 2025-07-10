@@ -2,8 +2,8 @@
 import React from "react";
 import { Button } from "@/components/ui/button";
 import { moveCamPosition } from "@/hooks/CamTools";
-import { TokenSearch } from "./tokens/TokenSearch";
-import { CameraSearch } from "./CameraSearch";
+import { TokenSearch } from "./TokenSearch";
+import { CameraSearch } from "../game/CameraSearch";
 // import { OuijaSearch } from "./OuijaSearch"; // Commented out - may restore later
 import { TokenPriceCategory } from "@/hooks/token/useTokenList";
 import { motion } from "framer-motion";

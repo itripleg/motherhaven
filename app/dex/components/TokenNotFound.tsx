@@ -1,5 +1,5 @@
-import { SearchContainer } from "./SearchContainer";
-import { TokenContainer } from "./tokens/TokenContainer";
+import { SearchContainer } from "./core/SearchContainer";
+import { TokenContainer } from "./core/TokenContainer";
 import { useTokenList } from "@/hooks/token/useTokenList";
 
 export function TokenNotFound({ address }: { address: string }) {
