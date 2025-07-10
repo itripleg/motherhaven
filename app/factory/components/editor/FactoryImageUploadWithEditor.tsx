@@ -4,7 +4,15 @@
 import React, { useState, useRef } from "react";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
-import { X, Upload, Camera, Crown } from "lucide-react";
+import {
+  X,
+  Upload,
+  Camera,
+  Crown,
+  MessageSquare,
+  Type,
+  Hash,
+} from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
 import { FactoryImagePositionEditor } from "./ImagePositionEditor";
 import { FactoryEditorBackground } from "./FactoryEditorBackground";
@@ -23,6 +31,7 @@ interface FactoryImageUploadWithEditorProps {
   onImageChange: (file: File | null) => void;
   onPositionChange: (position: ImagePosition) => void;
   onDescriptionChange: (description: string) => void;
+  onTokenInfoChange?: (info: { name?: string; ticker?: string }) => void;
   tokenName?: string;
   tokenSymbol?: string;
 }
@@ -36,6 +45,7 @@ export const FactoryImageUploadWithEditor: React.FC<
   onImageChange,
   onPositionChange,
   onDescriptionChange,
+  onTokenInfoChange,
   tokenName = "Your Token",
   tokenSymbol = "TOKEN",
 }) => {
@@ -45,6 +55,9 @@ export const FactoryImageUploadWithEditor: React.FC<
   );
 
   const [isEditing, setIsEditing] = useState(false);
+  const [editMode, setEditMode] = useState<
+    "position" | "description" | "name" | "ticker" | null
+  >(null);
   const [imageUrl, setImageUrl] = useState<string | undefined>(undefined);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
@@ -78,8 +91,8 @@ export const FactoryImageUploadWithEditor: React.FC<
         return;
       }
       console.log("Calling onImageChange with:", file);
+      // REMOVED: Don't call onPositionChange here - let the parent handle it
       onImageChange(file);
-      onPositionChange({ x: 0, y: 0, scale: 1, rotation: 0, fit: "cover" });
     }
     // Reset the input value so the same file can be selected again
     e.target.value = "";
@@ -100,10 +113,12 @@ export const FactoryImageUploadWithEditor: React.FC<
 
   const handleEditSave = () => {
     setIsEditing(false);
+    setEditMode(null);
   };
 
   const handleEditCancel = () => {
     setIsEditing(false);
+    setEditMode(null);
   };
 
   return (
@@ -117,16 +132,21 @@ export const FactoryImageUploadWithEditor: React.FC<
       />
 
       <AnimatePresence mode="wait">
-        {isEditing && imageUrl ? (
+        {isEditing ? (
           <FactoryImagePositionEditor
             position={imagePosition}
             onPositionChange={onPositionChange}
             description={description}
             onDescriptionChange={onDescriptionChange}
+            onTokenInfoChange={onTokenInfoChange}
             onSave={handleEditSave}
             onCancel={handleEditCancel}
             isUpdating={false}
             imageUrl={imageUrl}
+            tokenName={tokenName}
+            tokenSymbol={tokenSymbol}
+            // Pass the initial mode to show description editor if that's what was clicked
+            initialMode={editMode}
           />
         ) : (
           <motion.div
@@ -155,21 +175,80 @@ export const FactoryImageUploadWithEditor: React.FC<
 
                   {/* Controls */}
                   <div className="flex items-center gap-1 p-1 bg-black/30 border border-primary/40 rounded-lg">
+                    {/* Token Name Edit Button */}
+                    <Tooltip>
+                      <TooltipTrigger asChild>
+                        <Button
+                          variant="ghost"
+                          size="icon"
+                          onClick={() => {
+                            setEditMode("name");
+                            setIsEditing(true);
+                          }}
+                          className="text-white hover:text-primary h-6 w-6"
+                        >
+                          <Type className="h-4 w-4" />
+                        </Button>
+                      </TooltipTrigger>
+                      <TooltipContent>Edit token name</TooltipContent>
+                    </Tooltip>
+
+                    {/* Token Symbol Edit Button */}
+                    <Tooltip>
+                      <TooltipTrigger asChild>
+                        <Button
+                          variant="ghost"
+                          size="icon"
+                          onClick={() => {
+                            setEditMode("ticker");
+                            setIsEditing(true);
+                          }}
+                          className="text-white hover:text-primary h-6 w-6"
+                        >
+                          <Hash className="h-4 w-4" />
+                        </Button>
+                      </TooltipTrigger>
+                      <TooltipContent>Edit token symbol</TooltipContent>
+                    </Tooltip>
+
+                    {/* Description Edit Button */}
+                    <Tooltip>
+                      <TooltipTrigger asChild>
+                        <Button
+                          variant="ghost"
+                          size="icon"
+                          onClick={() => {
+                            setEditMode("description");
+                            setIsEditing(true);
+                          }}
+                          className="text-white hover:text-primary h-6 w-6"
+                        >
+                          <MessageSquare className="h-4 w-4" />
+                        </Button>
+                      </TooltipTrigger>
+                      <TooltipContent>Edit description</TooltipContent>
+                    </Tooltip>
+
                     {imageUrl && (
                       <Tooltip>
                         <TooltipTrigger asChild>
                           <Button
                             variant="ghost"
                             size="icon"
-                            onClick={() => setIsEditing(true)}
+                            onClick={() => {
+                              setEditMode("position");
+                              setIsEditing(true);
+                            }}
                             className="text-white hover:text-primary h-6 w-6"
                           >
                             <Camera className="h-4 w-4" />
                           </Button>
                         </TooltipTrigger>
-                        <TooltipContent>Edit position</TooltipContent>
+                        <TooltipContent>Edit image position</TooltipContent>
                       </Tooltip>
                     )}
+
+                    <div className="w-px h-4 bg-white/20 mx-1" />
 
                     <Tooltip>
                       <TooltipTrigger asChild>
@@ -240,7 +319,7 @@ export const FactoryImageUploadWithEditor: React.FC<
             </div>
 
             {/* Upload prompt when no image */}
-            {!imageUrl && (
+            {/* {!imageUrl && (
               <div className="absolute inset-0 flex items-center justify-center">
                 <div
                   onClick={handleUploadClick}
@@ -255,7 +334,7 @@ export const FactoryImageUploadWithEditor: React.FC<
                   </p>
                 </div>
               </div>
-            )}
+            )} */}
           </motion.div>
         )}
       </AnimatePresence>

@@ -80,7 +80,7 @@ export function FactoryTabs({
       case "tokenomics":
         return "complete"; // Tokenomics are pre-configured
       case "preview":
-        return tokenInfo.name && tokenInfo.ticker ? "complete" : "disabled";
+        return "complete"; // Always accessible - users can customize anytime
       default:
         return "empty";
     }
@@ -118,13 +118,37 @@ export function FactoryTabs({
     });
   };
 
-  // Handle image changes from the preview tab
+  // Handle image changes from the preview tab - SIMPLIFIED
   const handleImageChange = (file: File | null) => {
     console.log("handleImageChange called with:", file);
-    onTokenInfoChange({
+    console.log("Current tokenInfo before update:", tokenInfo);
+
+    const updatedTokenInfo = {
       ...tokenInfo,
       image: file,
-    });
+      // Reset position when changing image to avoid conflicts
+      imagePosition: file
+        ? { x: 0, y: 0, scale: 1, rotation: 0, fit: "cover" as const }
+        : tokenInfo.imagePosition,
+    };
+
+    console.log("Updated tokenInfo being passed:", updatedTokenInfo);
+    onTokenInfoChange(updatedTokenInfo);
+  };
+
+  // Handle token info changes for name and ticker from the preview tab
+  const handleTokenInfoUpdateFromPreview = (info: {
+    name?: string;
+    ticker?: string;
+  }) => {
+    console.log("handleTokenInfoUpdateFromPreview called with:", info);
+    const updatedTokenInfo = {
+      ...tokenInfo,
+      ...(info.name !== undefined && { name: info.name }),
+      ...(info.ticker !== undefined && { ticker: info.ticker }),
+    };
+    console.log("Updated tokenInfo from preview:", updatedTokenInfo);
+    onTokenInfoChange(updatedTokenInfo);
   };
 
   return (
@@ -355,7 +379,7 @@ export function FactoryTabs({
                   </Badge>
                 </CardTitle>
                 <CardDescription className="text-base">
-                  Upload image and see how your token will appear
+                  Upload image, edit text, and see how your token will appear
                 </CardDescription>
               </CardHeader>
               <CardContent className="p-8">
@@ -374,6 +398,7 @@ export function FactoryTabs({
                   onImageChange={handleImageChange}
                   onPositionChange={handleImagePositionChange}
                   onDescriptionChange={handleDescriptionChange}
+                  onTokenInfoChange={handleTokenInfoUpdateFromPreview}
                   tokenName={tokenInfo.name || "Your Token"}
                   tokenSymbol={tokenInfo.ticker || "TOKEN"}
                 />

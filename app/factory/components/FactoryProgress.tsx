@@ -21,6 +21,8 @@ interface FactoryProgressProps {
     name: string;
     ticker: string;
     image: File | null;
+    description?: string;
+    burnManager?: string;
   };
 }
 
@@ -55,6 +57,12 @@ export function FactoryProgress({
   isFormValid,
   tokenInfo,
 }: FactoryProgressProps) {
+  // Check if there's a valid burn manager
+  const hasValidBurnManager =
+    tokenInfo.burnManager &&
+    tokenInfo.burnManager.startsWith("0x") &&
+    tokenInfo.burnManager.length === 42;
+
   const getStepStatus = (stepId: string, threshold: number) => {
     // Tokenomics is always completed since it's pre-configured
     if (stepId === "tokenomics") return "completed";
@@ -66,9 +74,9 @@ export function FactoryProgress({
       return "pending";
     }
 
-    // Preview/Customize step - can access if form is valid
+    // Preview/Customize step - completed if has any customization
     if (stepId === "preview") {
-      if (isFormValid) return "completed";
+      if (tokenInfo.image || tokenInfo.description) return "completed";
       return "pending";
     }
 
@@ -79,6 +87,9 @@ export function FactoryProgress({
   };
 
   const getProgressColor = () => {
+    if (hasValidBurnManager) {
+      return "from-orange-500 via-red-500 to-yellow-500"; // Burning colors
+    }
     if (completionPercentage === 100) return "from-green-500 to-emerald-400";
     if (completionPercentage >= 75) return "from-blue-500 to-primary";
     if (completionPercentage >= 50) return "from-yellow-500 to-orange-400";
@@ -87,9 +98,11 @@ export function FactoryProgress({
   };
 
   const getProgressMessage = () => {
-    if (completionPercentage === 100) return "🚀 Ready for launch!";
+    if (hasValidBurnManager)
+      return "🔥 Burn Manager Detected - Deflationary Token Ready!";
+    if (completionPercentage >= 90) return "🚀 Ready for launch!";
     if (completionPercentage >= 75)
-      return "🎨 Customize your token's appearance";
+      return "🎨 Customize your token's appearance and add description";
     if (completionPercentage >= 50)
       return "✨ Add token name and symbol to continue";
     if (tokenInfo.name || tokenInfo.ticker)
@@ -100,7 +113,7 @@ export function FactoryProgress({
   const canAccessTab = (tabId: string) => {
     if (tabId === "info") return true;
     if (tabId === "tokenomics") return true;
-    if (tabId === "preview") return isFormValid;
+    if (tabId === "preview") return true; // Always accessible - users can customize anytime
     return false;
   };
 
@@ -138,20 +151,24 @@ export function FactoryProgress({
               className={`
                 px-4 py-2 text-base font-bold border-2 transition-all duration-500
                 ${
-                  completionPercentage === 100
+                  hasValidBurnManager
+                    ? "bg-orange-500/20 text-orange-400 border-orange-400/50 shadow-orange-400/20 shadow-lg animate-pulse"
+                    : completionPercentage >= 90
                     ? "bg-green-500/20 text-green-400 border-green-400/50 shadow-green-400/20 shadow-lg"
                     : "bg-primary/20 text-primary border-primary/50"
                 }
               `}
             >
-              {completionPercentage}% Complete
+              {hasValidBurnManager
+                ? "🔥 Deflationary"
+                : `${completionPercentage}% Complete`}
             </Badge>
           </motion.div>
         </div>
 
         {/* Progress Bar */}
         <div className="mb-8">
-          <div className="w-full bg-secondary/50 rounded-full h-4 overflow-hidden border border-border/50">
+          <div className="w-full bg-secondary/50 rounded-full h-4 overflow-hidden border border-border/50 relative">
             <motion.div
               className={`h-full bg-gradient-to-r ${getProgressColor()} relative`}
               initial={{ width: 0 }}
@@ -167,30 +184,98 @@ export function FactoryProgress({
                     opacity: [0, 1, 1, 0],
                   }}
                   transition={{
-                    duration: 2.5,
+                    duration: 6,
                     repeat: Infinity,
                     ease: "easeInOut",
                     times: [0, 0.2, 0.8, 1],
                   }}
                 />
               )}
+
+              {/* Burn Animation - only show when burn manager is valid */}
+              {hasValidBurnManager && completionPercentage > 0 && (
+                <>
+                  {/* Flickering flames */}
+                  {[...Array(8)].map((_, i) => (
+                    <motion.div
+                      key={i}
+                      className="absolute top-0 w-1 bg-gradient-to-t from-orange-400 via-red-500 to-yellow-300 rounded-full"
+                      style={{
+                        left: `${10 + i * 10}%`,
+                        height: "120%",
+                        transformOrigin: "bottom",
+                      }}
+                      animate={{
+                        scaleY: [0.8, 1.4, 1.0, 1.2, 0.9],
+                        scaleX: [1, 0.8, 1.2, 0.9, 1],
+                        opacity: [0.6, 1, 0.8, 0.9, 0.7],
+                      }}
+                      transition={{
+                        duration: 1.5 + Math.random() * 0.8,
+                        repeat: Infinity,
+                        delay: i * 0.1,
+                        ease: "easeInOut",
+                      }}
+                    />
+                  ))}
+
+                  {/* Ember particles */}
+                  {[...Array(6)].map((_, i) => (
+                    <motion.div
+                      key={`ember-${i}`}
+                      className="absolute w-1 h-1 bg-orange-400 rounded-full"
+                      style={{
+                        left: `${Math.random() * 80 + 10}%`,
+                        bottom: "100%",
+                      }}
+                      animate={{
+                        y: [-20, -40],
+                        x: [(Math.random() - 0.5) * 20],
+                        opacity: [1, 0],
+                        scale: [1, 0.3],
+                      }}
+                      transition={{
+                        duration: 2 + Math.random(),
+                        repeat: Infinity,
+                        delay: Math.random() * 2,
+                        ease: "easeOut",
+                      }}
+                    />
+                  ))}
+                </>
+              )}
             </motion.div>
           </div>
 
-          {/* Progress Markers */}
+          {/* Progress Markers - Remove specific percentages when burning */}
           <div className="flex justify-between mt-2 px-1">
-            {[0, 25, 50, 75, 100].map((mark) => (
-              <div
-                key={mark}
-                className={`text-xs transition-colors duration-300 ${
-                  completionPercentage >= mark
-                    ? "text-primary font-medium"
-                    : "text-muted-foreground"
-                }`}
-              >
-                {mark}%
-              </div>
-            ))}
+            {hasValidBurnManager
+              ? // Show fire emojis instead of percentages when burning
+                ["🔥", "🔥", "🔥", "🔥", "🔥"].map((emoji, index) => (
+                  <div
+                    key={index}
+                    className={`text-xs transition-colors duration-300 ${
+                      completionPercentage >= index * 25
+                        ? "text-orange-400 font-medium"
+                        : "text-muted-foreground"
+                    }`}
+                  >
+                    {emoji}
+                  </div>
+                ))
+              : // Normal percentage markers
+                [0, 25, 50, 75, 100].map((mark) => (
+                  <div
+                    key={mark}
+                    className={`text-xs transition-colors duration-300 ${
+                      completionPercentage >= mark
+                        ? "text-primary font-medium"
+                        : "text-muted-foreground"
+                    }`}
+                  >
+                    {mark}%
+                  </div>
+                ))}
           </div>
         </div>
 
@@ -367,18 +452,69 @@ export function FactoryProgress({
                 <Target className="h-3 w-3 text-primary" />
               </div>
               <div className="text-sm">
-                <p className="text-foreground font-medium mb-1">💡 Quick Tip</p>
-                <p className="text-muted-foreground">
-                  {!tokenInfo.name &&
-                    !tokenInfo.ticker &&
-                    "Start by giving your token a name and symbol in the Token Details tab."}
-                  {(tokenInfo.name || tokenInfo.ticker) &&
-                    !isFormValid &&
-                    "Complete both token name and symbol to unlock customization options."}
-                  {isFormValid &&
-                    completionPercentage < 100 &&
-                    "Great! Now you can upload images and add descriptions in the Customize tab."}
+                <p className="text-foreground font-medium mb-1">
+                  💡 Quick Tips
                 </p>
+                <div className="text-muted-foreground space-y-2">
+                  {!tokenInfo.name && !tokenInfo.ticker && (
+                    <div>
+                      <p className="mb-1">Getting started:</p>
+                      <ul className="text-xs space-y-1 ml-4">
+                        <li>
+                          • Choose a memorable token name (e.g., "Doge Coin")
+                        </li>
+                        <li>• Pick a 3-8 character symbol (e.g., "DOGE")</li>
+                        <li>
+                          • You can customize images and description anytime
+                        </li>
+                        <li>
+                          • Initial purchase is optional - you can launch
+                          without buying
+                        </li>
+                      </ul>
+                    </div>
+                  )}
+                  {(tokenInfo.name || tokenInfo.ticker) && !isFormValid && (
+                    <div>
+                      <p className="mb-1">Almost there:</p>
+                      <ul className="text-xs space-y-1 ml-4">
+                        <li>
+                          • Complete both token name and symbol to unlock launch
+                        </li>
+                        <li>
+                          • Consider adding a description to explain your
+                          token's purpose
+                        </li>
+                        <li>• Upload an image to make your token stand out</li>
+                      </ul>
+                    </div>
+                  )}
+                  {isFormValid && completionPercentage < 100 && (
+                    <div>
+                      <p className="mb-1">
+                        Ready to launch or keep customizing:
+                      </p>
+                      <ul className="text-xs space-y-1 ml-4">
+                        <li>
+                          • Add a professional image and description for better
+                          appeal
+                        </li>
+                        <li>
+                          • Decide if you want to purchase tokens at launch
+                          (optional)
+                        </li>
+                        <li>
+                          • Review tokenomics - everything is pre-configured for
+                          fairness
+                        </li>
+                        <li>
+                          • Your token will be tradable immediately after
+                          creation
+                        </li>
+                      </ul>
+                    </div>
+                  )}
+                </div>
               </div>
             </div>
           </motion.div>
