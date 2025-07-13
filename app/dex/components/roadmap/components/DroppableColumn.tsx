@@ -1,4 +1,4 @@
-// app/roadmap/components/DroppableColumn.tsx (Tailwind-only version)
+// app/roadmap/components/DroppableColumn.tsx - FIXED: Added droppable zones and sortable functionality
 "use client";
 
 import { Badge } from "@/components/ui/badge";
@@ -6,6 +6,7 @@ import {
   SortableContext,
   verticalListSortingStrategy,
 } from "@dnd-kit/sortable";
+import { useDroppable } from "@dnd-kit/core";
 import { RoadmapItem as RoadmapItemType } from "../types";
 import { RoadmapItem } from "./RoadmapItem";
 
@@ -62,6 +63,15 @@ export function DroppableColumn({
 }: DroppableColumnProps) {
   const config = statusConfig[status];
 
+  // Create droppable zone for the entire column
+  const { setNodeRef, isOver } = useDroppable({
+    id: `droppable-${status}`,
+    data: {
+      type: "column",
+      status: status,
+    },
+  });
+
   return (
     <div className="space-y-4">
       {/* Column Header */}
@@ -79,34 +89,60 @@ export function DroppableColumn({
         </div>
       </div>
 
-      {/* Scrollable Items Container */}
-      <div className="relative">
+      {/* Droppable Items Container */}
+      <div
+        ref={setNodeRef}
+        className={`relative transition-all duration-200 ${
+          isOver
+            ? "ring-2 ring-primary/50 ring-offset-2 ring-offset-background"
+            : ""
+        }`}
+      >
         <div
-          className="min-h-[200px] max-h-[600px] space-y-3 overflow-y-auto pr-1 scrollbar-thin"
+          className={`min-h-[200px] max-h-[600px] space-y-3 overflow-y-auto pr-1 scrollbar-thin rounded-lg transition-all duration-200 p-1 ${
+            isOver ? "bg-primary/5" : ""
+          }`}
           style={scrollbarStyles}
         >
-          <SortableContext
-            items={items.map((item) => item.id)}
-            strategy={verticalListSortingStrategy}
-          >
-            {items.map((item) => (
-              <RoadmapItem
-                key={item.id}
-                item={item}
-                onUpvote={onUpvote}
-                isConnecting={isConnecting}
-                address={address}
-                isExpanded={expandedItemId === item.id}
-                onExpand={onExpand}
-              />
-            ))}
-          </SortableContext>
-
-          {/* Empty State */}
-          {items.length === 0 && (
-            <div className="text-center text-muted-foreground py-8 border-2 border-dashed border-border rounded-lg flex flex-col items-center justify-center h-32">
-              <div className="text-4xl mb-2">📝</div>
-              <p className="text-sm">Drop items here</p>
+          {items.length > 0 ? (
+            <SortableContext
+              items={items.map((item) => item.id)}
+              strategy={verticalListSortingStrategy}
+            >
+              {items.map((item) => (
+                <RoadmapItem
+                  key={item.id}
+                  item={item}
+                  onUpvote={onUpvote}
+                  isConnecting={isConnecting}
+                  address={address}
+                  isExpanded={expandedItemId === item.id}
+                  onExpand={onExpand}
+                />
+              ))}
+            </SortableContext>
+          ) : (
+            /* Enhanced Empty State with Drop Zone */
+            <div
+              className={`text-center text-muted-foreground py-8 border-2 border-dashed rounded-lg flex flex-col items-center justify-center h-48 transition-all duration-200 ${
+                isOver
+                  ? "border-primary bg-primary/10 text-primary"
+                  : "border-border hover:border-border/60"
+              }`}
+            >
+              <div
+                className={`text-4xl mb-2 transition-all duration-200 ${
+                  isOver ? "scale-110" : ""
+                }`}
+              >
+                {isOver ? "👋" : "📝"}
+              </div>
+              <p className="text-sm font-medium">
+                {isOver ? "Drop item here!" : "No items yet"}
+              </p>
+              <p className="text-xs opacity-70 mt-1">
+                {isOver ? "" : "Drag items here or add new ones"}
+              </p>
             </div>
           )}
         </div>
