@@ -1,9 +1,10 @@
+// components/WalletConnector.tsx
 "use client";
 
 import { useState } from "react";
 import { motion } from "framer-motion";
 import { Button } from "@/components/ui/button";
-import { Loader2 } from "lucide-react";
+import { Loader2, Zap } from "lucide-react";
 import {
   Card,
   CardHeader,
@@ -26,7 +27,6 @@ interface WalletConnectorProps {
 
 // Function to get proper wallet name from connector
 function getWalletName(connector: Connector): string {
-  // Since the connectors already have correct names, just return them
   return connector.name || connector.id;
 }
 
@@ -37,28 +37,19 @@ export function WalletConnector({
 }: WalletConnectorProps) {
   const [hoveredIndex, setHoveredIndex] = useState<number | null>(null);
 
-  // Debug logging
-  console.log("WalletConnector received connectors:", connectors);
-  connectors?.forEach((c, i) => {
-    console.log(
-      `Connector ${i}: id="${c.id}", name="${
-        c.name
-      }", getWalletName="${getWalletName(c)}"`
-    );
-  });
-
   return (
     <Card className="w-full max-w-md mx-auto">
       <CardHeader>
-        <CardTitle>Connect Your Wallet</CardTitle>
+        <CardTitle className="flex items-center gap-2">
+          Connect Your Wallet
+          <Zap className="h-5 w-5 text-primary" />
+        </CardTitle>
         <CardDescription>
-          Choose a wallet to connect to this app
+          Choose a wallet to connect. You'll be automatically switched to
+          Avalanche Fuji Testnet.
         </CardDescription>
       </CardHeader>
       <CardContent>
-        <div className="mb-4 text-xs text-red-500">
-          DEBUG: WalletConnector component is rendering
-        </div>
         <motion.div
           className="grid gap-4 md:grid-cols-2 lg:grid-cols-3"
           initial={{ opacity: 0, y: 20 }}
@@ -91,25 +82,46 @@ export function WalletConnector({
                   transition={{ duration: 0.3 }}
                 />
                 <motion.div
-                  className="flex items-center justify-center space-x-2"
+                  className="flex flex-col items-center justify-center space-y-1"
                   initial={{ y: 0 }}
                   animate={{ y: isLoading ? -30 : 0 }}
                   transition={{ duration: 0.3 }}
                 >
-                  <span>{getWalletName(connector)}</span>
+                  <span className="font-medium">
+                    {getWalletName(connector)}
+                  </span>
+                  <span className="text-xs text-muted-foreground">
+                    + Auto Network Switch
+                  </span>
                 </motion.div>
                 <motion.div
-                  className="absolute inset-0 flex items-center justify-center"
+                  className="absolute inset-0 flex flex-col items-center justify-center"
                   initial={{ y: 30 }}
                   animate={{ y: isLoading ? 0 : 30 }}
                   transition={{ duration: 0.3 }}
                 >
-                  {/* <Loader2 className="w-6 h-6 animate-spin" /> */}
+                  <Loader2 className="w-6 h-6 animate-spin" />
+                  <span className="text-xs mt-1">Connecting...</span>
                 </motion.div>
               </Button>
             </motion.div>
           ))}
         </motion.div>
+
+        {/* Network Info */}
+        <div className="mt-4 p-3 bg-primary/5 border border-primary/20 rounded-lg">
+          <div className="flex items-center gap-2 text-sm">
+            <div className="w-2 h-2 bg-primary rounded-full" />
+            <span className="text-primary font-medium">Target Network:</span>
+            <span className="text-muted-foreground">
+              Avalanche Fuji Testnet
+            </span>
+          </div>
+          <p className="text-xs text-muted-foreground mt-1">
+            Your wallet will automatically switch to the correct network after
+            connection.
+          </p>
+        </div>
       </CardContent>
     </Card>
   );
