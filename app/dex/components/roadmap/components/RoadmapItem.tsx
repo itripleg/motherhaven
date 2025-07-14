@@ -1,4 +1,4 @@
-// app/roadmap/components/RoadmapItem.tsx
+// app/dex/components/roadmap/components/RoadmapItem.tsx - FIXED: Pass collection to CommentsSection
 "use client";
 
 import * as React from "react";
@@ -19,6 +19,8 @@ interface RoadmapItemProps {
   isExpanded: boolean;
   onExpand: (itemId: string | null) => void;
   isDragging?: boolean;
+  // NEW: Support for different collections
+  collection?: "roadmap" | "tokenRoadmapItems";
 }
 
 export function RoadmapItem({
@@ -29,6 +31,7 @@ export function RoadmapItem({
   isExpanded,
   onExpand,
   isDragging = false,
+  collection = "roadmap", // Default to global roadmap
 }: RoadmapItemProps) {
   const {
     attributes,
@@ -125,6 +128,7 @@ export function RoadmapItem({
                   comments={item.comments || []}
                   address={address}
                   isConnecting={isConnecting}
+                  collection={collection}
                 />
               </motion.div>
             )}

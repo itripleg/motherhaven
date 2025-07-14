@@ -1,4 +1,4 @@
-// app/dex/components/roadmap/TokenRoadmap.tsx
+// app/dex/components/roadmap/components/TokenRoadmap.tsx - COMPLETE: Fixed collection support
 "use client";
 
 import * as React from "react";
@@ -352,33 +352,16 @@ export function TokenRoadmap({
                       </h4>
                       <div className="space-y-2">
                         {statusItems.map((item) => (
-                          <div
+                          <RoadmapItem
                             key={item.id}
-                            className="text-xs p-2 bg-background/30 rounded border border-border/20 hover:bg-background/50 transition-colors"
-                          >
-                            <div className="flex items-center justify-between">
-                              <span className="text-foreground font-medium line-clamp-1">
-                                {item.title}
-                              </span>
-                              <button
-                                onClick={() => handleUpvote(item.id)}
-                                disabled={!address}
-                                className="flex items-center gap-1 text-muted-foreground hover:text-primary transition-colors disabled:opacity-50"
-                              >
-                                <span>
-                                  {Array.isArray(item.upvotes)
-                                    ? item.upvotes.length
-                                    : 0}
-                                </span>
-                                <span>👍</span>
-                              </button>
-                            </div>
-                            {item.notes && (
-                              <p className="text-muted-foreground text-xs mt-1 line-clamp-2">
-                                {item.notes}
-                              </p>
-                            )}
-                          </div>
+                            item={item}
+                            onUpvote={handleUpvote}
+                            isConnecting={isConnecting}
+                            address={address}
+                            isExpanded={expandedItemId === item.id}
+                            onExpand={setExpandedItemId}
+                            collection="tokenRoadmapItems"
+                          />
                         ))}
                       </div>
                     </div>
@@ -396,6 +379,7 @@ export function TokenRoadmap({
                     isExpanded={false}
                     onExpand={() => {}}
                     isDragging={true}
+                    collection="tokenRoadmapItems"
                   />
                 ) : null}
               </DragOverlay>
@@ -467,6 +451,7 @@ export function TokenRoadmap({
               address={address}
               expandedItemId={expandedItemId}
               onExpand={setExpandedItemId}
+              collection="tokenRoadmapItems"
             />
           ))}
         </div>
@@ -481,6 +466,7 @@ export function TokenRoadmap({
               isExpanded={false}
               onExpand={() => {}}
               isDragging={true}
+              collection="tokenRoadmapItems"
             />
           ) : null}
         </DragOverlay>

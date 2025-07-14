@@ -24,12 +24,28 @@ interface WalletConnectorProps {
   isLoading: boolean;
 }
 
+// Function to get proper wallet name from connector
+function getWalletName(connector: Connector): string {
+  // Since the connectors already have correct names, just return them
+  return connector.name || connector.id;
+}
+
 export function WalletConnector({
   connectors,
   onConnect,
   isLoading,
 }: WalletConnectorProps) {
   const [hoveredIndex, setHoveredIndex] = useState<number | null>(null);
+
+  // Debug logging
+  console.log("WalletConnector received connectors:", connectors);
+  connectors?.forEach((c, i) => {
+    console.log(
+      `Connector ${i}: id="${c.id}", name="${
+        c.name
+      }", getWalletName="${getWalletName(c)}"`
+    );
+  });
 
   return (
     <Card className="w-full max-w-md mx-auto">
@@ -40,6 +56,9 @@ export function WalletConnector({
         </CardDescription>
       </CardHeader>
       <CardContent>
+        <div className="mb-4 text-xs text-red-500">
+          DEBUG: WalletConnector component is rendering
+        </div>
         <motion.div
           className="grid gap-4 md:grid-cols-2 lg:grid-cols-3"
           initial={{ opacity: 0, y: 20 }}
@@ -77,10 +96,7 @@ export function WalletConnector({
                   animate={{ y: isLoading ? -30 : 0 }}
                   transition={{ duration: 0.3 }}
                 >
-                  {connector.icon && (
-                    <span className="mr-2">{connector.icon}</span>
-                  )}
-                  <span>{connector.name}</span>
+                  <span>{getWalletName(connector)}</span>
                 </motion.div>
                 <motion.div
                   className="absolute inset-0 flex items-center justify-center"

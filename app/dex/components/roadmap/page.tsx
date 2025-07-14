@@ -1,4 +1,4 @@
-// app/roadmap/page.tsx
+// app/dex/components/roadmap/page.tsx - COMPLETE: Fixed collection support
 "use client";
 
 import * as React from "react";
@@ -365,6 +365,7 @@ export default function Roadmap() {
                         address={address}
                         expandedItemId={expandedItemId}
                         onExpand={setExpandedItemId}
+                        collection="roadmap"
                       />
                     </motion.div>
                   );
@@ -384,6 +385,7 @@ export default function Roadmap() {
                       isExpanded={false}
                       onExpand={() => {}}
                       isDragging={true}
+                      collection="roadmap"
                     />
                   </div>
                 ) : (
@@ -395,6 +397,7 @@ export default function Roadmap() {
                     isExpanded={false}
                     onExpand={() => {}}
                     isDragging={true}
+                    collection="roadmap"
                   />
                 )
               ) : null}

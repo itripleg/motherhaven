@@ -7,7 +7,13 @@ import { type Address } from "viem";
 import { Button } from "@/components/ui/button";
 import { toast } from "@/hooks/use-toast";
 import { WalletConnector } from "./WalletConnector";
-import { Sheet, SheetContent, SheetTrigger } from "@/components/ui/sheet";
+import {
+  Sheet,
+  SheetContent,
+  SheetTrigger,
+  SheetTitle,
+  SheetDescription,
+} from "@/components/ui/sheet";
 
 interface ConnectButtonProps {
   size?: "default" | "sm" | "lg" | "icon";
@@ -116,7 +122,11 @@ export function ConnectButton({
           {isConnecting ? "Connecting..." : "Connect Wallet"}
         </Button>
       </SheetTrigger>
-      <SheetContent>
+      <SheetContent className="z-[120]">
+        <SheetTitle className="sr-only">Connect Wallet</SheetTitle>
+        <SheetDescription className="sr-only">
+          Choose a wallet to connect to this application
+        </SheetDescription>
         <WalletConnector
           connectors={connectors}
           onConnect={handleConnect}

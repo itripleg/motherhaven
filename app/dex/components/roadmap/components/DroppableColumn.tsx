@@ -1,4 +1,4 @@
-// app/roadmap/components/DroppableColumn.tsx - FIXED: Added droppable zones and sortable functionality
+// app/dex/components/roadmap/components/DroppableColumn.tsx - COMPLETE: Added collection support
 "use client";
 
 import { Badge } from "@/components/ui/badge";
@@ -18,6 +18,7 @@ interface DroppableColumnProps {
   address?: string;
   expandedItemId: string | null;
   onExpand: (itemId: string | null) => void;
+  collection?: "roadmap" | "tokenRoadmapItems";
 }
 
 const statusConfig = {
@@ -60,6 +61,7 @@ export function DroppableColumn({
   address,
   expandedItemId,
   onExpand,
+  collection = "roadmap",
 }: DroppableColumnProps) {
   const config = statusConfig[status];
 
@@ -118,6 +120,7 @@ export function DroppableColumn({
                   address={address}
                   isExpanded={expandedItemId === item.id}
                   onExpand={onExpand}
+                  collection={collection}
                 />
               ))}
             </SortableContext>

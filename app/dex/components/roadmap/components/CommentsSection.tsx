@@ -1,4 +1,4 @@
-// app/roadmap/components/CommentsSection.tsx
+// app/dex/components/roadmap/components/CommentsSection.tsx - FIXED: Support both roadmap collections
 "use client";
 
 import * as React from "react";
@@ -15,6 +15,8 @@ interface CommentsSectionProps {
   comments: Comment[];
   address?: string;
   isConnecting: boolean;
+  // NEW: Specify which collection this item belongs to
+  collection?: "roadmap" | "tokenRoadmapItems";
 }
 
 const COMMENT_LIMIT = 100; // Character limit for comments
@@ -25,6 +27,7 @@ export function CommentsSection({
   comments,
   address,
   isConnecting,
+  collection = "roadmap", // Default to global roadmap for backward compatibility
 }: CommentsSectionProps) {
   const [newComment, setNewComment] = React.useState("");
   const [isSubmitting, setIsSubmitting] = React.useState(false);
@@ -77,7 +80,8 @@ export function CommentsSection({
         timestamp: new Date().toISOString(),
       };
 
-      const itemRef = doc(db, "roadmap", itemId);
+      // FIXED: Use the correct collection based on the prop
+      const itemRef = doc(db, collection, itemId);
       await updateDoc(itemRef, {
         comments: arrayUnion(comment),
       });
@@ -89,11 +93,37 @@ export function CommentsSection({
       });
     } catch (error) {
       console.error("Error adding comment:", error);
-      toast({
-        title: "Error",
-        description: "Failed to add comment. Please try again.",
-        variant: "destructive",
-      });
+
+      // Enhanced error handling for debugging
+      if (error instanceof Error) {
+        console.error("Error details:", {
+          message: error.message,
+          collection,
+          itemId,
+          documentPath: `${collection}/${itemId}`,
+        });
+
+        // Provide more specific error messages
+        if (error.message.includes("No document to update")) {
+          toast({
+            title: "Document Error",
+            description: `The roadmap item was not found in ${collection}. Please refresh the page.`,
+            variant: "destructive",
+          });
+        } else {
+          toast({
+            title: "Error",
+            description: "Failed to add comment. Please try again.",
+            variant: "destructive",
+          });
+        }
+      } else {
+        toast({
+          title: "Error",
+          description: "Failed to add comment. Please try again.",
+          variant: "destructive",
+        });
+      }
     } finally {
       setIsSubmitting(false);
     }
@@ -201,6 +231,13 @@ export function CommentsSection({
             {comments.length}/{MAX_COMMENTS_PER_ITEM} comments
           </span>
         </div>
+
+        {/* Debug info in development */}
+        {process.env.NODE_ENV === "development" && (
+          <div className="text-xs text-muted-foreground/50 bg-background/20 p-2 rounded">
+            Collection: {collection} | Item ID: {itemId}
+          </div>
+        )}
       </motion.div>
     </div>
   );
