@@ -172,44 +172,17 @@ export function NetworkGuard({ children }: NetworkGuardProps) {
     <>
       {children}
 
-      {/* Debug Panel - Development only */}
-      {/* {process.env.NODE_ENV === "development" && (
-        <div className="fixed bottom-4 left-4 max-w-xs z-40 bg-black/80 text-white p-3 rounded-lg text-xs font-mono">
-          <div className="mb-2 font-bold">Network Debug:</div>
-          <div className="space-y-1">
-            <div>Connected: {isConnected ? "✅" : "❌"}</div>
-            <div>
-              Wagmi: {wagmiChainId ? getNetworkName(wagmiChainId) : "None"}
-            </div>
-            <div>
-              Wallet:{" "}
-              {actualWalletChainId
-                ? getNetworkName(actualWalletChainId)
-                : "None"}
-            </div>
-            <div>
-              Effective:{" "}
-              {effectiveChainId ? getNetworkName(effectiveChainId) : "None"}
-            </div>
-            <div>Required: {REQUIRED_NETWORK_NAME}</div>
-            <div className={isWrongNetwork ? "text-red-400" : "text-green-400"}>
-              Status: {isWrongNetwork ? "❌ Wrong" : "✅ Correct"}
-            </div>
-          </div>
-        </div>
-      )} */}
-
-      {/* Wrong Network Banner */}
+      {/* Wrong Network Banner - Right Side */}
       <AnimatePresence>
         {showBanner && isConnected && (
           <motion.div
-            initial={{ opacity: 0, y: -100 }}
-            animate={{ opacity: 1, y: 0 }}
-            exit={{ opacity: 0, y: -100 }}
+            initial={{ opacity: 0, x: 100 }}
+            animate={{ opacity: 1, x: 0 }}
+            exit={{ opacity: 0, x: 100 }}
             transition={{ duration: 0.5, ease: "easeInOut" }}
-            className="fixed top-20 left-4 right-4 z-50 flex justify-center pointer-events-none"
+            className="fixed top-20 right-4 z-50 pointer-events-none max-w-sm"
           >
-            <Card className="max-w-md w-full bg-yellow-500/10 border-yellow-500/30 backdrop-blur-md shadow-xl pointer-events-auto">
+            <Card className="w-full bg-yellow-500/10 border-yellow-500/30 backdrop-blur-md shadow-xl pointer-events-auto">
               <CardContent className="p-4">
                 <div className="flex items-start gap-3">
                   <AlertTriangle className="h-5 w-5 text-yellow-500 mt-0.5 flex-shrink-0" />
@@ -218,8 +191,8 @@ export function NetworkGuard({ children }: NetworkGuardProps) {
                       Wrong Network
                     </h3>
                     <p className="text-xs text-muted-foreground mb-3">
-                      You&apos;re on {getNetworkName(effectiveChainId)}. Switch
-                      to {REQUIRED_NETWORK_NAME} to use all features.
+                      You're on {getNetworkName(effectiveChainId)}. Switch to{" "}
+                      {REQUIRED_NETWORK_NAME} to use all features.
                     </p>
                     <div className="flex items-center gap-2">
                       <Button
