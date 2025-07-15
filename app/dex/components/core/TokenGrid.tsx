@@ -1,4 +1,4 @@
-// app/dex/components/tokens/TokenGrid.tsx
+// app/dex/components/core/TokenGrid.tsx - Fixed for mobile scrolling
 import { motion } from "framer-motion";
 import { TokenCard } from "./TokenCard";
 import { Token } from "@/types";
@@ -53,10 +53,21 @@ export const TokenGrid = ({ tokens, gridLayout = 3 }: TokenGridProps) => {
   // Get layout configuration
   const config = LAYOUT_CONFIG[gridLayout];
 
-  // Calculate container styles for breakout layouts (4 & 5 columns)
+  // Calculate container styles for breakout layouts (4 & 5 columns) - MOBILE AWARE
   const getContainerStyles = (): React.CSSProperties => {
-    if (gridLayout === 3) return { overflow: "visible", position: "relative" };
+    // Always use responsive layout on mobile regardless of gridLayout setting
+    const isMobile = typeof window !== "undefined" && window.innerWidth < 1024; // lg breakpoint
 
+    if (gridLayout === 3 || isMobile) {
+      return {
+        overflow: "visible",
+        position: "relative",
+        maxWidth: "100%",
+        width: "100%",
+      };
+    }
+
+    // Desktop breakout layout for 4 & 5 columns
     const totalWidth =
       config.cardWidth * gridLayout + config.gap * (gridLayout - 1) + 80; // 80px padding
     return {
@@ -69,9 +80,13 @@ export const TokenGrid = ({ tokens, gridLayout = 3 }: TokenGridProps) => {
     };
   };
 
-  // Get grid styles
+  // Get grid styles - MOBILE AWARE
   const getGridStyles = (): React.CSSProperties => {
-    if (gridLayout === 3) return {};
+    const isMobile = typeof window !== "undefined" && window.innerWidth < 1024;
+
+    if (gridLayout === 3 || isMobile) {
+      return {};
+    }
 
     return {
       gridTemplateColumns: `repeat(${gridLayout}, ${config.cardWidth}px)`,
@@ -81,17 +96,19 @@ export const TokenGrid = ({ tokens, gridLayout = 3 }: TokenGridProps) => {
     };
   };
 
-  // Apply masking for 3-column layout after transition
+  // Apply masking for 3-column layout after transition - MOBILE AWARE
   const shouldApplyMask = gridLayout === 3 && !isTransitioning;
-  const maskStyles = shouldApplyMask
-    ? {
-        maskImage:
-          "linear-gradient(to bottom, rgb(0, 0, 0) 0%, rgb(0, 0, 0) 92%, transparent 100%)",
-        WebkitMaskImage:
-          "linear-gradient(to bottom, rgb(0, 0, 0) 0%, rgb(0, 0, 0) 92%, transparent 100%)",
-        maxHeight: "80vh",
-      }
-    : {};
+  const isMobile = typeof window !== "undefined" && window.innerWidth < 1024;
+  const maskStyles =
+    shouldApplyMask && !isMobile
+      ? {
+          maskImage:
+            "linear-gradient(to bottom, rgb(0, 0, 0) 0%, rgb(0, 0, 0) 92%, transparent 100%)",
+          WebkitMaskImage:
+            "linear-gradient(to bottom, rgb(0, 0, 0) 0%, rgb(0, 0, 0) 92%, transparent 100%)",
+          maxHeight: "80vh",
+        }
+      : {};
 
   // Loading state
   if (isLoading && Object.keys(prices).length === 0) {

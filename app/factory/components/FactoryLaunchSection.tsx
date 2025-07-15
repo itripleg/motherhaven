@@ -53,7 +53,7 @@ interface FactoryLaunchSectionProps {
   };
   transactionData: string | undefined;
   onLaunch: () => void;
-  onRetry?: () => void; // Add retry function
+  onRetry?: () => void;
 }
 
 export function FactoryLaunchSection({
@@ -72,32 +72,19 @@ export function FactoryLaunchSection({
 }: FactoryLaunchSectionProps) {
   const buttonRef = useRef<HTMLButtonElement>(null);
   const containerRef = useRef<HTMLDivElement>(null);
-  const flamesRef = useRef<HTMLDivElement>(null);
-  const pulseRef = useRef<HTMLDivElement>(null);
 
-  // Enhanced ready-to-launch animations
+  // Simplified ready-to-launch animations - only when ready
   useEffect(() => {
     if (isFormValid && !isCreating && !isPending && !isConfirming && !error) {
       const button = buttonRef.current;
       const container = containerRef.current;
-      const flames = flamesRef.current;
-      const pulse = pulseRef.current;
 
       if (button) {
-        // Breathing glow effect
+        // Gentle glow effect
         gsap.to(button, {
           boxShadow:
-            "0 0 40px rgba(var(--primary-rgb), 0.6), 0 0 80px rgba(var(--primary-rgb), 0.3)",
+            "0 0 20px rgba(var(--primary-rgb), 0.4), 0 0 40px rgba(var(--primary-rgb), 0.2)",
           duration: 2,
-          ease: "sine.inOut",
-          repeat: -1,
-          yoyo: true,
-        });
-
-        // Subtle scale pulse
-        gsap.to(button, {
-          scale: 1.02,
-          duration: 3,
           ease: "sine.inOut",
           repeat: -1,
           yoyo: true,
@@ -105,9 +92,9 @@ export function FactoryLaunchSection({
       }
 
       if (container) {
-        // Container border animation
+        // Subtle border animation
         gsap.to(container, {
-          borderColor: "rgba(var(--primary-rgb), 0.5)",
+          borderColor: "rgba(var(--primary-rgb), 0.4)",
           duration: 2.5,
           ease: "sine.inOut",
           repeat: -1,
@@ -115,26 +102,9 @@ export function FactoryLaunchSection({
         });
       }
 
-      if (pulse) {
-        // Pulse rings
-        gsap.fromTo(
-          pulse.children,
-          { scale: 0, opacity: 0.8 },
-          {
-            scale: 3,
-            opacity: 0,
-            duration: 2,
-            ease: "power2.out",
-            stagger: 0.3,
-            repeat: -1,
-          }
-        );
-      }
-
       return () => {
         if (button) gsap.killTweensOf(button);
         if (container) gsap.killTweensOf(container);
-        if (pulse) gsap.killTweensOf(pulse);
       };
     }
   }, [isFormValid, isCreating, isPending, isConfirming, error]);
@@ -145,10 +115,8 @@ export function FactoryLaunchSection({
   ): { title: string; message: string; code?: string } => {
     if (!error) return { title: "", message: "" };
 
-    // Type-safe error parsing using 'any' to access dynamic properties
     const errorObj = error as any;
 
-    // Handle different error types
     if (typeof error === "string") {
       return {
         title: "Transaction Failed",
@@ -156,7 +124,6 @@ export function FactoryLaunchSection({
       };
     }
 
-    // Wagmi/Viem error structure
     if (errorObj?.cause?.reason) {
       return {
         title: "Smart Contract Error",
@@ -185,7 +152,6 @@ export function FactoryLaunchSection({
       let message = errorObj.message;
       let title = "Transaction Failed";
 
-      // Common error patterns
       if (message.includes("insufficient funds")) {
         title = "Insufficient Funds";
         message = "You don't have enough AVAX to complete this transaction.";
@@ -213,7 +179,6 @@ export function FactoryLaunchSection({
       };
     }
 
-    // Fallback for unknown errors
     return {
       title: "Unknown Error",
       message: "An unexpected error occurred. Please try again.",
@@ -224,32 +189,32 @@ export function FactoryLaunchSection({
   const getButtonState = () => {
     if (uploadingImage)
       return {
-        text: "Uploading Image...",
-        icon: Upload,
+        text: "Uploading...",
+        icon: null,
         disabled: true,
         variant: "loading",
         description: "Preparing your token's visual identity",
       };
     if (isCreating)
       return {
-        text: "Creating Token...",
-        icon: Flame,
+        text: "Deploying...",
+        icon: null,
         disabled: true,
         variant: "loading",
         description: "Forging your token on the blockchain",
       };
     if (isPending)
       return {
-        text: "Transaction Pending...",
-        icon: Clock,
+        text: "Submitting...",
+        icon: null,
         disabled: true,
         variant: "loading",
         description: "Waiting for blockchain confirmation",
       };
     if (isConfirming)
       return {
-        text: "Confirming...",
-        icon: Zap,
+        text: "Finalizing...",
+        icon: null,
         disabled: true,
         variant: "loading",
         description: "Almost there! Final confirmation in progress",
@@ -308,73 +273,15 @@ export function FactoryLaunchSection({
             : "border-border/30"
         }`}
       >
-        <CardContent className="p-8 relative z-10">
+        <CardContent className="p-4 md:p-8 relative z-10">
           {/* Success State */}
           {receipt ? (
             <motion.div
               initial={{ opacity: 0, y: 20, scale: 0.95 }}
               animate={{ opacity: 1, y: 0, scale: 1 }}
               transition={{ type: "spring", stiffness: 100 }}
-              className="text-center space-y-8"
+              className="text-center space-y-6"
             >
-              {/* Celebration Effects */}
-              <div className="absolute inset-0 pointer-events-none overflow-hidden">
-                {/* Confetti */}
-                {[...Array(20)].map((_, i) => (
-                  <motion.div
-                    key={i}
-                    className="absolute w-2 h-2 rounded"
-                    style={{
-                      backgroundColor: [
-                        "#3b82f6",
-                        "#10b981",
-                        "#f59e0b",
-                        "#ef4444",
-                        "#8b5cf6",
-                      ][i % 5],
-                      left: `${Math.random() * 100}%`,
-                      top: `-10px`,
-                    }}
-                    animate={{
-                      y: [0, 400],
-                      x: [(Math.random() - 0.5) * 200],
-                      rotate: [0, 360],
-                      opacity: [1, 0],
-                    }}
-                    transition={{
-                      duration: 3 + Math.random() * 2,
-                      delay: Math.random() * 2,
-                      ease: "easeOut",
-                    }}
-                  />
-                ))}
-
-                {/* Golden sparkles */}
-                {[...Array(15)].map((_, i) => (
-                  <motion.div
-                    key={`sparkle-${i}`}
-                    className="absolute text-yellow-400"
-                    style={{
-                      left: `${Math.random() * 100}%`,
-                      top: `${Math.random() * 100}%`,
-                    }}
-                    animate={{
-                      scale: [0, 1, 0],
-                      rotate: [0, 180],
-                      opacity: [0, 1, 0],
-                    }}
-                    transition={{
-                      duration: 2,
-                      delay: Math.random() * 3,
-                      repeat: Infinity,
-                      repeatDelay: Math.random() * 4,
-                    }}
-                  >
-                    ✨
-                  </motion.div>
-                ))}
-              </div>
-
               {/* Success Header */}
               <div className="relative">
                 <motion.div
@@ -387,7 +294,7 @@ export function FactoryLaunchSection({
                     initial={{ y: 20, opacity: 0 }}
                     animate={{ y: 0, opacity: 1 }}
                     transition={{ delay: 0.3 }}
-                    className="text-4xl font-bold text-foreground mb-2"
+                    className="text-2xl md:text-4xl font-bold text-foreground mb-2"
                   >
                     🎉 Token Created! 🎉
                   </motion.h3>
@@ -395,12 +302,11 @@ export function FactoryLaunchSection({
                     initial={{ y: 20, opacity: 0 }}
                     animate={{ y: 0, opacity: 1 }}
                     transition={{ delay: 0.4 }}
-                    className="text-muted-foreground text-lg mb-6"
+                    className="text-muted-foreground text-base md:text-lg mb-6"
                   >
                     Your token is now live and trading!
                   </motion.p>
 
-                  {/* View on DEX Button */}
                   <motion.div
                     initial={{ y: 20, opacity: 0 }}
                     animate={{ y: 0, opacity: 1 }}
@@ -408,16 +314,15 @@ export function FactoryLaunchSection({
                   >
                     <Button
                       onClick={() => {
-                        // Extract token address from receipt logs if available
                         const tokenAddress =
                           receipt?.logs?.[0]?.address || transactionData;
                         if (tokenAddress) {
                           window.open(`/dex/${tokenAddress}`, "_blank");
                         }
                       }}
-                      className="btn-primary px-8 py-3 text-lg font-semibold rounded-xl shadow-lg hover:shadow-xl transition-all duration-300 group"
+                      className="btn-primary px-6 md:px-8 py-3 text-base md:text-lg font-semibold rounded-xl shadow-lg hover:shadow-xl transition-all duration-300 group w-full md:w-auto"
                     >
-                      <div className="flex items-center gap-3">
+                      <div className="flex items-center justify-center gap-3">
                         <span>View on DEX</span>
                         <motion.div
                           animate={{ x: [0, 4, 0] }}
@@ -436,14 +341,14 @@ export function FactoryLaunchSection({
                 initial={{ opacity: 0, y: 20 }}
                 animate={{ opacity: 1, y: 0 }}
                 transition={{ delay: 0.6 }}
-                className="grid grid-cols-1 lg:grid-cols-2 gap-6"
+                className="grid grid-cols-1 lg:grid-cols-2 gap-4 md:gap-6"
               >
-                <div className="unified-card border-primary/30 bg-primary/10 p-6">
-                  <h4 className="text-lg font-semibold text-foreground flex items-center gap-2 mb-4">
+                <div className="unified-card border-primary/30 bg-primary/10 p-4 md:p-6">
+                  <h4 className="text-base md:text-lg font-semibold text-foreground flex items-center gap-2 mb-4">
                     <CheckCircle className="h-5 w-5 text-primary" />
                     Token Details
                   </h4>
-                  <div className="space-y-3">
+                  <div className="space-y-2 md:space-y-3">
                     {[
                       { label: "Name", value: tokenInfo.name },
                       { label: "Symbol", value: tokenInfo.ticker },
@@ -456,10 +361,10 @@ export function FactoryLaunchSection({
                         key={item.label}
                         className="flex justify-between items-center py-2 border-b border-primary/20 last:border-0"
                       >
-                        <span className="text-muted-foreground">
+                        <span className="text-muted-foreground text-sm md:text-base">
                           {item.label}:
                         </span>
-                        <span className="font-medium text-foreground">
+                        <span className="font-medium text-foreground text-sm md:text-base">
                           {item.value}
                         </span>
                       </div>
@@ -467,12 +372,12 @@ export function FactoryLaunchSection({
                   </div>
                 </div>
 
-                <div className="unified-card border-primary/30 bg-primary/10 p-6">
-                  <h4 className="text-lg font-semibold text-foreground flex items-center gap-2 mb-4">
+                <div className="unified-card border-primary/30 bg-primary/10 p-4 md:p-6">
+                  <h4 className="text-base md:text-lg font-semibold text-foreground flex items-center gap-2 mb-4">
                     <Target className="h-5 w-5 text-primary" />
                     Economics
                   </h4>
-                  <div className="space-y-3">
+                  <div className="space-y-2 md:space-y-3">
                     {[
                       {
                         label: "Funding Goal",
@@ -491,10 +396,10 @@ export function FactoryLaunchSection({
                         key={item.label}
                         className="flex justify-between items-center py-2 border-b border-primary/20 last:border-0"
                       >
-                        <span className="text-muted-foreground">
+                        <span className="text-muted-foreground text-sm md:text-base">
                           {item.label}:
                         </span>
-                        <span className="font-medium text-foreground">
+                        <span className="font-medium text-foreground text-sm md:text-base">
                           {item.value}
                         </span>
                       </div>
@@ -508,11 +413,11 @@ export function FactoryLaunchSection({
                   initial={{ opacity: 0 }}
                   animate={{ opacity: 1 }}
                   transition={{ delay: 0.8 }}
-                  className="unified-card border-primary/30 bg-primary/5 p-4"
+                  className="unified-card border-primary/30 bg-primary/5 p-3 md:p-4"
                 >
-                  <div className="flex items-center justify-center gap-3">
+                  <div className="flex items-center justify-center gap-3 flex-wrap">
                     <Zap className="h-4 w-4 text-primary" />
-                    <span className="text-sm text-muted-foreground">
+                    <span className="text-xs md:text-sm text-muted-foreground">
                       Transaction Hash:
                     </span>
                     <AddressComponent hash={transactionData} type="tx" />
@@ -522,172 +427,25 @@ export function FactoryLaunchSection({
             </motion.div>
           ) : (
             /* Launch Interface */
-            <div className="text-center space-y-8 relative">
-              {/* Background Effects */}
-              <div className="absolute inset-0 pointer-events-none overflow-hidden rounded-xl">
-                {/* Ready State: Rocket Flames and Energy */}
-                {isFormValid &&
-                  !isCreating &&
-                  !isPending &&
-                  !isConfirming &&
-                  !error && (
-                    <>
-                      {/* Rocket Flames at Bottom */}
-                      <div
-                        ref={flamesRef}
-                        className="absolute bottom-0 left-1/2 transform -translate-x-1/2 w-32 h-16"
-                      >
-                        {[...Array(8)].map((_, i) => (
-                          <motion.div
-                            key={i}
-                            className="absolute bottom-0"
-                            style={{
-                              left: `${10 + i * 12}%`,
-                              width: "8px",
-                              height: "24px",
-                            }}
-                            animate={{
-                              height: [16, 32, 20, 28, 16],
-                              opacity: [0.6, 1, 0.8, 0.9, 0.7],
-                              scaleX: [0.8, 1.2, 1.0, 1.1, 0.9],
-                            }}
-                            transition={{
-                              duration: 1.2 + Math.random() * 0.6,
-                              repeat: Infinity,
-                              delay: i * 0.1,
-                              ease: "easeInOut",
-                            }}
-                          >
-                            <div className="w-full h-full bg-gradient-to-t from-orange-500 via-red-500 to-yellow-400 rounded-full blur-[0.5px]" />
-                          </motion.div>
-                        ))}
-                      </div>
-
-                      {/* Energy Pulses */}
-                      <div
-                        ref={pulseRef}
-                        className="absolute inset-0 flex items-center justify-center"
-                      >
-                        {[...Array(3)].map((_, i) => (
-                          <div
-                            key={i}
-                            className="absolute w-4 h-4 border-2 border-primary/30 rounded-full"
-                          />
-                        ))}
-                      </div>
-
-                      {/* Floating Icons */}
-                      {[
-                        {
-                          Icon: Star,
-                          position: "top-1/4 left-1/4",
-                          delay: 0,
-                          animation: "spin",
-                        },
-                        {
-                          Icon: Coins,
-                          position: "top-1/3 right-1/4",
-                          delay: 0.5,
-                          animation: "float",
-                        },
-                        {
-                          Icon: Crown,
-                          position: "bottom-1/3 left-1/5",
-                          delay: 1,
-                          animation: "pulse",
-                        },
-                        {
-                          Icon: TrendingUp,
-                          position: "bottom-1/4 right-1/3",
-                          delay: 1.5,
-                          animation: "float",
-                        },
-                      ].map(({ Icon, position, delay, animation }, i) => (
-                        <motion.div
-                          key={i}
-                          className={`absolute ${position} opacity-20`}
-                          animate={
-                            animation === "spin"
-                              ? { rotate: [0, 360] }
-                              : animation === "pulse"
-                              ? { scale: [1, 1.3, 1] }
-                              : { y: [-5, 5, -5], rotate: [0, 10, -10, 0] }
-                          }
-                          transition={{
-                            duration:
-                              animation === "spin"
-                                ? 6
-                                : animation === "pulse"
-                                ? 2
-                                : 3 + Math.random(),
-                            repeat: Infinity,
-                            delay,
-                            ease: animation === "spin" ? "linear" : "easeInOut",
-                          }}
-                        >
-                          <Icon className="h-6 w-6 text-primary" />
-                        </motion.div>
-                      ))}
-                    </>
-                  )}
-
-                {/* Loading State: Spinning Energy */}
-                {(isCreating || isPending || isConfirming) && (
-                  <motion.div
-                    className="absolute inset-0 opacity-20"
-                    animate={{
-                      background: [
-                        "radial-gradient(ellipse at 50% 50%, rgba(var(--primary-rgb), 0.2) 0%, transparent 70%)",
-                        "radial-gradient(ellipse at 30% 30%, rgba(var(--primary-rgb), 0.15) 0%, transparent 70%)",
-                        "radial-gradient(ellipse at 70% 70%, rgba(var(--primary-rgb), 0.25) 0%, transparent 70%)",
-                        "radial-gradient(ellipse at 50% 50%, rgba(var(--primary-rgb), 0.2) 0%, transparent 70%)",
-                      ],
-                    }}
-                    transition={{
-                      duration: 3,
-                      repeat: Infinity,
-                      ease: "easeInOut",
-                    }}
-                  />
-                )}
-
-                {/* Error State */}
-                {error && (
-                  <motion.div
-                    className="absolute inset-0 opacity-30"
-                    animate={{
-                      background: [
-                        "radial-gradient(ellipse at 50% 50%, rgba(239, 68, 68, 0.15) 0%, transparent 70%)",
-                        "radial-gradient(ellipse at 50% 50%, rgba(239, 68, 68, 0.25) 0%, transparent 70%)",
-                      ],
-                    }}
-                    transition={{
-                      duration: 2,
-                      repeat: Infinity,
-                      ease: "easeInOut",
-                    }}
-                  />
-                )}
-              </div>
-
+            <div className="text-center space-y-6 md:space-y-8 relative">
               {/* Status Header */}
               <motion.div
                 key={`${isCreating}-${isPending}-${isConfirming}-${isFormValid}-${error}-${errorDetails.title}`}
                 initial={{ opacity: 0, y: 20 }}
                 animate={{ opacity: 1, y: 0 }}
                 transition={{ duration: 0.6 }}
-                className="space-y-6 relative z-10"
+                className="space-y-4 md:space-y-6 relative z-10"
               >
                 <div className="text-center">
                   {error ? (
                     <div className="space-y-4">
                       <div className="flex items-center justify-center gap-3">
-                        <XCircle className="h-10 w-10 text-red-400" />
-                        <h3 className="text-3xl font-bold text-red-400">
+                        <XCircle className="h-8 md:h-10 w-8 md:w-10 text-red-400" />
+                        <h3 className="text-2xl md:text-3xl font-bold text-red-400">
                           {errorDetails.title}
                         </h3>
                       </div>
-                      <p className="text-red-400/80 text-lg max-w-md mx-auto">
+                      <p className="text-red-400/80 text-base md:text-lg max-w-md mx-auto">
                         {errorDetails.message}
                       </p>
                       {errorDetails.code && (
@@ -707,35 +465,27 @@ export function FactoryLaunchSection({
                             repeat: Infinity,
                           }}
                         >
-                          <Loader2 className="h-10 w-10 text-primary" />
+                          <Loader2 className="h-8 md:h-10 w-8 md:w-10 text-primary" />
                         </motion.div>
-                        <h3 className="text-3xl font-bold text-primary">
-                          {buttonState.text}
+                        <h3 className="text-2xl md:text-3xl font-bold text-primary">
+                          {uploadingImage
+                            ? "Uploading Image..."
+                            : isCreating
+                            ? "Creating Token..."
+                            : isPending
+                            ? "Transaction Pending..."
+                            : "Confirming..."}
                         </h3>
                       </div>
-                      <p className="text-primary/80 text-lg">
-                        {buttonState.description}
+                      <p className="text-primary/80 text-base md:text-lg">
+                        {uploadingImage
+                          ? "Preparing your token's visual identity"
+                          : isCreating
+                          ? "Forging your token on the blockchain"
+                          : isPending
+                          ? "Waiting for blockchain confirmation"
+                          : "Almost there! Final confirmation in progress"}
                       </p>
-
-                      {/* Progress Dots */}
-                      <div className="flex justify-center gap-2">
-                        {[0, 1, 2].map((index) => (
-                          <motion.div
-                            key={index}
-                            className="w-2 h-2 bg-primary rounded-full"
-                            animate={{
-                              scale: [1, 1.5, 1],
-                              opacity: [0.5, 1, 0.5],
-                            }}
-                            transition={{
-                              duration: 1.5,
-                              repeat: Infinity,
-                              delay: index * 0.2,
-                              ease: "easeInOut",
-                            }}
-                          />
-                        ))}
-                      </div>
                     </div>
                   ) : isFormValid ? (
                     <div className="space-y-4">
@@ -743,38 +493,37 @@ export function FactoryLaunchSection({
                         <motion.div
                           animate={{
                             scale: [1, 1.1, 1],
-                            rotate: [0, 5, -5, 0],
+                            y: [0, -5, 0],
                           }}
                           transition={{ duration: 2, repeat: Infinity }}
                         >
-                          <Rocket className="h-12 w-12 text-primary" />
+                          <Rocket className="h-10 md:h-12 w-10 md:w-12 text-primary" />
                         </motion.div>
-                        <h3 className="text-4xl font-bold text-gradient bg-gradient-to-r from-primary via-purple-400 to-primary bg-clip-text text-transparent">
+                        <h3 className="text-3xl md:text-4xl font-bold text-gradient bg-gradient-to-r from-primary via-purple-400 to-primary bg-clip-text text-transparent">
                           Ready for Launch
                         </h3>
                         <motion.div
                           animate={{
-                            rotate: [0, 10, -10, 0],
-                            scale: [1, 1.2, 1],
+                            scale: [1, 1.1, 1],
                           }}
-                          transition={{ duration: 2.5, repeat: Infinity }}
+                          transition={{ duration: 3, repeat: Infinity }}
                         >
-                          <Flame className="h-12 w-12 text-orange-400" />
+                          <Flame className="h-10 md:h-12 w-10 md:w-12 text-orange-400" />
                         </motion.div>
                       </div>
-                      <p className="text-primary/90 text-xl font-medium">
+                      <p className="text-primary/90 text-lg md:text-xl font-medium">
                         🚀 {buttonState.description} 🚀
                       </p>
                     </div>
                   ) : (
                     <div className="space-y-3">
                       <div className="flex items-center justify-center gap-3">
-                        <Clock className="h-10 w-10 text-muted-foreground" />
-                        <h3 className="text-3xl font-bold text-muted-foreground">
+                        <Clock className="h-8 md:h-10 w-8 md:w-10 text-muted-foreground" />
+                        <h3 className="text-2xl md:text-3xl font-bold text-muted-foreground">
                           Complete Your Token
                         </h3>
                       </div>
-                      <p className="text-muted-foreground/80 text-lg">
+                      <p className="text-muted-foreground/80 text-base md:text-lg">
                         {buttonState.description}
                       </p>
                     </div>
@@ -782,18 +531,18 @@ export function FactoryLaunchSection({
                 </div>
               </motion.div>
 
-              {/* Launch Button */}
+              {/* Launch Button - Mobile Optimized */}
               <motion.div
                 whileHover={!buttonState.disabled ? { scale: 1.02 } : {}}
                 whileTap={!buttonState.disabled ? { scale: 0.98 } : {}}
-                className="flex justify-center relative"
+                className="flex justify-center relative px-4"
               >
                 <Button
                   ref={buttonRef}
                   onClick={handleButtonClick}
                   disabled={buttonState.disabled}
                   className={`
-                    px-16 py-8 text-2xl font-bold rounded-2xl transition-all duration-500 relative overflow-hidden group
+                    w-full max-w-md px-6 md:px-16 py-6 md:py-8 text-lg md:text-2xl font-bold rounded-2xl transition-all duration-500 relative overflow-hidden group
                     ${
                       buttonState.variant === "ready"
                         ? "btn-primary border-2 border-primary/50 text-white shadow-2xl"
@@ -824,26 +573,30 @@ export function FactoryLaunchSection({
                       initial={{ opacity: 0, y: 5 }}
                       animate={{ opacity: 1, y: 0 }}
                       exit={{ opacity: 0, y: -5 }}
-                      className="flex items-center gap-4 relative z-10"
+                      className="flex items-center justify-center gap-3 md:gap-4 relative z-10"
                     >
-                      <ButtonIcon
-                        className={`h-8 w-8 ${
-                          buttonState.variant === "loading"
-                            ? "animate-spin"
-                            : buttonState.variant === "ready" ||
-                              buttonState.variant === "retry"
-                            ? "group-hover:scale-110 transition-transform duration-300"
-                            : ""
-                        }`}
-                      />
-                      {buttonState.text}
+                      {ButtonIcon && (
+                        <ButtonIcon
+                          className={`h-6 w-6 md:h-8 md:w-8 ${
+                            buttonState.variant === "loading"
+                              ? "animate-spin"
+                              : buttonState.variant === "ready" ||
+                                buttonState.variant === "retry"
+                              ? "group-hover:scale-110 transition-transform duration-300"
+                              : ""
+                          }`}
+                        />
+                      )}
+                      <span className="whitespace-nowrap">
+                        {buttonState.text}
+                      </span>
                       {(buttonState.variant === "ready" ||
                         buttonState.variant === "retry") && (
                         <motion.div
                           animate={{ x: [0, 5, 0] }}
                           transition={{ duration: 1.5, repeat: Infinity }}
                         >
-                          <ArrowRight className="h-8 w-8" />
+                          <ArrowRight className="h-6 w-6 md:h-8 md:w-8" />
                         </motion.div>
                       )}
                     </motion.div>
@@ -862,10 +615,10 @@ export function FactoryLaunchSection({
                 exit={{ opacity: 0, height: 0 }}
                 className="mt-6"
               >
-                <div className="unified-card border-red-400/30 bg-red-400/5 p-6 space-y-4">
+                <div className="unified-card border-red-400/30 bg-red-400/5 p-4 md:p-6 space-y-4">
                   <div className="flex items-center gap-3 mb-4">
                     <AlertTriangle className="h-5 w-5 text-red-400" />
-                    <h4 className="font-semibold text-red-400 text-lg">
+                    <h4 className="font-semibold text-red-400 text-base md:text-lg">
                       {errorDetails.title}
                     </h4>
                   </div>
@@ -886,67 +639,8 @@ export function FactoryLaunchSection({
                       </div>
                     )}
 
-                    {/* Common Solutions */}
-                    <div className="space-y-2">
-                      <h5 className="text-red-400 font-medium text-sm">
-                        Possible Solutions:
-                      </h5>
-                      <ul className="text-red-300/80 text-xs space-y-1 ml-4">
-                        {errorDetails.message.includes(
-                          "insufficient funds"
-                        ) && (
-                          <>
-                            <li>• Add more AVAX to your wallet</li>
-                            <li>• Reduce the purchase amount</li>
-                            <li>• Check if you have enough for gas fees</li>
-                          </>
-                        )}
-                        {errorDetails.message.includes("user rejected") && (
-                          <>
-                            <li>• Try the transaction again</li>
-                            <li>
-                              • Check your wallet for pending transactions
-                            </li>
-                          </>
-                        )}
-                        {errorDetails.message.includes("gas") && (
-                          <>
-                            <li>• Wait a few minutes and try again</li>
-                            <li>• Check network congestion</li>
-                            <li>• Ensure you have enough AVAX for gas</li>
-                          </>
-                        )}
-                        {errorDetails.message.includes("nonce") && (
-                          <>
-                            <li>• Reset your wallet's transaction history</li>
-                            <li>• Wait a moment and try again</li>
-                          </>
-                        )}
-                        {errorDetails.message.includes("already exists") && (
-                          <>
-                            <li>• Try a different token name</li>
-                            <li>• Use a different symbol</li>
-                            <li>• Check if the token already exists</li>
-                          </>
-                        )}
-                        {!errorDetails.message.includes("insufficient funds") &&
-                          !errorDetails.message.includes("user rejected") &&
-                          !errorDetails.message.includes("gas") &&
-                          !errorDetails.message.includes("nonce") &&
-                          !errorDetails.message.includes("already exists") && (
-                            <>
-                              <li>• Check your wallet connection</li>
-                              <li>• Ensure you're on the correct network</li>
-                              <li>• Wait a moment and try again</li>
-                              <li>• Contact support if the issue persists</li>
-                            </>
-                          )}
-                      </ul>
-                    </div>
-
-                    {/* Transaction Hash for Failed Transactions */}
                     {transactionData && (
-                      <div className="flex items-center gap-2 pt-2 border-t border-red-400/20">
+                      <div className="flex items-center gap-2 pt-2 border-t border-red-400/20 flex-wrap">
                         <ExternalLink className="h-4 w-4 text-red-400/70" />
                         <span className="text-xs text-red-400/70">
                           Failed Transaction:

@@ -12,6 +12,7 @@ import { TooltipProvider } from "@/components/ui/tooltip";
 import { TokenInfoForm } from "./TokenInfoForm";
 import { TokenomicsForm } from "./TokenomicsForm";
 import { FactoryImageUploadWithEditor } from "./editor/FactoryImageUploadWithEditor";
+import { MobileImageUpload } from "./MobileImageUpload";
 import { TokenCreationInfo } from "@/types";
 import { FactoryConfig } from "@/contexts/FactoryConfigProvider";
 import { ImagePosition } from "./editor/types";
@@ -27,7 +28,9 @@ import {
   AlertCircle,
   Loader2,
   Star,
+  Smartphone,
 } from "lucide-react";
+import { useEffect, useState } from "react";
 
 interface FactoryTabsProps {
   activeTab: string;
@@ -67,6 +70,19 @@ export function FactoryTabs({
   factoryConfig,
   configLoading,
 }: FactoryTabsProps) {
+  const [isMobile, setIsMobile] = useState(false);
+
+  // Detect mobile screen size
+  useEffect(() => {
+    const checkMobile = () => {
+      setIsMobile(window.innerWidth < 768); // md breakpoint
+    };
+
+    checkMobile();
+    window.addEventListener("resize", checkMobile);
+    return () => window.removeEventListener("resize", checkMobile);
+  }, []);
+
   // Calculate completion status for each tab
   const getTabStatus = (tabId: string) => {
     switch (tabId) {
@@ -286,7 +302,7 @@ export function FactoryTabs({
                         </div>
                         <div className="text-center p-4 bg-secondary/30 rounded-lg">
                           <div className="text-2xl font-bold text-primary">
-                            1,000,000,000
+                            1B
                           </div>
                           <div className="text-xs text-muted-foreground">
                             Max Supply
@@ -294,7 +310,7 @@ export function FactoryTabs({
                         </div>
                         <div className="text-center p-4 bg-secondary/30 rounded-lg">
                           <div className="text-2xl font-bold text-primary">
-                            0.00001
+                            .00001
                           </div>
                           <div className="text-xs text-muted-foreground">
                             Initial Price
@@ -366,7 +382,7 @@ export function FactoryTabs({
             </Card>
           )}
 
-          {/* Preview Tab - Now handles all visual customization */}
+          {/* Preview Tab - Now handles all visual customization with mobile optimization */}
           {activeTab === "preview" && (
             <Card className="unified-card border-primary/20">
               <CardHeader className="text-center border-b border-border/50">
@@ -383,25 +399,47 @@ export function FactoryTabs({
                 </CardDescription>
               </CardHeader>
               <CardContent className="p-8">
-                <FactoryImageUploadWithEditor
-                  imageFile={tokenInfo.image}
-                  imagePosition={
-                    tokenInfo.imagePosition || {
-                      x: 0,
-                      y: 0,
-                      scale: 1,
-                      rotation: 0,
-                      fit: "cover",
+                {isMobile ? (
+                  <MobileImageUpload
+                    imageFile={tokenInfo.image}
+                    imagePosition={
+                      tokenInfo.imagePosition || {
+                        x: 0,
+                        y: 0,
+                        scale: 1,
+                        rotation: 0,
+                        fit: "cover",
+                      }
                     }
-                  }
-                  description={tokenInfo.description || ""}
-                  onImageChange={handleImageChange}
-                  onPositionChange={handleImagePositionChange}
-                  onDescriptionChange={handleDescriptionChange}
-                  onTokenInfoChange={handleTokenInfoUpdateFromPreview}
-                  tokenName={tokenInfo.name || "Your Token"}
-                  tokenSymbol={tokenInfo.ticker || "TOKEN"}
-                />
+                    description={tokenInfo.description || ""}
+                    onImageChange={handleImageChange}
+                    onPositionChange={handleImagePositionChange}
+                    onDescriptionChange={handleDescriptionChange}
+                    onTokenInfoChange={handleTokenInfoUpdateFromPreview}
+                    tokenName={tokenInfo.name || "Your Token"}
+                    tokenSymbol={tokenInfo.ticker || "TOKEN"}
+                  />
+                ) : (
+                  <FactoryImageUploadWithEditor
+                    imageFile={tokenInfo.image}
+                    imagePosition={
+                      tokenInfo.imagePosition || {
+                        x: 0,
+                        y: 0,
+                        scale: 1,
+                        rotation: 0,
+                        fit: "cover",
+                      }
+                    }
+                    description={tokenInfo.description || ""}
+                    onImageChange={handleImageChange}
+                    onPositionChange={handleImagePositionChange}
+                    onDescriptionChange={handleDescriptionChange}
+                    onTokenInfoChange={handleTokenInfoUpdateFromPreview}
+                    tokenName={tokenInfo.name || "Your Token"}
+                    tokenSymbol={tokenInfo.ticker || "TOKEN"}
+                  />
+                )}
               </CardContent>
             </Card>
           )}

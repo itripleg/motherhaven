@@ -10,6 +10,7 @@ import {
   TrendingUp,
   Star,
   Rocket,
+  ShoppingCart,
 } from "lucide-react";
 
 interface FactoryProgressProps {
@@ -23,6 +24,11 @@ interface FactoryProgressProps {
     image: File | null;
     description?: string;
     burnManager?: string;
+    purchase?: {
+      enabled: boolean;
+      amount: string;
+      minTokensOut: string;
+    };
   };
 }
 
@@ -32,21 +38,28 @@ const progressSteps = [
     label: "Token Details",
     icon: Lightbulb,
     description: "Name & symbol",
-    threshold: 25,
+    threshold: 20,
+  },
+  {
+    id: "purchase",
+    label: "Initial Purchase",
+    icon: ShoppingCart,
+    description: "Set purchase amount",
+    threshold: 40,
   },
   {
     id: "tokenomics",
     label: "Economics",
     icon: TrendingUp,
     description: "Funding & supply",
-    threshold: 50,
+    threshold: 60,
   },
   {
     id: "preview",
     label: "Customize",
     icon: Star,
     description: "Image & description",
-    threshold: 75,
+    threshold: 80,
   },
 ];
 
@@ -63,16 +76,33 @@ export function FactoryProgress({
     tokenInfo.burnManager.startsWith("0x") &&
     tokenInfo.burnManager.length === 42;
 
-  const getStepStatus = (stepId: string, threshold: number) => {
-    // Tokenomics is always completed since it's pre-configured
-    if (stepId === "tokenomics") return "completed";
+  // Check purchase step completion
+  const isPurchaseComplete = () => {
+    // Handle case where purchase might not be defined
+    if (!tokenInfo.purchase) return false;
+    if (!tokenInfo.purchase.enabled) return true; // Disabled = complete
+    return (
+      tokenInfo.purchase.enabled &&
+      parseFloat(tokenInfo.purchase.amount || "0") > 0
+    );
+  };
 
-    // Token details completion based on actual form data
+  const getStepStatus = (stepId: string, threshold: number) => {
+    // Token details completion
     if (stepId === "info") {
       if (tokenInfo.name && tokenInfo.ticker) return "completed";
       if (tokenInfo.name || tokenInfo.ticker) return "current";
       return "pending";
     }
+
+    // Purchase step completion
+    if (stepId === "purchase") {
+      if (isPurchaseComplete()) return "completed";
+      return "pending";
+    }
+
+    // Tokenomics is always completed since it's pre-configured
+    if (stepId === "tokenomics") return "completed";
 
     // Preview/Customize step - completed if has any customization
     if (stepId === "preview") {
@@ -82,7 +112,7 @@ export function FactoryProgress({
 
     // Fallback to threshold-based logic
     if (completionPercentage >= threshold) return "completed";
-    if (completionPercentage >= threshold - 25) return "current";
+    if (completionPercentage >= threshold - 20) return "current";
     return "pending";
   };
 
@@ -101,6 +131,8 @@ export function FactoryProgress({
     if (hasValidBurnManager)
       return "🔥 Burn Manager Detected - Deflationary Token Ready!";
     if (completionPercentage >= 90) return "🚀 Ready for launch!";
+    if (!isPurchaseComplete())
+      return "💰 Set your initial purchase amount or disable";
     if (completionPercentage >= 75)
       return "🎨 Customize your token's appearance and add description";
     if (completionPercentage >= 50)
@@ -112,8 +144,9 @@ export function FactoryProgress({
 
   const canAccessTab = (tabId: string) => {
     if (tabId === "info") return true;
+    if (tabId === "purchase") return tokenInfo.name && tokenInfo.ticker; // Requires basic info
     if (tabId === "tokenomics") return true;
-    if (tabId === "preview") return true; // Always accessible - users can customize anytime
+    if (tabId === "preview") return true; // Always accessible
     return false;
   };
 
@@ -161,14 +194,14 @@ export function FactoryProgress({
             >
               {hasValidBurnManager
                 ? "🔥 Deflationary"
-                : `${completionPercentage}% Complete`}
+                : `${completionPercentage}%`}
             </Badge>
           </motion.div>
         </div>
 
         {/* Progress Bar */}
         <div className="mb-8">
-          <div className="w-full bg-secondary/50 rounded-full h-4 overflow-hidden border border-border/50 relative">
+          <div className="w-full bg-secondary/50 rounded-full h-3 overflow-hidden border border-border/50 relative">
             <motion.div
               className={`h-full bg-gradient-to-r ${getProgressColor()} relative`}
               initial={{ width: 0 }}
@@ -192,10 +225,9 @@ export function FactoryProgress({
                 />
               )}
 
-              {/* Burn Animation - only show when burn manager is valid */}
+              {/* Burn Animation */}
               {hasValidBurnManager && completionPercentage > 0 && (
                 <>
-                  {/* Flickering flames */}
                   {[...Array(8)].map((_, i) => (
                     <motion.div
                       key={i}
@@ -218,69 +250,14 @@ export function FactoryProgress({
                       }}
                     />
                   ))}
-
-                  {/* Ember particles */}
-                  {[...Array(6)].map((_, i) => (
-                    <motion.div
-                      key={`ember-${i}`}
-                      className="absolute w-1 h-1 bg-orange-400 rounded-full"
-                      style={{
-                        left: `${Math.random() * 80 + 10}%`,
-                        bottom: "100%",
-                      }}
-                      animate={{
-                        y: [-20, -40],
-                        x: [(Math.random() - 0.5) * 20],
-                        opacity: [1, 0],
-                        scale: [1, 0.3],
-                      }}
-                      transition={{
-                        duration: 2 + Math.random(),
-                        repeat: Infinity,
-                        delay: Math.random() * 2,
-                        ease: "easeOut",
-                      }}
-                    />
-                  ))}
                 </>
               )}
             </motion.div>
           </div>
-
-          {/* Progress Markers - Remove specific percentages when burning */}
-          <div className="flex justify-between mt-2 px-1">
-            {hasValidBurnManager
-              ? // Show fire emojis instead of percentages when burning
-                ["🔥", "🔥", "🔥", "🔥", "🔥"].map((emoji, index) => (
-                  <div
-                    key={index}
-                    className={`text-xs transition-colors duration-300 ${
-                      completionPercentage >= index * 25
-                        ? "text-orange-400 font-medium"
-                        : "text-muted-foreground"
-                    }`}
-                  >
-                    {emoji}
-                  </div>
-                ))
-              : // Normal percentage markers
-                [0, 25, 50, 75, 100].map((mark) => (
-                  <div
-                    key={mark}
-                    className={`text-xs transition-colors duration-300 ${
-                      completionPercentage >= mark
-                        ? "text-primary font-medium"
-                        : "text-muted-foreground"
-                    }`}
-                  >
-                    {mark}%
-                  </div>
-                ))}
-          </div>
         </div>
 
         {/* Clickable Step Indicators */}
-        <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
+        <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
           {progressSteps.map((step, index) => {
             const status = getStepStatus(step.id, step.threshold);
             const StepIcon = step.icon;
@@ -401,8 +378,8 @@ export function FactoryProgress({
                   />
                 )}
 
-                {/* Current Step Pulse - Only for token details when incomplete */}
-                {status === "current" && !isActive && step.id === "info" && (
+                {/* Current Step Pulse */}
+                {status === "current" && !isActive && (
                   <motion.div
                     className="absolute -inset-1 bg-primary/20 rounded-lg border border-primary/40"
                     animate={{ opacity: [0.5, 1, 0.5] }}
@@ -413,39 +390,18 @@ export function FactoryProgress({
                     }}
                   />
                 )}
-
-                {/* Completion Celebration */}
-                {status === "completed" &&
-                  completionPercentage === 100 &&
-                  index === progressSteps.length - 1 && (
-                    <motion.div
-                      className="absolute inset-0 pointer-events-none"
-                      initial={{ scale: 0 }}
-                      animate={{ scale: [0, 1.2, 1] }}
-                      transition={{ delay: 0.5, duration: 0.8 }}
-                    >
-                      <div className="absolute top-1 right-1">
-                        <motion.div
-                          animate={{ rotate: 360 }}
-                          transition={{ duration: 2, ease: "linear" }}
-                        >
-                          ✨
-                        </motion.div>
-                      </div>
-                    </motion.div>
-                  )}
               </motion.button>
             );
           })}
         </div>
 
-        {/* Quick Tips */}
+        {/* Desktop Only Tips */}
         {completionPercentage < 100 && (
           <motion.div
             initial={{ opacity: 0, y: 10 }}
             animate={{ opacity: 1, y: 0 }}
             transition={{ delay: 0.6 }}
-            className="mt-6 p-4 bg-primary/5 border border-primary/20 rounded-lg"
+            className="mt-6 p-4 bg-primary/5 border border-primary/20 rounded-lg hidden md:block"
           >
             <div className="flex items-start gap-3">
               <div className="p-1 bg-primary/20 rounded">
@@ -464,31 +420,52 @@ export function FactoryProgress({
                           • Choose a memorable token name (e.g., "Doge Coin")
                         </li>
                         <li>• Pick a 3-8 character symbol (e.g., "DOGE")</li>
+                        <li>• Set initial purchase amount or disable it</li>
                         <li>
                           • You can customize images and description anytime
                         </li>
-                        <li>
-                          • Initial purchase is optional - you can launch
-                          without buying
-                        </li>
                       </ul>
                     </div>
                   )}
-                  {(tokenInfo.name || tokenInfo.ticker) && !isFormValid && (
-                    <div>
-                      <p className="mb-1">Almost there:</p>
-                      <ul className="text-xs space-y-1 ml-4">
-                        <li>
-                          • Complete both token name and symbol to unlock launch
-                        </li>
-                        <li>
-                          • Consider adding a description to explain your
-                          token's purpose
-                        </li>
-                        <li>• Upload an image to make your token stand out</li>
-                      </ul>
-                    </div>
-                  )}
+                  {(tokenInfo.name || tokenInfo.ticker) &&
+                    !isPurchaseComplete() && (
+                      <div>
+                        <p className="mb-1">Set purchase options:</p>
+                        <ul className="text-xs space-y-1 ml-4">
+                          <li>
+                            • Enter amount in AVAX to buy tokens at launch
+                          </li>
+                          <li>
+                            • Or disable initial purchase to launch without
+                            buying
+                          </li>
+                          <li>
+                            • This helps with initial liquidity and price
+                            discovery
+                          </li>
+                        </ul>
+                      </div>
+                    )}
+                  {isPurchaseComplete() &&
+                    tokenInfo.purchase &&
+                    !isFormValid && (
+                      <div>
+                        <p className="mb-1">Almost there:</p>
+                        <ul className="text-xs space-y-1 ml-4">
+                          <li>
+                            • Complete both token name and symbol to unlock
+                            launch
+                          </li>
+                          <li>
+                            • Consider adding a description to explain your
+                            token's purpose
+                          </li>
+                          <li>
+                            • Upload an image to make your token stand out
+                          </li>
+                        </ul>
+                      </div>
+                    )}
                   {isFormValid && completionPercentage < 100 && (
                     <div>
                       <p className="mb-1">
@@ -498,10 +475,6 @@ export function FactoryProgress({
                         <li>
                           • Add a professional image and description for better
                           appeal
-                        </li>
-                        <li>
-                          • Decide if you want to purchase tokens at launch
-                          (optional)
                         </li>
                         <li>
                           • Review tokenomics - everything is pre-configured for
