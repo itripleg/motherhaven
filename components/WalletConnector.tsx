@@ -1,9 +1,9 @@
+// components/WalletConnector.tsx
 "use client";
 
 import { useState } from "react";
-import { motion } from "framer-motion";
 import { Button } from "@/components/ui/button";
-import { Loader2 } from "lucide-react";
+import { Loader2, Wallet } from "lucide-react";
 import {
   Card,
   CardHeader,
@@ -22,11 +22,11 @@ interface WalletConnectorProps {
   connectors?: readonly Connector[];
   onConnect: (index: number) => void;
   isLoading: boolean;
+  connectingConnectorId?: number | null;
 }
 
 // Function to get proper wallet name from connector
 function getWalletName(connector: Connector): string {
-  // Since the connectors already have correct names, just return them
   return connector.name || connector.id;
 }
 
@@ -34,82 +34,57 @@ export function WalletConnector({
   connectors,
   onConnect,
   isLoading,
+  connectingConnectorId,
 }: WalletConnectorProps) {
-  const [hoveredIndex, setHoveredIndex] = useState<number | null>(null);
-
-  // Debug logging
-  console.log("WalletConnector received connectors:", connectors);
-  connectors?.forEach((c, i) => {
-    console.log(
-      `Connector ${i}: id="${c.id}", name="${
-        c.name
-      }", getWalletName="${getWalletName(c)}"`
-    );
-  });
-
   return (
-    <Card className="w-full max-w-md mx-auto">
+    <Card className="w-full max-w-md mx-auto border-primary/20">
       <CardHeader>
-        <CardTitle>Connect Your Wallet</CardTitle>
+        <CardTitle className="flex items-center gap-2">
+          Connect Your Wallet
+          <Wallet className="h-5 w-5 text-primary" />
+        </CardTitle>
         <CardDescription>
-          Choose a wallet to connect to this app
+          Choose a wallet to connect to the application.
         </CardDescription>
       </CardHeader>
       <CardContent>
-        <div className="mb-4 text-xs text-red-500">
-          DEBUG: WalletConnector component is rendering
-        </div>
-        <motion.div
-          className="grid gap-4 md:grid-cols-2 lg:grid-cols-3"
-          initial={{ opacity: 0, y: 20 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ duration: 0.5 }}
-        >
+        <div className="grid gap-3">
           {connectors?.map((connector, index) => (
-            <motion.div
-              key={connector.id}
-              initial={{ opacity: 0, scale: 0.9 }}
-              animate={{ opacity: 1, scale: 1 }}
-              transition={{ duration: 0.2, delay: index * 0.1 }}
-              whileHover={{ scale: 1.05 }}
-              whileTap={{ scale: 0.95 }}
-            >
+            <div key={connector.id}>
               <Button
-                className="w-full h-20 font-semibold relative overflow-hidden text-sm"
+                variant="outline"
+                size="lg"
+                className="w-full h-16 text-lg font-medium border-primary/30 hover:border-primary/50"
                 onClick={() => onConnect(index)}
                 disabled={isLoading}
-                onMouseEnter={() => setHoveredIndex(index)}
-                onMouseLeave={() => setHoveredIndex(null)}
               >
-                <motion.div
-                  className="absolute inset-0 bg-primary/10"
-                  initial={{ scale: 0, opacity: 0 }}
-                  animate={{
-                    scale: hoveredIndex === index ? 1 : 0,
-                    opacity: hoveredIndex === index ? 1 : 0,
-                  }}
-                  transition={{ duration: 0.3 }}
-                />
-                <motion.div
-                  className="flex items-center justify-center space-x-2"
-                  initial={{ y: 0 }}
-                  animate={{ y: isLoading ? -30 : 0 }}
-                  transition={{ duration: 0.3 }}
-                >
-                  <span>{getWalletName(connector)}</span>
-                </motion.div>
-                <motion.div
-                  className="absolute inset-0 flex items-center justify-center"
-                  initial={{ y: 30 }}
-                  animate={{ y: isLoading ? 0 : 30 }}
-                  transition={{ duration: 0.3 }}
-                >
-                  {/* <Loader2 className="w-6 h-6 animate-spin" /> */}
-                </motion.div>
+                {isLoading && connectingConnectorId === index ? (
+                  <div className="flex items-center gap-2">
+                    <Loader2 className="w-5 h-5 animate-spin" />
+                    Connecting...
+                  </div>
+                ) : (
+                  getWalletName(connector)
+                )}
               </Button>
-            </motion.div>
+            </div>
           ))}
-        </motion.div>
+        </div>
+
+        {/* Network Info */}
+        <div className="mt-4 p-3 bg-secondary border border-primary/20 rounded-lg">
+          <div className="flex items-center gap-2 text-sm">
+            <div className="w-2 h-2 bg-primary rounded-full" />
+            <span className="text-primary font-medium">Required Network:</span>
+            <span className="text-muted-foreground">
+              Avalanche Fuji Testnet
+            </span>
+          </div>
+          <p className="text-xs text-muted-foreground mt-1">
+            Please ensure your wallet is connected to the correct network for
+            full functionality.
+          </p>
+        </div>
       </CardContent>
     </Card>
   );

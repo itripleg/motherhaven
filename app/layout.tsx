@@ -8,7 +8,8 @@ import { Toaster } from "@/components/ui/toaster";
 import { EventWatcher } from "../components/EventWatcher";
 import { FactoryConfigProvider } from "@/contexts/FactoryConfigProvider";
 import { ColorThemeProvider } from "@/contexts/ColorThemeProvider";
-// import { FactoryGuard } from "@/components/FactoryGuard";
+import { NetworkGuard } from "@/components/NetworkGuard";
+import { NetworkDebug } from "@/components/NetworkDebug";
 
 const geistSans = localFont({
   src: "./fonts/GeistVF.woff",
@@ -50,16 +51,15 @@ export default function RootLayout({
         >
           <WagmiContext>
             <ColorThemeProvider>
-              {/* <FactoryGuard> */}
-              <MyMenu />
-              {/* <div className="p-0 md:p-20" /> */}
-              <FactoryConfigProvider>
-                <EventWatcher />
-                {/* <Header /> */}
-                {children}
-                <Toaster />
-              </FactoryConfigProvider>
-              {/* </FactoryGuard> */}
+              <NetworkGuard>
+                <MyMenu />
+                <FactoryConfigProvider>
+                  <EventWatcher />
+                  {children}
+                  <Toaster />
+                </FactoryConfigProvider>
+                {/* <NetworkDebug /> */}
+              </NetworkGuard>
             </ColorThemeProvider>
           </WagmiContext>
         </ThemeProvider>
