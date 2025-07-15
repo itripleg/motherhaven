@@ -58,7 +58,7 @@ export default function RootLayout({
                   {children}
                   <Toaster />
                 </FactoryConfigProvider>
-                <NetworkDebug />
+                {/* <NetworkDebug /> */}
               </NetworkGuard>
             </ColorThemeProvider>
           </WagmiContext>

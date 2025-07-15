@@ -43,6 +43,9 @@ export function ConnectButton({
   className = "",
 }: ConnectButtonProps) {
   const [isConnecting, setIsConnecting] = useState(false);
+  const [connectingConnectorId, setConnectingConnectorId] = useState<
+    number | null
+  >(null);
   const [sheetOpen, setSheetOpen] = useState(false);
 
   const { address, isConnected } = useAccount();
@@ -63,6 +66,7 @@ export function ConnectButton({
       });
       setSheetOpen(false);
       setIsConnecting(false);
+      setConnectingConnectorId(null);
 
       // Log network status for debugging
       console.log(
@@ -93,6 +97,7 @@ export function ConnectButton({
         duration: 5000,
       });
       setIsConnecting(false);
+      setConnectingConnectorId(null);
     }
   }, [isError, error]);
 
@@ -123,6 +128,7 @@ export function ConnectButton({
 
   const handleConnect = async (connectorId: number) => {
     setIsConnecting(true);
+    setConnectingConnectorId(connectorId);
     try {
       const connector = connectors[connectorId];
       toast({
@@ -134,6 +140,7 @@ export function ConnectButton({
     } catch (error) {
       console.error("Connection error:", error);
       setIsConnecting(false);
+      setConnectingConnectorId(null);
     }
   };
 
@@ -188,7 +195,7 @@ export function ConnectButton({
   }
 
   return (
-    <Sheet open={sheetOpen} onOpenChange={setSheetOpen}>
+    <Sheet open={sheetOpen} onOpenChange={setSheetOpen} modal={false}>
       <SheetTrigger asChild>
         <Button
           variant={variant}
@@ -199,17 +206,22 @@ export function ConnectButton({
           {isConnecting ? "Connecting..." : "Connect Wallet"}
         </Button>
       </SheetTrigger>
-      <SheetContent className="z-[120]">
+      <SheetContent
+        side="right"
+        className="z-[120] bg-transparent border-none shadow-none p-0 w-auto h-auto absolute top-4 right-4 transform-none data-[state=open]:animate-in data-[state=closed]:animate-out data-[state=closed]:slide-out-to-right-4 data-[state=open]:slide-in-from-right-4 duration-300"
+        style={{ position: "absolute", inset: "auto 1rem 1rem auto" }}
+      >
         <SheetTitle className="sr-only">Connect Wallet</SheetTitle>
         <SheetDescription className="sr-only">
           Choose a wallet to connect to this application. Please ensure you're
           on {REQUIRED_NETWORK_NAME}.
         </SheetDescription>
-        <div className="space-y-4">
+        <div className="p-4">
           <WalletConnector
             connectors={connectors}
             onConnect={handleConnect}
             isLoading={isConnecting}
+            connectingConnectorId={connectingConnectorId}
           />
         </div>
       </SheetContent>

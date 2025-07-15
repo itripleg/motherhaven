@@ -16,13 +16,11 @@ export function AuthWrapper({ children }: AuthWrapperProps) {
 
   if (!isConnected) {
     return (
-      <Container className="">
-        <WalletConnector
-          connectors={connectors}
-          onConnect={handleConnect}
-          isLoading={false}
-        />
-      </Container>
+      <WalletConnector
+        connectors={connectors}
+        onConnect={handleConnect}
+        isLoading={false}
+      />
     );
   }
 
