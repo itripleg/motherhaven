@@ -23,8 +23,8 @@ export const config = createConfig({
   chains: [avalancheFuji],
   connectors: [metaMask()],
   transports: avalancheFujiTransport,
-  pollingInterval: 30000, // 30 seconds instead of default 4 seconds
-  syncConnectedChain: false, // Disable automatic chain sync
+  pollingInterval: 4000, // Default 4 seconds for better responsiveness
+  syncConnectedChain: true, // Enable automatic chain sync for Brave compatibility
 });
 
 // Create and export a public client instance using viem directly

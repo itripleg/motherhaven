@@ -1,4 +1,4 @@
-// app/dex/factory/components/PurchaseOptionsSection.tsx
+// app/factory/components/PurchaseOptionsSection.tsx
 "use client";
 
 import React from "react";

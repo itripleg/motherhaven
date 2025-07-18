@@ -126,7 +126,7 @@ export default function DexPage() {
                   <Button
                     size="lg"
                     className="btn-primary group"
-                    onClick={() => (window.location.href = "/dex/factory")}
+                    onClick={() => (window.location.href = "/factory")}
                   >
                     <Rocket className="h-5 w-5 mr-2 group-hover:translate-y-[-2px] transition-transform duration-300" />
                     Launch Now

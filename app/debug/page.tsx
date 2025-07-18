@@ -401,7 +401,7 @@ function DebugMainContent() {
             <Button
               variant="outline"
               className="justify-start"
-              onClick={() => window.open("/dex/factory", "_blank")}
+              onClick={() => window.open("/factory", "_blank")}
             >
               <Factory className="h-4 w-4 mr-2" />
               Open Token Factory

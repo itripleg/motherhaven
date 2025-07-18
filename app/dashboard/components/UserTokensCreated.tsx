@@ -15,6 +15,7 @@ import {
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Progress } from "@/components/ui/progress";
+import { Alert, AlertDescription } from "@/components/ui/alert";
 import {
   Crown,
   Plus,
@@ -26,7 +27,6 @@ import {
   ArrowUpRight,
   ExternalLink,
   RefreshCw,
-  Sparkles,
   Eye,
   BarChart3,
   DollarSign,
@@ -52,18 +52,6 @@ interface CreatedToken {
     tradeCount: number;
     uniqueHolders: number;
   };
-  lastTrade?: {
-    timestamp: string;
-    type: "buy" | "sell";
-    price: string;
-  };
-}
-
-interface TokenStats {
-  totalCreated: number;
-  totalValue: string;
-  totalVolume: string;
-  avgPerformance: number;
 }
 
 export function UserTokensCreated() {
@@ -71,9 +59,7 @@ export function UserTokensCreated() {
   const router = useRouter();
   const [tokens, setTokens] = useState<CreatedToken[]>([]);
   const [isLoading, setIsLoading] = useState(true);
-  const [sortBy, setSortBy] = useState<"newest" | "performance" | "volume">(
-    "newest"
-  );
+  const [error, setError] = useState<string | null>(null);
 
   // Subscribe to user's created tokens
   useEffect(() => {
@@ -90,84 +76,48 @@ export function UserTokensCreated() {
     const unsubscribe = onSnapshot(
       tokensQuery,
       (snapshot) => {
-        const tokenData: CreatedToken[] = snapshot.docs.map((doc) => {
-          const data = doc.data();
-          return {
-            address: doc.id,
-            name: data.name || "Unknown Token",
-            symbol: data.symbol || "TOKEN",
-            imageUrl: data.imageUrl,
-            createdAt: data.createdAt || new Date().toISOString(),
-            fundingGoal: data.fundingGoal || "25",
-            collateral: data.collateral || "0",
-            currentPrice:
-              data.statistics?.currentPrice || data.lastPrice || "0.000001",
-            state: data.currentState || data.state || 1,
-            statistics: data.statistics,
-            lastTrade: data.lastTrade,
-          };
-        });
+        try {
+          const tokenData: CreatedToken[] = snapshot.docs.map((doc) => {
+            const data = doc.data();
+            return {
+              address: doc.id,
+              name: data.name || "Unknown Token",
+              symbol: data.symbol || "TOKEN",
+              imageUrl: data.imageUrl,
+              createdAt: data.createdAt || new Date().toISOString(),
+              fundingGoal: data.fundingGoal || "25",
+              collateral: data.statistics?.collateral || data.collateral || "0",
+              currentPrice:
+                data.statistics?.currentPrice || data.lastPrice || "0.000001",
+              state: data.currentState || data.state || 1,
+              statistics: data.statistics,
+            };
+          });
 
-        // Sort tokens
-        const sortedTokens = [...tokenData].sort((a, b) => {
-          switch (sortBy) {
-            case "newest":
-              return (
-                new Date(b.createdAt).getTime() -
-                new Date(a.createdAt).getTime()
-              );
-            case "performance":
-              const aProgress =
-                (parseFloat(a.collateral) / parseFloat(a.fundingGoal)) * 100;
-              const bProgress =
-                (parseFloat(b.collateral) / parseFloat(b.fundingGoal)) * 100;
-              return bProgress - aProgress;
-            case "volume":
-              const aVolume = parseFloat(a.statistics?.volumeETH || "0");
-              const bVolume = parseFloat(b.statistics?.volumeETH || "0");
-              return bVolume - aVolume;
-            default:
-              return 0;
-          }
-        });
+          // Sort by creation date (newest first)
+          const sortedTokens = tokenData.sort(
+            (a, b) =>
+              new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()
+          );
 
-        setTokens(sortedTokens);
-        setIsLoading(false);
+          setTokens(sortedTokens);
+          setError(null);
+        } catch (err) {
+          console.error("Error processing tokens:", err);
+          setError("Failed to process token data");
+        } finally {
+          setIsLoading(false);
+        }
       },
       (error) => {
-        console.error("Error fetching user tokens:", error);
+        console.error("Error fetching tokens:", error);
+        setError("Failed to load tokens");
         setIsLoading(false);
       }
     );
 
     return () => unsubscribe();
-  }, [address, isConnected, sortBy]);
-
-  // Calculate stats
-  const stats: TokenStats = {
-    totalCreated: tokens.length,
-    totalValue: tokens
-      .reduce((sum, token) => {
-        const value = parseFloat(token.collateral) || 0;
-        return sum + value;
-      }, 0)
-      .toFixed(4),
-    totalVolume: tokens
-      .reduce((sum, token) => {
-        const volume = parseFloat(token.statistics?.volumeETH || "0");
-        return sum + volume;
-      }, 0)
-      .toFixed(4),
-    avgPerformance:
-      tokens.length > 0
-        ? tokens.reduce((sum, token) => {
-            const progress =
-              (parseFloat(token.collateral) / parseFloat(token.fundingGoal)) *
-              100;
-            return sum + progress;
-          }, 0) / tokens.length
-        : 0,
-  };
+  }, [address, isConnected]);
 
   const getTokenStatusBadge = (token: CreatedToken) => {
     const progress =
@@ -252,62 +202,67 @@ export function UserTokensCreated() {
               Tokens you&apos;ve created and their performance
             </CardDescription>
           </div>
-          <Button
-            variant="outline"
-            size="sm"
-            onClick={() => router.push("/dex/factory")}
-            className="bg-primary/10 hover:bg-primary/20 border-primary/30"
-          >
-            <Plus className="h-4 w-4 mr-2" />
-            Create
-          </Button>
         </div>
       </CardHeader>
 
       <CardContent className="p-6 space-y-6">
-        {/* Stats Overview */}
-        <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-          <div className="text-center">
-            <p className="text-2xl font-bold text-primary">
-              {stats.totalCreated}
-            </p>
-            <p className="text-xs text-muted-foreground">Tokens Created</p>
-          </div>
-          <div className="text-center">
-            <p className="text-2xl font-bold text-green-400">
-              {stats.totalValue}
-            </p>
-            <p className="text-xs text-muted-foreground">Total Raised (AVAX)</p>
-          </div>
-          <div className="text-center">
-            <p className="text-2xl font-bold text-blue-400">
-              {stats.totalVolume}
-            </p>
-            <p className="text-xs text-muted-foreground">Total Volume (AVAX)</p>
-          </div>
-          <div className="text-center">
-            <p className="text-2xl font-bold text-purple-400">
-              {stats.avgPerformance.toFixed(0)}%
-            </p>
-            <p className="text-xs text-muted-foreground">Avg. Progress</p>
-          </div>
-        </div>
+        {error && (
+          <Alert variant="destructive">
+            <AlertDescription>{error}</AlertDescription>
+          </Alert>
+        )}
 
-        {/* Sort Controls */}
-        <div className="flex items-center gap-2">
-          <span className="text-sm text-muted-foreground">Sort by:</span>
-          {["newest", "performance", "volume"].map((option) => (
-            <Button
-              key={option}
-              variant={sortBy === option ? "default" : "outline"}
-              size="sm"
-              onClick={() => setSortBy(option as any)}
-              className="text-xs capitalize"
-            >
-              {option}
-            </Button>
-          ))}
-        </div>
+        {/* Stats Overview */}
+        {tokens.length > 0 && (
+          <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-4">
+            <div className="text-center p-3">
+              <p className="text-xl sm:text-2xl font-bold text-primary">
+                {tokens.length}
+              </p>
+              <p className="text-xs text-muted-foreground">Tokens Created</p>
+            </div>
+            <div className="text-center p-3">
+              <p className="text-xl sm:text-2xl font-bold text-green-400">
+                {tokens
+                  .reduce(
+                    (sum, token) => sum + parseFloat(token.collateral || "0"),
+                    0
+                  )
+                  .toFixed(2)}
+              </p>
+              <p className="text-xs text-muted-foreground">Total Raised</p>
+            </div>
+            <div className="text-center p-3">
+              <p className="text-xl sm:text-2xl font-bold text-blue-400">
+                {tokens
+                  .reduce(
+                    (sum, token) =>
+                      sum + parseFloat(token.statistics?.volumeETH || "0"),
+                    0
+                  )
+                  .toFixed(2)}
+              </p>
+              <p className="text-xs text-muted-foreground">Total Volume</p>
+            </div>
+            <div className="text-center p-3">
+              <p className="text-xl sm:text-2xl font-bold text-purple-400">
+                {tokens.length > 0
+                  ? (
+                      tokens.reduce((sum, token) => {
+                        const progress =
+                          (parseFloat(token.collateral) /
+                            parseFloat(token.fundingGoal)) *
+                          100;
+                        return sum + progress;
+                      }, 0) / tokens.length
+                    ).toFixed(0)
+                  : 0}
+                %
+              </p>
+              <p className="text-xs text-muted-foreground">Avg. Progress</p>
+            </div>
+          </div>
+        )}
 
         {/* Tokens List */}
         <div className="space-y-4">
@@ -360,10 +315,91 @@ export function UserTokensCreated() {
                     initial={{ opacity: 0, y: 20 }}
                     animate={{ opacity: 1, y: 0 }}
                     transition={{ delay: index * 0.1 }}
-                    className="unified-card border-primary/20 bg-primary/5 p-4 hover:bg-primary/10 transition-all duration-300 cursor-pointer group"
+                    className="unified-card border-primary/20 bg-primary/5 p-3 sm:p-4 hover:bg-primary/10 transition-all duration-300 cursor-pointer group"
                     onClick={() => router.push(`/dex/${token.address}`)}
                   >
-                    <div className="flex items-start gap-4">
+                    {/* Mobile Layout */}
+                    <div className="block sm:hidden space-y-3">
+                      {/* Header Row - Image, Name, Progress */}
+                      <div className="flex items-start gap-3">
+                        <div className="relative w-10 h-10 rounded-full overflow-hidden bg-primary/20 flex-shrink-0">
+                          {token.imageUrl ? (
+                            <Image
+                              src={token.imageUrl}
+                              alt={token.name}
+                              fill
+                              className="object-cover"
+                              unoptimized
+                            />
+                          ) : (
+                            <div className="w-full h-full flex items-center justify-center">
+                              <span className="text-sm font-bold text-primary">
+                                {token.symbol[0]}
+                              </span>
+                            </div>
+                          )}
+                        </div>
+                        <div className="flex-1 min-w-0">
+                          <div className="flex items-center justify-between mb-1">
+                            <h3 className="font-semibold text-foreground text-sm truncate pr-2">
+                              {token.name} ({token.symbol})
+                            </h3>
+                            <p
+                              className={`text-sm font-bold ${getPerformanceColor(
+                                progress
+                              )} flex-shrink-0`}
+                            >
+                              {clampedProgress.toFixed(1)}%
+                            </p>
+                          </div>
+                          {getTokenStatusBadge(token)}
+                        </div>
+                      </div>
+
+                      {/* Progress Bar */}
+                      <div>
+                        <Progress
+                          value={clampedProgress}
+                          className="h-2 mb-1"
+                        />
+                        <div className="flex justify-between text-xs text-muted-foreground">
+                          <span>{token.collateral} AVAX</span>
+                          <span>Goal: {token.fundingGoal} AVAX</span>
+                        </div>
+                      </div>
+
+                      {/* Stats and Actions */}
+                      <div className="flex items-center justify-between">
+                        <div className="flex items-center gap-3 text-xs text-muted-foreground">
+                          <span className="flex items-center gap-1">
+                            <Activity className="h-3 w-3" />
+                            {token.statistics?.tradeCount || 0}
+                          </span>
+                          <span className="flex items-center gap-1">
+                            <Users className="h-3 w-3" />
+                            {token.statistics?.uniqueHolders || 0}
+                          </span>
+                          <span className="flex items-center gap-1">
+                            <Clock className="h-3 w-3" />
+                            {timeAgo(token.createdAt)}
+                          </span>
+                        </div>
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            router.push(`/dex/${token.address}`);
+                          }}
+                          className="h-7 px-2 text-xs hover:bg-primary/20"
+                        >
+                          <Eye className="h-3 w-3" />
+                        </Button>
+                      </div>
+                    </div>
+
+                    {/* Desktop Layout */}
+                    <div className="hidden sm:flex items-start gap-4">
                       {/* Token Image */}
                       <div className="relative w-12 h-12 rounded-full overflow-hidden bg-primary/20 flex-shrink-0">
                         {token.imageUrl ? (
@@ -478,15 +514,6 @@ export function UserTokensCreated() {
               <p className="text-sm text-muted-foreground">
                 Manage your token portfolio and track performance
               </p>
-              <Button
-                variant="outline"
-                size="sm"
-                onClick={() => router.push("/dex/factory")}
-                className="bg-primary/10 hover:bg-primary/20 border-primary/30"
-              >
-                <Plus className="h-4 w-4 mr-2" />
-                Create Another
-              </Button>
             </div>
           </div>
         )}

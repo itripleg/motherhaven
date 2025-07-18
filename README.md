@@ -60,7 +60,7 @@ The primary objective is to create a central location for radical technological 
 - Planned transition to Wagmi-based authentication
 
 ### Core Functionality
-- Token Factory (`/dex/factory`): Create custom tokens
+- Token Factory (`/factory`): Create custom tokens
 - Decentralized Exchange (`/dex/[tokenAddress]`): Buy and sell tokens
 
 ### Economic Model

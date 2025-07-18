@@ -17,6 +17,28 @@ interface NetworkGuardProps {
 const REQUIRED_CHAIN_ID = avalancheFuji.id; // 43113
 const REQUIRED_NETWORK_NAME = "Avalanche Fuji Testnet";
 
+// Enhanced wallet detection for Brave compatibility
+const getWalletProvider = () => {
+  if (typeof window === "undefined") return null;
+
+  // Check for MetaMask specifically on Brave
+  if (window.ethereum?.providers) {
+    // Multiple providers case (Brave + MetaMask)
+    const metamaskProvider = window.ethereum.providers.find(
+      (provider: any) => provider.isMetaMask && !provider.isBraveWallet
+    );
+    if (metamaskProvider) return metamaskProvider;
+  }
+
+  // Check for MetaMask without Brave wallet interference
+  if (window.ethereum?.isMetaMask && !window.ethereum?.isBraveWallet) {
+    return window.ethereum;
+  }
+
+  // Fallback to default ethereum provider
+  return window.ethereum || null;
+};
+
 export function NetworkGuard({ children }: NetworkGuardProps) {
   const [mounted, setMounted] = useState(false);
   const [showBanner, setShowBanner] = useState(false);
@@ -24,6 +46,7 @@ export function NetworkGuard({ children }: NetworkGuardProps) {
   const [actualWalletChainId, setActualWalletChainId] = useState<
     number | undefined
   >(undefined);
+  const [walletProvider, setWalletProvider] = useState<any>(null);
 
   const { isConnected } = useAccount();
   const wagmiChainId = useChainId();
@@ -34,34 +57,47 @@ export function NetworkGuard({ children }: NetworkGuardProps) {
   const effectiveChainId = actualWalletChainId ?? wagmiChainId;
   const isWrongNetwork = isConnected && effectiveChainId !== REQUIRED_CHAIN_ID;
 
+  // Initialize wallet provider on mount
+  useEffect(() => {
+    const provider = getWalletProvider();
+    setWalletProvider(provider);
+    setMounted(true);
+
+    if (provider) {
+      console.log("🔍 Detected wallet provider:", {
+        isMetaMask: provider.isMetaMask,
+        isBraveWallet: provider.isBraveWallet,
+        isMultiProvider: !!window.ethereum?.providers,
+      });
+    }
+  }, []);
+
   // Get actual wallet chain ID when connected
   useEffect(() => {
-    if (!isConnected) {
+    if (!isConnected || !walletProvider) {
       setActualWalletChainId(undefined);
       return;
     }
 
     const getWalletChainId = async () => {
-      if (typeof window !== "undefined" && window.ethereum) {
-        try {
-          const chainId = await window.ethereum.request({
-            method: "eth_chainId",
-          });
-          const numericChainId = parseInt(chainId, 16);
-          console.log("🔍 Got actual wallet chain ID:", numericChainId);
-          setActualWalletChainId(numericChainId);
-        } catch (error) {
-          console.error("Failed to get wallet chain ID:", error);
-          setActualWalletChainId(wagmiChainId);
-        }
+      try {
+        const chainId = await walletProvider.request({
+          method: "eth_chainId",
+        });
+        const numericChainId = parseInt(chainId, 16);
+        console.log("🔍 Got actual wallet chain ID:", numericChainId);
+        setActualWalletChainId(numericChainId);
+      } catch (error) {
+        console.error("Failed to get wallet chain ID:", error);
+        setActualWalletChainId(wagmiChainId);
       }
     };
 
     // Get initial chain ID when connected
     getWalletChainId();
 
-    // Listen for chain changes
-    if (window.ethereum) {
+    // Listen for chain changes on the correct provider
+    if (walletProvider) {
       const handleChainChanged = (chainId: string) => {
         const numericChainId = parseInt(chainId, 16);
         console.log("🔄 Wallet chain changed to:", numericChainId);
@@ -69,16 +105,47 @@ export function NetworkGuard({ children }: NetworkGuardProps) {
         setBannerDismissed(false); // Reset dismissal on chain change
       };
 
-      window.ethereum.on("chainChanged", handleChainChanged);
-      return () => {
-        window.ethereum.removeListener("chainChanged", handleChainChanged);
-      };
-    }
-  }, [isConnected, wagmiChainId]);
+      // Check if provider supports event listeners
+      if (typeof walletProvider.on === "function") {
+        walletProvider.on("chainChanged", handleChainChanged);
+        return () => {
+          if (typeof walletProvider.removeListener === "function") {
+            walletProvider.removeListener("chainChanged", handleChainChanged);
+          } else if (typeof walletProvider.off === "function") {
+            walletProvider.off("chainChanged", handleChainChanged);
+          }
+        };
+      } else if (typeof walletProvider.addEventListener === "function") {
+        // Fallback for providers that use addEventListener
+        walletProvider.addEventListener("chainChanged", handleChainChanged);
+        return () => {
+          if (typeof walletProvider.removeEventListener === "function") {
+            walletProvider.removeEventListener(
+              "chainChanged",
+              handleChainChanged
+            );
+          }
+        };
+      } else {
+        // Fallback to polling if no event support
+        const pollInterval = setInterval(async () => {
+          try {
+            const chainId = await walletProvider.request({
+              method: "eth_chainId",
+            });
+            const numericChainId = parseInt(chainId, 16);
+            if (numericChainId !== actualWalletChainId) {
+              handleChainChanged(chainId);
+            }
+          } catch (error) {
+            console.error("Error polling chain ID:", error);
+          }
+        }, 5000);
 
-  useEffect(() => {
-    setMounted(true);
-  }, []);
+        return () => clearInterval(pollInterval);
+      }
+    }
+  }, [isConnected, wagmiChainId, walletProvider]);
 
   useEffect(() => {
     if (!mounted) return;
@@ -93,6 +160,7 @@ export function NetworkGuard({ children }: NetworkGuardProps) {
     - Wrong Network: ${isWrongNetwork}
     - Banner Dismissed: ${bannerDismissed}
     - Is Switching: ${isSwitching}
+    - Wallet Provider: ${walletProvider ? "Available" : "Not Available"}
     `);
 
     // Show banner if wrong network and not dismissed
@@ -115,6 +183,7 @@ export function NetworkGuard({ children }: NetworkGuardProps) {
     isWrongNetwork,
     bannerDismissed,
     isSwitching,
+    walletProvider,
   ]);
 
   const handleSwitchNetwork = async () => {

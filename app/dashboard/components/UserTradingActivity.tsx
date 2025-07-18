@@ -1,8 +1,8 @@
 // app/dashboard/components/UserTradingActivity.tsx
 "use client";
 
-import { useState, useEffect } from "react";
-import { motion, AnimatePresence } from "framer-motion";
+import { useState, useEffect, useMemo } from "react";
+import { motion } from "framer-motion";
 import { useAccount } from "wagmi";
 import { formatEther } from "viem";
 import {
@@ -13,8 +13,7 @@ import {
   CardDescription,
 } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { Badge } from "@/components/ui/badge";
-import { Progress } from "@/components/ui/progress";
+import { Alert, AlertDescription } from "@/components/ui/alert";
 import {
   Table,
   TableBody,
@@ -24,41 +23,18 @@ import {
   TableRow,
 } from "@/components/ui/table";
 import {
-  LineChart,
-  Line,
-  XAxis,
-  YAxis,
-  CartesianGrid,
-  ResponsiveContainer,
-  BarChart,
-  Bar,
-  Tooltip,
-  PieChart,
-  Pie,
-  Cell,
-  Legend,
-} from "recharts";
-import {
   Activity,
   TrendingUp,
   TrendingDown,
   ArrowUpRight,
   ArrowDownLeft,
   DollarSign,
-  Target,
-  Clock,
   BarChart3,
-  PieChart as PieChartIcon,
   RefreshCw,
-  ExternalLink,
-  Filter,
-  Calendar,
-  Award,
   Zap,
-  Eye,
   CheckCircle,
   XCircle,
-  Timer,
+  ExternalLink,
 } from "lucide-react";
 import {
   collection,
@@ -84,28 +60,16 @@ interface Trade {
   pricePerToken: string;
   timestamp: string;
   transactionHash: string;
-  success: boolean;
+  success?: boolean;
 }
 
 interface TradingStats {
   totalTrades: number;
   totalVolume: string;
-  totalPnL: number;
-  winRate: number;
-  avgTradeSize: string;
   totalFees: string;
-  topPerformingToken: {
-    symbol: string;
-    pnl: number;
-  } | null;
-}
-
-interface ActivitySummary {
-  today: number;
-  week: number;
-  month: number;
-  profitableTrades: number;
-  totalTrades: number;
+  buyCount: number;
+  sellCount: number;
+  avgTradeSize: string;
 }
 
 export function UserTradingActivity() {
@@ -113,18 +77,10 @@ export function UserTradingActivity() {
   const router = useRouter();
   const [trades, setTrades] = useState<Trade[]>([]);
   const [isLoading, setIsLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
   const [timeframe, setTimeframe] = useState<"24h" | "7d" | "30d" | "all">(
     "7d"
   );
-  const [tradingStats, setTradingStats] = useState<TradingStats>({
-    totalTrades: 0,
-    totalVolume: "0",
-    totalPnL: 0,
-    winRate: 0,
-    avgTradeSize: "0",
-    totalFees: "0",
-    topPerformingToken: null,
-  });
 
   // Fetch user trades
   useEffect(() => {
@@ -135,6 +91,9 @@ export function UserTradingActivity() {
       }
 
       try {
+        setIsLoading(true);
+        setError(null);
+
         const tradesRef = collection(db, "trades");
         const q = query(
           tradesRef,
@@ -149,13 +108,12 @@ export function UserTradingActivity() {
             const data = doc.data();
 
             // Get token details
-            const tokenDoc = await getDocs(
-              query(
-                collection(db, "tokens"),
-                where("address", "==", data.token)
-              )
+            const tokensQuery = query(
+              collection(db, "tokens"),
+              where("address", "==", data.token)
             );
-            const tokenData = tokenDoc.docs[0]?.data();
+            const tokenSnapshot = await getDocs(tokensQuery);
+            const tokenData = tokenSnapshot.docs[0]?.data();
             const tokenName = tokenData?.name || "Unknown Token";
             const tokenSymbol = tokenData?.symbol || "TOKEN";
 
@@ -172,7 +130,7 @@ export function UserTradingActivity() {
               pricePerToken: data.pricePerToken,
               timestamp: data.timestamp,
               transactionHash: data.transactionHash,
-              success: data.success !== false, // Default to true if not specified
+              success: data.success !== false,
             };
           })
         );
@@ -180,6 +138,8 @@ export function UserTradingActivity() {
         // Filter by timeframe
         const now = new Date();
         const filteredTrades = tradeData.filter((trade) => {
+          if (timeframe === "all") return true;
+
           const tradeDate = new Date(trade.timestamp);
           const daysDiff =
             (now.getTime() - tradeDate.getTime()) / (1000 * 60 * 60 * 24);
@@ -197,12 +157,9 @@ export function UserTradingActivity() {
         });
 
         setTrades(filteredTrades);
-
-        // Calculate trading stats
-        const stats = calculateTradingStats(filteredTrades);
-        setTradingStats(stats);
       } catch (error) {
         console.error("Error fetching trades:", error);
+        setError("Failed to load trading history");
       } finally {
         setIsLoading(false);
       }
@@ -211,16 +168,16 @@ export function UserTradingActivity() {
     fetchTrades();
   }, [address, timeframe]);
 
-  const calculateTradingStats = (trades: Trade[]): TradingStats => {
+  // Calculate trading stats
+  const tradingStats: TradingStats = useMemo(() => {
     if (trades.length === 0) {
       return {
         totalTrades: 0,
         totalVolume: "0",
-        totalPnL: 0,
-        winRate: 0,
-        avgTradeSize: "0",
         totalFees: "0",
-        topPerformingToken: null,
+        buyCount: 0,
+        sellCount: 0,
+        avgTradeSize: "0",
       };
     }
 
@@ -234,83 +191,19 @@ export function UserTradingActivity() {
       0
     );
 
+    const buyCount = trades.filter((t) => t.type === "buy").length;
+    const sellCount = trades.filter((t) => t.type === "sell").length;
     const avgTradeSize = totalVolume / trades.length;
-
-    // Calculate PnL (simplified - would need more complex logic for real PnL)
-    const buys = trades.filter((t) => t.type === "buy");
-    const sells = trades.filter((t) => t.type === "sell");
-    const totalBuyVolume = buys.reduce(
-      (sum, trade) => sum + Number(formatEther(BigInt(trade.ethAmount))),
-      0
-    );
-    const totalSellVolume = sells.reduce(
-      (sum, trade) => sum + Number(formatEther(BigInt(trade.ethAmount))),
-      0
-    );
-    const estimatedPnL = totalSellVolume - totalBuyVolume - totalFees;
-
-    // Calculate win rate (simplified)
-    const profitableTrades = Math.floor(trades.length * 0.6); // Mock calculation
-    const winRate =
-      trades.length > 0 ? (profitableTrades / trades.length) * 100 : 0;
-
-    // Find top performing token
-    const tokenPerformance: Record<string, number> = {};
-    trades.forEach((trade) => {
-      if (!tokenPerformance[trade.tokenSymbol]) {
-        tokenPerformance[trade.tokenSymbol] = 0;
-      }
-      tokenPerformance[trade.tokenSymbol] += trade.type === "sell" ? 1 : -0.5; // Mock score
-    });
-
-    const topToken = Object.entries(tokenPerformance).sort(
-      ([, a], [, b]) => b - a
-    )[0];
 
     return {
       totalTrades: trades.length,
       totalVolume: totalVolume.toFixed(4),
-      totalPnL: estimatedPnL,
-      winRate,
-      avgTradeSize: avgTradeSize.toFixed(4),
       totalFees: totalFees.toFixed(6),
-      topPerformingToken: topToken
-        ? {
-            symbol: topToken[0],
-            pnl: topToken[1],
-          }
-        : null,
+      buyCount,
+      sellCount,
+      avgTradeSize: avgTradeSize.toFixed(4),
     };
-  };
-
-  // Generate mock performance chart data
-  const performanceData = Array.from({ length: 30 }, (_, i) => ({
-    date: new Date(
-      Date.now() - (29 - i) * 24 * 60 * 60 * 1000
-    ).toLocaleDateString(),
-    pnl: Math.random() * 100 - 50,
-    volume: Math.random() * 10,
-  }));
-
-  const activitySummary: ActivitySummary = {
-    today: trades.filter((t) => {
-      const tradeDate = new Date(t.timestamp);
-      const today = new Date();
-      return tradeDate.toDateString() === today.toDateString();
-    }).length,
-    week: trades.filter((t) => {
-      const tradeDate = new Date(t.timestamp);
-      const weekAgo = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000);
-      return tradeDate >= weekAgo;
-    }).length,
-    month: trades.filter((t) => {
-      const tradeDate = new Date(t.timestamp);
-      const monthAgo = new Date(Date.now() - 30 * 24 * 60 * 60 * 1000);
-      return tradeDate >= monthAgo;
-    }).length,
-    profitableTrades: Math.floor(trades.length * 0.6),
-    totalTrades: trades.length,
-  };
+  }, [trades]);
 
   if (!isConnected) {
     return (
@@ -363,6 +256,7 @@ export function UserTradingActivity() {
                 variant="ghost"
                 size="icon"
                 className="hover:bg-primary/20"
+                onClick={() => window.location.reload()}
               >
                 <RefreshCw className="h-4 w-4" />
               </Button>
@@ -399,201 +293,48 @@ export function UserTradingActivity() {
 
             <div className="unified-card border-primary/20 bg-primary/5 p-4">
               <div className="flex items-center gap-2 mb-2">
-                <Target className="h-4 w-4 text-purple-400" />
-                <span className="text-xs text-muted-foreground">Win Rate</span>
+                <TrendingUp className="h-4 w-4 text-green-400" />
+                <span className="text-xs text-muted-foreground">Buys</span>
               </div>
               <p className="text-2xl font-bold text-foreground">
-                {tradingStats.winRate.toFixed(1)}%
+                {tradingStats.buyCount}
               </p>
-              <Progress value={tradingStats.winRate} className="h-2 mt-1" />
+              <p className="text-xs text-green-400">Purchases</p>
             </div>
 
             <div className="unified-card border-primary/20 bg-primary/5 p-4">
               <div className="flex items-center gap-2 mb-2">
-                <TrendingUp
-                  className={`h-4 w-4 ${
-                    tradingStats.totalPnL >= 0
-                      ? "text-green-400"
-                      : "text-red-400"
-                  }`}
-                />
-                <span className="text-xs text-muted-foreground">P&L</span>
+                <TrendingDown className="h-4 w-4 text-red-400" />
+                <span className="text-xs text-muted-foreground">Sells</span>
               </div>
-              <p
-                className={`text-2xl font-bold ${
-                  tradingStats.totalPnL >= 0 ? "text-green-400" : "text-red-400"
-                }`}
-              >
-                {tradingStats.totalPnL >= 0 ? "+" : ""}
-                {tradingStats.totalPnL.toFixed(4)}
+              <p className="text-2xl font-bold text-foreground">
+                {tradingStats.sellCount}
               </p>
-              <p className="text-xs text-muted-foreground">AVAX</p>
+              <p className="text-xs text-red-400">Sales</p>
             </div>
           </div>
+
+          {error && (
+            <Alert variant="destructive" className="mb-4">
+              <AlertDescription>{error}</AlertDescription>
+            </Alert>
+          )}
         </CardContent>
       </Card>
-
-      {/* Performance Chart & Activity Summary */}
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-        {/* Performance Chart */}
-        <Card className="unified-card border-primary/20 lg:col-span-2">
-          <CardHeader>
-            <CardTitle className="flex items-center gap-2">
-              <BarChart3 className="h-5 w-5 text-primary" />
-              Performance Overview
-            </CardTitle>
-          </CardHeader>
-          <CardContent>
-            <div className="h-[300px]">
-              <ResponsiveContainer width="100%" height="100%">
-                <LineChart data={performanceData}>
-                  <CartesianGrid
-                    strokeDasharray="3 3"
-                    stroke="hsl(var(--muted-foreground))"
-                    strokeOpacity={0.1}
-                  />
-                  <XAxis
-                    dataKey="date"
-                    stroke="hsl(var(--muted-foreground))"
-                    fontSize={11}
-                    tickLine={false}
-                    axisLine={false}
-                  />
-                  <YAxis
-                    stroke="hsl(var(--muted-foreground))"
-                    fontSize={11}
-                    tickLine={false}
-                    axisLine={false}
-                  />
-                  <Tooltip
-                    contentStyle={{
-                      backgroundColor: "hsl(var(--background))",
-                      border: "1px solid hsl(var(--border))",
-                      borderRadius: "8px",
-                    }}
-                  />
-                  <Line
-                    type="monotone"
-                    dataKey="pnl"
-                    stroke="hsl(var(--primary))"
-                    strokeWidth={2}
-                    dot={false}
-                  />
-                </LineChart>
-              </ResponsiveContainer>
-            </div>
-          </CardContent>
-        </Card>
-
-        {/* Activity Summary */}
-        <Card className="unified-card border-primary/20">
-          <CardHeader>
-            <CardTitle className="flex items-center gap-2">
-              <Clock className="h-5 w-5 text-primary" />
-              Activity Summary
-            </CardTitle>
-          </CardHeader>
-          <CardContent className="space-y-4">
-            <div className="space-y-3">
-              <div className="flex items-center justify-between">
-                <span className="text-sm text-muted-foreground">Today</span>
-                <span className="font-semibold text-foreground">
-                  {activitySummary.today} trades
-                </span>
-              </div>
-              <div className="flex items-center justify-between">
-                <span className="text-sm text-muted-foreground">This Week</span>
-                <span className="font-semibold text-foreground">
-                  {activitySummary.week} trades
-                </span>
-              </div>
-              <div className="flex items-center justify-between">
-                <span className="text-sm text-muted-foreground">
-                  This Month
-                </span>
-                <span className="font-semibold text-foreground">
-                  {activitySummary.month} trades
-                </span>
-              </div>
-            </div>
-
-            <div className="pt-4 border-t border-border/50">
-              <div className="space-y-2">
-                <div className="flex items-center justify-between">
-                  <span className="text-sm text-muted-foreground">
-                    Success Rate
-                  </span>
-                  <span className="text-sm font-semibold text-green-400">
-                    {activitySummary.totalTrades > 0
-                      ? (
-                          (activitySummary.profitableTrades /
-                            activitySummary.totalTrades) *
-                          100
-                        ).toFixed(1)
-                      : 0}
-                    %
-                  </span>
-                </div>
-                <Progress
-                  value={
-                    activitySummary.totalTrades > 0
-                      ? (activitySummary.profitableTrades /
-                          activitySummary.totalTrades) *
-                        100
-                      : 0
-                  }
-                  className="h-2"
-                />
-              </div>
-            </div>
-
-            <div className="pt-4 border-t border-border/50">
-              <h4 className="text-sm font-semibold text-foreground mb-3">
-                Top Performer
-              </h4>
-              {tradingStats.topPerformingToken ? (
-                <div className="flex items-center justify-between">
-                  <span className="font-semibold text-primary">
-                    {tradingStats.topPerformingToken.symbol}
-                  </span>
-                  <Badge className="bg-green-500/20 text-green-400 border-green-400/30">
-                    Best
-                  </Badge>
-                </div>
-              ) : (
-                <p className="text-sm text-muted-foreground">No trades yet</p>
-              )}
-            </div>
-
-            <div className="pt-4 border-t border-border/50">
-              <Button
-                variant="outline"
-                className="w-full bg-primary/10 hover:bg-primary/20 border-primary/30"
-                onClick={() => router.push("/dex")}
-              >
-                <ArrowUpRight className="h-4 w-4 mr-2" />
-                Start Trading
-              </Button>
-            </div>
-          </CardContent>
-        </Card>
-      </div>
 
       {/* Recent Trades Table */}
       <Card className="unified-card border-primary/20">
         <CardHeader>
           <div className="flex items-center justify-between">
             <CardTitle className="flex items-center gap-2">
-              <Table className="h-5 w-5 text-primary" />
+              <BarChart3 className="h-5 w-5 text-primary" />
               Recent Trades
             </CardTitle>
-            <Button
-              variant="outline"
-              size="sm"
-              onClick={() => router.push("/dashboard?tab=portfolio")}
-            >
-              View All
-            </Button>
+            {trades.length > 0 && (
+              <p className="text-sm text-muted-foreground">
+                Showing {trades.length} trades
+              </p>
+            )}
           </div>
         </CardHeader>
         <CardContent>
@@ -631,10 +372,11 @@ export function UserTradingActivity() {
                     <TableHead>Value</TableHead>
                     <TableHead>Status</TableHead>
                     <TableHead>Time</TableHead>
+                    <TableHead>Actions</TableHead>
                   </TableRow>
                 </TableHeader>
                 <TableBody>
-                  {trades.slice(0, 10).map((trade, index) => (
+                  {trades.slice(0, 20).map((trade, index) => (
                     <motion.tr
                       key={trade.id}
                       initial={{ opacity: 0, y: 20 }}
@@ -716,6 +458,31 @@ export function UserTradingActivity() {
                           <p className="text-xs text-muted-foreground">
                             {new Date(trade.timestamp).toLocaleTimeString()}
                           </p>
+                        </div>
+                      </TableCell>
+                      <TableCell>
+                        <div className="flex items-center gap-2">
+                          <Button
+                            variant="ghost"
+                            size="sm"
+                            onClick={() => router.push(`/dex/${trade.token}`)}
+                            className="h-7 px-3 text-xs hover:bg-primary/20"
+                          >
+                            View Token
+                          </Button>
+                          <Button
+                            variant="ghost"
+                            size="sm"
+                            onClick={() =>
+                              window.open(
+                                `https://testnet.snowtrace.io/tx/${trade.transactionHash}`,
+                                "_blank"
+                              )
+                            }
+                            className="h-7 px-3 text-xs hover:bg-primary/20"
+                          >
+                            <ExternalLink className="h-3 w-3" />
+                          </Button>
                         </div>
                       </TableCell>
                     </motion.tr>

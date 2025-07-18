@@ -1,4 +1,4 @@
-// app/dex/factory/components/TokenInfoForm.tsx
+// app/factory/components/TokenInfoForm.tsx
 "use client";
 
 import type React from "react";

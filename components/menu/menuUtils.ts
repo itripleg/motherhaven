@@ -17,7 +17,7 @@ export const isActiveRoute = (href: string, pathname: string): boolean => {
     return (
       pathname === "/dex" ||
       (pathname.startsWith("/dex/") &&
-        !pathname.startsWith("/dex/factory") &&
+        !pathname.startsWith("/factory") &&
         pathname.split("/").length === 3)
     ); // /dex/[tokenAddress]
   }
@@ -40,7 +40,7 @@ export const getCurrentNavItem = (pathname: string): NavItem => {
   // If on a token page, show DEX with token info
   if (
     pathname.startsWith("/dex/") &&
-    !pathname.startsWith("/dex/factory") &&
+    !pathname.startsWith("/factory") &&
     pathname.split("/").length === 3
   ) {
     return {

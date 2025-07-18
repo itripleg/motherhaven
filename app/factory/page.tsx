@@ -1,4 +1,4 @@
-// app/dex/factory/page.tsx
+// app/factory/page.tsx
 "use client";
 
 import { useState, useEffect, useCallback } from "react";

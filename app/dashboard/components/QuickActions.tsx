@@ -71,7 +71,7 @@ export function QuickActions() {
       icon: Plus,
       color:
         "bg-green-500/20 text-green-400 border-green-400/30 hover:bg-green-500/30",
-      action: () => router.push("/dex/factory"),
+      action: () => router.push("/factory"),
       badge: "Popular",
     },
     {

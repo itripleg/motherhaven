@@ -1,4 +1,4 @@
-// app/dex/factory/components/SimpleImageUpload.tsx
+// app/factory/components/SimpleImageUpload.tsx
 "use client";
 
 import React, { useState, useRef } from "react";
