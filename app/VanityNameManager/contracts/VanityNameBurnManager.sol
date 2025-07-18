@@ -9,9 +9,22 @@ interface IBurnManager {
     function supportsToken(address token) external view returns (bool);
 }
 
+interface IERC20 {
+    function transferFrom(
+        address from,
+        address to,
+        uint256 amount
+    ) external returns (bool);
+    function balanceOf(address account) external view returns (uint256);
+}
+
+interface IBurnToken {
+    function burn(uint256 amount) external;
+}
+
 /**
  * @title VanityNameBurnManager
- * @dev A burn manager that allows users to burn tokens to set/change their vanity display name
+ * @dev A simple burn manager that processes vanity name requests when tokens are burned
  */
 contract VanityNameBurnManager is IBurnManager, Ownable, ReentrancyGuard {
     // =================================================================
@@ -45,8 +58,6 @@ contract VanityNameBurnManager is IBurnManager, Ownable, ReentrancyGuard {
 
     event TokenSupported(address indexed token, bool supported);
     event BurnCostUpdated(uint256 oldCost, uint256 newCost);
-    event NameReserved(string indexed name, address indexed user);
-    event NameReleased(string indexed name, address indexed user);
 
     // =================================================================
     //                       Enums & Structs
@@ -89,7 +100,7 @@ contract VanityNameBurnManager is IBurnManager, Ownable, ReentrancyGuard {
     /// @dev Reverse mapping: name to user (for uniqueness)
     mapping(string => address) public nameToUser;
 
-    /// @dev User's pending requests
+    /// @dev User's request history
     mapping(address => uint256[]) public userRequests;
 
     /// @dev Cost to burn tokens for name change (in token units with decimals)
@@ -103,6 +114,9 @@ contract VanityNameBurnManager is IBurnManager, Ownable, ReentrancyGuard {
 
     /// @dev Emergency pause mechanism
     bool public paused = false;
+
+    /// @dev Store intended vanity name per user (set by frontend before burn)
+    mapping(address => string) public intendedVanityNames;
 
     // =================================================================
     //                         Constructor
@@ -152,16 +166,75 @@ contract VanityNameBurnManager is IBurnManager, Ownable, ReentrancyGuard {
     // =================================================================
 
     /**
-     * @dev Called when tokens are burned - this should not be called directly
-     * Instead, use requestVanityName which will handle the burn internally
+     * @dev Called when tokens are burned - processes vanity name request automatically
+     * Frontend should call setIntendedVanityName() before burning tokens
      */
     function notifyBurn(
         address burner,
         uint256 amount
-    ) external override validToken(msg.sender) {
-        // This is called after tokens are burned via requestVanityName
-        // The actual logic is in requestVanityName function
+    ) external override validToken(msg.sender) notPaused nonReentrant {
         require(amount >= burnCostPerNameChange, "Insufficient burn amount");
+
+        // Get the intended vanity name
+        string memory newName = intendedVanityNames[burner];
+        require(bytes(newName).length > 0, "No intended vanity name set");
+
+        // Validate the name
+        require(_isValidName(newName), "Invalid name format");
+        require(bytes(newName).length >= MIN_NAME_LENGTH, "Name too short");
+        require(bytes(newName).length <= MAX_NAME_LENGTH, "Name too long");
+
+        // Check if name is available
+        string memory lowerNewName = _toLowerCase(newName);
+        address currentOwner = nameToUser[lowerNewName];
+        require(
+            currentOwner == address(0) || currentOwner == burner,
+            "Name already taken"
+        );
+
+        // Get user's current name
+        string memory oldName = userVanityNames[burner];
+
+        // Create the request
+        uint256 requestId = nextRequestId++;
+
+        vanityNameRequests[requestId] = VanityNameRequest({
+            requestId: requestId,
+            user: burner,
+            oldName: oldName,
+            newName: newName,
+            burnAmount: amount,
+            token: msg.sender,
+            timestamp: block.timestamp,
+            status: RequestStatus.CONFIRMED, // Auto-confirm since validation passed
+            rejectionReason: ""
+        });
+
+        userRequests[burner].push(requestId);
+
+        // Update name mappings
+        if (bytes(oldName).length > 0) {
+            // Release old name
+            delete nameToUser[_toLowerCase(oldName)];
+        }
+        nameToUser[lowerNewName] = burner;
+        userVanityNames[burner] = newName;
+
+        // Clear intended name
+        delete intendedVanityNames[burner];
+
+        // Emit events
+        emit VanityNameRequested(
+            burner,
+            oldName,
+            newName,
+            amount,
+            msg.sender,
+            block.timestamp,
+            requestId
+        );
+
+        emit VanityNameConfirmed(burner, newName, requestId, block.timestamp);
     }
 
     /**
@@ -174,16 +247,32 @@ contract VanityNameBurnManager is IBurnManager, Ownable, ReentrancyGuard {
     }
 
     // =================================================================
-    //                       Core Functions
+    //                       Helper Functions
     // =================================================================
 
     /**
-     * @dev Request a vanity name change by burning tokens
-     * @param newName The desired vanity name
-     * @param tokenAddress The address of the token to burn
-     * @param burnAmount The amount of tokens to burn (must be >= burnCostPerNameChange)
+     * @dev Set intended vanity name (called by frontend before burning)
+     * This allows the burn to know what name the user wants
      */
-    function requestVanityName(
+    function setIntendedVanityName(
+        string calldata newName
+    ) external validName(newName) {
+        // Check if name is available
+        string memory lowerNewName = _toLowerCase(newName);
+        address currentOwner = nameToUser[lowerNewName];
+        require(
+            currentOwner == address(0) || currentOwner == msg.sender,
+            "Name already taken"
+        );
+
+        intendedVanityNames[msg.sender] = newName;
+    }
+
+    /**
+     * @dev Request vanity name with burn in one transaction (recommended)
+     * Checks availability and burns tokens atomically
+     */
+    function requestVanityNameWithBurn(
         string calldata newName,
         address tokenAddress,
         uint256 burnAmount
@@ -199,17 +288,38 @@ contract VanityNameBurnManager is IBurnManager, Ownable, ReentrancyGuard {
             "Insufficient burn amount"
         );
 
-        // Check if name is already taken
-        address currentOwner = nameToUser[_toLowerCase(newName)];
+        // Check if name is available
+        string memory lowerNewName = _toLowerCase(newName);
+        address currentOwner = nameToUser[lowerNewName];
         require(
             currentOwner == address(0) || currentOwner == msg.sender,
             "Name already taken"
         );
 
+        // Check user has enough tokens
+        IERC20 token = IERC20(tokenAddress);
+        require(
+            token.balanceOf(msg.sender) >= burnAmount,
+            "Insufficient token balance"
+        );
+
+        // Transfer and burn tokens
+        require(
+            token.transferFrom(msg.sender, address(this), burnAmount),
+            "Token transfer failed"
+        );
+
+        // Try to burn tokens (if token supports it)
+        try IBurnToken(tokenAddress).burn(burnAmount) {
+            // Tokens burned successfully
+        } catch {
+            // If burn fails, tokens stay in contract (effectively burned from circulation)
+        }
+
         // Get user's current name
         string memory oldName = userVanityNames[msg.sender];
 
-        // Create request
+        // Create the request
         uint256 requestId = nextRequestId++;
 
         vanityNameRequests[requestId] = VanityNameRequest({
@@ -220,37 +330,21 @@ contract VanityNameBurnManager is IBurnManager, Ownable, ReentrancyGuard {
             burnAmount: burnAmount,
             token: tokenAddress,
             timestamp: block.timestamp,
-            status: RequestStatus.PENDING,
+            status: RequestStatus.CONFIRMED, // Auto-confirm since validation passed
             rejectionReason: ""
         });
 
         userRequests[msg.sender].push(requestId);
 
-        // Reserve the name temporarily
-        string memory lowerNewName = _toLowerCase(newName);
+        // Update name mappings
         if (bytes(oldName).length > 0) {
             // Release old name
             delete nameToUser[_toLowerCase(oldName)];
-            emit NameReleased(oldName, msg.sender);
         }
         nameToUser[lowerNewName] = msg.sender;
-        emit NameReserved(newName, msg.sender);
+        userVanityNames[msg.sender] = newName;
 
-        // Burn tokens from user
-        IERC20(tokenAddress).transferFrom(
-            msg.sender,
-            address(this),
-            burnAmount
-        );
-
-        // Actually burn the tokens by calling the token's burn function
-        // This assumes the token has a burn function - if not, tokens just stay in this contract
-        try IBurnToken(tokenAddress).burn(burnAmount) {
-            // Tokens burned successfully
-        } catch {
-            // If burn fails, tokens stay in contract (effectively burned from circulation)
-        }
-
+        // Emit events
         emit VanityNameRequested(
             msg.sender,
             oldName,
@@ -260,64 +354,29 @@ contract VanityNameBurnManager is IBurnManager, Ownable, ReentrancyGuard {
             block.timestamp,
             requestId
         );
-    }
-
-    /**
-     * @dev Confirm a vanity name change (owner only - called by API after Firebase update)
-     */
-    function confirmVanityName(
-        uint256 requestId
-    ) external onlyOwner requestExists(requestId) {
-        VanityNameRequest storage request = vanityNameRequests[requestId];
-        require(
-            request.status == RequestStatus.PENDING,
-            "Request already processed"
-        );
-
-        // Update user's vanity name
-        userVanityNames[request.user] = request.newName;
-        request.status = RequestStatus.CONFIRMED;
 
         emit VanityNameConfirmed(
-            request.user,
-            request.newName,
+            msg.sender,
+            newName,
             requestId,
             block.timestamp
         );
     }
 
     /**
-     * @dev Reject a vanity name change (owner only)
+     * @dev Get user's intended vanity name
      */
-    function rejectVanityName(
-        uint256 requestId,
-        string calldata reason
-    ) external onlyOwner requestExists(requestId) {
-        VanityNameRequest storage request = vanityNameRequests[requestId];
-        require(
-            request.status == RequestStatus.PENDING,
-            "Request already processed"
-        );
+    function getIntendedVanityName(
+        address user
+    ) external view returns (string memory) {
+        return intendedVanityNames[user];
+    }
 
-        // Release the reserved name
-        string memory lowerNewName = _toLowerCase(request.newName);
-        delete nameToUser[lowerNewName];
-
-        // Restore old name if it existed
-        if (bytes(request.oldName).length > 0) {
-            nameToUser[_toLowerCase(request.oldName)] = request.user;
-        }
-
-        request.status = RequestStatus.REJECTED;
-        request.rejectionReason = reason;
-
-        emit VanityNameRejected(
-            request.user,
-            request.newName,
-            requestId,
-            reason,
-            block.timestamp
-        );
+    /**
+     * @dev Clear intended vanity name (if user wants to cancel)
+     */
+    function clearIntendedVanityName() external {
+        delete intendedVanityNames[msg.sender];
     }
 
     /**
@@ -335,43 +394,7 @@ contract VanityNameBurnManager is IBurnManager, Ownable, ReentrancyGuard {
     }
 
     /**
-     * @dev Get user's pending requests
-     */
-    function getUserPendingRequests(
-        address user
-    ) external view returns (uint256[] memory) {
-        uint256[] memory allRequests = userRequests[user];
-        uint256 pendingCount = 0;
-
-        // Count pending requests
-        for (uint256 i = 0; i < allRequests.length; i++) {
-            if (
-                vanityNameRequests[allRequests[i]].status ==
-                RequestStatus.PENDING
-            ) {
-                pendingCount++;
-            }
-        }
-
-        // Create array of pending requests
-        uint256[] memory pendingRequests = new uint256[](pendingCount);
-        uint256 index = 0;
-
-        for (uint256 i = 0; i < allRequests.length; i++) {
-            if (
-                vanityNameRequests[allRequests[i]].status ==
-                RequestStatus.PENDING
-            ) {
-                pendingRequests[index] = allRequests[i];
-                index++;
-            }
-        }
-
-        return pendingRequests;
-    }
-
-    /**
-     * @dev Get all requests for a user
+     * @dev Get user's request history
      */
     function getUserRequests(
         address user
@@ -457,8 +480,6 @@ contract VanityNameBurnManager is IBurnManager, Ownable, ReentrancyGuard {
 
         delete nameToUser[_toLowerCase(name)];
         delete userVanityNames[user];
-
-        emit NameReleased(name, user);
     }
 
     // =================================================================
@@ -546,19 +567,4 @@ contract VanityNameBurnManager is IBurnManager, Ownable, ReentrancyGuard {
     function getBurnCost() external view returns (uint256) {
         return burnCostPerNameChange;
     }
-}
-
-// Interface for burn-enabled tokens
-interface IBurnToken {
-    function burn(uint256 amount) external;
-}
-
-// Standard ERC20 interface for token transfers
-interface IERC20 {
-    function transferFrom(
-        address from,
-        address to,
-        uint256 amount
-    ) external returns (bool);
-    function balanceOf(address account) external view returns (uint256);
 }
