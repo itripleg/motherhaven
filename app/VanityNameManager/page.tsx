@@ -24,14 +24,12 @@ import {
   Activity,
 } from "lucide-react";
 import {
-  VanityRequestStatus,
   VANITY_NAME_CONSTANTS,
   type VanityNameData,
-  type VanityRequestDocument,
   type VanityNameStats as VanityStatsType,
 } from "@/types/vanity";
 
-// We'll import these components once we create them
+// Updated component imports
 import { VanityNameRequest } from "./components/VanityNameRequest";
 import { VanityNameHistory } from "./components/VanityNameHistory";
 import { VanityNameSearch } from "./components/VanityNameSearch";
@@ -48,9 +46,6 @@ export default function VanityNameManagerPage({}: VanityNameManagerPageProps) {
   const [userVanityData, setUserVanityData] = useState<VanityNameData | null>(
     null
   );
-  const [pendingRequests, setPendingRequests] = useState<
-    VanityRequestDocument[]
-  >([]);
   const [systemStats, setSystemStats] = useState<VanityStatsType | null>(null);
 
   // Load user's vanity name data
@@ -64,15 +59,13 @@ export default function VanityNameManagerPage({}: VanityNameManagerPageProps) {
       try {
         setIsLoading(true);
 
-        // TODO: Implement these API calls
-        const [vanityData, requests, stats] = await Promise.all([
+        // Simplified API calls - no more pending requests
+        const [vanityData, stats] = await Promise.all([
           fetchUserVanityData(address),
-          fetchUserPendingRequests(address),
           fetchSystemStats(),
         ]);
 
         setUserVanityData(vanityData);
-        setPendingRequests(requests);
         setSystemStats(stats);
       } catch (error) {
         console.error("Error loading vanity data:", error);
@@ -88,7 +81,25 @@ export default function VanityNameManagerPage({}: VanityNameManagerPageProps) {
   const fetchUserVanityData = async (
     userAddress: string
   ): Promise<VanityNameData> => {
-    // TODO: Implement actual API call
+    // TODO: Implement actual API call to get user's current name and history
+    // This would fetch from the new vanity_users collection
+    try {
+      const response = await fetch(`/api/vanity-name/user/${userAddress}`);
+      if (response.ok) {
+        const data = await response.json();
+        return {
+          current: data.currentName || "",
+          history: data.nameHistory || [],
+          totalChanges: data.nameHistory?.length || 0,
+          lastChanged:
+            data.nameHistory?.[data.nameHistory.length - 1]?.timestamp || null,
+        };
+      }
+    } catch (error) {
+      console.error("Error fetching user vanity data:", error);
+    }
+
+    // Fallback to empty data
     return {
       current: "",
       history: [],
@@ -97,15 +108,19 @@ export default function VanityNameManagerPage({}: VanityNameManagerPageProps) {
     };
   };
 
-  const fetchUserPendingRequests = async (
-    userAddress: string
-  ): Promise<VanityRequestDocument[]> => {
-    // TODO: Implement actual API call
-    return [];
-  };
-
   const fetchSystemStats = async (): Promise<VanityStatsType> => {
-    // TODO: Implement actual API call
+    // TODO: Implement actual API call to get system-wide stats
+    // This would aggregate data from vanity_users and vanity_names collections
+    try {
+      const response = await fetch("/api/vanity-name/stats");
+      if (response.ok) {
+        return await response.json();
+      }
+    } catch (error) {
+      console.error("Error fetching system stats:", error);
+    }
+
+    // Fallback to mock data
     return {
       totalNames: 0,
       totalRequests: 0,
@@ -119,10 +134,9 @@ export default function VanityNameManagerPage({}: VanityNameManagerPageProps) {
 
   // Handle successful name request
   const handleNameRequestSuccess = () => {
-    // Refresh user data
+    // Refresh user data after successful name change
     if (address) {
       fetchUserVanityData(address).then(setUserVanityData);
-      fetchUserPendingRequests(address).then(setPendingRequests);
     }
   };
 
@@ -234,7 +248,7 @@ export default function VanityNameManagerPage({}: VanityNameManagerPageProps) {
                 </Badge>
               </div>
               <p className="text-muted-foreground text-lg">
-                Customize your digital identity with unique vanity names
+                Burn VAIN tokens to earn unique vanity names
               </p>
             </div>
 
@@ -266,30 +280,28 @@ export default function VanityNameManagerPage({}: VanityNameManagerPageProps) {
               </motion.div>
             )}
 
-            {/* Pending Requests Alert */}
-            {pendingRequests.length > 0 && (
-              <motion.div
-                initial={{ opacity: 0, y: 10 }}
-                animate={{ opacity: 1, y: 0 }}
-                transition={{ delay: 0.3 }}
-                className="max-w-md mx-auto"
-              >
-                <Card className="unified-card border-yellow-400/30 bg-yellow-500/10">
-                  <CardContent className="p-4 text-center">
-                    <div className="flex items-center justify-center gap-2 mb-2">
-                      <Activity className="h-4 w-4 text-yellow-400" />
-                      <span className="text-sm font-medium text-yellow-400">
-                        {pendingRequests.length} Pending Request
-                        {pendingRequests.length !== 1 ? "s" : ""}
-                      </span>
-                    </div>
-                    <p className="text-xs text-muted-foreground">
-                      Your name change requests are being processed
-                    </p>
-                  </CardContent>
-                </Card>
-              </motion.div>
-            )}
+            {/* Info Card for New System */}
+            <motion.div
+              initial={{ opacity: 0, y: 10 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ delay: 0.3 }}
+              className="max-w-2xl mx-auto"
+            >
+              <Card className="unified-card border-blue-400/30 bg-blue-500/10">
+                <CardContent className="p-6 text-center">
+                  <div className="flex items-center justify-center gap-3 mb-3">
+                    <Flame className="h-5 w-5 text-blue-400" />
+                    <span className="text-lg font-semibold text-blue-400">
+                      Burn-to-Earn System
+                    </span>
+                  </div>
+                  <p className="text-blue-300 text-sm leading-relaxed">
+                    🔥 Burn VAIN tokens to earn name changes • 🎭 Set vanity
+                    names instantly • ⚡ No approvals needed!
+                  </p>
+                </CardContent>
+              </Card>
+            </motion.div>
           </motion.div>
 
           {/* Main Content Tabs */}
@@ -355,7 +367,6 @@ export default function VanityNameManagerPage({}: VanityNameManagerPageProps) {
                       <VanityNameRequest
                         userAddress={address}
                         currentName={userVanityData?.current || ""}
-                        pendingRequests={pendingRequests}
                         onSuccess={handleNameRequestSuccess}
                       />
                     )}
