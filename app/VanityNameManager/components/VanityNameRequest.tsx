@@ -187,7 +187,10 @@ export function VanityNameRequest({
     address: selectedToken.address,
     abi: BURN_TOKEN_ABI,
     functionName: "allowance",
-    args: address && VANITY_BURN_MANAGER_ADDRESS ? [address, VANITY_BURN_MANAGER_ADDRESS] : undefined,
+    args:
+      address && VANITY_BURN_MANAGER_ADDRESS
+        ? [address, VANITY_BURN_MANAGER_ADDRESS]
+        : undefined,
   });
 
   // Contract writes
@@ -217,7 +220,8 @@ export function VanityNameRequest({
     });
 
   // Check if approval is needed
-  const needsApproval = burnCost && currentAllowance ? currentAllowance < burnCost : true;
+  const needsApproval =
+    burnCost && currentAllowance ? currentAllowance < burnCost : true;
 
   // Client-side validation
   const validateVanityNameClient = useCallback(
@@ -317,7 +321,9 @@ export function VanityNameRequest({
 
         // Contract-side validation if client-side passes
         if (result.isValid) {
-          const contractResult = await validateVanityNameContract(requestedName);
+          const contractResult = await validateVanityNameContract(
+            requestedName
+          );
           setValidationResult(contractResult);
         }
       } catch (error) {
@@ -389,11 +395,17 @@ export function VanityNameRequest({
   // Auto-proceed after approval
   useEffect(() => {
     const proceedAfterApproval = async () => {
-      if (!approveSuccess || !burnCost || isRequestPending || isWaitingForRequest) return;
+      if (
+        !approveSuccess ||
+        !burnCost ||
+        isRequestPending ||
+        isWaitingForRequest
+      )
+        return;
 
       try {
         console.log("🎭 Proceeding with vanity name request after approval...");
-        
+
         await writeRequest({
           address: VANITY_BURN_MANAGER_ADDRESS,
           abi: VANITY_BURN_MANAGER_ABI,
@@ -403,13 +415,16 @@ export function VanityNameRequest({
 
         toast({
           title: "🔥 Processing Request...",
-          description: `Burning ${formatEther(burnCost)} ${selectedToken.symbol} for "${requestedName}"!`,
+          description: `Burning ${formatEther(burnCost)} ${
+            selectedToken.symbol
+          } for "${requestedName}"!`,
         });
       } catch (error: any) {
         console.error("Request after approval failed:", error);
         toast({
           title: "Request Failed",
-          description: error.message || "Failed to process request after approval.",
+          description:
+            error.message || "Failed to process request after approval.",
           variant: "destructive",
         });
         setIsSubmitting(false);
@@ -417,7 +432,17 @@ export function VanityNameRequest({
     };
 
     proceedAfterApproval();
-  }, [approveSuccess, burnCost, requestedName, selectedToken.address, selectedToken.symbol, writeRequest, toast, isRequestPending, isWaitingForRequest]);
+  }, [
+    approveSuccess,
+    burnCost,
+    requestedName,
+    selectedToken.address,
+    selectedToken.symbol,
+    writeRequest,
+    toast,
+    isRequestPending,
+    isWaitingForRequest,
+  ]);
 
   // Handle the complete request process
   const handleRequestVanityName = async (e: React.FormEvent) => {
@@ -429,7 +454,9 @@ export function VanityNameRequest({
     if (tokenBalance && burnCost > tokenBalance.value) {
       toast({
         title: "Insufficient Balance",
-        description: `You need ${formatEther(burnCost)} ${selectedToken.symbol} tokens.`,
+        description: `You need ${formatEther(burnCost)} ${
+          selectedToken.symbol
+        } tokens.`,
         variant: "destructive",
       });
       return;
@@ -457,7 +484,9 @@ export function VanityNameRequest({
 
         toast({
           title: "🔓 Approving Tokens...",
-          description: `Approving ${formatEther(burnCost)} ${selectedToken.symbol} for vanity name request.`,
+          description: `Approving ${formatEther(burnCost)} ${
+            selectedToken.symbol
+          } for vanity name request.`,
         });
 
         // The rest will be handled by the approval success effect
@@ -473,14 +502,18 @@ export function VanityNameRequest({
 
         toast({
           title: "🔥 Processing Request...",
-          description: `Burning ${formatEther(burnCost)} ${selectedToken.symbol} for "${requestedName}"!`,
+          description: `Burning ${formatEther(burnCost)} ${
+            selectedToken.symbol
+          } for "${requestedName}"!`,
         });
       }
     } catch (error: any) {
       console.error("Request failed:", error);
       toast({
         title: "Request Failed",
-        description: error.message || "Failed to start vanity name request. Please try again.",
+        description:
+          error.message ||
+          "Failed to start vanity name request. Please try again.",
         variant: "destructive",
       });
       setIsSubmitting(false);
@@ -570,9 +603,7 @@ export function VanityNameRequest({
                 {!needsApproval ? (
                   <>
                     <Shield className="h-4 w-4 text-green-400" />
-                    <span className="font-medium text-green-400">
-                      Approved
-                    </span>
+                    <span className="font-medium text-green-400">Approved</span>
                   </>
                 ) : (
                   <>
@@ -697,15 +728,20 @@ export function VanityNameRequest({
                       Required Cost:
                     </span>
                     <span className="font-medium text-foreground">
-                      {burnCost ? formatEther(burnCost) : "Loading..."} {selectedToken.symbol}
+                      {burnCost ? formatEther(burnCost) : "Loading..."}{" "}
+                      {selectedToken.symbol}
                     </span>
                   </div>
                   <div className="flex items-center justify-between text-sm">
                     <span className="text-muted-foreground">
                       Approval Status:
                     </span>
-                    <span className={`font-medium ${needsApproval ? 'text-yellow-500' : 'text-green-500'}`}>
-                      {needsApproval ? 'Approval needed' : 'Ready to burn'}
+                    <span
+                      className={`font-medium ${
+                        needsApproval ? "text-yellow-500" : "text-green-500"
+                      }`}
+                    >
+                      {needsApproval ? "Approval needed" : "Ready to burn"}
                     </span>
                   </div>
                 </div>
@@ -714,7 +750,9 @@ export function VanityNameRequest({
               <Alert className="border-blue-400/20 bg-blue-500/5">
                 <Info className="h-4 w-4 text-blue-400" />
                 <AlertDescription className="text-blue-300">
-                  <strong>Atomic Transaction:</strong> We check availability and burn tokens in one secure transaction. No wasted burns on taken names!
+                  <strong>Atomic Transaction:</strong> We check availability and
+                  burn tokens in one secure transaction. No wasted burns on
+                  taken names!
                 </AlertDescription>
               </Alert>
             </div>
@@ -738,7 +776,11 @@ export function VanityNameRequest({
               }
               className="w-full h-12 text-lg font-semibold"
             >
-              {isSubmitting || isApprovePending || isWaitingForApprove || isRequestPending || isWaitingForRequest ? (
+              {isSubmitting ||
+              isApprovePending ||
+              isWaitingForApprove ||
+              isRequestPending ||
+              isWaitingForRequest ? (
                 <div className="flex items-center gap-2">
                   <Loader2 className="h-5 w-5 animate-spin" />
                   <span>{getProcessingStatus()}</span>
@@ -747,7 +789,9 @@ export function VanityNameRequest({
                 <div className="flex items-center gap-2">
                   <Flame className="h-5 w-5" />
                   <span>
-                    {needsApproval ? &quot;Approve &amp; &quot; : &quot;&quot;}Request &quot;{requestedName}&quot; for {burnCost ? formatEther(burnCost) : "..."} {selectedToken.symbol}
+                    {needsApproval ? "Approve & " : ""}Request "{requestedName}"
+                    for {burnCost ? formatEther(burnCost) : "..."}{" "}
+                    {selectedToken.symbol}
                   </span>
                   <ArrowRight className="h-5 w-5" />
                 </div>
@@ -758,7 +802,9 @@ export function VanityNameRequest({
             {tokenBalance && burnCost && burnCost > tokenBalance.value && (
               <div className="text-center">
                 <p className="text-sm text-destructive">
-                  Insufficient balance. You need {formatEther(burnCost)} {selectedToken.symbol} but only have {formatBalance(tokenBalance.value)}.
+                  Insufficient balance. You need {formatEther(burnCost)}{" "}
+                  {selectedToken.symbol} but only have{" "}
+                  {formatBalance(tokenBalance.value)}.
                 </p>
               </div>
             )}
@@ -767,7 +813,8 @@ export function VanityNameRequest({
             {needsApproval && (
               <div className="text-center">
                 <p className="text-xs text-muted-foreground">
-                  This will require two transactions: approval and then the vanity name request.
+                  This will require two transactions: approval and then the
+                  vanity name request.
                 </p>
               </div>
             )}
@@ -784,19 +831,26 @@ export function VanityNameRequest({
               <h3 className="font-semibold text-blue-400">How it works</h3>
               <div className="text-sm text-blue-300 space-y-1">
                 <p>
-                  <strong>Step 1:</strong> Enter your desired name and validate availability
+                  <strong>Step 1:</strong> Enter your desired name and validate
+                  availability
                 </p>
                 <p>
-                  <strong>Step 2:</strong> {needsApproval ? 'Approve tokens for the contract' : 'Skip approval (already approved)'}
+                  <strong>Step 2:</strong>{" "}
+                  {needsApproval
+                    ? "Approve tokens for the contract"
+                    : "Skip approval (already approved)"}
                 </p>
                 <p>
-                  <strong>Step 3:</strong> Contract checks availability and burns tokens atomically
+                  <strong>Step 3:</strong> Contract checks availability and
+                  burns tokens atomically
                 </p>
                 <p>
-                  <strong>Step 4:</strong> Your new name is processed and activated immediately
+                  <strong>Step 4:</strong> Your new name is processed and
+                  activated immediately
                 </p>
                 <p className="mt-2 text-xs text-blue-400">
-                  💡 <strong>Bulletproof process!</strong> Name availability is checked right before burning - no wasted tokens!
+                  💡 <strong>Bulletproof process!</strong> Name availability is
+                  checked right before burning - no wasted tokens!
                 </p>
               </div>
             </div>
