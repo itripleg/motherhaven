@@ -21,12 +21,12 @@ const BotFleetTab: React.FC<BotFleetTabProps> = ({ bots, fleetStats }) => {
           <p className="text-muted-foreground mb-4">
             No TVB instances are currently running or connected.
           </p>
-          <p className="text-muted-foreground/70 text-sm">
+          {/* <p className="text-muted-foreground/70 text-sm">
             Start a bot with:{" "}
             <code className="bg-secondary px-2 py-1 rounded text-foreground">
               py .\launch_all.py --auto --verbose --auto
             </code>
-          </p>
+          </p> */}
         </CardContent>
       </Card>
     );

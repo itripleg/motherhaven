@@ -36,7 +36,8 @@ const PageHeader: React.FC<PageHeaderProps> = ({
           </Badge>
         </h1>
         <p className="text-gray-400 text-lg">
-          Personality-driven trading bots creating authentic volume
+          The trading bots are for fun and creating volume during testnet. They
+          don&apos;t have logic to attempt being profitable.
         </p>
       </div>
 
