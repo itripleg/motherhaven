@@ -28,7 +28,7 @@ import {
   VANITY_NAME_CONSTANTS,
   type VanityNameData,
   type VanityRequestDocument,
-  type VanityNameStats,
+  type VanityNameStats as VanityStatsType,
 } from "@/types/vanity";
 
 // We'll import these components once we create them
@@ -51,7 +51,7 @@ export default function VanityNameManagerPage({}: VanityNameManagerPageProps) {
   const [pendingRequests, setPendingRequests] = useState<
     VanityRequestDocument[]
   >([]);
-  const [systemStats, setSystemStats] = useState<VanityNameStats | null>(null);
+  const [systemStats, setSystemStats] = useState<VanityStatsType | null>(null);
 
   // Load user's vanity name data
   useEffect(() => {
@@ -104,7 +104,7 @@ export default function VanityNameManagerPage({}: VanityNameManagerPageProps) {
     return [];
   };
 
-  const fetchSystemStats = async (): Promise<VanityNameStats> => {
+  const fetchSystemStats = async (): Promise<VanityStatsType> => {
     // TODO: Implement actual API call
     return {
       totalNames: 0,
@@ -351,19 +351,23 @@ export default function VanityNameManagerPage({}: VanityNameManagerPageProps) {
                   transition={{ duration: 0.3 }}
                 >
                   <TabsContent value="request" className="mt-0">
-                    <VanityNameRequest
-                      userAddress={address}
-                      currentName={userVanityData?.current || ""}
-                      pendingRequests={pendingRequests}
-                      onSuccess={handleNameRequestSuccess}
-                    />
+                    {address && (
+                      <VanityNameRequest
+                        userAddress={address}
+                        currentName={userVanityData?.current || ""}
+                        pendingRequests={pendingRequests}
+                        onSuccess={handleNameRequestSuccess}
+                      />
+                    )}
                   </TabsContent>
 
                   <TabsContent value="history" className="mt-0">
-                    <VanityNameHistory
-                      userAddress={address}
-                      vanityData={userVanityData}
-                    />
+                    {address && (
+                      <VanityNameHistory
+                        userAddress={address}
+                        vanityData={userVanityData}
+                      />
+                    )}
                   </TabsContent>
 
                   <TabsContent value="search" className="mt-0">
@@ -379,10 +383,12 @@ export default function VanityNameManagerPage({}: VanityNameManagerPageProps) {
                   </TabsContent>
 
                   <TabsContent value="settings" className="mt-0">
-                    <VanityNameSettings
-                      userAddress={address}
-                      vanityData={userVanityData}
-                    />
+                    {address && (
+                      <VanityNameSettings
+                        userAddress={address}
+                        vanityData={userVanityData}
+                      />
+                    )}
                   </TabsContent>
                 </motion.div>
               </AnimatePresence>

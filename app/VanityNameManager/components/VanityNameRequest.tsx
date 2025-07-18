@@ -8,8 +8,9 @@ import {
   useBalance,
   useWriteContract,
   useWaitForTransactionReceipt,
+  useReadContract,
 } from "wagmi";
-import { parseUnits, formatEther } from "viem";
+import { parseUnits, formatEther, Address } from "viem";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -49,16 +50,75 @@ interface VanityNameRequestProps {
   onSuccess: () => void;
 }
 
+// Contract addresses - these should come from environment variables
+const VANITY_BURN_MANAGER_ADDRESS = process.env
+  .NEXT_PUBLIC_VANITY_BURN_MANAGER_ADDRESS as Address;
+const BURN_TOKEN_ADDRESS = process.env
+  .NEXT_PUBLIC_BURN_TOKEN_ADDRESS as Address;
+
 // Supported tokens for vanity name requests
 const SUPPORTED_TOKENS = [
   {
-    address: "0xc3df61f5387fe2e0e6521ffdad338b1bbf5e5f7c" as const,
-    symbol: "TOKEN",
+    address: BURN_TOKEN_ADDRESS,
+    symbol: "VAIN",
     name: "Vanity Token",
     decimals: 18,
     icon: "🎭",
   },
 ];
+
+// VanityNameBurnManager ABI (only functions we need)
+const VANITY_BURN_MANAGER_ABI = [
+  {
+    inputs: [
+      { name: "newName", type: "string" },
+      { name: "tokenAddress", type: "address" },
+      { name: "burnAmount", type: "uint256" },
+    ],
+    name: "requestVanityName",
+    outputs: [],
+    stateMutability: "nonpayable",
+    type: "function",
+  },
+  {
+    inputs: [],
+    name: "getBurnCost",
+    outputs: [{ name: "", type: "uint256" }],
+    stateMutability: "view",
+    type: "function",
+  },
+  {
+    inputs: [{ name: "name", type: "string" }],
+    name: "isNameAvailable",
+    outputs: [{ name: "", type: "bool" }],
+    stateMutability: "view",
+    type: "function",
+  },
+] as const;
+
+// BurnToken ABI (only functions we need)
+const BURN_TOKEN_ABI = [
+  {
+    inputs: [
+      { name: "spender", type: "address" },
+      { name: "value", type: "uint256" },
+    ],
+    name: "approve",
+    outputs: [{ name: "", type: "bool" }],
+    stateMutability: "nonpayable",
+    type: "function",
+  },
+  {
+    inputs: [
+      { name: "owner", type: "address" },
+      { name: "spender", type: "address" },
+    ],
+    name: "allowance",
+    outputs: [{ name: "", type: "uint256" }],
+    stateMutability: "view",
+    type: "function",
+  },
+] as const;
 
 export function VanityNameRequest({
   userAddress,
@@ -72,24 +132,64 @@ export function VanityNameRequest({
   // Form state
   const [requestedName, setRequestedName] = useState("");
   const [selectedToken, setSelectedToken] = useState(SUPPORTED_TOKENS[0]);
-  const [burnAmount, setBurnAmount] = useState(VANITY_NAME_CONSTANTS.BURN_COST);
   const [isValidating, setIsValidating] = useState(false);
   const [validationResult, setValidationResult] =
     useState<VanityNameValidationResult | null>(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [needsApproval, setNeedsApproval] = useState(false);
 
-  // Contract interaction
-  const { writeContract, data: txHash, error: writeError } = useWriteContract();
-  const { isLoading: isWaitingForTx, isSuccess: txSuccess } =
-    useWaitForTransactionReceipt({
-      hash: txHash,
-    });
+  // Contract reads
+  const { data: burnCost } = useReadContract({
+    address: VANITY_BURN_MANAGER_ADDRESS,
+    abi: VANITY_BURN_MANAGER_ABI,
+    functionName: "getBurnCost",
+  });
 
-  // Token balance
   const { data: tokenBalance } = useBalance({
     address: address,
     token: selectedToken.address,
   });
+
+  const { data: allowance } = useReadContract({
+    address: selectedToken.address,
+    abi: BURN_TOKEN_ABI,
+    functionName: "allowance",
+    args:
+      address && VANITY_BURN_MANAGER_ADDRESS
+        ? [address, VANITY_BURN_MANAGER_ADDRESS]
+        : undefined,
+  });
+
+  // Contract writes
+  const {
+    writeContract: writeApprove,
+    data: approveTxHash,
+    error: approveError,
+  } = useWriteContract();
+
+  const {
+    writeContract: writeRequest,
+    data: requestTxHash,
+    error: requestError,
+  } = useWriteContract();
+
+  // Transaction receipts
+  const { isLoading: isWaitingForApprove, isSuccess: approveSuccess } =
+    useWaitForTransactionReceipt({
+      hash: approveTxHash,
+    });
+
+  const { isLoading: isWaitingForRequest, isSuccess: requestSuccess } =
+    useWaitForTransactionReceipt({
+      hash: requestTxHash,
+    });
+
+  // Check if approval is needed
+  useEffect(() => {
+    if (burnCost && allowance !== undefined) {
+      setNeedsApproval(allowance < burnCost);
+    }
+  }, [burnCost, allowance]);
 
   // Validation effect
   useEffect(() => {
@@ -129,7 +229,17 @@ export function VanityNameRequest({
 
   // Handle transaction success
   useEffect(() => {
-    if (txSuccess) {
+    if (approveSuccess) {
+      toast({
+        title: "Approval Successful! ✅",
+        description: "You can now request your vanity name.",
+      });
+      setNeedsApproval(false);
+    }
+  }, [approveSuccess, toast]);
+
+  useEffect(() => {
+    if (requestSuccess) {
       toast({
         title: "Request Submitted! 🎉",
         description:
@@ -144,19 +254,30 @@ export function VanityNameRequest({
       // Notify parent
       onSuccess();
     }
-  }, [txSuccess, toast, onSuccess]);
+  }, [requestSuccess, toast, onSuccess]);
 
-  // Handle write errors
+  // Handle errors
   useEffect(() => {
-    if (writeError) {
+    if (approveError) {
       toast({
-        title: "Transaction Failed",
-        description: writeError.message,
+        title: "Approval Failed",
+        description: approveError.message,
         variant: "destructive",
       });
       setIsSubmitting(false);
     }
-  }, [writeError, toast]);
+  }, [approveError, toast]);
+
+  useEffect(() => {
+    if (requestError) {
+      toast({
+        title: "Request Failed",
+        description: requestError.message,
+        variant: "destructive",
+      });
+      setIsSubmitting(false);
+    }
+  }, [requestError, toast]);
 
   // Client-side validation
   const validateVanityNameClient = useCallback(
@@ -238,25 +359,48 @@ export function VanityNameRequest({
     []
   );
 
+  // Handle approval
+  const handleApprove = async () => {
+    if (!burnCost || !address) return;
+
+    setIsSubmitting(true);
+
+    try {
+      await writeApprove({
+        address: selectedToken.address,
+        abi: BURN_TOKEN_ABI,
+        functionName: "approve",
+        args: [VANITY_BURN_MANAGER_ADDRESS, burnCost],
+      });
+    } catch (error) {
+      console.error("Approval failed:", error);
+      setIsSubmitting(false);
+    }
+  };
+
   // Handle form submission
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
 
-    if (!validationResult?.isValid || !address) return;
+    if (!validationResult?.isValid || !address || !burnCost) return;
+
+    if (needsApproval) {
+      await handleApprove();
+      return;
+    }
 
     setIsSubmitting(true);
 
     try {
       // Check token balance
-      const requiredAmount = parseUnits(burnAmount, selectedToken.decimals);
       const currentBalance = tokenBalance?.value || 0n;
 
-      if (currentBalance < requiredAmount) {
+      if (currentBalance < burnCost) {
         toast({
           title: "Insufficient Balance",
-          description: `You need ${formatEther(requiredAmount)} ${
-            selectedToken.symbol
-          } to request this name.`,
+          description: `You need ${formatEther(
+            burnCost
+          )} VAIN to request this name.`,
           variant: "destructive",
         });
         setIsSubmitting(false);
@@ -264,23 +408,11 @@ export function VanityNameRequest({
       }
 
       // Call contract function
-      await writeContract({
-        address: selectedToken.address,
-        abi: [
-          {
-            name: "requestVanityName",
-            type: "function",
-            inputs: [
-              { name: "newName", type: "string" },
-              { name: "tokenAddress", type: "address" },
-              { name: "burnAmount", type: "uint256" },
-            ],
-            outputs: [],
-            stateMutability: "nonpayable",
-          },
-        ],
+      await writeRequest({
+        address: VANITY_BURN_MANAGER_ADDRESS,
+        abi: VANITY_BURN_MANAGER_ABI,
         functionName: "requestVanityName",
-        args: [requestedName, selectedToken.address, requiredAmount],
+        args: [requestedName, selectedToken.address, burnCost],
       });
     } catch (error) {
       console.error("Contract call failed:", error);
@@ -310,6 +442,20 @@ export function VanityNameRequest({
     return validationResult.isValid
       ? "border-green-400/50"
       : "border-red-400/50";
+  };
+
+  const getButtonText = () => {
+    if (isSubmitting || isWaitingForApprove || isWaitingForRequest) {
+      if (isWaitingForApprove) return "Confirming Approval...";
+      if (isWaitingForRequest) return "Confirming Request...";
+      return needsApproval ? "Approving Tokens..." : "Submitting Request...";
+    }
+
+    if (needsApproval) {
+      return "Approve Tokens";
+    }
+
+    return "Request Vanity Name";
   };
 
   return (
@@ -484,82 +630,72 @@ export function VanityNameRequest({
 
             <Separator />
 
-            {/* Token Selection */}
+            {/* Token Information */}
             <div className="space-y-4">
-              <Label>Burn Token</Label>
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-                {SUPPORTED_TOKENS.map((token) => (
-                  <div
-                    key={token.address}
-                    className={`p-4 border rounded-lg cursor-pointer transition-all ${
-                      selectedToken.address === token.address
-                        ? "border-primary bg-primary/10"
-                        : "border-border hover:bg-muted/50"
-                    }`}
-                    onClick={() => setSelectedToken(token)}
-                  >
-                    <div className="flex items-center gap-3">
-                      <div className="text-2xl">{token.icon}</div>
-                      <div>
-                        <p className="font-medium text-foreground">
-                          {token.symbol}
-                        </p>
-                        <p className="text-sm text-muted-foreground">
-                          {token.name}
-                        </p>
-                      </div>
-                    </div>
-                  </div>
-                ))}
-              </div>
-
-              {/* Token Balance */}
-              <div className="flex items-center justify-between p-3 bg-muted/50 rounded-lg">
-                <div className="flex items-center gap-2">
-                  <Coins className="h-4 w-4 text-muted-foreground" />
-                  <span className="text-sm text-muted-foreground">
-                    Your Balance
-                  </span>
-                </div>
-                <span className="font-medium text-foreground">
-                  {tokenBalance ? formatEther(tokenBalance.value) : "0"}{" "}
-                  {selectedToken.symbol}
-                </span>
-              </div>
-            </div>
-
-            <Separator />
-
-            {/* Burn Amount */}
-            <div className="space-y-4">
-              <Label>Burn Amount</Label>
-              <div className="space-y-3">
-                <div className="flex items-center gap-4">
-                  <div className="flex items-center gap-2 text-sm text-muted-foreground">
-                    <Flame className="h-4 w-4" />
-                    <span>Required:</span>
-                  </div>
-                  <div className="font-medium text-foreground">
-                    {formatEther(
-                      parseUnits(burnAmount, selectedToken.decimals)
-                    )}{" "}
-                    {selectedToken.symbol}
+              <Label>Burn Token Information</Label>
+              <div className="p-4 border rounded-lg">
+                <div className="flex items-center gap-3 mb-3">
+                  <div className="text-2xl">{selectedToken.icon}</div>
+                  <div>
+                    <p className="font-medium text-foreground">
+                      {selectedToken.symbol}
+                    </p>
+                    <p className="text-sm text-muted-foreground">
+                      {selectedToken.name}
+                    </p>
                   </div>
                 </div>
 
-                <div className="p-4 bg-red-500/10 border border-red-400/30 rounded-lg">
-                  <div className="flex items-center gap-2 mb-2">
-                    <AlertTriangle className="h-4 w-4 text-red-400" />
-                    <span className="text-sm font-medium text-red-400">
-                      Important
+                {/* Token Balance */}
+                <div className="flex items-center justify-between p-3 bg-muted/50 rounded-lg mb-3">
+                  <div className="flex items-center gap-2">
+                    <Coins className="h-4 w-4 text-muted-foreground" />
+                    <span className="text-sm text-muted-foreground">
+                      Your Balance
                     </span>
                   </div>
-                  <p className="text-sm text-red-300">
-                    These tokens will be permanently burned and cannot be
-                    recovered. Make sure you have enough balance before
-                    proceeding.
-                  </p>
+                  <span className="font-medium text-foreground">
+                    {tokenBalance ? formatEther(tokenBalance.value) : "0"} VAIN
+                  </span>
                 </div>
+
+                {/* Burn Cost */}
+                <div className="flex items-center justify-between p-3 bg-red-500/10 border border-red-400/30 rounded-lg">
+                  <div className="flex items-center gap-2">
+                    <Flame className="h-4 w-4 text-red-400" />
+                    <span className="text-sm text-red-400">
+                      Required to Burn
+                    </span>
+                  </div>
+                  <span className="font-medium text-red-400">
+                    {burnCost ? formatEther(burnCost) : "Loading..."} VAIN
+                  </span>
+                </div>
+              </div>
+
+              {/* Approval Status */}
+              {needsApproval && (
+                <Alert>
+                  <AlertTriangle className="h-4 w-4" />
+                  <AlertDescription>
+                    You need to approve the burn manager to spend your tokens
+                    before requesting a name.
+                  </AlertDescription>
+                </Alert>
+              )}
+
+              <div className="p-4 bg-red-500/10 border border-red-400/30 rounded-lg">
+                <div className="flex items-center gap-2 mb-2">
+                  <AlertTriangle className="h-4 w-4 text-red-400" />
+                  <span className="text-sm font-medium text-red-400">
+                    Important
+                  </span>
+                </div>
+                <p className="text-sm text-red-300">
+                  These tokens will be permanently burned and cannot be
+                  recovered. Make sure you have enough balance before
+                  proceeding.
+                </p>
               </div>
             </div>
 
@@ -572,26 +708,33 @@ export function VanityNameRequest({
                 disabled={
                   !validationResult?.isValid ||
                   isSubmitting ||
-                  isWaitingForTx ||
+                  isWaitingForApprove ||
+                  isWaitingForRequest ||
                   !requestedName.trim() ||
-                  pendingRequests.length > 0
+                  pendingRequests.length > 0 ||
+                  !burnCost
                 }
                 className="w-full h-12 text-lg font-semibold"
               >
-                {isSubmitting || isWaitingForTx ? (
+                {isSubmitting || isWaitingForApprove || isWaitingForRequest ? (
                   <div className="flex items-center gap-2">
                     <Loader2 className="h-5 w-5 animate-spin" />
-                    <span>
-                      {isWaitingForTx
-                        ? "Confirming Transaction..."
-                        : "Submitting Request..."}
-                    </span>
+                    <span>{getButtonText()}</span>
                   </div>
                 ) : (
                   <div className="flex items-center gap-2">
-                    <Flame className="h-5 w-5" />
-                    <span>Burn Tokens & Request Name</span>
-                    <ArrowRight className="h-5 w-5" />
+                    {needsApproval ? (
+                      <>
+                        <CheckCircle className="h-5 w-5" />
+                        <span>Approve Tokens</span>
+                      </>
+                    ) : (
+                      <>
+                        <Flame className="h-5 w-5" />
+                        <span>Burn Tokens & Request Name</span>
+                        <ArrowRight className="h-5 w-5" />
+                      </>
+                    )}
                   </div>
                 )}
               </Button>
@@ -619,10 +762,13 @@ export function VanityNameRequest({
               <h3 className="font-semibold text-blue-400">How it works</h3>
               <div className="text-sm text-blue-300 space-y-1">
                 <p>1. Choose a unique vanity name following our requirements</p>
-                <p>2. Select a supported token and burn the required amount</p>
-                <p>3. Your request will be processed automatically</p>
+                <p>2. Approve the burn manager to spend your tokens</p>
                 <p>
-                  4. Once confirmed, your new name will be active across the
+                  3. Submit your request - tokens will be burned automatically
+                </p>
+                <p>4. Your request will be processed and approved if valid</p>
+                <p>
+                  5. Once confirmed, your new name will be active across the
                   platform
                 </p>
               </div>

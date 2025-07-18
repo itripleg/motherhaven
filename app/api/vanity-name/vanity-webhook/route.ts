@@ -1,4 +1,4 @@
-// app/api/vanity-webhook/route.ts
+// app/api/vanity-name/webhook/route.ts
 import { NextResponse } from "next/server";
 import {
   collection,
@@ -35,9 +35,13 @@ import { Address } from "viem";
 //                    CONTRACT CONFIGURATION
 // =================================================================
 
-// TODO: Replace with actual deployed contract address
+// Contract addresses from environment variables
 const VANITY_BURN_MANAGER_ADDRESS = process.env
-  .VANITY_BURN_MANAGER_ADDRESS as Address;
+  .NEXT_PUBLIC_VANITY_BURN_MANAGER_ADDRESS as Address;
+
+if (!VANITY_BURN_MANAGER_ADDRESS) {
+  console.error("❌ VANITY_BURN_MANAGER_ADDRESS not configured");
+}
 
 // Vanity Burn Manager ABI (events only)
 const VANITY_BURN_MANAGER_EVENTS = [
@@ -99,16 +103,25 @@ async function validateVanityName(
   name: string,
   userAddress: Address
 ): Promise<VanityNameValidationError | null> {
+  console.log(`🔍 Validating name: "${name}" for user: ${userAddress}`);
+
   // Length validation
   if (name.length < VANITY_NAME_CONSTANTS.MIN_LENGTH) {
+    console.log(
+      `❌ Name too short: ${name.length} < ${VANITY_NAME_CONSTANTS.MIN_LENGTH}`
+    );
     return VanityNameValidationError.TOO_SHORT;
   }
   if (name.length > VANITY_NAME_CONSTANTS.MAX_LENGTH) {
+    console.log(
+      `❌ Name too long: ${name.length} > ${VANITY_NAME_CONSTANTS.MAX_LENGTH}`
+    );
     return VanityNameValidationError.TOO_LONG;
   }
 
   // Character validation
   if (!VANITY_NAME_CONSTANTS.ALLOWED_CHARACTERS.test(name)) {
+    console.log(`❌ Invalid characters in name: "${name}"`);
     return VanityNameValidationError.INVALID_CHARACTERS;
   }
 
@@ -116,6 +129,7 @@ async function validateVanityName(
   if (
     VANITY_NAME_CONSTANTS.RESERVED_NAMES.includes(name.toLowerCase() as any)
   ) {
+    console.log(`❌ Reserved name: "${name}"`);
     return VanityNameValidationError.RESERVED;
   }
 
@@ -129,10 +143,12 @@ async function validateVanityName(
     const nameData = nameDoc.data() as VanityNameDocument;
     // Allow if the current user already owns this name
     if (nameData.owner.toLowerCase() !== userAddress.toLowerCase()) {
+      console.log(`❌ Name already taken by: ${nameData.owner}`);
       return VanityNameValidationError.ALREADY_TAKEN;
     }
   }
 
+  console.log(`✅ Name validation passed: "${name}"`);
   return null; // Valid name
 }
 
@@ -180,6 +196,15 @@ async function processVanityNameRequested(
   const newName = event.newName;
   const burnAmount = event.burnAmount.toString();
   const tokenAddress = event.token as Address;
+
+  console.log(`📝 Request details:`, {
+    requestId,
+    userAddress,
+    oldName,
+    newName,
+    burnAmount,
+    tokenAddress,
+  });
 
   // Validate the requested name
   const validationError = await validateVanityName(newName, userAddress);
@@ -278,12 +303,14 @@ async function processVanityNameRequested(
         },
       };
       transaction.set(userRef, newUserDoc);
+      console.log(`👤 Created new user document for: ${userAddress}`);
     }
 
     console.log("✅ VanityNameRequested processed successfully");
   });
 
   // Auto-approve the request (you might want to add manual approval logic here)
+  console.log(`🔄 Auto-approving request ${requestId}...`);
   await processVanityNameApproval(
     requestId,
     userAddress,
@@ -324,6 +351,7 @@ async function processVanityNameConfirmed(
     VANITY_NAME_CONSTANTS.COLLECTION_NAMES.VANITY_REQUESTS,
     requestId.toString()
   );
+
   await updateDoc(requestRef, {
     status: VanityRequestStatus.CONFIRMED,
     updatedAt: timestamp,
@@ -384,6 +412,8 @@ async function processVanityNameRejection(
 ): Promise<void> {
   const reasonText =
     typeof reason === "string" ? reason : `Validation failed: ${reason}`;
+
+  console.log(`❌ Rejecting request ${requestId}: ${reasonText}`);
 
   await runTransaction(db, async (transaction) => {
     const requestRef = doc(
@@ -484,6 +514,7 @@ async function processVanityNameApproval(
         userData.vanityName.current.toLowerCase()
       );
       transaction.delete(oldNameRef);
+      console.log(`🗑️ Released old name: ${userData.vanityName.current}`);
     }
 
     // Create new vanity name document
@@ -517,7 +548,8 @@ async function processVanityNameApproval(
 
   // TODO: Call contract to confirm the name change
   // This would require a function to call the contract's confirmVanityName method
-  // await confirmVanityNameOnContract(requestId);
+  // For now, we're auto-approving in the webhook processing
+  console.log(`📋 Request ${requestId} completed successfully`);
 }
 
 // =================================================================
@@ -531,9 +563,19 @@ export async function POST(req: Request) {
     console.log("📨 Vanity webhook received:", {
       webhookId: body.webhookId,
       eventCount: body.event?.activity?.length || 0,
+      timestamp: new Date().toISOString(),
     });
 
+    if (!VANITY_BURN_MANAGER_ADDRESS) {
+      console.error("❌ VANITY_BURN_MANAGER_ADDRESS not configured");
+      return NextResponse.json(
+        { error: "Contract address not configured" },
+        { status: 500 }
+      );
+    }
+
     if (!body.event?.activity || body.event.activity.length === 0) {
+      console.log("ℹ️ No events to process");
       return NextResponse.json({
         status: "success",
         message: "No events to process",
@@ -551,6 +593,9 @@ export async function POST(req: Request) {
           log.address.toLowerCase() !==
           VANITY_BURN_MANAGER_ADDRESS?.toLowerCase()
         ) {
+          console.log(
+            `⏭️ Skipping event from different contract: ${log.address}`
+          );
           continue;
         }
 
@@ -625,11 +670,14 @@ export async function POST(req: Request) {
       }
     }
 
+    console.log(`✅ Processed ${processedEvents.length} events successfully`);
+
     return NextResponse.json({
       status: "success",
       processed: processedEvents.length,
       events: processedEvents,
       contractAddress: VANITY_BURN_MANAGER_ADDRESS,
+      timestamp: new Date().toISOString(),
     });
   } catch (error) {
     console.error("❌ Webhook processing error:", error);
@@ -637,6 +685,7 @@ export async function POST(req: Request) {
       {
         error: "Internal server error",
         message: error instanceof Error ? error.message : "Unknown error",
+        timestamp: new Date().toISOString(),
       },
       { status: 500 }
     );
@@ -660,6 +709,8 @@ export async function GET(req: Request) {
       description:
         "This endpoint processes vanity name events from the burn manager contract",
       allowedMethods: ["POST"],
+      webhookUrl: "/api/vanity-name/webhook",
     },
+    timestamp: new Date().toISOString(),
   });
 }

@@ -5,8 +5,6 @@ import { useWatchContractEvent } from "wagmi";
 import { Log } from "viem";
 import { FACTORY_ADDRESS, FACTORY_ABI } from "@/types";
 
-// export const FACTORY_ADDRESS = "0x7713A39875A5335dc4Fc4f9359908afb55984b1F";
-
 // Event types
 type LogWithArgs = Log & {
   args: Record<string, any>;
