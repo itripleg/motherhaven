@@ -5,12 +5,11 @@ import React, { useState, useEffect, useCallback } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import {
   useAccount,
-  useBalance,
   useWriteContract,
   useWaitForTransactionReceipt,
   useReadContract,
 } from "wagmi";
-import { formatEther, Address } from "viem";
+import { formatEther, Address, parseEther } from "viem";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -48,10 +47,10 @@ interface VanityNameRequestProps {
 // Contract addresses
 const VANITY_BURN_MANAGER_ADDRESS = process.env
   .NEXT_PUBLIC_VANITY_BURN_MANAGER_ADDRESS as Address;
-const BURN_TOKEN_ADDRESS =
-  "0xC3DF61f5387fE2E0e6521ffdad338b1bbf5e5f7c" as Address; // Hardcoded VAIN
+const VAIN_TOKEN_ADDRESS =
+  "0xC3DF61f5387fE2E0e6521Ffdad338B1bBf5E5f7c" as Address;
 
-// Updated ABIs for new contract
+// Contract ABIs
 const VANITY_BURN_MANAGER_ABI = [
   {
     inputs: [{ name: "newName", type: "string" }],
@@ -62,7 +61,7 @@ const VANITY_BURN_MANAGER_ABI = [
   },
   {
     inputs: [],
-    name: "getCostPerNameChange",
+    name: "costPerNameChange",
     outputs: [{ name: "", type: "uint256" }],
     stateMutability: "view",
     type: "function",
@@ -76,20 +75,15 @@ const VANITY_BURN_MANAGER_ABI = [
   },
   {
     inputs: [{ name: "user", type: "address" }],
-    name: "getUserVanityName",
-    outputs: [{ name: "", type: "string" }],
+    name: "userBurnBalance",
+    outputs: [{ name: "", type: "uint256" }],
     stateMutability: "view",
     type: "function",
   },
   {
     inputs: [{ name: "user", type: "address" }],
-    name: "getUserBurnInfo",
-    outputs: [
-      { name: "totalBurned", type: "uint256" },
-      { name: "totalSpent", type: "uint256" },
-      { name: "availableBalance", type: "uint256" },
-      { name: "possibleNameChanges", type: "uint256" },
-    ],
+    name: "userSpentBalance",
+    outputs: [{ name: "", type: "uint256" }],
     stateMutability: "view",
     type: "function",
   },
@@ -102,11 +96,25 @@ const VANITY_BURN_MANAGER_ABI = [
   },
 ] as const;
 
-const BURN_TOKEN_ABI = [
+const VAIN_TOKEN_ABI = [
   {
     inputs: [{ name: "account", type: "address" }],
     name: "balanceOf",
     outputs: [{ name: "", type: "uint256" }],
+    stateMutability: "view",
+    type: "function",
+  },
+  {
+    inputs: [],
+    name: "symbol",
+    outputs: [{ name: "", type: "string" }],
+    stateMutability: "view",
+    type: "function",
+  },
+  {
+    inputs: [],
+    name: "decimals",
+    outputs: [{ name: "", type: "uint8" }],
     stateMutability: "view",
     type: "function",
   },
@@ -127,6 +135,12 @@ export function VanityNameRequest({
   const { address } = useAccount();
   const { toast } = useToast();
 
+  // Debug: Log important values
+  console.log("=== VANITY NAME REQUEST DEBUG ===");
+  console.log("Connected address:", address);
+  console.log("VAIN_TOKEN_ADDRESS:", VAIN_TOKEN_ADDRESS);
+  console.log("VANITY_BURN_MANAGER_ADDRESS:", VANITY_BURN_MANAGER_ADDRESS);
+
   // Form state
   const [requestedName, setRequestedName] = useState("");
   const [isValidating, setIsValidating] = useState(false);
@@ -134,22 +148,73 @@ export function VanityNameRequest({
     useState<VanityNameValidationResult | null>(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
 
-  // Contract reads
-  const { data: nameCost } = useReadContract({
-    address: VANITY_BURN_MANAGER_ADDRESS,
-    abi: VANITY_BURN_MANAGER_ABI,
-    functionName: "getCostPerNameChange",
+  // Read VAIN token balance
+  const {
+    data: vainBalance,
+    error: vainBalanceError,
+    isLoading: isVainBalanceLoading,
+    status: vainBalanceStatus,
+  } = useReadContract({
+    address: VAIN_TOKEN_ADDRESS,
+    abi: VAIN_TOKEN_ABI,
+    functionName: "balanceOf",
+    args: address ? [address] : undefined,
+    query: {
+      enabled: !!address,
+      refetchInterval: 10000,
+    },
   });
 
-  const { data: tokenBalance } = useBalance({
-    address: address,
-    token: BURN_TOKEN_ADDRESS,
+  // Debug VAIN balance
+  console.log("VAIN Balance Debug:", {
+    vainBalance: vainBalance?.toString(),
+    vainBalanceError: vainBalanceError?.message,
+    isVainBalanceLoading,
+    vainBalanceStatus,
+    enabled: !!address,
+    args: address ? [address] : undefined,
   });
 
-  const { data: burnInfo } = useReadContract({
+  const { data: vainSymbol, error: symbolError } = useReadContract({
+    address: VAIN_TOKEN_ADDRESS,
+    abi: VAIN_TOKEN_ABI,
+    functionName: "symbol",
+  });
+
+  console.log("VAIN Symbol Debug:", {
+    vainSymbol,
+    symbolError: symbolError?.message,
+  });
+
+  // Read burn manager data
+  const { data: nameCost, error: nameCostError } = useReadContract({
     address: VANITY_BURN_MANAGER_ADDRESS,
     abi: VANITY_BURN_MANAGER_ABI,
-    functionName: "getUserBurnInfo",
+    functionName: "costPerNameChange",
+  });
+
+  console.log("Name Cost Debug:", {
+    nameCost: nameCost?.toString(),
+    nameCostError: nameCostError?.message,
+    burnManagerAddress: VANITY_BURN_MANAGER_ADDRESS,
+  });
+
+  const { data: userBurnBalance, error: burnBalanceError } = useReadContract({
+    address: VANITY_BURN_MANAGER_ADDRESS,
+    abi: VANITY_BURN_MANAGER_ABI,
+    functionName: "userBurnBalance",
+    args: address ? [address] : undefined,
+  });
+
+  console.log("User Burn Balance Debug:", {
+    userBurnBalance: userBurnBalance?.toString(),
+    burnBalanceError: burnBalanceError?.message,
+  });
+
+  const { data: userSpentBalance } = useReadContract({
+    address: VANITY_BURN_MANAGER_ADDRESS,
+    abi: VANITY_BURN_MANAGER_ABI,
+    functionName: "userSpentBalance",
     args: address ? [address] : undefined,
   });
 
@@ -158,6 +223,16 @@ export function VanityNameRequest({
     abi: VANITY_BURN_MANAGER_ABI,
     functionName: "canUserSetName",
     args: address ? [address] : undefined,
+  });
+
+  const { data: isNameAvailable } = useReadContract({
+    address: VANITY_BURN_MANAGER_ADDRESS,
+    abi: VANITY_BURN_MANAGER_ABI,
+    functionName: "isNameAvailable",
+    args: requestedName ? [requestedName] : undefined,
+    query: {
+      enabled: !!requestedName && requestedName.length >= 3,
+    },
   });
 
   // Contract writes
@@ -186,16 +261,36 @@ export function VanityNameRequest({
       hash: setNameTxHash,
     });
 
-  // Parse burn info
-  const totalBurned = burnInfo ? formatEther(burnInfo[0]) : "0";
-  const totalSpent = burnInfo ? formatEther(burnInfo[1]) : "0";
-  const availableBalance = burnInfo ? formatEther(burnInfo[2]) : "0";
-  const possibleNameChanges = burnInfo ? Number(burnInfo[3]) : 0;
+  // Calculate balances
+  const formattedVainBalance = vainBalance ? formatEther(vainBalance) : "0";
+  const formattedBurnBalance = userBurnBalance
+    ? formatEther(userBurnBalance)
+    : "0";
+  const formattedSpentBalance = userSpentBalance
+    ? formatEther(userSpentBalance)
+    : "0";
+  const availableBalance =
+    userBurnBalance && userSpentBalance
+      ? formatEther(userBurnBalance - userSpentBalance)
+      : "0";
+
+  const possibleNameChanges =
+    nameCost && userBurnBalance && userSpentBalance
+      ? Number((userBurnBalance - userSpentBalance) / nameCost)
+      : 0;
+
+  // Debug calculated values
+  console.log("Calculated Values:", {
+    formattedVainBalance,
+    formattedBurnBalance,
+    formattedSpentBalance,
+    availableBalance,
+    possibleNameChanges,
+  });
 
   // Client-side validation
   const validateVanityNameClient = useCallback(
-    async (name: string): Promise<VanityNameValidationResult> => {
-      // Length validation
+    (name: string): VanityNameValidationResult => {
       if (name.length < VANITY_NAME_CONSTANTS.MIN_LENGTH) {
         return {
           isValid: false,
@@ -212,7 +307,6 @@ export function VanityNameRequest({
         };
       }
 
-      // Character validation
       if (!VANITY_NAME_CONSTANTS.ALLOWED_CHARACTERS.test(name)) {
         return {
           isValid: false,
@@ -221,7 +315,6 @@ export function VanityNameRequest({
         };
       }
 
-      // Reserved names
       if (
         VANITY_NAME_CONSTANTS.RESERVED_NAMES.includes(name.toLowerCase() as any)
       ) {
@@ -237,45 +330,9 @@ export function VanityNameRequest({
     []
   );
 
-  // Contract-side validation
-  const validateVanityNameContract = useCallback(
-    async (name: string): Promise<VanityNameValidationResult> => {
-      try {
-        // Check availability via API
-        const response = await fetch("/api/vanity-name/check-availability", {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ name }),
-        });
-
-        const data = await response.json();
-
-        if (!data.available) {
-          return {
-            isValid: false,
-            error: data.reason || VanityNameValidationError.ALREADY_TAKEN,
-            message:
-              data.reason === VanityNameValidationError.ALREADY_TAKEN
-                ? "This name is already taken"
-                : "This name is not available",
-          };
-        }
-
-        return { isValid: true };
-      } catch (error) {
-        return {
-          isValid: false,
-          error: VanityNameValidationError.INVALID_CHARACTERS,
-          message: "Unable to check availability. Please try again.",
-        };
-      }
-    },
-    []
-  );
-
   // Validation effect
   useEffect(() => {
-    const validateName = async () => {
+    const validateName = () => {
       if (!requestedName.trim()) {
         setValidationResult(null);
         return;
@@ -283,33 +340,34 @@ export function VanityNameRequest({
 
       setIsValidating(true);
 
-      try {
-        // Client-side validation
-        const result = await validateVanityNameClient(requestedName);
-        setValidationResult(result);
+      // Client-side validation
+      const clientResult = validateVanityNameClient(requestedName);
+      if (!clientResult.isValid) {
+        setValidationResult(clientResult);
+        setIsValidating(false);
+        return;
+      }
 
-        // Contract-side validation if client-side passes
-        if (result.isValid) {
-          const contractResult = await validateVanityNameContract(
-            requestedName
-          );
-          setValidationResult(contractResult);
-        }
-      } catch (error) {
-        console.error("Validation error:", error);
+      // Contract availability check
+      if (isNameAvailable === false) {
         setValidationResult({
           isValid: false,
-          error: VanityNameValidationError.INVALID_CHARACTERS,
-          message: "Unable to validate name. Please try again.",
+          error: VanityNameValidationError.ALREADY_TAKEN,
+          message: "This name is already taken",
         });
-      } finally {
-        setIsValidating(false);
+      } else if (isNameAvailable === true) {
+        setValidationResult({
+          isValid: true,
+          message: "Name is available!",
+        });
       }
+
+      setIsValidating(false);
     };
 
-    const timeoutId = setTimeout(validateName, 300); // Debounce
+    const timeoutId = setTimeout(validateName, 300);
     return () => clearTimeout(timeoutId);
-  }, [requestedName, validateVanityNameClient, validateVanityNameContract]);
+  }, [requestedName, isNameAvailable, validateVanityNameClient]);
 
   // Handle transaction success
   useEffect(() => {
@@ -329,12 +387,9 @@ export function VanityNameRequest({
         description: `Your vanity name "${requestedName}" is now active!`,
       });
 
-      // Reset form
       setRequestedName("");
       setValidationResult(null);
       setIsSubmitting(false);
-
-      // Notify parent
       onSuccess();
     }
   }, [setNameSuccess, toast, onSuccess, requestedName]);
@@ -364,12 +419,21 @@ export function VanityNameRequest({
 
   // Handle burn tokens
   const handleBurnTokens = async (amount: bigint) => {
-    if (!address || !tokenBalance) return;
+    if (!address || !vainBalance) {
+      toast({
+        title: "No Balance Data",
+        description: "Unable to read your VAIN balance. Please try refreshing.",
+        variant: "destructive",
+      });
+      return;
+    }
 
-    if (amount > tokenBalance.value) {
+    if (amount > vainBalance) {
       toast({
         title: "Insufficient Balance",
-        description: `You need ${formatEther(amount)} VAIN tokens.`,
+        description: `You need ${formatEther(
+          amount
+        )} VAIN but only have ${formattedVainBalance}.`,
         variant: "destructive",
       });
       return;
@@ -379,17 +443,15 @@ export function VanityNameRequest({
 
     try {
       await writeBurn({
-        address: BURN_TOKEN_ADDRESS,
-        abi: BURN_TOKEN_ABI,
+        address: VAIN_TOKEN_ADDRESS,
+        abi: VAIN_TOKEN_ABI,
         functionName: "burn",
         args: [amount],
       });
 
       toast({
         title: "🔥 Burning Tokens...",
-        description: `Burning ${formatEther(
-          amount
-        )} VAIN tokens to earn name changes!`,
+        description: `Burning ${formatEther(amount)} VAIN tokens!`,
       });
     } catch (error: any) {
       console.error("Burn failed:", error);
@@ -407,7 +469,16 @@ export function VanityNameRequest({
   const handleSetVanityName = async (e: React.FormEvent) => {
     e.preventDefault();
 
-    if (!validationResult?.isValid || !address || !canSetName) return;
+    if (!validationResult?.isValid || !address || !canSetName) {
+      toast({
+        title: "Cannot Set Name",
+        description:
+          validationResult?.message ||
+          "Invalid name or insufficient burn balance",
+        variant: "destructive",
+      });
+      return;
+    }
 
     setIsSubmitting(true);
 
@@ -447,11 +518,11 @@ export function VanityNameRequest({
   };
 
   const getValidationColor = () => {
-    if (isValidating) return "border-blue-400/50";
-    if (!validationResult) return "border-border";
+    if (isValidating) return "border-blue-400/50 focus:border-blue-400";
+    if (!validationResult) return "";
     return validationResult.isValid
-      ? "border-green-400/50"
-      : "border-red-400/50";
+      ? "border-green-400/50 focus:border-green-400"
+      : "border-red-400/50 focus:border-red-400";
   };
 
   const getProcessingStatus = () => {
@@ -517,6 +588,61 @@ export function VanityNameRequest({
         </CardContent>
       </Card>
 
+      {/* VAIN Token Balance */}
+      <Card className="border-border bg-card">
+        <CardHeader>
+          <CardTitle className="flex items-center gap-3">
+            <Coins className="h-5 w-5 text-primary" />
+            VAIN Token Balance
+          </CardTitle>
+        </CardHeader>
+        <CardContent className="space-y-4">
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4 text-center">
+            <div className="space-y-2">
+              <div className="flex items-center justify-center gap-2">
+                <Coins className="h-4 w-4 text-blue-400" />
+                <Label className="text-sm text-muted-foreground">
+                  Wallet Balance
+                </Label>
+              </div>
+              <div className="text-xl font-bold text-foreground">
+                {isVainBalanceLoading ? (
+                  <div className="flex items-center gap-2">
+                    <Loader2 className="h-4 w-4 animate-spin" />
+                    Loading...
+                  </div>
+                ) : vainBalanceError ? (
+                  <div className="text-red-400 text-sm">
+                    Error: {vainBalanceError.message}
+                  </div>
+                ) : vainBalance ? (
+                  `${parseFloat(formattedVainBalance).toLocaleString()} ${
+                    vainSymbol || "VAIN"
+                  }`
+                ) : (
+                  <div className="text-yellow-400">
+                    0 {vainSymbol || "VAIN"} (No balance data)
+                  </div>
+                )}
+              </div>
+            </div>
+
+            <div className="space-y-2">
+              <div className="flex items-center justify-center gap-2">
+                <Flame className="h-4 w-4 text-orange-400" />
+                <Label className="text-sm text-muted-foreground">
+                  Burn Cost per Name
+                </Label>
+              </div>
+              <div className="text-xl font-bold text-foreground">
+                {nameCost ? formatEther(nameCost) : "1000"}{" "}
+                {vainSymbol || "VAIN"}
+              </div>
+            </div>
+          </div>
+        </CardContent>
+      </Card>
+
       {/* Burn Balance */}
       <Card className="unified-card border-primary/20">
         <CardHeader>
@@ -535,7 +661,7 @@ export function VanityNameRequest({
                 </Label>
               </div>
               <div className="text-xl font-bold text-foreground">
-                {parseFloat(totalBurned).toLocaleString()}
+                {parseFloat(formattedBurnBalance).toLocaleString()}
               </div>
             </div>
 
@@ -547,7 +673,7 @@ export function VanityNameRequest({
                 </Label>
               </div>
               <div className="text-xl font-bold text-foreground">
-                {parseFloat(totalSpent).toLocaleString()}
+                {parseFloat(formattedSpentBalance).toLocaleString()}
               </div>
             </div>
 
@@ -574,7 +700,7 @@ export function VanityNameRequest({
                   <Button
                     size="sm"
                     onClick={() => nameCost && handleBurnTokens(nameCost)}
-                    disabled={!tokenBalance || nameCost! > tokenBalance.value}
+                    disabled={!vainBalance || nameCost! > vainBalance}
                   >
                     <Flame className="h-3 w-3 mr-1" />
                     Burn {nameCost ? formatEther(nameCost) : "1000"} VAIN
@@ -583,9 +709,7 @@ export function VanityNameRequest({
                     size="sm"
                     variant="outline"
                     onClick={() => nameCost && handleBurnTokens(nameCost * 5n)}
-                    disabled={
-                      !tokenBalance || nameCost! * 5n > tokenBalance.value
-                    }
+                    disabled={!vainBalance || nameCost! * 5n > vainBalance}
                   >
                     <Flame className="h-3 w-3 mr-1" />
                     Burn {nameCost ? formatEther(nameCost * 5n) : "5000"} VAIN
@@ -686,7 +810,7 @@ export function VanityNameRequest({
                 ) : (
                   <div className="flex items-center gap-2">
                     <Crown className="h-5 w-5" />
-                    <span>Set Name "{requestedName}"</span>
+                    <span>Set Name &quot;{requestedName}&quot;</span>
                     <ArrowRight className="h-5 w-5" />
                   </div>
                 )}
@@ -703,7 +827,28 @@ export function VanityNameRequest({
         </Card>
       )}
 
-      {/* Info Card */}
+      {/* Debug Info Card */}
+      <Card className="unified-card border-yellow-400/20 bg-yellow-500/5">
+        <CardHeader>
+          <CardTitle className="flex items-center gap-3">
+            <Info className="h-5 w-5 text-yellow-400" />
+            Debug Information
+          </CardTitle>
+        </CardHeader>
+        <CardContent className="space-y-2 text-sm font-mono">
+          <div>Connected: {address ? "✅" : "❌"}</div>
+          <div>Address: {address || "Not connected"}</div>
+          <div>VAIN Token: {VAIN_TOKEN_ADDRESS}</div>
+          <div>Burn Manager: {VANITY_BURN_MANAGER_ADDRESS || "Not set"}</div>
+          <div>VAIN Balance Status: {vainBalanceStatus}</div>
+          <div>VAIN Balance Loading: {isVainBalanceLoading ? "Yes" : "No"}</div>
+          <div>VAIN Balance Error: {vainBalanceError?.message || "None"}</div>
+          <div>VAIN Balance Raw: {vainBalance?.toString() || "undefined"}</div>
+          <div>VAIN Symbol: {vainSymbol || "undefined"}</div>
+          <div>Name Cost: {nameCost?.toString() || "undefined"}</div>
+          <div>Name Cost Error: {nameCostError?.message || "None"}</div>
+        </CardContent>
+      </Card>
       <Card className="unified-card border-blue-400/20 bg-blue-500/5">
         <CardContent className="p-6">
           <div className="flex items-start gap-3">

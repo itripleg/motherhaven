@@ -1,17 +1,11 @@
 // types/vanity.ts
-// TypeScript types for Vanity Name System
+// TypeScript types for Vanity Name System (Simplified Contract Version)
 
 import { Address } from "viem";
 
 // =================================================================
 //                        ENUMS
 // =================================================================
-
-export enum VanityRequestStatus {
-  PENDING = "pending",
-  CONFIRMED = "confirmed",
-  REJECTED = "rejected",
-}
 
 export enum VanityNameValidationError {
   TOO_SHORT = "TOO_SHORT",
@@ -32,7 +26,6 @@ export enum VanityNameValidationError {
 export interface VanityNameHistoryEntry {
   name: string;
   changedAt: string; // ISO timestamp
-  requestId: number;
   burnAmount: string; // Token amount with decimals (as string)
   tokenAddress: Address;
   transactionHash: string;
@@ -49,42 +42,17 @@ export interface VanityNameData {
 }
 
 /**
- * Document structure for vanityNames collection
+ * Document structure for vanityNames collection (simplified)
  */
 export interface VanityNameDocument {
   name: string; // Lowercase for uniqueness
   displayName: string; // Original case for display
   owner: Address; // User address (lowercase)
   claimedAt: string; // ISO timestamp
-  requestId: number;
   burnAmount: string; // Token amount with decimals
   tokenAddress: Address;
   transactionHash: string;
   isActive: boolean; // For soft deletion
-}
-
-/**
- * Document structure for vanityRequests collection
- */
-export interface VanityRequestDocument {
-  requestId: number;
-  user: Address; // User address (lowercase)
-  oldName: string; // Previous vanity name (empty if first time)
-  newName: string; // Requested new name
-  burnAmount: string; // Token amount with decimals
-  tokenAddress: Address;
-  status: VanityRequestStatus;
-  rejectionReason: string; // Only populated if rejected
-  createdAt: string; // ISO timestamp
-  updatedAt: string; // ISO timestamp
-  transactionHash: string; // Original burn transaction
-  blockNumber: number;
-
-  // Webhook processing metadata
-  webhookProcessed: boolean;
-  webhookProcessedAt: string | null; // ISO timestamp
-  confirmationTxHash: string | null; // TX hash when confirmed on contract
-  confirmationBlockNumber: number | null;
 }
 
 // =================================================================
@@ -138,40 +106,26 @@ export interface UserDocument {
 }
 
 // =================================================================
-//                    CONTRACT EVENT TYPES
+//                    CONTRACT EVENT TYPES (SIMPLIFIED)
 // =================================================================
 
 /**
- * VanityNameRequested event from contract
+ * VanityNameSet event from simplified contract
  */
-export interface VanityNameRequestedEvent {
+export interface VanityNameSetEvent {
   user: Address;
   oldName: string;
   newName: string;
-  burnAmount: bigint;
-  token: Address;
-  timestamp: bigint;
-  requestId: bigint;
-}
-
-/**
- * VanityNameConfirmed event from contract
- */
-export interface VanityNameConfirmedEvent {
-  user: Address;
-  vanityName: string;
-  requestId: bigint;
   timestamp: bigint;
 }
 
 /**
- * VanityNameRejected event from contract
+ * TokensBurned event from simplified contract
  */
-export interface VanityNameRejectedEvent {
-  user: Address;
-  requestedName: string;
-  requestId: bigint;
-  reason: string;
+export interface TokensBurnedEvent {
+  burner: Address;
+  amount: bigint;
+  newBurnBalance: bigint;
   timestamp: bigint;
 }
 
@@ -179,14 +133,8 @@ export interface VanityNameRejectedEvent {
  * Parsed event data for webhook processing
  */
 export interface ParsedVanityEvent {
-  eventName:
-    | "VanityNameRequested"
-    | "VanityNameConfirmed"
-    | "VanityNameRejected";
-  args:
-    | VanityNameRequestedEvent
-    | VanityNameConfirmedEvent
-    | VanityNameRejectedEvent;
+  eventName: "VanityNameSet" | "TokensBurned";
+  args: VanityNameSetEvent | TokensBurnedEvent;
   transactionHash: string;
   blockNumber: number;
   timestamp: string; // ISO timestamp
@@ -266,23 +214,6 @@ export interface SearchVanityNamesResponse {
   hasMore: boolean;
 }
 
-/**
- * Request to get pending vanity requests (admin only)
- */
-export interface GetPendingVanityRequestsRequest {
-  limit?: number;
-  offset?: number;
-}
-
-/**
- * Response for pending vanity requests
- */
-export interface GetPendingVanityRequestsResponse {
-  requests: VanityRequestDocument[];
-  total: number;
-  hasMore: boolean;
-}
-
 // =================================================================
 //                    WEBHOOK PAYLOAD TYPES
 // =================================================================
@@ -324,11 +255,7 @@ export interface AlchemyWebhookPayload {
  * Processed webhook data for vanity name events
  */
 export interface ProcessedVanityWebhook {
-  requestId: number;
-  eventType:
-    | "VanityNameRequested"
-    | "VanityNameConfirmed"
-    | "VanityNameRejected";
+  eventType: "VanityNameSet" | "TokensBurned";
   user: Address;
   transactionHash: string;
   blockNumber: number;
@@ -339,7 +266,6 @@ export interface ProcessedVanityWebhook {
   newName?: string;
   burnAmount?: string;
   tokenAddress?: Address;
-  rejectionReason?: string;
 }
 
 // =================================================================
@@ -384,11 +310,9 @@ export interface VanityNameOptions {
  */
 export interface VanityNameStats {
   totalNames: number;
-  totalRequests: number;
-  pendingRequests: number;
-  confirmedRequests: number;
-  rejectedRequests: number;
+  totalBurns: number;
   activeUsers: number;
+  totalBurnedTokens: string; // Total tokens burned across all users
   popularNames: Array<{
     name: string;
     changeCount: number;
@@ -402,8 +326,19 @@ export interface VanityNameLeaderboardEntry {
   user: Address;
   currentName: string;
   totalChanges: number;
+  totalBurned: string;
   lastChanged: string;
   rank: number;
+}
+
+/**
+ * User burn info from contract
+ */
+export interface UserBurnInfo {
+  totalBurned: string;
+  totalSpent: string;
+  availableBalance: string;
+  possibleNameChanges: number;
 }
 
 // =================================================================
@@ -444,50 +379,27 @@ export class WebhookProcessingError extends Error {
 // =================================================================
 
 /**
- * Type guard for VanityNameRequestedEvent
+ * Type guard for VanityNameSetEvent
  */
-export function isVanityNameRequestedEvent(
-  event: any
-): event is VanityNameRequestedEvent {
+export function isVanityNameSetEvent(event: any): event is VanityNameSetEvent {
   return (
     event &&
     typeof event.user === "string" &&
     typeof event.oldName === "string" &&
     typeof event.newName === "string" &&
-    typeof event.burnAmount === "bigint" &&
-    typeof event.token === "string" &&
-    typeof event.timestamp === "bigint" &&
-    typeof event.requestId === "bigint"
-  );
-}
-
-/**
- * Type guard for VanityNameConfirmedEvent
- */
-export function isVanityNameConfirmedEvent(
-  event: any
-): event is VanityNameConfirmedEvent {
-  return (
-    event &&
-    typeof event.user === "string" &&
-    typeof event.vanityName === "string" &&
-    typeof event.requestId === "bigint" &&
     typeof event.timestamp === "bigint"
   );
 }
 
 /**
- * Type guard for VanityNameRejectedEvent
+ * Type guard for TokensBurnedEvent
  */
-export function isVanityNameRejectedEvent(
-  event: any
-): event is VanityNameRejectedEvent {
+export function isTokensBurnedEvent(event: any): event is TokensBurnedEvent {
   return (
     event &&
-    typeof event.user === "string" &&
-    typeof event.requestedName === "string" &&
-    typeof event.requestId === "bigint" &&
-    typeof event.reason === "string" &&
+    typeof event.burner === "string" &&
+    typeof event.amount === "bigint" &&
+    typeof event.newBurnBalance === "bigint" &&
     typeof event.timestamp === "bigint"
   );
 }
@@ -519,7 +431,6 @@ export const VANITY_NAME_CONSTANTS = {
   COLLECTION_NAMES: {
     USERS: "users",
     VANITY_NAMES: "vanityNames",
-    VANITY_REQUESTS: "vanityRequests",
   },
   RESERVED_NAMES: [
     "admin",
@@ -544,7 +455,6 @@ export const VANITY_NAME_CONSTANTS = {
 // =================================================================
 
 const VanityNameTypes = {
-  VanityRequestStatus,
   VanityNameValidationError,
   VanityNameError,
   WebhookProcessingError,
