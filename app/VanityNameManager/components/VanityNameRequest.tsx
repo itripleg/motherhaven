@@ -67,13 +67,12 @@ const SUPPORTED_TOKENS = [
   },
 ];
 
-// VanityNameBurnManager ABI (only functions we need)
+// VanityNameBurnManager ABI (updated functions)
 const VANITY_BURN_MANAGER_ABI = [
   {
     inputs: [
       { name: "newName", type: "string" },
       { name: "tokenAddress", type: "address" },
-      { name: "burnAmount", type: "uint256" },
     ],
     name: "requestVanityName",
     outputs: [],
@@ -94,28 +93,29 @@ const VANITY_BURN_MANAGER_ABI = [
     stateMutability: "view",
     type: "function",
   },
-] as const;
-
-// BurnToken ABI (only functions we need)
-const BURN_TOKEN_ABI = [
   {
-    inputs: [
-      { name: "spender", type: "address" },
-      { name: "value", type: "uint256" },
+    inputs: [{ name: "user", type: "address" }],
+    name: "getUserPendingRequest",
+    outputs: [
+      { name: "requestId", type: "uint256" },
+      { name: "requestedName", type: "string" },
+      { name: "burnAmount", type: "uint256" },
+      { name: "token", type: "address" },
+      { name: "timestamp", type: "uint256" },
+      { name: "hasPending", type: "bool" },
     ],
-    name: "approve",
-    outputs: [{ name: "", type: "bool" }],
-    stateMutability: "nonpayable",
+    stateMutability: "view",
     type: "function",
   },
+] as const;
+
+// BurnToken ABI (only burn function needed)
+const BURN_TOKEN_ABI = [
   {
-    inputs: [
-      { name: "owner", type: "address" },
-      { name: "spender", type: "address" },
-    ],
-    name: "allowance",
-    outputs: [{ name: "", type: "uint256" }],
-    stateMutability: "view",
+    inputs: [{ name: "amount", type: "uint256" }],
+    name: "burn",
+    outputs: [],
+    stateMutability: "nonpayable",
     type: "function",
   },
 ] as const;
@@ -136,7 +136,7 @@ export function VanityNameRequest({
   const [validationResult, setValidationResult] =
     useState<VanityNameValidationResult | null>(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
-  const [needsApproval, setNeedsApproval] = useState(false);
+  const [step, setStep] = useState<"request" | "burn">("request");
 
   // Contract reads
   const { data: burnCost } = useReadContract({
@@ -150,46 +150,39 @@ export function VanityNameRequest({
     token: selectedToken.address,
   });
 
-  const { data: allowance } = useReadContract({
-    address: selectedToken.address,
-    abi: BURN_TOKEN_ABI,
-    functionName: "allowance",
-    args:
-      address && VANITY_BURN_MANAGER_ADDRESS
-        ? [address, VANITY_BURN_MANAGER_ADDRESS]
-        : undefined,
+  const { data: pendingRequestData } = useReadContract({
+    address: VANITY_BURN_MANAGER_ADDRESS,
+    abi: VANITY_BURN_MANAGER_ABI,
+    functionName: "getUserPendingRequest",
+    args: address ? [address] : undefined,
   });
 
   // Contract writes
-  const {
-    writeContract: writeApprove,
-    data: approveTxHash,
-    error: approveError,
-  } = useWriteContract();
-
   const {
     writeContract: writeRequest,
     data: requestTxHash,
     error: requestError,
   } = useWriteContract();
 
-  // Transaction receipts
-  const { isLoading: isWaitingForApprove, isSuccess: approveSuccess } =
-    useWaitForTransactionReceipt({
-      hash: approveTxHash,
-    });
+  const {
+    writeContract: writeBurn,
+    data: burnTxHash,
+    error: burnError,
+  } = useWriteContract();
 
+  // Transaction receipts
   const { isLoading: isWaitingForRequest, isSuccess: requestSuccess } =
     useWaitForTransactionReceipt({
       hash: requestTxHash,
     });
 
-  // Check if approval is needed
-  useEffect(() => {
-    if (burnCost && allowance !== undefined) {
-      setNeedsApproval(allowance < burnCost);
-    }
-  }, [burnCost, allowance]);
+  const { isLoading: isWaitingForBurn, isSuccess: burnSuccess } =
+    useWaitForTransactionReceipt({
+      hash: burnTxHash,
+    });
+
+  // Check if user has a pending request (from contract state)
+  const hasPendingRequest = pendingRequestData && pendingRequestData[5]; // hasPending boolean
 
   // Validation effect
   useEffect(() => {
@@ -229,45 +222,35 @@ export function VanityNameRequest({
 
   // Handle transaction success
   useEffect(() => {
-    if (approveSuccess) {
-      toast({
-        title: "Approval Successful! ✅",
-        description: "You can now request your vanity name.",
-      });
-      setNeedsApproval(false);
-    }
-  }, [approveSuccess, toast]);
-
-  useEffect(() => {
     if (requestSuccess) {
       toast({
-        title: "Request Submitted! 🎉",
-        description:
-          "Your vanity name request has been submitted and is being processed.",
+        title: "Request Created! ✅",
+        description: "Now burn tokens to activate your vanity name request.",
+      });
+      setStep("burn");
+      setIsSubmitting(false);
+    }
+  }, [requestSuccess, toast]);
+
+  useEffect(() => {
+    if (burnSuccess) {
+      toast({
+        title: "Tokens Burned! 🔥",
+        description: "Your vanity name request is being processed.",
       });
 
       // Reset form
       setRequestedName("");
       setValidationResult(null);
       setIsSubmitting(false);
+      setStep("request");
 
       // Notify parent
       onSuccess();
     }
-  }, [requestSuccess, toast, onSuccess]);
+  }, [burnSuccess, toast, onSuccess]);
 
   // Handle errors
-  useEffect(() => {
-    if (approveError) {
-      toast({
-        title: "Approval Failed",
-        description: approveError.message,
-        variant: "destructive",
-      });
-      setIsSubmitting(false);
-    }
-  }, [approveError, toast]);
-
   useEffect(() => {
     if (requestError) {
       toast({
@@ -278,6 +261,17 @@ export function VanityNameRequest({
       setIsSubmitting(false);
     }
   }, [requestError, toast]);
+
+  useEffect(() => {
+    if (burnError) {
+      toast({
+        title: "Burn Failed",
+        description: burnError.message,
+        variant: "destructive",
+      });
+      setIsSubmitting(false);
+    }
+  }, [burnError, toast]);
 
   // Client-side validation
   const validateVanityNameClient = useCallback(
@@ -359,35 +353,36 @@ export function VanityNameRequest({
     []
   );
 
-  // Handle approval
-  const handleApprove = async () => {
-    if (!burnCost || !address) return;
-
-    setIsSubmitting(true);
-
-    try {
-      await writeApprove({
-        address: selectedToken.address,
-        abi: BURN_TOKEN_ABI,
-        functionName: "approve",
-        args: [VANITY_BURN_MANAGER_ADDRESS, burnCost],
-      });
-    } catch (error) {
-      console.error("Approval failed:", error);
-      setIsSubmitting(false);
-    }
-  };
-
-  // Handle form submission
-  const handleSubmit = async (e: React.FormEvent) => {
+  // Handle request submission (Step 1)
+  const handleRequest = async (e: React.FormEvent) => {
     e.preventDefault();
 
     if (!validationResult?.isValid || !address || !burnCost) return;
 
-    if (needsApproval) {
-      await handleApprove();
-      return;
+    setIsSubmitting(true);
+
+    try {
+      // Call requestVanityName - this creates a pending request
+      await writeRequest({
+        address: VANITY_BURN_MANAGER_ADDRESS,
+        abi: VANITY_BURN_MANAGER_ABI,
+        functionName: "requestVanityName",
+        args: [requestedName, selectedToken.address],
+      });
+    } catch (error) {
+      console.error("Request failed:", error);
+      toast({
+        title: "Request Failed",
+        description: "Unable to create vanity name request. Please try again.",
+        variant: "destructive",
+      });
+      setIsSubmitting(false);
     }
+  };
+
+  // Handle burn submission (Step 2)
+  const handleBurn = async () => {
+    if (!burnCost || !address) return;
 
     setIsSubmitting(true);
 
@@ -400,25 +395,25 @@ export function VanityNameRequest({
           title: "Insufficient Balance",
           description: `You need ${formatEther(
             burnCost
-          )} VAIN to request this name.`,
+          )} VAIN to complete this request.`,
           variant: "destructive",
         });
         setIsSubmitting(false);
         return;
       }
 
-      // Call contract function
-      await writeRequest({
-        address: VANITY_BURN_MANAGER_ADDRESS,
-        abi: VANITY_BURN_MANAGER_ABI,
-        functionName: "requestVanityName",
-        args: [requestedName, selectedToken.address, burnCost],
+      // Call burn directly on the token
+      await writeBurn({
+        address: selectedToken.address,
+        abi: BURN_TOKEN_ABI,
+        functionName: "burn",
+        args: [burnCost],
       });
     } catch (error) {
-      console.error("Contract call failed:", error);
+      console.error("Burn failed:", error);
       toast({
-        title: "Request Failed",
-        description: "Unable to submit vanity name request. Please try again.",
+        title: "Burn Failed",
+        description: "Unable to burn tokens. Please try again.",
         variant: "destructive",
       });
       setIsSubmitting(false);
@@ -444,19 +439,19 @@ export function VanityNameRequest({
       : "border-red-400/50";
   };
 
-  const getButtonText = () => {
-    if (isSubmitting || isWaitingForApprove || isWaitingForRequest) {
-      if (isWaitingForApprove) return "Confirming Approval...";
-      if (isWaitingForRequest) return "Confirming Request...";
-      return needsApproval ? "Approving Tokens..." : "Submitting Request...";
-    }
+  const getPendingRequestInfo = () => {
+    if (!pendingRequestData || !pendingRequestData[5]) return null;
 
-    if (needsApproval) {
-      return "Approve Tokens";
-    }
-
-    return "Request Vanity Name";
+    return {
+      requestId: Number(pendingRequestData[0]),
+      requestedName: pendingRequestData[1],
+      burnAmount: pendingRequestData[2],
+      token: pendingRequestData[3],
+      timestamp: Number(pendingRequestData[4]),
+    };
   };
+
+  const pendingInfo = getPendingRequestInfo();
 
   return (
     <div className="space-y-6">
@@ -498,11 +493,12 @@ export function VanityNameRequest({
                 Pending Requests
               </Label>
               <div className="flex items-center gap-2">
-                {pendingRequests.length > 0 ? (
+                {pendingRequests.length > 0 || hasPendingRequest ? (
                   <>
                     <Clock className="h-4 w-4 text-yellow-400" />
                     <span className="font-medium text-foreground">
-                      {pendingRequests.length} pending
+                      {pendingRequests.length + (hasPendingRequest ? 1 : 0)}{" "}
+                      pending
                     </span>
                   </>
                 ) : (
@@ -517,31 +513,47 @@ export function VanityNameRequest({
             </div>
           </div>
 
-          {/* Pending Requests List */}
+          {/* Pending Request Alert */}
+          {pendingInfo && (
+            <Alert className="border-yellow-400/30 bg-yellow-500/10">
+              <Clock className="h-4 w-4 text-yellow-400" />
+              <AlertDescription>
+                <div className="font-medium text-yellow-400 mb-1">
+                  Pending Request: "{pendingInfo.requestedName}"
+                </div>
+                <div className="text-sm text-muted-foreground">
+                  You need to burn {formatEther(pendingInfo.burnAmount)} VAIN
+                  tokens to activate this request.
+                </div>
+              </AlertDescription>
+            </Alert>
+          )}
+
+          {/* Completed Pending Requests List */}
           {pendingRequests.length > 0 && (
             <div className="space-y-2">
               <Label className="text-sm text-muted-foreground">
-                Pending Requests
+                Processing Requests
               </Label>
               <div className="space-y-2">
                 {pendingRequests.map((request) => (
                   <div
                     key={request.requestId}
-                    className="flex items-center justify-between p-3 bg-yellow-500/10 border border-yellow-400/30 rounded-lg"
+                    className="flex items-center justify-between p-3 bg-blue-500/10 border border-blue-400/30 rounded-lg"
                   >
                     <div className="flex items-center gap-3">
-                      <Clock className="h-4 w-4 text-yellow-400" />
+                      <RefreshCw className="h-4 w-4 text-blue-400" />
                       <div>
                         <p className="font-medium text-foreground">
                           {request.newName}
                         </p>
                         <p className="text-xs text-muted-foreground">
-                          Requested{" "}
+                          Processing since{" "}
                           {new Date(request.createdAt).toLocaleDateString()}
                         </p>
                       </div>
                     </div>
-                    <Badge className="bg-yellow-500/20 text-yellow-400 border-yellow-400/30">
+                    <Badge className="bg-blue-500/20 text-blue-400 border-blue-400/30">
                       Processing
                     </Badge>
                   </div>
@@ -553,205 +565,243 @@ export function VanityNameRequest({
       </Card>
 
       {/* Request Form */}
-      <Card className="unified-card border-primary/20">
-        <CardHeader>
-          <CardTitle className="flex items-center gap-3">
-            <Sparkles className="h-5 w-5 text-primary" />
-            Request New Name
-          </CardTitle>
-        </CardHeader>
-        <CardContent>
-          <form onSubmit={handleSubmit} className="space-y-6">
-            {/* Name Input */}
-            <div className="space-y-2">
-              <Label htmlFor="vanityName">Vanity Name</Label>
-              <div className="relative">
-                <Input
-                  id="vanityName"
-                  type="text"
-                  value={requestedName}
-                  onChange={(e) => setRequestedName(e.target.value)}
-                  placeholder="Enter your desired name"
-                  className={`pr-10 ${getValidationColor()}`}
-                  minLength={VANITY_NAME_CONSTANTS.MIN_LENGTH}
-                  maxLength={VANITY_NAME_CONSTANTS.MAX_LENGTH}
-                />
-                <div className="absolute right-3 top-1/2 -translate-y-1/2">
-                  {getValidationIcon()}
+      {pendingInfo ? (
+        /* Step 2: Burn Tokens */
+        <Card className="unified-card border-orange-400/20 bg-orange-500/5">
+          <CardHeader>
+            <CardTitle className="flex items-center gap-3">
+              <Flame className="h-5 w-5 text-orange-400" />
+              Step 2: Burn Tokens
+            </CardTitle>
+          </CardHeader>
+          <CardContent className="space-y-6">
+            <Alert>
+              <Info className="h-4 w-4" />
+              <AlertDescription>
+                Your request for "<strong>{pendingInfo.requestedName}</strong>"
+                is ready. Burn {formatEther(pendingInfo.burnAmount)} VAIN tokens
+                to activate it.
+              </AlertDescription>
+            </Alert>
+
+            {/* Token Balance */}
+            <div className="p-4 border rounded-lg">
+              <div className="flex items-center justify-between mb-3">
+                <div className="flex items-center gap-2">
+                  <Coins className="h-4 w-4 text-muted-foreground" />
+                  <span className="text-sm text-muted-foreground">
+                    Your Balance
+                  </span>
                 </div>
+                <span className="font-medium text-foreground">
+                  {tokenBalance ? formatEther(tokenBalance.value) : "0"} VAIN
+                </span>
               </div>
 
-              {/* Validation Messages */}
-              <AnimatePresence>
-                {validationResult && (
-                  <motion.div
-                    initial={{ opacity: 0, height: 0 }}
-                    animate={{ opacity: 1, height: "auto" }}
-                    exit={{ opacity: 0, height: 0 }}
-                    transition={{ duration: 0.2 }}
-                  >
-                    <Alert
-                      variant={
-                        validationResult.isValid ? "default" : "destructive"
-                      }
-                    >
-                      <div className="flex items-center gap-2">
-                        {validationResult.isValid ? (
-                          <CheckCircle className="h-4 w-4 text-green-400" />
-                        ) : (
-                          <AlertTriangle className="h-4 w-4" />
-                        )}
-                        <AlertDescription>
-                          {validationResult.message ||
-                            (validationResult.isValid
-                              ? "Name is available!"
-                              : "Name is not available")}
-                        </AlertDescription>
-                      </div>
-                    </Alert>
-                  </motion.div>
-                )}
-              </AnimatePresence>
-
-              {/* Name Requirements */}
-              <div className="text-xs text-muted-foreground space-y-1">
-                <p>Requirements:</p>
-                <ul className="list-disc list-inside ml-2 space-y-1">
-                  <li>
-                    {VANITY_NAME_CONSTANTS.MIN_LENGTH}-
-                    {VANITY_NAME_CONSTANTS.MAX_LENGTH} characters long
-                  </li>
-                  <li>Letters, numbers, and underscores only</li>
-                  <li>Must be unique across all users</li>
-                  <li>Cannot be a reserved name</li>
-                </ul>
+              <div className="flex items-center justify-between p-3 bg-red-500/10 border border-red-400/30 rounded-lg">
+                <div className="flex items-center gap-2">
+                  <Flame className="h-4 w-4 text-red-400" />
+                  <span className="text-sm text-red-400">Will Burn</span>
+                </div>
+                <span className="font-medium text-red-400">
+                  {formatEther(pendingInfo.burnAmount)} VAIN
+                </span>
               </div>
             </div>
 
-            <Separator />
-
-            {/* Token Information */}
-            <div className="space-y-4">
-              <Label>Burn Token Information</Label>
-              <div className="p-4 border rounded-lg">
-                <div className="flex items-center gap-3 mb-3">
-                  <div className="text-2xl">{selectedToken.icon}</div>
-                  <div>
-                    <p className="font-medium text-foreground">
-                      {selectedToken.symbol}
-                    </p>
-                    <p className="text-sm text-muted-foreground">
-                      {selectedToken.name}
-                    </p>
+            <Button
+              onClick={handleBurn}
+              disabled={
+                isSubmitting ||
+                isWaitingForBurn ||
+                !tokenBalance ||
+                tokenBalance.value < BigInt(pendingInfo.burnAmount)
+              }
+              className="w-full h-12 text-lg font-semibold"
+            >
+              {isSubmitting || isWaitingForBurn ? (
+                <div className="flex items-center gap-2">
+                  <Loader2 className="h-5 w-5 animate-spin" />
+                  <span>Burning Tokens...</span>
+                </div>
+              ) : (
+                <div className="flex items-center gap-2">
+                  <Flame className="h-5 w-5" />
+                  <span>Burn {formatEther(pendingInfo.burnAmount)} VAIN</span>
+                  <ArrowRight className="h-5 w-5" />
+                </div>
+              )}
+            </Button>
+          </CardContent>
+        </Card>
+      ) : (
+        /* Step 1: Request Name */
+        <Card className="unified-card border-primary/20">
+          <CardHeader>
+            <CardTitle className="flex items-center gap-3">
+              <Sparkles className="h-5 w-5 text-primary" />
+              Step 1: Request New Name
+            </CardTitle>
+          </CardHeader>
+          <CardContent>
+            <form onSubmit={handleRequest} className="space-y-6">
+              {/* Name Input */}
+              <div className="space-y-2">
+                <Label htmlFor="vanityName">Vanity Name</Label>
+                <div className="relative">
+                  <Input
+                    id="vanityName"
+                    type="text"
+                    value={requestedName}
+                    onChange={(e) => setRequestedName(e.target.value)}
+                    placeholder="Enter your desired name"
+                    className={`pr-10 ${getValidationColor()}`}
+                    minLength={VANITY_NAME_CONSTANTS.MIN_LENGTH}
+                    maxLength={VANITY_NAME_CONSTANTS.MAX_LENGTH}
+                  />
+                  <div className="absolute right-3 top-1/2 -translate-y-1/2">
+                    {getValidationIcon()}
                   </div>
                 </div>
 
-                {/* Token Balance */}
-                <div className="flex items-center justify-between p-3 bg-muted/50 rounded-lg mb-3">
-                  <div className="flex items-center gap-2">
-                    <Coins className="h-4 w-4 text-muted-foreground" />
-                    <span className="text-sm text-muted-foreground">
-                      Your Balance
-                    </span>
-                  </div>
-                  <span className="font-medium text-foreground">
-                    {tokenBalance ? formatEther(tokenBalance.value) : "0"} VAIN
-                  </span>
-                </div>
+                {/* Validation Messages */}
+                <AnimatePresence>
+                  {validationResult && (
+                    <motion.div
+                      initial={{ opacity: 0, height: 0 }}
+                      animate={{ opacity: 1, height: "auto" }}
+                      exit={{ opacity: 0, height: 0 }}
+                      transition={{ duration: 0.2 }}
+                    >
+                      <Alert
+                        variant={
+                          validationResult.isValid ? "default" : "destructive"
+                        }
+                      >
+                        <div className="flex items-center gap-2">
+                          {validationResult.isValid ? (
+                            <CheckCircle className="h-4 w-4 text-green-400" />
+                          ) : (
+                            <AlertTriangle className="h-4 w-4" />
+                          )}
+                          <AlertDescription>
+                            {validationResult.message ||
+                              (validationResult.isValid
+                                ? "Name is available!"
+                                : "Name is not available")}
+                          </AlertDescription>
+                        </div>
+                      </Alert>
+                    </motion.div>
+                  )}
+                </AnimatePresence>
 
-                {/* Burn Cost */}
-                <div className="flex items-center justify-between p-3 bg-red-500/10 border border-red-400/30 rounded-lg">
-                  <div className="flex items-center gap-2">
-                    <Flame className="h-4 w-4 text-red-400" />
-                    <span className="text-sm text-red-400">
-                      Required to Burn
-                    </span>
-                  </div>
-                  <span className="font-medium text-red-400">
-                    {burnCost ? formatEther(burnCost) : "Loading..."} VAIN
-                  </span>
+                {/* Name Requirements */}
+                <div className="text-xs text-muted-foreground space-y-1">
+                  <p>Requirements:</p>
+                  <ul className="list-disc list-inside ml-2 space-y-1">
+                    <li>
+                      {VANITY_NAME_CONSTANTS.MIN_LENGTH}-
+                      {VANITY_NAME_CONSTANTS.MAX_LENGTH} characters long
+                    </li>
+                    <li>Letters, numbers, and underscores only</li>
+                    <li>Must be unique across all users</li>
+                    <li>Cannot be a reserved name</li>
+                  </ul>
                 </div>
               </div>
 
-              {/* Approval Status */}
-              {needsApproval && (
-                <Alert>
-                  <AlertTriangle className="h-4 w-4" />
-                  <AlertDescription>
-                    You need to approve the burn manager to spend your tokens
-                    before requesting a name.
+              <Separator />
+
+              {/* Token Information */}
+              <div className="space-y-4">
+                <Label>Cost Information</Label>
+                <div className="p-4 border rounded-lg">
+                  <div className="flex items-center gap-3 mb-3">
+                    <div className="text-2xl">{selectedToken.icon}</div>
+                    <div>
+                      <p className="font-medium text-foreground">
+                        {selectedToken.symbol}
+                      </p>
+                      <p className="text-sm text-muted-foreground">
+                        {selectedToken.name}
+                      </p>
+                    </div>
+                  </div>
+
+                  <div className="space-y-2">
+                    <div className="flex items-center justify-between text-sm">
+                      <span className="text-muted-foreground">
+                        Current Balance:
+                      </span>
+                      <span className="font-medium text-foreground">
+                        {tokenBalance ? formatEther(tokenBalance.value) : "0"}{" "}
+                        VAIN
+                      </span>
+                    </div>
+                    <div className="flex items-center justify-between text-sm">
+                      <span className="text-muted-foreground">
+                        Required Cost:
+                      </span>
+                      <span className="font-medium text-foreground">
+                        {burnCost ? formatEther(burnCost) : "Loading..."} VAIN
+                      </span>
+                    </div>
+                  </div>
+                </div>
+
+                <Alert className="border-blue-400/20 bg-blue-500/5">
+                  <Info className="h-4 w-4 text-blue-400" />
+                  <AlertDescription className="text-blue-300">
+                    <strong>Two-Step Process:</strong> First create your
+                    request, then burn tokens to activate it. No approval needed
+                    - you burn tokens directly!
                   </AlertDescription>
                 </Alert>
-              )}
-
-              <div className="p-4 bg-red-500/10 border border-red-400/30 rounded-lg">
-                <div className="flex items-center gap-2 mb-2">
-                  <AlertTriangle className="h-4 w-4 text-red-400" />
-                  <span className="text-sm font-medium text-red-400">
-                    Important
-                  </span>
-                </div>
-                <p className="text-sm text-red-300">
-                  These tokens will be permanently burned and cannot be
-                  recovered. Make sure you have enough balance before
-                  proceeding.
-                </p>
               </div>
-            </div>
 
-            <Separator />
+              <Separator />
 
-            {/* Submit Button */}
-            <div className="space-y-4">
+              {/* Submit Button */}
               <Button
                 type="submit"
                 disabled={
                   !validationResult?.isValid ||
                   isSubmitting ||
-                  isWaitingForApprove ||
                   isWaitingForRequest ||
                   !requestedName.trim() ||
-                  pendingRequests.length > 0 ||
-                  !burnCost
+                  !burnCost ||
+                  hasPendingRequest
                 }
                 className="w-full h-12 text-lg font-semibold"
               >
-                {isSubmitting || isWaitingForApprove || isWaitingForRequest ? (
+                {isSubmitting || isWaitingForRequest ? (
                   <div className="flex items-center gap-2">
                     <Loader2 className="h-5 w-5 animate-spin" />
-                    <span>{getButtonText()}</span>
+                    <span>Creating Request...</span>
                   </div>
                 ) : (
                   <div className="flex items-center gap-2">
-                    {needsApproval ? (
-                      <>
-                        <CheckCircle className="h-5 w-5" />
-                        <span>Approve Tokens</span>
-                      </>
-                    ) : (
-                      <>
-                        <Flame className="h-5 w-5" />
-                        <span>Burn Tokens & Request Name</span>
-                        <ArrowRight className="h-5 w-5" />
-                      </>
-                    )}
+                    <Sparkles className="h-5 w-5" />
+                    <span>Create Vanity Name Request</span>
+                    <ArrowRight className="h-5 w-5" />
                   </div>
                 )}
               </Button>
 
               {/* Disabled Reason */}
-              {pendingRequests.length > 0 && (
+              {hasPendingRequest && (
                 <div className="text-center">
                   <p className="text-sm text-muted-foreground">
-                    You cannot request a new name while you have pending
-                    requests.
+                    You already have a pending request. Complete it by burning
+                    tokens first.
                   </p>
                 </div>
               )}
-            </div>
-          </form>
-        </CardContent>
-      </Card>
+            </form>
+          </CardContent>
+        </Card>
+      )}
 
       {/* Info Card */}
       <Card className="unified-card border-blue-400/20 bg-blue-500/5">
@@ -761,15 +811,25 @@ export function VanityNameRequest({
             <div className="space-y-2">
               <h3 className="font-semibold text-blue-400">How it works</h3>
               <div className="text-sm text-blue-300 space-y-1">
-                <p>1. Choose a unique vanity name following our requirements</p>
-                <p>2. Approve the burn manager to spend your tokens</p>
                 <p>
-                  3. Submit your request - tokens will be burned automatically
+                  <strong>Step 1:</strong> Create a vanity name request with
+                  your desired name
                 </p>
-                <p>4. Your request will be processed and approved if valid</p>
                 <p>
-                  5. Once confirmed, your new name will be active across the
-                  platform
+                  <strong>Step 2:</strong> Burn the required VAIN tokens to
+                  activate the request
+                </p>
+                <p>
+                  <strong>Step 3:</strong> Your request will be processed
+                  automatically if valid
+                </p>
+                <p>
+                  <strong>Step 4:</strong> Your new name will be active across
+                  the platform
+                </p>
+                <p className="mt-2 text-xs text-blue-400">
+                  💡 <strong>No approval needed!</strong> You burn tokens
+                  directly - much simpler than traditional ERC20 transfers.
                 </p>
               </div>
             </div>
