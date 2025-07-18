@@ -3,7 +3,7 @@
 
 import React, { useState, useEffect } from "react";
 import { motion, AnimatePresence } from "framer-motion";
-import { useAccount } from "wagmi";
+import { useAccount, useReadContract } from "wagmi";
 import { Container } from "@/components/craft";
 import { AuthWrapper } from "@/components/AuthWrapper";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -28,6 +28,7 @@ import {
   type VanityNameData,
   type VanityNameStats as VanityStatsType,
 } from "@/types/vanity";
+import { Address } from "viem";
 
 // Updated component imports
 import { VanityNameRequest } from "./components/VanityNameRequest";
@@ -37,107 +38,165 @@ import { VanityNameSettings } from "./components/VanityNameSettings";
 import { VanityNameStats } from "./components/VanityNameStats";
 import { VanityNameLeaderboard } from "./components/VanityNameLeaderboard";
 
+// Contract addresses
+const VANITY_BURN_MANAGER_ADDRESS = process.env
+  .NEXT_PUBLIC_VANITY_BURN_MANAGER_ADDRESS as Address;
+
+// Contract ABI for reading user's current vanity name
+const VANITY_BURN_MANAGER_ABI = [
+  {
+    inputs: [{ name: "user", type: "address" }],
+    name: "getUserVanityName",
+    outputs: [{ name: "", type: "string" }],
+    stateMutability: "view",
+    type: "function",
+  },
+  {
+    inputs: [{ name: "user", type: "address" }],
+    name: "getUserBurnInfo",
+    outputs: [
+      { name: "totalBurned", type: "uint256" },
+      { name: "totalSpent", type: "uint256" },
+      { name: "availableBalance", type: "uint256" },
+      { name: "possibleNameChanges", type: "uint256" },
+    ],
+    stateMutability: "view",
+    type: "function",
+  },
+] as const;
+
 interface VanityNameManagerPageProps {}
 
 export default function VanityNameManagerPage({}: VanityNameManagerPageProps) {
   const { address, isConnected } = useAccount();
   const [activeTab, setActiveTab] = useState("request");
-  const [isLoading, setIsLoading] = useState(true);
+  const [refreshKey, setRefreshKey] = useState(0);
   const [userVanityData, setUserVanityData] = useState<VanityNameData | null>(
     null
   );
-  const [systemStats, setSystemStats] = useState<VanityStatsType | null>(null);
 
-  // Load user's vanity name data
+  // Read current vanity name directly from contract
+  const { data: currentVanityName, refetch: refetchVanityName } =
+    useReadContract({
+      address: VANITY_BURN_MANAGER_ADDRESS,
+      abi: VANITY_BURN_MANAGER_ABI,
+      functionName: "getUserVanityName",
+      args: address ? [address] : undefined,
+      query: {
+        enabled: !!address && !!VANITY_BURN_MANAGER_ADDRESS,
+        refetchInterval: 5000,
+      },
+    });
+
+  const { data: burnInfo, refetch: refetchBurnInfo } = useReadContract({
+    address: VANITY_BURN_MANAGER_ADDRESS,
+    abi: VANITY_BURN_MANAGER_ABI,
+    functionName: "getUserBurnInfo",
+    args: address ? [address] : undefined,
+    query: {
+      enabled: !!address && !!VANITY_BURN_MANAGER_ADDRESS,
+      refetchInterval: 5000,
+    },
+  });
+
+  // Load user's vanity name data from API and contract
   useEffect(() => {
     const loadUserData = async () => {
       if (!address || !isConnected) {
-        setIsLoading(false);
         return;
       }
 
       try {
-        setIsLoading(true);
+        // Fetch user data from API (Firebase) - this will provide name history
+        const response = await fetch(`/api/vanity-name/user/${address}`);
+        if (response.ok) {
+          const apiData = await response.json();
+          console.log("📊 Loaded user data from API:", apiData);
 
-        // Simplified API calls - no more pending requests
-        const [vanityData, stats] = await Promise.all([
-          fetchUserVanityData(address),
-          fetchSystemStats(),
-        ]);
+          // Update user vanity data with API response
+          const updatedUserData: VanityNameData = {
+            current: apiData.currentName || currentVanityName || "",
+            history: apiData.nameHistory || [],
+            totalChanges: apiData.stats?.totalChanges || 0,
+            lastChanged: apiData.stats?.lastChanged || null,
+          };
 
-        setUserVanityData(vanityData);
-        setSystemStats(stats);
+          // Only update if we have new data or if current data differs
+          setUserVanityData((prev) => {
+            if (
+              !prev ||
+              prev.current !== updatedUserData.current ||
+              prev.history.length !== updatedUserData.history.length
+            ) {
+              return updatedUserData;
+            }
+            return prev;
+          });
+        } else {
+          console.log("ℹ️ No API data found, using contract data only");
+          // Fallback to contract-only data
+          const contractOnlyData: VanityNameData = {
+            current: currentVanityName || "",
+            history: [],
+            totalChanges:
+              burnInfo?.[1] && burnInfo?.[0]
+                ? Number(burnInfo[1] / BigInt("1000000000000000000000"))
+                : 0,
+            lastChanged: null,
+          };
+          setUserVanityData(contractOnlyData);
+        }
       } catch (error) {
-        console.error("Error loading vanity data:", error);
-      } finally {
-        setIsLoading(false);
+        console.error("Error loading user data:", error);
+        // Fallback to contract data
+        const fallbackData: VanityNameData = {
+          current: currentVanityName || "",
+          history: [],
+          totalChanges: 0,
+          lastChanged: null,
+        };
+        setUserVanityData(fallbackData);
       }
     };
 
     loadUserData();
-  }, [address, isConnected]);
+  }, [address, isConnected, currentVanityName, burnInfo]);
 
-  // Mock functions - replace with actual API calls
-  const fetchUserVanityData = async (
-    userAddress: string
-  ): Promise<VanityNameData> => {
-    // TODO: Implement actual API call to get user's current name and history
-    // This would fetch from the new vanity_users collection
-    try {
-      const response = await fetch(`/api/vanity-name/user/${userAddress}`);
-      if (response.ok) {
-        const data = await response.json();
-        return {
-          current: data.currentName || "",
-          history: data.nameHistory || [],
-          totalChanges: data.nameHistory?.length || 0,
-          lastChanged:
-            data.nameHistory?.[data.nameHistory.length - 1]?.timestamp || null,
-        };
-      }
-    } catch (error) {
-      console.error("Error fetching user vanity data:", error);
-    }
-
-    // Fallback to empty data
-    return {
-      current: "",
-      history: [],
-      totalChanges: 0,
-      lastChanged: null,
-    };
-  };
-
-  const fetchSystemStats = async (): Promise<VanityStatsType> => {
-    // TODO: Implement actual API call to get system-wide stats
-    // This would aggregate data from vanity_users and vanity_names collections
-    try {
-      const response = await fetch("/api/vanity-name/stats");
-      if (response.ok) {
-        return await response.json();
-      }
-    } catch (error) {
-      console.error("Error fetching system stats:", error);
-    }
-
-    // Fallback to mock data
-    return {
-      totalNames: 0,
-      totalRequests: 0,
-      pendingRequests: 0,
-      confirmedRequests: 0,
-      rejectedRequests: 0,
-      activeUsers: 0,
-      popularNames: [],
-    };
+  // Empty system stats - will be populated when you build analytics
+  const systemStats: VanityStatsType = {
+    totalNames: 0,
+    totalRequests: 0,
+    pendingRequests: 0,
+    confirmedRequests: 0,
+    rejectedRequests: 0,
+    activeUsers: 0,
+    popularNames: [],
   };
 
   // Handle successful name request
   const handleNameRequestSuccess = () => {
-    // Refresh user data after successful name change
+    // Refresh contract data
+    refetchVanityName();
+    refetchBurnInfo();
+
+    // Refresh API data
     if (address) {
-      fetchUserVanityData(address).then(setUserVanityData);
+      fetch(`/api/vanity-name/user/${address}`)
+        .then((response) => response.json())
+        .then((apiData) => {
+          const updatedUserData: VanityNameData = {
+            current: apiData.currentName || "",
+            history: apiData.nameHistory || [],
+            totalChanges: apiData.stats?.totalChanges || 0,
+            lastChanged: apiData.stats?.lastChanged || null,
+          };
+          setUserVanityData(updatedUserData);
+        })
+        .catch((error) => console.error("Error refreshing user data:", error));
     }
+
+    // Force re-render of components
+    setRefreshKey((prev) => prev + 1);
   };
 
   if (!isConnected) {
@@ -193,36 +252,6 @@ export default function VanityNameManagerPage({}: VanityNameManagerPageProps) {
     );
   }
 
-  if (isLoading) {
-    return (
-      <div className="min-h-screen animated-bg floating-particles">
-        <Container className="py-8 pt-24">
-          <div className="flex items-center justify-center min-h-[60vh]">
-            <motion.div
-              initial={{ opacity: 0 }}
-              animate={{ opacity: 1 }}
-              className="text-center space-y-4"
-            >
-              <motion.div
-                animate={{ rotate: 360 }}
-                transition={{ duration: 2, repeat: Infinity, ease: "linear" }}
-                className="mx-auto w-12 h-12 border-4 border-primary border-t-transparent rounded-full"
-              />
-              <div>
-                <h3 className="text-xl font-semibold text-foreground">
-                  Loading Vanity Names
-                </h3>
-                <p className="text-muted-foreground">
-                  Fetching your identity data...
-                </p>
-              </div>
-            </motion.div>
-          </div>
-        </Container>
-      </div>
-    );
-  }
-
   return (
     <AuthWrapper>
       <div className="min-h-screen animated-bg floating-particles md:pt-20">
@@ -251,34 +280,6 @@ export default function VanityNameManagerPage({}: VanityNameManagerPageProps) {
                 Burn VAIN tokens to earn unique vanity names
               </p>
             </div>
-
-            {/* Current Name Display */}
-            {userVanityData?.current && (
-              <motion.div
-                initial={{ opacity: 0, scale: 0.9 }}
-                animate={{ opacity: 1, scale: 1 }}
-                transition={{ delay: 0.2 }}
-                className="max-w-md mx-auto"
-              >
-                <Card className="unified-card border-primary/30 bg-primary/10">
-                  <CardContent className="p-6 text-center">
-                    <div className="flex items-center justify-center gap-3 mb-2">
-                      <Crown className="h-5 w-5 text-primary" />
-                      <span className="text-sm text-muted-foreground">
-                        Your Current Name
-                      </span>
-                    </div>
-                    <h3 className="text-2xl font-bold text-foreground">
-                      {userVanityData.current}
-                    </h3>
-                    <p className="text-xs text-muted-foreground mt-2">
-                      Changed {userVanityData.totalChanges} time
-                      {userVanityData.totalChanges !== 1 ? "s" : ""}
-                    </p>
-                  </CardContent>
-                </Card>
-              </motion.div>
-            )}
 
             {/* Info Card for New System */}
             <motion.div
@@ -356,7 +357,7 @@ export default function VanityNameManagerPage({}: VanityNameManagerPageProps) {
 
               <AnimatePresence mode="wait">
                 <motion.div
-                  key={activeTab}
+                  key={`${activeTab}-${refreshKey}`}
                   initial={{ opacity: 0, y: 20 }}
                   animate={{ opacity: 1, y: 0 }}
                   exit={{ opacity: 0, y: -20 }}

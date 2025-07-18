@@ -34,13 +34,14 @@ contract VanityNameBurnManager is IBurnManager, Ownable, ReentrancyGuard {
 
     event BurnCostUpdated(uint256 oldCost, uint256 newCost);
 
+    event BurnTokenUpdated(address indexed oldToken, address indexed newToken);
+
     // =================================================================
     //                       State Variables
     // =================================================================
 
-    /// @dev Hard-coded VAIN token address
-    address public constant VAIN_TOKEN =
-        0xC3DF61f5387fE2E0e6521Ffdad338B1bBf5E5f7c;
+    /// @dev The token address that can be burned for vanity names
+    address public burnToken;
 
     /// @dev Track how many tokens each user has burned
     mapping(address => uint256) public userBurnBalance;
@@ -88,15 +89,23 @@ contract VanityNameBurnManager is IBurnManager, Ownable, ReentrancyGuard {
         _;
     }
 
+    modifier onlyBurnToken() {
+        require(msg.sender == burnToken, "Only burn token can notify");
+        require(burnToken != address(0), "Burn token not set");
+        _;
+    }
+
     // =================================================================
     //                   IBurnManager Implementation
     // =================================================================
 
     /**
-     * @dev Called when users burn VAIN tokens - adds to their burn balance
+     * @dev Called when users burn tokens - adds to their burn balance
      */
-    function notifyBurn(address burner, uint256 amount) external override {
-        require(msg.sender == VAIN_TOKEN, "Only VAIN token can notify");
+    function notifyBurn(
+        address burner,
+        uint256 amount
+    ) external override onlyBurnToken {
         require(amount > 0, "Cannot burn zero tokens");
 
         userBurnBalance[burner] += amount;
@@ -114,8 +123,8 @@ contract VanityNameBurnManager is IBurnManager, Ownable, ReentrancyGuard {
      */
     function supportsToken(
         address token
-    ) external pure override returns (bool) {
-        return token == VAIN_TOKEN;
+    ) external view override returns (bool) {
+        return token == burnToken && burnToken != address(0);
     }
 
     // =================================================================
@@ -129,12 +138,14 @@ contract VanityNameBurnManager is IBurnManager, Ownable, ReentrancyGuard {
     function setVanityName(
         string calldata newName
     ) external validName(newName) notPaused nonReentrant {
+        require(burnToken != address(0), "Burn token not set");
+
         // Check user has enough burned tokens available
         uint256 availableBalance = userBurnBalance[msg.sender] -
             userSpentBalance[msg.sender];
         require(
             availableBalance >= costPerNameChange,
-            "Insufficient burn balance - burn more VAIN tokens first"
+            "Insufficient burn balance - burn more tokens first"
         );
 
         // Check if name is available (double-check for race conditions)
@@ -237,14 +248,35 @@ contract VanityNameBurnManager is IBurnManager, Ownable, ReentrancyGuard {
      * @dev Check if user can set a vanity name
      */
     function canUserSetName(address user) external view returns (bool) {
+        if (burnToken == address(0)) return false;
+
         uint256 availableBalance = userBurnBalance[user] -
             userSpentBalance[user];
         return availableBalance >= costPerNameChange;
     }
 
+    /**
+     * @dev Get the current burn token address
+     */
+    function getBurnToken() external view returns (address) {
+        return burnToken;
+    }
+
     // =================================================================
     //                       Owner Functions
     // =================================================================
+
+    /**
+     * @dev Set the burn token address
+     */
+    function setBurnToken(address _burnToken) external onlyOwner {
+        require(_burnToken != address(0), "Burn token cannot be zero address");
+
+        address oldToken = burnToken;
+        burnToken = _burnToken;
+
+        emit BurnTokenUpdated(oldToken, _burnToken);
+    }
 
     /**
      * @dev Update cost per name change

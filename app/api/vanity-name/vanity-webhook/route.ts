@@ -21,7 +21,7 @@ import { Address } from "viem";
 const VANITY_BURN_MANAGER_ADDRESS = process.env
   .NEXT_PUBLIC_VANITY_BURN_MANAGER_ADDRESS as Address;
 const VAIN_TOKEN_ADDRESS =
-  "0xC3DF61f5387fE2E0e6521ffdad338b1bbf5e5f7c" as Address;
+  "0xC3DF61f5387fE2E0e6521ffdad338B1bbf5e5f7c" as Address;
 
 if (!VANITY_BURN_MANAGER_ADDRESS) {
   console.error("❌ VANITY_BURN_MANAGER_ADDRESS not configured");
@@ -92,41 +92,6 @@ interface AlchemyWebhookPayload {
   };
 }
 
-interface ProcessedVanityWebhook {
-  eventType: "TokensBurned" | "VanityNameSet";
-  user: Address;
-  transactionHash: string;
-  blockNumber: number;
-  timestamp: string;
-  data: any;
-}
-
-interface UserBurnDocument {
-  address: Address;
-  totalBurned: string;
-  totalSpent: string;
-  availableBalance: string;
-  burnHistory: BurnEntry[];
-  nameHistory: NameEntry[];
-  createdAt: string;
-  updatedAt: string;
-}
-
-interface BurnEntry {
-  amount: string;
-  transactionHash: string;
-  blockNumber: number;
-  timestamp: string;
-}
-
-interface NameEntry {
-  oldName: string;
-  newName: string;
-  transactionHash: string;
-  blockNumber: number;
-  timestamp: string;
-}
-
 interface VanityNameDocument {
   name: string;
   displayName: string;
@@ -135,6 +100,22 @@ interface VanityNameDocument {
   transactionHash: string;
   blockNumber: number;
   isActive: boolean;
+}
+
+interface VanityNameHistoryEntry {
+  name: string;
+  changedAt: string;
+  requestId: number;
+  burnAmount: string;
+  tokenAddress: Address;
+  transactionHash: string;
+}
+
+interface VanityNameData {
+  current: string;
+  history: VanityNameHistoryEntry[];
+  totalChanges: number;
+  lastChanged: string | null;
 }
 
 // =================================================================
@@ -162,60 +143,13 @@ async function processTokensBurned(
     newBurnBalance: formatEther(BigInt(newBurnBalance)),
   });
 
-  // Update user's burn document
-  await runTransaction(db, async (transaction) => {
-    const userRef = doc(db, "vanity_users", burner);
-    const userDoc = await transaction.get(userRef);
-
-    if (userDoc.exists()) {
-      // Update existing user
-      const userData = userDoc.data() as UserBurnDocument;
-
-      const updatedBurnHistory = [
-        ...userData.burnHistory,
-        {
-          amount,
-          transactionHash,
-          blockNumber,
-          timestamp,
-        },
-      ];
-
-      transaction.update(userRef, {
-        totalBurned: newBurnBalance,
-        burnHistory: updatedBurnHistory,
-        updatedAt: timestamp,
-      });
-    } else {
-      // Create new user document
-      const newUserDoc: UserBurnDocument = {
-        address: burner,
-        totalBurned: newBurnBalance,
-        totalSpent: "0",
-        availableBalance: newBurnBalance,
-        burnHistory: [
-          {
-            amount,
-            transactionHash,
-            blockNumber,
-            timestamp,
-          },
-        ],
-        nameHistory: [],
-        createdAt: timestamp,
-        updatedAt: timestamp,
-      };
-
-      transaction.set(userRef, newUserDoc);
-      console.log(`👤 Created new user document for: ${burner}`);
-    }
-  });
-
+  // For now, we're just logging burn events
+  // You can add burn tracking to user documents later if needed
   console.log("✅ TokensBurned processed successfully");
 }
 
 /**
- * Process VanityNameSet event
+ * Process VanityNameSet event and update both vanity_names and users collections
  */
 async function processVanityNameSet(
   event: any,
@@ -236,16 +170,11 @@ async function processVanityNameSet(
   });
 
   await runTransaction(db, async (transaction) => {
-    const userRef = doc(db, "vanity_users", user);
+    const userRef = doc(db, "users", user);
     const newNameRef = doc(db, "vanity_names", newName.toLowerCase());
 
     // Get user document
     const userDoc = await transaction.get(userRef);
-    if (!userDoc.exists()) {
-      throw new Error(`User document not found: ${user}`);
-    }
-
-    const userData = userDoc.data() as UserBurnDocument;
 
     // Release old name if it exists
     if (oldName && oldName.length > 0) {
@@ -265,28 +194,67 @@ async function processVanityNameSet(
       isActive: true,
     };
 
-    // Update name history
-    const updatedNameHistory = [
-      ...userData.nameHistory,
-      {
-        oldName: oldName || "",
-        newName,
-        transactionHash,
-        blockNumber,
-        timestamp,
-      },
-    ];
+    // Create new history entry
+    const newHistoryEntry: VanityNameHistoryEntry = {
+      name: newName,
+      changedAt: timestamp,
+      requestId: blockNumber,
+      burnAmount: "1000000000000000000000", // 1000 tokens
+      tokenAddress: VAIN_TOKEN_ADDRESS,
+      transactionHash,
+    };
 
-    // Update user document
-    transaction.update(userRef, {
-      nameHistory: updatedNameHistory,
-      updatedAt: timestamp,
-    });
+    if (userDoc.exists()) {
+      // Update existing user document
+      const userData = userDoc.data();
+      const currentVanityData = userData.vanityName || {
+        current: "",
+        history: [],
+        totalChanges: 0,
+        lastChanged: null,
+      };
+
+      const updatedVanityData: VanityNameData = {
+        current: newName,
+        history: [...currentVanityData.history, newHistoryEntry],
+        totalChanges: currentVanityData.totalChanges + 1,
+        lastChanged: timestamp,
+      };
+
+      transaction.update(userRef, {
+        vanityName: updatedVanityData,
+        lastActive: timestamp,
+      });
+
+      console.log(`📝 Updated existing user document for: ${user}`);
+    } else {
+      // Create new user document with vanity name data
+      const newUserDoc = {
+        address: user,
+        createdTokens: [],
+        lastActive: timestamp,
+        theme: {
+          colors: [],
+          lastUpdated: timestamp,
+        },
+        vanityName: {
+          current: newName,
+          history: [newHistoryEntry],
+          totalChanges: 1,
+          lastChanged: timestamp,
+        },
+      };
+
+      transaction.set(userRef, newUserDoc);
+      console.log(`👤 Created new user document for: ${user}`);
+    }
 
     // Set new name document
     transaction.set(newNameRef, nameDoc);
 
-    console.log("✅ VanityNameSet processed successfully");
+    console.log(
+      "✅ VanityNameSet processed successfully - updated both collections"
+    );
   });
 }
 
@@ -320,7 +288,7 @@ export async function POST(req: Request) {
       });
     }
 
-    const processedEvents: ProcessedVanityWebhook[] = [];
+    const processedEvents: any[] = [];
 
     for (const activity of body.event.activity) {
       try {
@@ -386,7 +354,7 @@ export async function POST(req: Request) {
         }
 
         processedEvents.push({
-          eventType: eventName as any,
+          eventType: eventName,
           user: ((eventArgs as any).user ||
             (eventArgs as any).burner) as Address,
           transactionHash,
@@ -439,7 +407,7 @@ export async function GET(req: Request) {
       webhookUrl: "/api/vanity-name/vanity-webhook",
     },
     collections: {
-      vanity_users: "Tracks user burn balances and name history",
+      users: "Updates user documents with vanity name data",
       vanity_names: "Tracks name ownership and availability",
     },
     timestamp: new Date().toISOString(),
