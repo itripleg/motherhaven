@@ -1,9 +1,9 @@
-// app/factory/components/MobileImageUpload.tsx
+// app/factory/components/MobileImageUpload.tsx - FIXED: Unified with DEX version
 "use client";
 
 import React, { useState, useRef } from "react";
 import { Button } from "@/components/ui/button";
-import { Card, CardContent } from "@/components/ui/card";
+import { Card } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { Badge } from "@/components/ui/badge";
@@ -161,8 +161,8 @@ export const MobileImageUpload: React.FC<MobileImageUploadProps> = ({
         className="hidden"
       />
 
-      {/* Token Header Preview - Matches TokenHeader exactly */}
-      <Card className="h-80 relative overflow-hidden border-primary/20">
+      {/* Token Header Preview - UNIFIED: Matches both DEX and factory exactly */}
+      <Card className="h-80 relative overflow-hidden unified-card border-primary/20">
         {/* Background Layer */}
         <div className="absolute inset-0 z-0">
           {imageUrl ? (
@@ -176,7 +176,7 @@ export const MobileImageUpload: React.FC<MobileImageUploadProps> = ({
           <div className="absolute inset-0 bg-gradient-to-b from-black/50 via-black/30 to-black/60 opacity-60" />
         </div>
 
-        {/* Content Layer - Matches TokenHeaderContent */}
+        {/* Content Layer - UNIFIED: Matches TokenHeaderContent exactly */}
         <div className="relative z-10 flex flex-col justify-between h-full p-4">
           {/* Top Bar */}
           <div className="flex justify-between items-start mb-4">
@@ -187,6 +187,14 @@ export const MobileImageUpload: React.FC<MobileImageUploadProps> = ({
             </div>
 
             <div className="flex items-center gap-2 ml-2 flex-shrink-0">
+              <Badge
+                className="bg-emerald-500/80 text-white border-0 text-xs"
+                variant="outline"
+              >
+                <Sparkles className="h-3 w-3 mr-1" />
+                Trading
+              </Badge>
+
               <div className="flex items-center gap-1 p-1 bg-black/30 border border-white/40 rounded-lg backdrop-blur-sm">
                 <Button
                   variant="ghost"

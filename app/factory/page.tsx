@@ -1,4 +1,4 @@
-// app/factory/page.tsx
+// app/factory/page.tsx - FIXED: Properly saves image position to Firebase
 "use client";
 
 import { useState, useEffect, useCallback } from "react";
@@ -9,7 +9,7 @@ import { useWriteContract, useWaitForTransactionReceipt } from "wagmi";
 import { zeroAddress, parseEther } from "viem";
 import { storage, db } from "@/firebase";
 import { ref, uploadBytes, getDownloadURL } from "firebase/storage";
-import { collection, getDocs, getCountFromServer } from "firebase/firestore";
+import { collection, getDocs, getCountFromServer, doc, setDoc } from "firebase/firestore";
 import { FACTORY_ADDRESS, FACTORY_ABI, FACTORY_CONSTANTS } from "@/types";
 import { useFactoryConfigContext } from "@/contexts/FactoryConfigProvider";
 
@@ -69,11 +69,6 @@ export default function FactoryPage() {
   const [tokenInfo, setTokenInfo] =
     useState<TokenCreationInfo>(DEFAULT_TOKEN_INFO);
 
-  // Debug state changes
-  useEffect(() => {
-    console.log("Main page tokenInfo state changed:", tokenInfo);
-  }, [tokenInfo]);
-
   // Real tokenomics from factory config and constants
   const tokenomics = factoryConfig
     ? {
@@ -81,7 +76,7 @@ export default function FactoryPage() {
         maxSupply: parseFloat(factoryConfig.maxSupply),
         initialPrice: parseFloat(factoryConfig.initialPrice),
         maxWalletPercentage: factoryConfig.maxWalletPercentage,
-        tradingFee: factoryConfig.tradingFee / 100, // Convert from basis points to percentage
+        tradingFee: factoryConfig.tradingFee / 100,
         minPurchase: parseFloat(factoryConfig.minPurchase),
         maxPurchase: parseFloat(factoryConfig.maxPurchase),
         priceRate: factoryConfig.priceRate,
@@ -89,12 +84,11 @@ export default function FactoryPage() {
         liquidityPool: "uniswap",
       }
     : {
-        // Fallback to constants if config not loaded
         fundingGoal: parseFloat(FACTORY_CONSTANTS.DEFAULT_FUNDING_GOAL),
         maxSupply: parseFloat(FACTORY_CONSTANTS.MAX_SUPPLY) / 1e18,
         initialPrice: parseFloat(FACTORY_CONSTANTS.INITIAL_PRICE),
         maxWalletPercentage: FACTORY_CONSTANTS.MAX_WALLET_PERCENTAGE,
-        tradingFee: FACTORY_CONSTANTS.TRADING_FEE / 100, // Convert from basis points
+        tradingFee: FACTORY_CONSTANTS.TRADING_FEE / 100,
         minPurchase: parseFloat(FACTORY_CONSTANTS.MIN_PURCHASE),
         maxPurchase: parseFloat(FACTORY_CONSTANTS.MAX_PURCHASE),
         priceRate: FACTORY_CONSTANTS.PRICE_RATE,
@@ -198,11 +192,9 @@ export default function FactoryPage() {
     if (error) {
       console.error("Token creation error:", error);
 
-      // Parse error for user-friendly message
       let errorMessage = "Failed to create token. Please try again.";
       let errorTitle = "Transaction Failed";
 
-      // Type-safe error parsing
       const errorObj = error as any;
 
       if (errorObj?.cause?.reason) {
@@ -244,7 +236,7 @@ export default function FactoryPage() {
         title: errorTitle,
         description: errorMessage,
         variant: "destructive",
-        duration: 8000, // Longer duration for errors
+        duration: 8000,
       });
 
       setIsCreating(false);
@@ -252,18 +244,71 @@ export default function FactoryPage() {
     }
   }, [error, toast]);
 
-  // Handle successful transaction
+  // FIXED: Handle successful transaction with proper Firebase save
   useEffect(() => {
     if (receipt && !isConfirming) {
-      toast({
-        title: "🎉 Token Created Successfully!",
-        description: "Your token is now live and ready for trading!",
-        duration: 10000, // Longer duration for success
-      });
+      // Extract token address from transaction receipt
+      const tokenAddress = receipt.logs?.[0]?.address || transactionData;
+      
+      if (tokenAddress) {
+        // Save complete token data to Firebase including image position
+        const saveTokenToFirebase = async () => {
+          try {
+            const tokenDocRef = doc(db, "tokens", tokenAddress.toLowerCase());
+            
+            const tokenData = {
+              name: tokenInfo.name,
+              symbol: tokenInfo.ticker,
+              imageUrl: tokenInfo.image ? await uploadImage(tokenInfo.image) : "",
+              address: tokenAddress,
+              creator: receipt.from,
+              blockNumber: Number(receipt.blockNumber),
+              transactionHash: receipt.transactionHash,
+              createdAt: new Date().toISOString(),
+              // FIXED: Include all the missing fields
+              currentState: 1, // TRADING state
+              state: 1,
+              fundingGoal: tokenomics.fundingGoal.toString(),
+              collateral: "0",
+              virtualSupply: "0",
+              lastPrice: tokenomics.initialPrice.toString(),
+              description: tokenInfo.description || "",
+              imagePosition: tokenInfo.imagePosition, // FIXED: Save image position
+              burnManager: tokenInfo.burnManager || zeroAddress,
+              statistics: {
+                currentPrice: tokenomics.initialPrice.toString(),
+                volumeETH: "0",
+                tradeCount: 0,
+                uniqueHolders: 0,
+              },
+            };
+
+            await setDoc(tokenDocRef, tokenData);
+            
+            console.log("Token data saved to Firebase:", tokenData);
+            
+            toast({
+              title: "🎉 Token Created Successfully!",
+              description: "Your token is now live and ready for trading!",
+              duration: 10000,
+            });
+          } catch (saveError) {
+            console.error("Error saving to Firebase:", saveError);
+            toast({
+              title: "Token Created",
+              description: "Token created but failed to save metadata. The token is still functional.",
+              variant: "destructive",
+            });
+          }
+        };
+
+        saveTokenToFirebase();
+      }
+
       setIsCreating(false);
       setUploadingImage(false);
     }
-  }, [receipt, isConfirming, toast]);
+  }, [receipt, isConfirming, toast, tokenInfo, tokenomics, transactionData]);
 
   // Upload image to Firebase Storage
   const uploadImage = async (file: File): Promise<string> => {
@@ -272,19 +317,18 @@ export default function FactoryPage() {
     return await getDownloadURL(uploadTask.ref);
   };
 
-  // Calculate completion percentage - tokenomics always adds 25% since it's pre-configured
+  // Calculate completion percentage
   const getCompletionPercentage = () => {
     let completed = 25; // Tokenomics is always complete (25%)
     if (tokenInfo.name) completed += 40; // Name adds 40%
     if (tokenInfo.ticker) completed += 35; // Ticker adds 35%
-    // Note: We don't count image since it's optional
     return Math.min(completed, 100);
   };
 
   // Check if form is valid for submission
   const isFormValid = !!(tokenInfo.name && tokenInfo.ticker);
 
-  // Handle token creation with better error handling
+  // FIXED: Handle token creation with proper image upload timing
   const handleTokenCreation = useCallback(async () => {
     if (!mounted || !isFormValid) return;
 
@@ -292,7 +336,6 @@ export default function FactoryPage() {
       setIsCreating(true);
       let imageUrl = "";
 
-      // Reset any previous errors
       resetContract();
 
       // Upload image if present
@@ -311,7 +354,6 @@ export default function FactoryPage() {
             description: "Failed to upload image. Proceeding without image.",
             variant: "destructive",
           });
-          // Continue without image rather than failing
         }
         setUploadingImage(false);
       }
@@ -321,7 +363,7 @@ export default function FactoryPage() {
         description: "Prepare for takeoff! Your token is being created.",
       });
 
-      // Validate inputs before proceeding
+      // Validate inputs
       if (!tokenInfo.name.trim()) {
         throw new Error("Token name is required");
       }
@@ -338,7 +380,7 @@ export default function FactoryPage() {
       // Prepare transaction parameters
       const createTokenArgs = [
         tokenInfo.name.trim(),
-        tokenInfo.ticker.trim().toUpperCase(), // Ensure uppercase
+        tokenInfo.ticker.trim().toUpperCase(),
         imageUrl,
         tokenInfo.burnManager || zeroAddress,
         tokenInfo.purchase.enabled && tokenInfo.purchase.minTokensOut
@@ -381,11 +423,11 @@ export default function FactoryPage() {
       setIsCreating(false);
       setUploadingImage(false);
     }
-  }, [mounted, isFormValid, tokenInfo, writeContract, resetContract, toast]);
+  }, [mounted, isFormValid, tokenInfo, writeContract, resetContract, toast, tokenomics]);
 
-  // Retry function that clears errors and attempts creation again
+  // Retry function
   const handleRetry = useCallback(() => {
-    resetContract(); // Clear previous error state
+    resetContract();
     handleTokenCreation();
   }, [resetContract, handleTokenCreation]);
 
@@ -434,7 +476,7 @@ export default function FactoryPage() {
             <FactoryHeader platformStats={platformStats} />
           </motion.div>
 
-          {/* Progress Section - Now with navigation */}
+          {/* Progress Section */}
           <motion.div
             initial={{ opacity: 0, y: 20 }}
             animate={{ opacity: 1, y: 0 }}
@@ -453,7 +495,7 @@ export default function FactoryPage() {
             />
           </motion.div>
 
-          {/* Main Content Tabs  */}
+          {/* Main Content Tabs */}
           <motion.div
             initial={{ opacity: 0, y: 20 }}
             animate={{ opacity: 1, y: 0 }}

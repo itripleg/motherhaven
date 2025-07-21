@@ -1,9 +1,10 @@
-// app/factory/components/editor/FactoryImageUploadWithEditor.tsx
+// app/factory/components/editor/FactoryImageUploadWithEditor.tsx - FIXED: Unified with DEX version
 "use client";
 
 import React, { useState, useRef } from "react";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
+import { Badge } from "@/components/ui/badge";
 import {
   X,
   Upload,
@@ -12,6 +13,7 @@ import {
   MessageSquare,
   Type,
   Hash,
+  Sparkles,
 } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
 import { FactoryImagePositionEditor } from "./ImagePositionEditor";
@@ -22,7 +24,6 @@ import {
   TooltipContent,
   TooltipTrigger,
 } from "@/components/ui/tooltip";
-import { Badge } from "@/components/ui/badge";
 
 interface FactoryImageUploadWithEditorProps {
   imageFile: File | null;
@@ -49,11 +50,6 @@ export const FactoryImageUploadWithEditor: React.FC<
   tokenName = "Your Token",
   tokenSymbol = "TOKEN",
 }) => {
-  console.log(
-    "FactoryImageUploadWithEditor received imageFile prop:",
-    imageFile
-  );
-
   const [isEditing, setIsEditing] = useState(false);
   const [editMode, setEditMode] = useState<
     "position" | "description" | "name" | "ticker" | null
@@ -63,24 +59,17 @@ export const FactoryImageUploadWithEditor: React.FC<
 
   // Create preview URL from file
   React.useEffect(() => {
-    console.log("imageFile changed:", imageFile);
     if (imageFile) {
       const url = URL.createObjectURL(imageFile);
-      console.log("Created URL:", url);
       setImageUrl(url);
-      return () => {
-        console.log("Cleaning up URL:", url);
-        URL.revokeObjectURL(url);
-      };
+      return () => URL.revokeObjectURL(url);
     } else {
-      console.log("No imageFile, setting imageUrl to undefined");
       setImageUrl(undefined);
     }
   }, [imageFile]);
 
   const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
-    console.log("File selected in editor:", file);
     if (file) {
       if (file.size > 10 * 1024 * 1024) {
         alert("File size must be less than 10MB");
@@ -90,21 +79,16 @@ export const FactoryImageUploadWithEditor: React.FC<
         alert("Please select an image file");
         return;
       }
-      console.log("Calling onImageChange with:", file);
-      // REMOVED: Don't call onPositionChange here - let the parent handle it
       onImageChange(file);
     }
-    // Reset the input value so the same file can be selected again
     e.target.value = "";
   };
 
   const handleUploadClick = () => {
-    console.log("Upload button clicked, current imageUrl:", imageUrl);
     fileInputRef.current?.click();
   };
 
   const removeImage = () => {
-    console.log("Remove image clicked");
     onImageChange(null);
     if (fileInputRef.current) {
       fileInputRef.current.value = "";
@@ -114,6 +98,8 @@ export const FactoryImageUploadWithEditor: React.FC<
   const handleEditSave = () => {
     setIsEditing(false);
     setEditMode(null);
+    // Note: Position changes are handled immediately via onPositionChange
+    // No need to save to Firebase here - that happens during token creation
   };
 
   const handleEditCancel = () => {
@@ -122,7 +108,7 @@ export const FactoryImageUploadWithEditor: React.FC<
   };
 
   return (
-    <Card className="h-80 relative overflow-hidden border-primary/20">
+    <Card className="h-80 relative overflow-hidden unified-card border-primary/20">
       <input
         ref={fileInputRef}
         type="file"
@@ -145,13 +131,14 @@ export const FactoryImageUploadWithEditor: React.FC<
             imageUrl={imageUrl}
             tokenName={tokenName}
             tokenSymbol={tokenSymbol}
-            // Pass the initial mode to show description editor if that's what was clicked
             initialMode={editMode}
           />
         ) : (
           <motion.div
+            key="display"
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
             transition={{ duration: 0.2 }}
             className="h-full"
           >
@@ -161,55 +148,64 @@ export const FactoryImageUploadWithEditor: React.FC<
               overlayOpacity={0.6}
             />
 
-            <div className="relative z-10 flex flex-col justify-between h-full p-6">
+            {/* Content Layer - Matches DEX TokenHeaderContent exactly */}
+            <div className="relative z-10 flex flex-col justify-between h-full p-4 lg:p-6">
               {/* Top Bar */}
-              <div className="flex justify-between items-start">
-                <div className="text-xs text-white/80 font-mono">
-                  0x1234...5678
+              <div className="flex justify-between items-start mb-4 lg:mb-0">
+                <div className="min-w-0 flex-1">
+                  <div className="text-xs text-white/80 font-mono">0x1234...5678</div>
                 </div>
 
-                <div className="flex items-center gap-2">
-                  <Badge className="bg-emerald-500 text-white border-0">
+                <div className="flex items-center gap-2 lg:gap-3 ml-2 flex-shrink-0">
+                  <Badge
+                    className="bg-emerald-500/80 text-white border-0 text-xs lg:text-sm"
+                    variant="outline"
+                  >
+                    <Sparkles className="h-3 w-3 lg:h-4 lg:w-4 mr-1" />
                     Trading
                   </Badge>
 
-                  {/* Controls */}
-                  <div className="flex items-center gap-1 p-1 bg-black/30 border border-primary/40 rounded-lg">
+                  {/* Icon group - always visible */}
+                  <div className="flex items-center gap-1 lg:gap-2 p-1 lg:p-1.5 bg-black/30 border border-white/40 rounded-lg backdrop-blur-sm">
                     {/* Token Name Edit Button */}
-                    <Tooltip>
-                      <TooltipTrigger asChild>
-                        <Button
-                          variant="ghost"
-                          size="icon"
-                          onClick={() => {
-                            setEditMode("name");
-                            setIsEditing(true);
-                          }}
-                          className="text-white hover:text-primary h-6 w-6"
-                        >
-                          <Type className="h-4 w-4" />
-                        </Button>
-                      </TooltipTrigger>
-                      <TooltipContent>Edit token name</TooltipContent>
-                    </Tooltip>
+                    {onTokenInfoChange && (
+                      <Tooltip>
+                        <TooltipTrigger asChild>
+                          <Button
+                            variant="ghost"
+                            size="icon"
+                            onClick={() => {
+                              setEditMode("name");
+                              setIsEditing(true);
+                            }}
+                            className="text-white hover:text-primary hover:bg-primary/20 h-6 w-6 lg:h-7 lg:w-7 border border-white/40 hover:border-primary/50 transition-all duration-200"
+                          >
+                            <Type className="h-3 w-3 lg:h-4 lg:w-4" />
+                          </Button>
+                        </TooltipTrigger>
+                        <TooltipContent>Edit token name</TooltipContent>
+                      </Tooltip>
+                    )}
 
                     {/* Token Symbol Edit Button */}
-                    <Tooltip>
-                      <TooltipTrigger asChild>
-                        <Button
-                          variant="ghost"
-                          size="icon"
-                          onClick={() => {
-                            setEditMode("ticker");
-                            setIsEditing(true);
-                          }}
-                          className="text-white hover:text-primary h-6 w-6"
-                        >
-                          <Hash className="h-4 w-4" />
-                        </Button>
-                      </TooltipTrigger>
-                      <TooltipContent>Edit token symbol</TooltipContent>
-                    </Tooltip>
+                    {onTokenInfoChange && (
+                      <Tooltip>
+                        <TooltipTrigger asChild>
+                          <Button
+                            variant="ghost"
+                            size="icon"
+                            onClick={() => {
+                              setEditMode("ticker");
+                              setIsEditing(true);
+                            }}
+                            className="text-white hover:text-primary hover:bg-primary/20 h-6 w-6 lg:h-7 lg:w-7 border border-white/40 hover:border-primary/50 transition-all duration-200"
+                          >
+                            <Hash className="h-3 w-3 lg:h-4 lg:w-4" />
+                          </Button>
+                        </TooltipTrigger>
+                        <TooltipContent>Edit token symbol</TooltipContent>
+                      </Tooltip>
+                    )}
 
                     {/* Description Edit Button */}
                     <Tooltip>
@@ -221,14 +217,15 @@ export const FactoryImageUploadWithEditor: React.FC<
                             setEditMode("description");
                             setIsEditing(true);
                           }}
-                          className="text-white hover:text-primary h-6 w-6"
+                          className="text-white hover:text-primary hover:bg-primary/20 h-6 w-6 lg:h-7 lg:w-7 border border-white/40 hover:border-primary/50 transition-all duration-200"
                         >
-                          <MessageSquare className="h-4 w-4" />
+                          <MessageSquare className="h-3 w-3 lg:h-4 lg:w-4" />
                         </Button>
                       </TooltipTrigger>
                       <TooltipContent>Edit description</TooltipContent>
                     </Tooltip>
 
+                    {/* Image Position Edit Button */}
                     {imageUrl && (
                       <Tooltip>
                         <TooltipTrigger asChild>
@@ -239,26 +236,25 @@ export const FactoryImageUploadWithEditor: React.FC<
                               setEditMode("position");
                               setIsEditing(true);
                             }}
-                            className="text-white hover:text-primary h-6 w-6"
+                            className="text-white hover:text-primary hover:bg-primary/20 h-6 w-6 lg:h-7 lg:w-7 border border-white/40 hover:border-primary/50 transition-all duration-200"
                           >
-                            <Camera className="h-4 w-4" />
+                            <Camera className="h-3 w-3 lg:h-4 lg:w-4" />
                           </Button>
                         </TooltipTrigger>
-                        <TooltipContent>Edit image position</TooltipContent>
+                        <TooltipContent>Edit photo position</TooltipContent>
                       </Tooltip>
                     )}
 
-                    <div className="w-px h-4 bg-white/20 mx-1" />
-
+                    {/* Upload Button */}
                     <Tooltip>
                       <TooltipTrigger asChild>
                         <Button
                           variant="ghost"
                           size="icon"
                           onClick={handleUploadClick}
-                          className="text-white hover:text-primary h-6 w-6"
+                          className="text-white hover:text-primary hover:bg-primary/20 h-6 w-6 lg:h-7 lg:w-7 border border-white/40 hover:border-primary/50 transition-all duration-200"
                         >
-                          <Upload className="h-4 w-4" />
+                          <Upload className="h-3 w-3 lg:h-4 lg:w-4" />
                         </Button>
                       </TooltipTrigger>
                       <TooltipContent>
@@ -266,6 +262,7 @@ export const FactoryImageUploadWithEditor: React.FC<
                       </TooltipContent>
                     </Tooltip>
 
+                    {/* Remove Image Button */}
                     {imageUrl && (
                       <Tooltip>
                         <TooltipTrigger asChild>
@@ -273,68 +270,76 @@ export const FactoryImageUploadWithEditor: React.FC<
                             variant="ghost"
                             size="icon"
                             onClick={removeImage}
-                            className="text-white hover:text-red-400 h-6 w-6"
+                            className="text-white hover:text-red-400 hover:bg-red-500/20 h-6 w-6 lg:h-7 lg:w-7 border border-white/40 hover:border-red-400/50 transition-all duration-200"
                           >
-                            <X className="h-4 w-4" />
+                            <X className="h-3 w-3 lg:h-4 lg:w-4" />
                           </Button>
                         </TooltipTrigger>
                         <TooltipContent>Remove image</TooltipContent>
                       </Tooltip>
                     )}
 
-                    <div className="p-1 bg-primary/20 border border-primary/40 rounded-md">
-                      <Crown className="h-4 w-4 text-primary" />
-                    </div>
+                    {/* Creator Badge */}
+                    <Tooltip>
+                      <TooltipTrigger asChild>
+                        <div className="p-1 lg:p-1.5 bg-primary/20 border border-primary/40 rounded-md">
+                          <Crown className="h-3 w-3 lg:h-4 lg:w-4 text-primary" />
+                        </div>
+                      </TooltipTrigger>
+                      <TooltipContent>You are the creator</TooltipContent>
+                    </Tooltip>
                   </div>
                 </div>
               </div>
 
               {/* Token Info */}
-              <div className="space-y-4">
-                <div>
-                  <h1 className="text-4xl font-bold text-white">
+              <div className="space-y-4 lg:space-y-6 flex-1">
+                <div className="space-y-2 lg:space-y-3">
+                  <h1 className="text-2xl lg:text-4xl font-bold text-white leading-tight">
                     {tokenName}
                     {tokenSymbol && (
-                      <span className="text-2xl text-white/70 ml-3">
+                      <span className="text-lg lg:text-2xl text-white/70 ml-2 lg:ml-3">
                         ({tokenSymbol})
                       </span>
                     )}
                   </h1>
 
                   {description && (
-                    <p className="text-white/70 text-base mt-2">
-                      &ldquo;{description}&rdquo;
+                    <p className="text-white/70 text-sm lg:text-base max-w-2xl line-clamp-2">
+                      "{description}"
                     </p>
                   )}
                 </div>
 
-                <div className="bg-white/10 p-4 rounded-xl border border-white/20 max-w-xs">
-                  <div className="text-white/80 text-sm">Current Price</div>
-                  <p className="text-white text-xl font-bold">
-                    0.001234{" "}
-                    <span className="text-white/70 text-base">AVAX</span>
+                {/* Price Card - Static for preview */}
+                <div className="backdrop-blur-sm bg-white/10 p-3 lg:p-4 rounded-lg lg:rounded-xl border border-white/20 max-w-xs">
+                  <div className="flex items-center gap-2 mb-2">
+                    <span className="text-white/80 text-sm">Current Price</span>
+                  </div>
+                  <p className="text-white text-lg lg:text-xl font-bold">
+                    0.00001 <span className="text-white/70 text-sm lg:text-base">AVAX</span>
                   </p>
                 </div>
               </div>
             </div>
 
             {/* Upload prompt when no image */}
-            {/* {!imageUrl && (
-              <div className="absolute inset-0 flex items-center justify-center">
+            {!imageUrl && (
+              <div className="absolute inset-0 flex items-center justify-center z-20">
                 <div
                   onClick={handleUploadClick}
-                  className="bg-black/60 backdrop-blur-sm p-8 rounded-xl border border-white/20 text-center cursor-pointer hover:bg-black/70 transition-colors"
+                  className="bg-black/60 backdrop-blur-sm p-6 lg:p-8 rounded-xl border border-white/20 text-center cursor-pointer hover:bg-black/70 transition-colors active:scale-95"
                 >
-                  <Upload className="h-12 w-12 text-white mx-auto mb-4" />
-                  <p className="text-white text-lg font-medium mb-2">
+                  <Upload className="h-8 w-8 lg:h-12 lg:w-12 text-white mx-auto mb-3 lg:mb-4" />
+                  <p className="text-white text-base lg:text-lg font-medium mb-2">
                     Upload Token Image
                   </p>
-                  <p className="text-white/70">
+                  <p className="text-white/70 text-sm lg:text-base">
                     Click to add a background image
                   </p>
                 </div>
               </div>
-            )} */}
+            )}
           </motion.div>
         )}
       </AnimatePresence>
