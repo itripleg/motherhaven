@@ -4,6 +4,7 @@ import React from "react";
 import { motion } from "framer-motion";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
+import Image from "next/image";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import {
@@ -34,11 +35,13 @@ const BotCard: React.FC<BotCardProps> = ({ bot, index }) => {
   const [lastActionKey, setLastActionKey] = React.useState("");
   const [lastMessageKey, setLastMessageKey] = React.useState("");
 
+  const { lastAction } = bot;
+
   // Track action changes for subtle animations
   React.useEffect(() => {
-    if (bot.lastAction) {
-      const actionKey = `${bot.lastAction.type}-${bot.lastAction.timestamp}`;
-      const messageKey = `${bot.lastAction.message}-${bot.lastAction.timestamp}`;
+    if (lastAction) {
+      const actionKey = `${lastAction.type}-${lastAction.timestamp}`;
+      const messageKey = `${lastAction.message}-${lastAction.timestamp}`;
 
       if (actionKey !== lastActionKey) {
         setLastActionKey(actionKey);
@@ -47,13 +50,7 @@ const BotCard: React.FC<BotCardProps> = ({ bot, index }) => {
         setLastMessageKey(messageKey);
       }
     }
-  }, [
-    bot.lastAction?.timestamp,
-    bot.lastAction?.type,
-    bot.lastAction?.message,
-    lastActionKey,
-    lastMessageKey,
-  ]);
+  }, [lastAction, lastActionKey, lastMessageKey]);
 
   const handleImageError = (
     e: React.SyntheticEvent<HTMLImageElement, Event>
@@ -77,20 +74,15 @@ const BotCard: React.FC<BotCardProps> = ({ bot, index }) => {
 
   // Use bot's calculated session duration instead of frontend calculation
   const getSessionUptime = (): string => {
-    // Use bot's calculated session duration from webhook
-    const sessionMinutes = bot.lastAction?.details?.sessionDurationMinutes;
+    const sessionMinutes = lastAction?.details?.sessionDurationMinutes;
 
     if (sessionMinutes !== undefined) {
       const hours = Math.floor(sessionMinutes / 60);
       const minutes = sessionMinutes % 60;
-
-      if (hours > 0) {
-        return `${hours}h`;
-      }
-      return `${minutes}m`;
+      return hours > 0 ? `${hours}h` : `${minutes}m`;
     }
 
-    // Fallback to frontend calculation only if bot data unavailable
+    // Fallback to frontend calculation
     const fallbackHours =
       Math.floor(
         (Date.now() - new Date(bot.sessionStarted).getTime()) / 3600000
@@ -98,42 +90,34 @@ const BotCard: React.FC<BotCardProps> = ({ bot, index }) => {
     return `${fallbackHours}h`;
   };
 
-  const uptimeDisplay = getSessionUptime();
-
-  // Extract token info from last action details based on webhook structure
+  // Extract token info from last action details
   const getTokenInfo = () => {
-    if (!bot.lastAction?.details) {
-      return null;
-    }
+    if (!lastAction?.details) return null;
 
-    const details = bot.lastAction.details;
-
-    // Based on webhook code: tokenSymbol and tokenName are direct properties
+    const { details } = lastAction;
     const tokenSymbol = details.tokenSymbol;
     const tokenAddress = details.tokenAddress || details.contractAddress;
 
-    if (tokenSymbol) {
-      return {
-        address: tokenAddress || "unknown",
-        symbol: tokenSymbol,
-      };
-    }
-
-    return null;
+    return tokenSymbol
+      ? {
+          address: tokenAddress || "unknown",
+          symbol: tokenSymbol,
+        }
+      : null;
   };
 
   // Extract bot wallet address from bot details
   const getBotWalletAddress = (): string | null => {
-    // Try multiple possible locations for the wallet address
     return (
-      bot.lastAction?.details?.walletAddress ||
-      bot.lastAction?.details?.address ||
+      lastAction?.details?.walletAddress ||
+      lastAction?.details?.address ||
       (bot as any).walletAddress ||
       (bot as any).address ||
       null
     );
   };
 
+  const uptimeDisplay = getSessionUptime();
   const tokenInfo = getTokenInfo();
   const botWalletAddress = getBotWalletAddress();
 
@@ -162,14 +146,6 @@ const BotCard: React.FC<BotCardProps> = ({ bot, index }) => {
           {/* Header - Fixed Height */}
           <CardHeader className="pb-3 flex-shrink-0 h-[140px]">
             <div className="flex items-center justify-between mb-4">
-              {/* <Badge className={getStatusColor(bot.isOnline)} variant="outline">
-                {bot.isOnline ? (
-                  <Wifi className="h-3 w-3 mr-1" />
-                ) : (
-                  <WifiOff className="h-3 w-3 mr-1" />
-                )}
-                {bot.isOnline ? "Online" : "Offline"}
-              </Badge> */}
               {bot.character?.mood && (
                 <div className="flex items-center gap-2">
                   {getMoodIcon(bot.character.mood)}
@@ -187,9 +163,11 @@ const BotCard: React.FC<BotCardProps> = ({ bot, index }) => {
             {/* Bot Info */}
             <div className="flex items-center gap-4">
               <div className="relative">
-                <img
+                <Image
                   src={bot.avatarUrl}
                   alt={bot.displayName}
+                  width={64}
+                  height={64}
                   className="w-16 h-16 rounded-full border-2 border-primary/30 object-cover"
                   onError={handleImageError}
                 />
@@ -231,11 +209,11 @@ const BotCard: React.FC<BotCardProps> = ({ bot, index }) => {
               {bot.bio ? (
                 <div className="p-3 bg-secondary/30 rounded-lg border border-border/30 h-full overflow-hidden">
                   <p className="text-muted-foreground text-sm italic leading-tight overflow-hidden text-ellipsis">
-                    &quot;
+                    &ldquo;
                     {bot.bio.length > 80
                       ? `${bot.bio.substring(0, 80)}...`
                       : bot.bio}
-                    &quot;
+                    &rdquo;
                   </p>
                 </div>
               ) : (
@@ -265,7 +243,7 @@ const BotCard: React.FC<BotCardProps> = ({ bot, index }) => {
 
             {/* Last Action Info - Fixed Height */}
             <div className="flex-shrink-0 space-y-2 h-[80px]">
-              {bot.lastAction ? (
+              {lastAction ? (
                 <div className="space-y-2">
                   {/* Action Type and Time */}
                   <div className="flex items-center justify-between text-sm">
@@ -273,16 +251,16 @@ const BotCard: React.FC<BotCardProps> = ({ bot, index }) => {
                     <div className="flex items-center gap-2">
                       <div
                         className={`flex items-center gap-1 px-2 py-1 rounded-full text-xs ${getActionColor(
-                          bot.lastAction.type
+                          lastAction.type
                         )}`}
                       >
-                        {getActionIcon(bot.lastAction.type)}
-                        <span>{formatActionType(bot.lastAction.type)}</span>
+                        {getActionIcon(lastAction.type)}
+                        <span>{formatActionType(lastAction.type)}</span>
                       </div>
                       {/* Show ticker for buy/sell actions */}
                       {tokenInfo &&
-                        (bot.lastAction.type === "buy" ||
-                          bot.lastAction.type === "sell") && (
+                        (lastAction.type === "buy" ||
+                          lastAction.type === "sell") && (
                           <Link
                             href={`/dex/${tokenInfo.address}`}
                             className="flex items-center gap-1 px-2 py-1 bg-primary/20 text-primary hover:text-primary/80 rounded-full transition-colors border border-primary/30"
@@ -294,10 +272,10 @@ const BotCard: React.FC<BotCardProps> = ({ bot, index }) => {
                             <ExternalLink className="h-3 w-3" />
                           </Link>
                         )}
-                      {/* Fallback ticker display if no token info but it's a trade action */}
+                      {/* Fallback ticker display */}
                       {!tokenInfo &&
-                        (bot.lastAction.type === "buy" ||
-                          bot.lastAction.type === "sell") && (
+                        (lastAction.type === "buy" ||
+                          lastAction.type === "sell") && (
                           <div className="px-2 py-1 bg-muted/30 text-muted-foreground rounded-full border border-border/30">
                             <span className="text-xs">TOKEN</span>
                           </div>
@@ -309,7 +287,7 @@ const BotCard: React.FC<BotCardProps> = ({ bot, index }) => {
                   <div className="flex items-center justify-between text-sm">
                     <span className="text-muted-foreground">When:</span>
                     <span className="text-foreground text-xs">
-                      {new Date(bot.lastAction.timestamp).toLocaleTimeString()}
+                      {new Date(lastAction.timestamp).toLocaleTimeString()}
                     </span>
                   </div>
                 </div>
@@ -324,7 +302,7 @@ const BotCard: React.FC<BotCardProps> = ({ bot, index }) => {
 
             {/* Message Section - Fixed Height with Subtle Animation */}
             <div className="flex-shrink-0">
-              {bot.lastAction?.message ? (
+              {lastAction?.message ? (
                 <div className="p-3 bg-secondary/40 rounded-lg h-full overflow-hidden border border-border/30">
                   <motion.div
                     key={lastMessageKey}
@@ -335,11 +313,11 @@ const BotCard: React.FC<BotCardProps> = ({ bot, index }) => {
                   >
                     <MessageCircle className="h-4 w-4 text-primary mt-0.5 flex-shrink-0" />
                     <p className="text-muted-foreground text-sm leading-tight overflow-hidden">
-                      &quot;
-                      {bot.lastAction.message.length > 60
-                        ? `${bot.lastAction.message.substring(0, 60)}...`
-                        : bot.lastAction.message}
-                      &quot;
+                      &ldquo;
+                      {lastAction.message.length > 60
+                        ? `${lastAction.message.substring(0, 60)}...`
+                        : lastAction.message}
+                      &rdquo;
                     </p>
                   </motion.div>
                 </div>

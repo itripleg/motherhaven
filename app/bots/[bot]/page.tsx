@@ -8,7 +8,6 @@ import Link from "next/link";
 import { Button } from "@/components/ui/button";
 import { ArrowLeft, RefreshCw } from "lucide-react";
 
-// Import Components and Helpers from the correct relative path
 import {
   BotStatus,
   ActivityLog as ActivityLogType,
@@ -18,9 +17,7 @@ import PerformanceStats from "../components/PerformanceStats";
 import BotConfiguration from "../components/BotConfiguration";
 import ActivityLog from "../components/ActivityLog";
 import InlineBotSelector from "../components/InlineBotSelector";
-import { AddressComponent } from "@/components/AddressComponent";
 
-// Import the new bot activities hook
 import { useBotActivity } from "@/hooks/useBotActivities";
 
 const BotDetailPage = () => {
@@ -53,7 +50,7 @@ const BotDetailPage = () => {
       animationDelay: Math.random() * 5,
       animationDuration: 2 + Math.random() * 3,
     }));
-  }, []); // Empty dependency array ensures this only runs once
+  }, []);
 
   // Convert persistent activities to the format expected by ActivityLog component
   const activityLog = useMemo((): ActivityLogType[] => {
@@ -98,7 +95,7 @@ const BotDetailPage = () => {
 
   useEffect(() => {
     fetchBotDetails();
-    const interval = setInterval(fetchBotDetails, 10000); // Refresh every 10 seconds for more real-time feel
+    const interval = setInterval(fetchBotDetails, 10000);
     return () => clearInterval(interval);
   }, [fetchBotDetails]);
 
@@ -114,7 +111,7 @@ const BotDetailPage = () => {
         <div className="text-center">
           <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary mx-auto mb-4"></div>
           <p className="text-foreground">
-            Loading bot details for "{botName}"...
+            Loading bot details for &ldquo;{botName}&rdquo;...
           </p>
         </div>
       </div>
@@ -124,10 +121,10 @@ const BotDetailPage = () => {
   if (!bot) {
     return (
       <div className="min-h-screen animated-bg floating-particles flex items-center justify-center text-center">
-        <div>
+        <div className="px-4">
           <h1 className="text-2xl text-foreground mb-4">Bot Not Found</h1>
           <p className="text-muted-foreground mb-4">
-            Could not find bot "{botName}" in the active fleet.
+            Could not find bot &ldquo;{botName}&rdquo; in the active fleet.
           </p>
           <Link
             href="/bots"
@@ -166,31 +163,35 @@ const BotDetailPage = () => {
         ))}
       </div>
 
-      <div className="relative z-10 container mx-auto p-6 pt-24 space-y-8">
+      <div className="relative z-10 container mx-auto p-4 md:p-6 pt-20 md:pt-24 space-y-6 md:space-y-8">
+        {/* Header Navigation */}
         <motion.div
           initial={{ opacity: 0, x: -20 }}
           animate={{ opacity: 1, x: 0 }}
-          className="flex items-center justify-between"
+          className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4"
         >
           <Link
             href="/bots"
             className="flex items-center gap-2 text-primary hover:text-primary/80 transition-colors"
           >
             <ArrowLeft className="h-4 w-4" />
-            Back to Bot Fleet
+            <span className="hidden sm:inline">Back to Bot Fleet</span>
+            <span className="sm:hidden">Back</span>
           </Link>
-          <div className="flex items-center gap-3">
+
+          <div className="flex flex-col sm:flex-row items-start sm:items-center gap-2 sm:gap-3 w-full sm:w-auto">
             {lastUpdate && (
-              <div className="text-sm text-muted-foreground flex items-center gap-1">
+              <div className="text-xs sm:text-sm text-muted-foreground flex items-center gap-1">
                 <RefreshCw className="h-3 w-3" />
-                Updated {lastUpdate.toLocaleTimeString()}
+                <span className="hidden sm:inline">Updated</span>
+                {lastUpdate.toLocaleTimeString()}
               </div>
             )}
             <Button
               onClick={handleRefresh}
               variant="outline"
               size="sm"
-              className="border-border text-foreground hover:bg-secondary"
+              className="border-border text-foreground hover:bg-secondary w-full sm:w-auto"
               disabled={isLoading || activitiesLoading}
             >
               <RefreshCw
@@ -212,9 +213,11 @@ const BotDetailPage = () => {
           <InlineBotSelector currentBotName={botName} />
         </motion.div>
 
+        {/* Bot Header - Mobile Optimized */}
         <motion.div
           initial={{ opacity: 0, y: -20 }}
           animate={{ opacity: 1, y: 0 }}
+          className="overflow-hidden"
         >
           <BotHeader
             bot={bot}
@@ -223,6 +226,7 @@ const BotDetailPage = () => {
           />
         </motion.div>
 
+        {/* Performance Stats */}
         <motion.div
           initial={{ opacity: 0, y: 20 }}
           animate={{ opacity: 1, y: 0 }}
@@ -231,21 +235,25 @@ const BotDetailPage = () => {
           <PerformanceStats bot={bot} />
         </motion.div>
 
+        {/* Bot Configuration */}
         {bot.config && (
-          <BotConfiguration showConfig={showConfig} config={bot.config} />
+          <motion.div
+            initial={{ opacity: 0, y: 20 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ delay: 0.15 }}
+          >
+            <BotConfiguration showConfig={showConfig} config={bot.config} />
+          </motion.div>
         )}
 
+        {/* Activity Log */}
         <motion.div
           initial={{ opacity: 0, y: 20 }}
           animate={{ opacity: 1, y: 0 }}
           transition={{ delay: 0.2 }}
+          className="overflow-hidden"
         >
-          <ActivityLog
-            logs={activityLog}
-            // loading={activitiesLoading}
-            // error={activitiesError}
-            // statistics={activityStats}
-          />
+          <ActivityLog logs={activityLog} />
         </motion.div>
       </div>
     </div>

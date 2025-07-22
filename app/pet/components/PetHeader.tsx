@@ -7,8 +7,6 @@ import {
   Heart,
   Skull,
   Activity,
-  Zap,
-  TrendingDown,
   Clock,
   Crown,
   DollarSign,
@@ -16,6 +14,7 @@ import {
   Check,
   X,
   RefreshCw,
+  TrendingDown,
 } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { Card, CardContent } from "@/components/ui/card";
@@ -56,10 +55,10 @@ export const PetHeader: React.FC<EnhancedPetHeaderProps> = ({
   const getHealthStatus = (health?: number) => {
     if (!health)
       return {
-        color: "text-gray-500",
+        color: "text-muted-foreground",
         status: "Unknown",
         urgency: "none",
-        bgColor: "bg-gray-500",
+        bgColor: "bg-muted",
       };
     if (health >= 80)
       return {
@@ -211,47 +210,21 @@ export const PetHeader: React.FC<EnhancedPetHeaderProps> = ({
           <div className="h-1 bg-gradient-to-r from-red-500 via-orange-500 to-red-500 animate-pulse" />
         )}
 
-        <CardContent className="p-6 lg:p-8">
-          {/* Main content grid */}
-          <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 items-center">
-            {/* Left: Pet Avatar & Identity */}
-            <div className="lg:col-span-4 flex items-center gap-4">
-              <div className="relative">
-                <div
-                  className={`text-7xl lg:text-8xl transition-all duration-300 ${
-                    isAlive
-                      ? healthStatus.urgency === "high"
-                        ? "animate-bounce"
-                        : ""
-                      : "grayscale opacity-60"
-                  }`}
-                >
-                  {petEmoji}
-                </div>
-
-                {/* Status indicator */}
-                <div
-                  className={`absolute -bottom-1 -right-1 w-6 h-6 lg:w-8 lg:h-8 rounded-full border-4 border-background flex items-center justify-center ${
-                    isAlive ? "bg-green-500" : "bg-red-500"
-                  } ${
-                    isAlive && healthStatus.urgency === "high"
-                      ? "animate-pulse"
-                      : ""
-                  }`}
-                >
-                  {isAlive ? "❤️" : "💀"}
-                </div>
-              </div>
-
-              <div className="space-y-2">
+        <CardContent className="p-4 sm:p-6 lg:p-8">
+          {/* Main content - responsive layout */}
+          <div className="space-y-6">
+            {/* Top Row: Pet Avatar & Identity */}
+            <div className="flex flex-col sm:flex-row items-center sm:items-start gap-4 relative">
+              {/* Pet Name and Info - Left Side */}
+              <div className="space-y-3 text-center sm:text-left flex-shrink-0 z-10">
                 {/* Pet Name with Rename Functionality */}
-                <div className="flex items-center gap-2">
+                <div className="flex flex-col sm:flex-row items-center gap-2">
                   {isEditing ? (
-                    <div className="flex items-center gap-2">
+                    <div className="flex items-center gap-2 w-full sm:w-auto">
                       <Input
                         value={newName}
                         onChange={(e) => setNewName(e.target.value)}
-                        className="text-2xl lg:text-3xl font-bold h-auto p-1 min-w-0"
+                        className="text-2xl sm:text-3xl lg:text-4xl font-bold h-auto p-1 min-w-0 text-center sm:text-left"
                         style={{ fontSize: "inherit" }}
                         maxLength={32}
                         disabled={isRenaming}
@@ -261,7 +234,7 @@ export const PetHeader: React.FC<EnhancedPetHeaderProps> = ({
                         }}
                         autoFocus
                       />
-                      <div className="flex gap-1">
+                      <div className="flex gap-1 flex-shrink-0">
                         <Button
                           onClick={handleSaveEdit}
                           disabled={isRenaming || isWritePending}
@@ -287,8 +260,8 @@ export const PetHeader: React.FC<EnhancedPetHeaderProps> = ({
                       </div>
                     </div>
                   ) : (
-                    <>
-                      <h1 className="text-3xl lg:text-4xl font-bold tracking-tight">
+                    <div className="flex items-center gap-2">
+                      <h1 className="text-2xl sm:text-3xl lg:text-4xl font-bold tracking-tight">
                         {petName}
                       </h1>
                       {isUserCaretaker && onRenamePet && (
@@ -302,168 +275,230 @@ export const PetHeader: React.FC<EnhancedPetHeaderProps> = ({
                           <Edit3 className="h-4 w-4" />
                         </Button>
                       )}
-                    </>
+                    </div>
                   )}
                 </div>
 
-                <div className="flex flex-col sm:flex-row sm:items-center gap-2">
-                  <Badge variant="outline" className="text-sm w-fit">
+                <div className="flex flex-wrap justify-center sm:justify-start gap-2">
+                  <Badge variant="outline" className="text-sm">
                     Community Dog
                   </Badge>
-                  <Badge
-                    variant={isAlive ? "default" : "destructive"}
-                    className="text-sm w-fit"
-                  >
-                    {isAlive ? (
-                      <>
-                        <Heart className="h-3 w-3 mr-1" />
-                        Alive
-                      </>
-                    ) : (
-                      <>
-                        <Skull className="h-3 w-3 mr-1" />
-                        Dead
-                      </>
-                    )}
-                  </Badge>
-                  {deathCount > 0 && (
-                    <Badge variant="outline" className="text-sm w-fit">
-                      <Clock className="h-3 w-3 mr-1" />
-                      Deaths: {deathCount}
-                    </Badge>
-                  )}
                 </div>
+
                 <div className="text-sm text-muted-foreground">
                   On Fuji Testnet
                 </div>
               </div>
-            </div>
 
-            {/* Center: Health Status */}
-            <div className="lg:col-span-5 space-y-4">
-              <div className="flex items-center justify-between">
-                <div className="flex items-center gap-2">
-                  <Activity className={`h-5 w-5 ${healthStatus.color}`} />
-                  <span className="text-lg font-semibold">Health Status</span>
-                </div>
-                <div className="text-right">
-                  <div
-                    className={`text-2xl lg:text-3xl font-bold ${healthStatus.color}`}
-                  >
-                    {currentHealth !== undefined ? currentHealth : "?"}/100
+              {/* Animated Pet Walking Area - Center Space */}
+              <div className="flex-1 relative h-24 hidden sm:block overflow-hidden">
+                
+                {/* Pet container with sporadic random animation */}
+                <motion.div
+                  className="absolute top-[15%] -translate-y-1/2 z-10"
+                  animate={{
+                    x: [0, 300, 150, 800, 1200, 600, 950, 200, 0],
+                    scaleX: [-1, -1, 1, -1, -1, 1, -1, 1, -1]
+                  }}
+                  transition={{
+                    duration: 18,
+                    repeat: Infinity,
+                    ease: "easeInOut",
+                    times: [0, 0.15, 0.25, 0.4, 0.55, 0.7, 0.8, 0.9, 1]
+                  }}
+                >
+                  {/* Pet with its status indicator */}
+                  <div className="relative">
+                    <motion.div
+                      className={`text-7xl transition-all duration-300 leading-none ${
+                        isAlive
+                          ? healthStatus.urgency === "high"
+                            ? "animate-bounce"
+                            : ""
+                          : "grayscale opacity-60"
+                      }`}
+                    >
+                      {petEmoji}
+                    </motion.div>
+
+                    {/* Status indicator */}
+                    <motion.div
+                      className={`absolute -bottom-1 -right-1 w-5 h-5 rounded-full border-4 border-background flex items-center justify-center ${
+                        isAlive ? "bg-green-500" : "bg-red-500"
+                      } ${
+                        isAlive && healthStatus.urgency === "high"
+                          ? "animate-pulse"
+                          : ""
+                      }`}
+                      animate={{
+                        scale: [1, 1.1, 1],
+                      }}
+                      transition={{
+                        duration: 2,
+                        repeat: Infinity,
+                        ease: "easeInOut",
+                      }}
+                    >
+                      <span className="text-xs">{isAlive ? "❤️" : "💀"}</span>
+                    </motion.div>
                   </div>
-                  <Badge
-                    variant={
-                      healthStatus.urgency === "high"
-                        ? "destructive"
-                        : "secondary"
-                    }
-                    className={`text-xs ${
-                      healthStatus.urgency === "high" ? "animate-pulse" : ""
-                    }`}
-                  >
-                    {healthStatus.status}
-                  </Badge>
-                </div>
+                </motion.div>
+
               </div>
 
-              {currentHealth !== undefined && (
-                <div className="space-y-2">
-                  <Progress
-                    value={currentHealth}
-                    className={`h-4 ${
-                      healthStatus.urgency === "high" ? "animate-pulse" : ""
-                    }`}
-                  />
-                  <div className="flex justify-between items-center text-sm text-muted-foreground">
-                    <div className="flex items-center gap-1">
-                      <TrendingDown className="h-3 w-3" />
-                      <span>-1 health per hour</span>
-                    </div>
-                    <span className="font-mono">0 ←→ 100</span>
-                  </div>
-                </div>
-              )}
-
-              {/* Last Fed Info */}
-              {timeSinceLastFed !== null && (
-                <div className="flex items-center gap-2 text-sm text-muted-foreground">
-                  <Clock className="h-3 w-3" />
-                  <span>Last fed: {formatTimeSince(timeSinceLastFed)}</span>
-                </div>
-              )}
-            </div>
-
-            {/* Right: Caretaker & Revival Info */}
-            <div className="lg:col-span-3 space-y-3">
-              {/* Caretaker Info */}
-              <div className="text-center p-3 bg-muted/30 rounded-lg border">
-                <div className="flex items-center justify-center gap-1 mb-1">
-                  <Crown
-                    className={`h-4 w-4 ${
-                      isUserCaretaker ? "text-primary" : "text-muted-foreground"
-                    }`}
-                  />
-                  <span className="text-sm font-medium">Current Caretaker</span>
-                </div>
+              {/* Mobile Pet - Static when small */}
+              <div className="relative flex-shrink-0 sm:hidden">
                 <div
-                  className={`text-sm ${
-                    isUserCaretaker
-                      ? "text-primary font-medium"
-                      : "text-muted-foreground"
+                  className={`text-6xl transition-all duration-300 ${
+                    isAlive
+                      ? healthStatus.urgency === "high"
+                        ? "animate-bounce"
+                        : ""
+                      : "grayscale opacity-60"
                   }`}
                 >
-                  {getCaretakerDisplay()}
+                  {petEmoji}
                 </div>
-                {isUserCaretaker && (
-                  <Badge
-                    variant="outline"
-                    className="mt-1 text-xs bg-primary/10 text-primary border-primary/30"
-                  >
-                    <Crown className="h-2 w-2 mr-1" />
-                    You own this pet
-                  </Badge>
+
+                {/* Status indicator */}
+                <div
+                  className={`absolute -bottom-1 -right-1 w-5 h-5 rounded-full border-4 border-background flex items-center justify-center ${
+                    isAlive ? "bg-green-500" : "bg-red-500"
+                  } ${
+                    isAlive && healthStatus.urgency === "high"
+                      ? "animate-pulse"
+                      : ""
+                  }`}
+                >
+                  {isAlive ? "❤️" : "💀"}
+                </div>
+              </div>
+            </div>
+
+            {/* Bottom Row: Health & Caretaker Info */}
+            <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+              {/* Health Status */}
+              <div className="lg:col-span-2 space-y-4">
+                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
+                  <div className="flex items-center gap-2">
+                    <Activity className={`h-5 w-5 ${healthStatus.color}`} />
+                    <span className="text-lg font-semibold">Health Status</span>
+                  </div>
+                  <div className="text-center sm:text-right">
+                    <div
+                      className={`text-2xl lg:text-3xl font-bold ${healthStatus.color}`}
+                    >
+                      {currentHealth !== undefined ? currentHealth : "?"}/100
+                    </div>
+                    <Badge
+                      variant={
+                        healthStatus.urgency === "high"
+                          ? "destructive"
+                          : "secondary"
+                      }
+                      className={`text-xs ${
+                        healthStatus.urgency === "high" ? "animate-pulse" : ""
+                      }`}
+                    >
+                      {healthStatus.status}
+                    </Badge>
+                  </div>
+                </div>
+
+                {currentHealth !== undefined && (
+                  <div className="space-y-2">
+                    <Progress
+                      value={currentHealth}
+                      className={`h-4 ${
+                        healthStatus.urgency === "high" ? "animate-pulse" : ""
+                      }`}
+                    />
+                    <div className="flex justify-between items-center text-sm text-muted-foreground">
+                      <div className="flex items-center gap-1">
+                        <TrendingDown className="h-3 w-3" />
+                        <span>-1 health per hour</span>
+                      </div>
+                      <span className="font-mono">0 ←→ 100</span>
+                    </div>
+                  </div>
                 )}
               </div>
 
-              {/* Revival Cost (if dead) */}
-              {!isAlive && (
-                <div className="text-center p-3 bg-red-100 dark:bg-red-900/30 rounded-lg border border-red-200 dark:border-red-800">
+              {/* Caretaker & Status Info */}
+              <div className="space-y-3">
+                {/* Caretaker Info */}
+                <div className="text-center p-3 bg-muted/30 rounded-lg border">
                   <div className="flex items-center justify-center gap-1 mb-1">
-                    <DollarSign className="h-4 w-4 text-red-600 dark:text-red-400" />
-                    <span className="text-sm font-medium text-red-700 dark:text-red-300">
-                      Revival Cost
+                    <Crown
+                      className={`h-4 w-4 ${
+                        isUserCaretaker
+                          ? "text-primary"
+                          : "text-muted-foreground"
+                      }`}
+                    />
+                    <span className="text-sm font-medium">
+                      Current Caretaker
                     </span>
                   </div>
-                  <div className="text-lg font-bold text-red-600 dark:text-red-400">
-                    {revivalCost} AVAX
+                  <div
+                    className={`text-sm ${
+                      isUserCaretaker
+                        ? "text-primary font-medium"
+                        : "text-muted-foreground"
+                    }`}
+                  >
+                    {getCaretakerDisplay()}
                   </div>
-                  <div className="text-xs text-red-600 dark:text-red-400 mt-1">
-                    {deathCount > 0 && `2^${deathCount} × base cost`}
-                  </div>
+                  {isUserCaretaker && (
+                    <Badge
+                      variant="outline"
+                      className="mt-1 text-xs bg-primary/10 text-primary border-primary/30"
+                    >
+                      <Crown className="h-2 w-2 mr-1" />
+                      You own this pet
+                    </Badge>
+                  )}
                 </div>
-              )}
 
-              {/* Live Status (if alive) */}
-              {isAlive && (
-                <div
-                  className={`text-center p-3 rounded-lg border ${
-                    healthStatus.urgency === "high"
-                      ? "bg-red-100 dark:bg-red-900/30 border-red-200 dark:border-red-800"
-                      : healthStatus.urgency === "medium"
-                      ? "bg-yellow-100 dark:bg-yellow-900/30 border-yellow-200 dark:border-yellow-800"
-                      : "bg-green-100 dark:bg-green-900/30 border-green-200 dark:border-green-800"
-                  }`}
-                >
-                  <div className="text-sm font-medium">
-                    {healthStatus.urgency === "high"
-                      ? "🚨 Feed Immediately!"
-                      : healthStatus.urgency === "medium"
-                      ? "⚠️ Getting Hungry"
-                      : "✅ Healthy & Happy"}
+                {/* Revival Cost (if dead) */}
+                {!isAlive && (
+                  <div className="text-center p-3 bg-red-100 dark:bg-red-900/30 rounded-lg border border-red-200 dark:border-red-800">
+                    <div className="flex items-center justify-center gap-1 mb-1">
+                      <DollarSign className="h-4 w-4 text-red-600 dark:text-red-400" />
+                      <span className="text-sm font-medium text-red-700 dark:text-red-300">
+                        Revival Cost
+                      </span>
+                    </div>
+                    <div className="text-lg font-bold text-red-600 dark:text-red-400">
+                      {revivalCost} AVAX
+                    </div>
+                    <div className="text-xs text-red-600 dark:text-red-400 mt-1">
+                      {deathCount > 0 && `2^${deathCount} × base cost`}
+                    </div>
                   </div>
-                </div>
-              )}
+                )}
+
+                {/* Live Status (if alive) */}
+                {isAlive && (
+                  <div
+                    className={`text-center p-3 rounded-lg border ${
+                      healthStatus.urgency === "high"
+                        ? "bg-red-100 dark:bg-red-900/30 border-red-200 dark:border-red-800"
+                        : healthStatus.urgency === "medium"
+                        ? "bg-yellow-100 dark:bg-yellow-900/30 border-yellow-200 dark:border-yellow-800"
+                        : "bg-green-100 dark:bg-green-900/30 border-green-200 dark:border-green-800"
+                    }`}
+                  >
+                    <div className="text-sm font-medium">
+                      {healthStatus.urgency === "high"
+                        ? "🚨 Feed Immediately!"
+                        : healthStatus.urgency === "medium"
+                        ? "⚠️ Getting Hungry"
+                        : "✅ Healthy & Happy"}
+                    </div>
+                  </div>
+                )}
+              </div>
             </div>
           </div>
 
@@ -485,7 +520,7 @@ export const PetHeader: React.FC<EnhancedPetHeaderProps> = ({
               </div>
               <div className="flex-1 min-w-0">
                 <p
-                  className={`text-base lg:text-lg font-medium mb-2 ${
+                  className={`text-base lg:text-lg font-medium ${
                     isAlive
                       ? healthStatus.urgency === "high"
                         ? "text-red-700 dark:text-red-300"
@@ -495,26 +530,6 @@ export const PetHeader: React.FC<EnhancedPetHeaderProps> = ({
                 >
                   {getPetMessage()}
                 </p>
-                <div className="flex flex-wrap items-center gap-4 text-sm text-muted-foreground">
-                  <div className="flex items-center gap-1">
-                    <Zap className="h-3 w-3" />
-                    <span>Burn CHOW tokens to feed</span>
-                  </div>
-                  <div className="flex items-center gap-1">
-                    <Heart className="h-3 w-3" />
-                    <span>Health gain scales with amount</span>
-                  </div>
-                  {!isAlive && (
-                    <div className="flex items-center gap-1">
-                      <Crown className="h-3 w-3" />
-                      <span>Reviver becomes new caretaker</span>
-                    </div>
-                  )}
-                  <div className="flex items-center gap-1">
-                    <Clock className="h-3 w-3" />
-                    <span>Health decays automatically</span>
-                  </div>
-                </div>
               </div>
             </div>
           </div>
