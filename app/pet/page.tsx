@@ -1,12 +1,10 @@
-// pet/page.tsx - Optimized Version
+// app/pet/page.tsx
 "use client";
 
 import React, { useState, useMemo } from "react";
 import { useAccount } from "wagmi";
 import { motion } from "framer-motion";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { Card, CardContent } from "@/components/ui/card";
-import { Badge } from "@/components/ui/badge";
 import { Activity, Users, Utensils } from "lucide-react";
 import { usePetContract } from "./hooks/usePetContract";
 import { PetHeader } from "./components/PetHeader";
@@ -17,7 +15,7 @@ import { PetBackground } from "./components/PetBackground";
 import { LoadingState } from "./components/LoadingState";
 import { ErrorState } from "./components/ErrorState";
 
-const OptimizedPetPage = () => {
+const SimplifiedPetPage = () => {
   const { isConnected } = useAccount();
   const [activeTab, setActiveTab] = useState("status");
 
@@ -89,34 +87,14 @@ const OptimizedPetPage = () => {
   return (
     <div className="min-h-screen animated-bg">
       {/* Animated Background */}
-      <PetBackground variant="default" intensity="medium" />
+      <PetBackground variant="alive" intensity="medium" />
 
       <div className="relative z-10 container mx-auto p-6 pt-24 space-y-8">
-        {/* Pet Header */}
-        <motion.div
-          initial={{ opacity: 0, y: -20 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ duration: 0.6 }}
-        >
-          <PetHeader
-            petName={petInfo.name}
-            isAlive={petInfo.isAlive}
-            currentHealth={displayHealth}
-            currentCaretaker={petInfo.currentCaretaker}
-            deathCount={petInfo.deathCount}
-            revivalCost={revivalCost}
-            isUserCaretaker={isUserCaretaker}
-            timeSinceLastFed={timeSinceLastFed}
-            onRenamePet={renamePet}
-            isWritePending={isWritePending}
-          />
-        </motion.div>
-
         {/* Main Content Tabs */}
         <motion.div
           initial={{ opacity: 0, y: 20 }}
           animate={{ opacity: 1, y: 0 }}
-          transition={{ delay: 0.1, duration: 0.6 }}
+          transition={{ duration: 0.6 }}
         >
           <Tabs
             value={activeTab}
@@ -150,13 +128,29 @@ const OptimizedPetPage = () => {
               </TabsTrigger>
             </TabsList>
 
-            {/* Pet Status Tab */}
+            {/* Pet Status Tab - Only tab that shows the full pet header */}
             <TabsContent value="status" className="mt-6">
               <motion.div
                 initial={{ opacity: 0, y: 20 }}
                 animate={{ opacity: 1, y: 0 }}
                 transition={{ duration: 0.4 }}
+                className="space-y-6"
               >
+                {/* Pet Header - Only shown on status tab */}
+                <PetHeader
+                  petName={petInfo.name}
+                  isAlive={petInfo.isAlive}
+                  currentHealth={displayHealth}
+                  currentCaretaker={petInfo.currentCaretaker}
+                  deathCount={petInfo.deathCount}
+                  revivalCost={revivalCost}
+                  isUserCaretaker={isUserCaretaker}
+                  timeSinceLastFed={timeSinceLastFed}
+                  onRenamePet={renamePet}
+                  isWritePending={isWritePending}
+                />
+
+                {/* Pet Status Card */}
                 <PetStatusCard
                   extendedPetInfo={petInfo}
                   revivalInfo={data.revivalInfo}
@@ -173,7 +167,7 @@ const OptimizedPetPage = () => {
               </motion.div>
             </TabsContent>
 
-            {/* Community Stats Tab */}
+            {/* Community Stats Tab - Community stats acts as its own header */}
             <TabsContent value="community" className="mt-6">
               <motion.div
                 initial={{ opacity: 0, y: 20 }}
@@ -184,7 +178,7 @@ const OptimizedPetPage = () => {
               </motion.div>
             </TabsContent>
 
-            {/* Feeding Tab */}
+            {/* Feeding Tab - Feeding section acts as its own header */}
             <TabsContent value="feeding" className="mt-6">
               <motion.div
                 initial={{ opacity: 0, y: 20 }}
@@ -203,97 +197,12 @@ const OptimizedPetPage = () => {
           </Tabs>
         </motion.div>
 
-        {/* Quick Action Cards */}
-        <motion.div
-          initial={{ opacity: 0, y: 20 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ delay: 0.2, duration: 0.6 }}
-          className="grid grid-cols-1 md:grid-cols-3 gap-4"
-        >
-          {/* Quick Status */}
-          <Card
-            className="cursor-pointer hover:shadow-md transition-shadow bg-white/50 dark:bg-gray-900/50 backdrop-blur-sm border-2"
-            onClick={() => setActiveTab("status")}
-          >
-            <CardContent className="p-4">
-              <div className="flex items-center gap-3">
-                <Activity
-                  className={`h-5 w-5 ${
-                    displayHealth >= 70
-                      ? "text-green-500"
-                      : displayHealth >= 40
-                      ? "text-yellow-500"
-                      : "text-red-500"
-                  }`}
-                />
-                <div>
-                  <div className="font-medium">Health Status</div>
-                  <div className="text-sm text-muted-foreground">
-                    {displayHealth}/100 HP
-                  </div>
-                </div>
-                <Badge
-                  variant={petInfo.isAlive ? "default" : "destructive"}
-                  className="ml-auto"
-                >
-                  {petInfo.isAlive ? "Alive" : "Dead"}
-                </Badge>
-              </div>
-            </CardContent>
-          </Card>
-
-          {/* Quick Community */}
-          <Card
-            className="cursor-pointer hover:shadow-md transition-shadow bg-white/50 dark:bg-gray-900/50 backdrop-blur-sm border-2"
-            onClick={() => setActiveTab("community")}
-          >
-            <CardContent className="p-4">
-              <div className="flex items-center gap-3">
-                <Users className="h-5 w-5 text-blue-500" />
-                <div>
-                  <div className="font-medium">Community</div>
-                  <div className="text-sm text-muted-foreground">
-                    {petInfo.totalFeedings} total feeds
-                  </div>
-                </div>
-                <Badge variant="outline" className="ml-auto">
-                  {userStats.feedingCount} yours
-                </Badge>
-              </div>
-            </CardContent>
-          </Card>
-
-          {/* Quick Feed */}
-          <Card
-            className="cursor-pointer hover:shadow-md transition-shadow bg-white/50 dark:bg-gray-900/50 backdrop-blur-sm border-2"
-            onClick={() => setActiveTab("feeding")}
-          >
-            <CardContent className="p-4">
-              <div className="flex items-center gap-3">
-                <Utensils className="h-5 w-5 text-green-500" />
-                <div>
-                  <div className="font-medium">Feed Pet</div>
-                  <div className="text-sm text-muted-foreground">
-                    Burn CHOW tokens
-                  </div>
-                </div>
-                <Badge
-                  variant={petInfo.isAlive ? "default" : "secondary"}
-                  className="ml-auto"
-                >
-                  {petInfo.isAlive ? "Ready" : "Revive First"}
-                </Badge>
-              </div>
-            </CardContent>
-          </Card>
-        </motion.div>
-
         {/* Footer Info */}
         <motion.div
           initial={{ opacity: 0 }}
           animate={{ opacity: 1 }}
           transition={{ delay: 0.3, duration: 0.6 }}
-          className="text-center space-y-2"
+          className="text-center space-y-2 hidden"
         >
           <div className="text-sm text-muted-foreground">
             Community Pet • Fuji Testnet • Contract:{" "}
@@ -314,4 +223,4 @@ const OptimizedPetPage = () => {
   );
 };
 
-export default OptimizedPetPage;
+export default SimplifiedPetPage;

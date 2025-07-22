@@ -5,25 +5,17 @@ import React from "react";
 import { motion } from "framer-motion";
 import {
   Users,
-  Zap,
-  Skull,
-  Heart,
+  Trophy,
   TrendingUp,
   Crown,
-  Activity,
   Award,
   Star,
-  Target,
   BarChart3,
-  Calendar,
-  Trophy,
-  Flame,
-  Timer,
+  Heart,
 } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Progress } from "@/components/ui/progress";
-import { Separator } from "@/components/ui/separator";
 import { CommunityStatsProps } from "../types";
 
 export const CommunityStats: React.FC<CommunityStatsProps> = ({
@@ -121,12 +113,6 @@ export const CommunityStats: React.FC<CommunityStatsProps> = ({
     Math.ceil(petStats.totalFeedings / 3)
   );
 
-  // Calculate average feedings per community member
-  const avgFeedingsPerMember =
-    petStats.totalFeedings > 0
-      ? (petStats.totalFeedings / estimatedCommunitySize).toFixed(1)
-      : "0";
-
   // Calculate survival rate
   const survivalRate =
     petStats.deathCount > 0
@@ -139,7 +125,60 @@ export const CommunityStats: React.FC<CommunityStatsProps> = ({
       : 100;
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-8">
+            {/* Community Overview */}
+      <Card className="unified-card">
+        <CardHeader className="text-center">
+          <CardTitle className="flex items-center justify-center gap-2 text-2xl">
+            <BarChart3 className="h-6 w-6 text-primary" />
+            Community Overview
+          </CardTitle>
+        </CardHeader>
+        <CardContent>
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+            <div className="text-center p-6 bg-gradient-to-b from-blue-500/20 to-blue-500/10 rounded-lg border border-blue-500/30">
+              <Users className="h-8 w-8 text-blue-500 mx-auto mb-3" />
+              <div className="text-3xl font-bold text-blue-500 mb-2">
+                ~{estimatedCommunitySize}
+              </div>
+              <div className="text-lg text-muted-foreground">
+                Estimated Active Members
+              </div>
+              <div className="text-sm text-muted-foreground mt-2">
+                Based on feeding patterns
+              </div>
+            </div>
+
+            <div className="text-center p-6 bg-gradient-to-b from-green-500/20 to-green-500/10 rounded-lg border border-green-500/30">
+              <Heart className="h-8 w-8 text-green-500 mx-auto mb-3" />
+              <div className="text-3xl font-bold text-green-500 mb-2">
+                {survivalRate}%
+              </div>
+              <div className="text-lg text-muted-foreground">Survival Rate</div>
+              <div className="text-sm text-muted-foreground mt-2">
+                Community care effectiveness
+              </div>
+            </div>
+
+            <div className="text-center p-6 bg-gradient-to-b from-orange-500/20 to-orange-500/10 rounded-lg border border-orange-500/30">
+              <TrendingUp className="h-8 w-8 text-orange-500 mx-auto mb-3" />
+              <div className="text-3xl font-bold text-orange-500 mb-2">
+                {petStats.totalFeedings > 100
+                  ? "High"
+                  : petStats.totalFeedings > 50
+                  ? "Medium"
+                  : "Growing"}
+              </div>
+              <div className="text-lg text-muted-foreground">
+                Community Activity
+              </div>
+              <div className="text-sm text-muted-foreground mt-2">
+                Based on total engagement
+              </div>
+            </div>
+          </div>
+        </CardContent>
+      </Card>
       {/* Your Community Recognition - Featured at Top */}
       {userStats && userStats.hasEverFed && (
         <motion.div
@@ -150,33 +189,25 @@ export const CommunityStats: React.FC<CommunityStatsProps> = ({
           <Card
             className={`unified-card border-2 ${contributionLevel.bgColor}`}
           >
-            <CardHeader>
-              <CardTitle className="flex items-center gap-2">
-                <Award className="h-5 w-5 text-primary" />
-                Your Community Recognition
+            <CardHeader className="text-center">
+              <div className="text-6xl mb-4">{contributionLevel.icon}</div>
+              <CardTitle className="text-3xl">
+                {contributionLevel.level} Member
               </CardTitle>
+              <p className="text-xl text-muted-foreground">
+                {contributionLevel.description}
+              </p>
             </CardHeader>
             <CardContent className="space-y-6">
-              {/* Recognition Level Display */}
-              <div className="flex items-center justify-between p-6 bg-gradient-to-r from-primary/10 to-secondary/10 rounded-lg border border-primary/20">
-                <div className="flex items-center gap-4">
-                  <div className="text-4xl">{contributionLevel.icon}</div>
-                  <div>
-                    <h3 className="text-2xl font-bold text-foreground">
-                      {contributionLevel.level}
-                    </h3>
-                    <p className="text-muted-foreground">
-                      {contributionLevel.description}
-                    </p>
-                  </div>
+              <div className="text-center p-6 bg-gradient-to-r from-primary/10 to-secondary/10 rounded-lg border border-primary/20">
+                <div className="text-4xl font-bold text-primary mb-2">
+                  {userStats.feedingCount}
                 </div>
-                <div className="text-right">
-                  <div className="text-3xl font-bold text-primary">
-                    {userStats.feedingCount}
-                  </div>
-                  <div className="text-sm text-muted-foreground">
-                    Total Feedings
-                  </div>
+                <div className="text-lg text-muted-foreground">
+                  Your Total Contributions
+                </div>
+                <div className="text-sm text-muted-foreground mt-2">
+                  {userParticipation}% of all community feedings
                 </div>
               </div>
 
@@ -184,7 +215,7 @@ export const CommunityStats: React.FC<CommunityStatsProps> = ({
               {contributionLevel.nextLevel && (
                 <div className="space-y-3">
                   <div className="flex justify-between items-center">
-                    <span className="font-medium">
+                    <span className="text-lg font-medium">
                       Progress to {contributionLevel.nextLevel}
                     </span>
                     <span className="text-sm text-muted-foreground">
@@ -198,340 +229,169 @@ export const CommunityStats: React.FC<CommunityStatsProps> = ({
                         contributionLevel.nextRequirement!) *
                       100
                     }
-                    className="h-3"
+                    className="h-4"
                   />
-                  <div className="text-sm text-muted-foreground">
+                  <div className="text-center text-lg font-medium text-primary">
                     {contributionLevel.nextRequirement! -
                       userStats.feedingCount}{" "}
-                    more feedings to reach {contributionLevel.nextLevel}
+                    more feedings to reach {contributionLevel.nextLevel}!
                   </div>
                 </div>
               )}
-
-              {/* Personal Stats Grid */}
-              <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                <div className="text-center p-4 bg-primary/10 rounded-lg border border-primary/20">
-                  <TrendingUp className="h-5 w-5 text-primary mx-auto mb-2" />
-                  <div className="text-2xl font-bold text-primary">
-                    {userParticipation}%
-                  </div>
-                  <div className="text-sm text-muted-foreground">
-                    Community Share
-                  </div>
-                </div>
-
-                <div className="text-center p-4 bg-secondary/20 rounded-lg border border-border/50">
-                  <Target className="h-5 w-5 text-secondary-foreground mx-auto mb-2" />
-                  <div className="text-2xl font-bold text-foreground">
-                    #
-                    {Math.max(
-                      1,
-                      Math.ceil(
-                        (petStats.totalFeedings - userStats.feedingCount) / 10
-                      ) + 1
-                    )}
-                  </div>
-                  <div className="text-sm text-muted-foreground">Est. Rank</div>
-                </div>
-
-                <div className="text-center p-4 bg-accent/20 rounded-lg border border-border/50">
-                  <Star className="h-5 w-5 text-accent-foreground mx-auto mb-2" />
-                  <div className="text-2xl font-bold text-accent-foreground">
-                    {userStats.feedingCount > 0
-                      ? Math.round(
-                          (userStats.feedingCount / petStats.totalFeedings) *
-                            1000
-                        ) / 10
-                      : 0}
-                    x
-                  </div>
-                  <div className="text-sm text-muted-foreground">
-                    Above Average
-                  </div>
-                </div>
-              </div>
             </CardContent>
           </Card>
         </motion.div>
       )}
 
-      {/* Community Overview & Statistics */}
+
+
+      {/* Recognition Levels */}
       <Card className="unified-card">
-        <CardHeader>
-          <CardTitle className="flex items-center gap-2">
-            <BarChart3 className="h-5 w-5 text-primary" />
-            Community Overview
+        <CardHeader className="text-center">
+          <CardTitle className="flex items-center justify-center gap-2 text-2xl">
+            <Award className="h-6 w-6 text-primary" />
+            Community Recognition Levels
           </CardTitle>
+          <p className="text-muted-foreground">
+            Earn recognition through your feeding contributions
+          </p>
         </CardHeader>
-        <CardContent className="space-y-6">
-          {/* Key Metrics Grid */}
-          <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-            <div className="text-center p-4 bg-gradient-to-b from-primary/20 to-primary/10 rounded-lg border border-primary/30">
-              <Zap className="h-6 w-6 text-primary mx-auto mb-2" />
-              <div className="text-2xl font-bold text-primary">
-                {petStats.totalFeedings}
-              </div>
-              <div className="text-sm text-muted-foreground">
-                Total Feedings
-              </div>
-            </div>
-
-            <div className="text-center p-4 bg-gradient-to-b from-green-500/20 to-green-500/10 rounded-lg border border-green-500/30">
-              <Users className="h-6 w-6 text-green-500 mx-auto mb-2" />
-              <div className="text-2xl font-bold text-green-500">
-                ~{estimatedCommunitySize}
-              </div>
-              <div className="text-sm text-muted-foreground">
-                Active Members
-              </div>
-            </div>
-
-            <div className="text-center p-4 bg-gradient-to-b from-red-500/20 to-red-500/10 rounded-lg border border-red-500/30">
-              <Skull className="h-6 w-6 text-red-500 mx-auto mb-2" />
-              <div className="text-2xl font-bold text-red-500">
-                {petStats.deathCount}
-              </div>
-              <div className="text-sm text-muted-foreground">Total Deaths</div>
-            </div>
-
-            <div className="text-center p-4 bg-gradient-to-b from-blue-500/20 to-blue-500/10 rounded-lg border border-blue-500/30">
-              <Heart className="h-6 w-6 text-blue-500 mx-auto mb-2" />
-              <div className="text-2xl font-bold text-blue-500">
-                {survivalRate}%
-              </div>
-              <div className="text-sm text-muted-foreground">Survival Rate</div>
-            </div>
-          </div>
-
-          {/* Community Health Metrics */}
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-            <div className="space-y-3">
-              <h4 className="font-semibold flex items-center gap-2">
-                <Activity className="h-4 w-4 text-primary" />
-                Community Activity
-              </h4>
-              <div className="space-y-2">
-                <div className="flex justify-between items-center p-3 bg-muted/30 rounded-lg">
-                  <span className="text-sm">Average feedings per member</span>
-                  <Badge variant="outline" className="font-mono">
-                    {avgFeedingsPerMember}
-                  </Badge>
-                </div>
-                <div className="flex justify-between items-center p-3 bg-muted/30 rounded-lg">
-                  <span className="text-sm">Feedings per death</span>
-                  <Badge variant="outline" className="font-mono">
-                    {petStats.deathCount > 0
-                      ? Math.round(petStats.totalFeedings / petStats.deathCount)
-                      : "∞"}
-                  </Badge>
-                </div>
-                <div className="flex justify-between items-center p-3 bg-muted/30 rounded-lg">
-                  <span className="text-sm">Community engagement</span>
-                  <Badge
-                    variant="outline"
-                    className={
-                      petStats.totalFeedings > 100
-                        ? "text-green-500 border-green-500/30"
-                        : petStats.totalFeedings > 50
-                        ? "text-yellow-500 border-yellow-500/30"
-                        : "text-gray-500 border-gray-500/30"
-                    }
-                  >
-                    {petStats.totalFeedings > 100
-                      ? "High"
-                      : petStats.totalFeedings > 50
-                      ? "Medium"
-                      : "Growing"}
-                  </Badge>
-                </div>
-              </div>
-            </div>
-
-            <div className="space-y-3">
-              <h4 className="font-semibold flex items-center gap-2">
-                <Trophy className="h-4 w-4 text-yellow-500" />
-                Community Achievements
-              </h4>
-              <div className="space-y-2">
-                <div className="flex items-center gap-3 p-3 bg-muted/30 rounded-lg">
-                  <div
-                    className={`w-3 h-3 rounded-full ${
-                      petStats.totalFeedings >= 100
-                        ? "bg-green-500"
-                        : "bg-gray-300"
-                    }`}
-                  />
-                  <span className="text-sm flex-1">
-                    100+ Community Feedings
-                  </span>
-                  {petStats.totalFeedings >= 100 && (
-                    <Badge className="text-xs bg-green-500/20 text-green-500">
-                      ✓
-                    </Badge>
-                  )}
-                </div>
-                <div className="flex items-center gap-3 p-3 bg-muted/30 rounded-lg">
-                  <div
-                    className={`w-3 h-3 rounded-full ${
-                      survivalRate >= 90 ? "bg-green-500" : "bg-gray-300"
-                    }`}
-                  />
-                  <span className="text-sm flex-1">90%+ Survival Rate</span>
-                  {survivalRate >= 90 && (
-                    <Badge className="text-xs bg-green-500/20 text-green-500">
-                      ✓
-                    </Badge>
-                  )}
-                </div>
-                <div className="flex items-center gap-3 p-3 bg-muted/30 rounded-lg">
-                  <div
-                    className={`w-3 h-3 rounded-full ${
-                      estimatedCommunitySize >= 20
-                        ? "bg-green-500"
-                        : "bg-gray-300"
-                    }`}
-                  />
-                  <span className="text-sm flex-1">20+ Active Members</span>
-                  {estimatedCommunitySize >= 20 && (
-                    <Badge className="text-xs bg-green-500/20 text-green-500">
-                      ✓
+        <CardContent>
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+            {[
+              { level: "New", icon: "🆕", range: "0", color: "gray" },
+              { level: "Newcomer", icon: "🌱", range: "1-4", color: "gray" },
+              { level: "Friend", icon: "💙", range: "5-9", color: "blue" },
+              { level: "Helper", icon: "🤝", range: "10-19", color: "green" },
+              { level: "Hero", icon: "⭐", range: "20-49", color: "yellow" },
+              { level: "Champion", icon: "👑", range: "50+", color: "purple" },
+            ].map((levelInfo) => (
+              <div
+                key={levelInfo.level}
+                className={`p-4 rounded-lg border transition-all ${
+                  contributionLevel.level === levelInfo.level
+                    ? "bg-primary/20 border-primary/50 ring-2 ring-primary/30 scale-105"
+                    : "bg-muted/30 border-border/50 hover:bg-muted/50"
+                }`}
+              >
+                <div className="text-center">
+                  <div className="text-3xl mb-2">{levelInfo.icon}</div>
+                  <div className="font-bold text-lg">{levelInfo.level}</div>
+                  <div className="text-sm text-muted-foreground mb-2">
+                    {levelInfo.range} feedings
+                  </div>
+                  {contributionLevel.level === levelInfo.level && (
+                    <Badge className="bg-primary/20 text-primary border-primary/30">
+                      <Star className="h-3 w-3 mr-1" />
+                      Your Level
                     </Badge>
                   )}
                 </div>
               </div>
-            </div>
+            ))}
           </div>
         </CardContent>
       </Card>
 
-      {/* How Community Works & Recognition */}
+      {/* Community Achievements */}
       <Card className="unified-card">
-        <CardHeader>
-          <CardTitle className="flex items-center gap-2">
-            <Users className="h-5 w-5 text-primary" />
-            How Community Pet Works
+        <CardHeader className="text-center">
+          <CardTitle className="flex items-center justify-center gap-2 text-2xl">
+            <Trophy className="h-6 w-6 text-yellow-500" />
+            Community Achievements
           </CardTitle>
         </CardHeader>
-        <CardContent className="space-y-6">
-          {/* Main Content Grid */}
-          <div className="grid grid-cols-1 lg:grid-cols-5 gap-6">
-            {/* Core Mechanics - 3 columns on large screens */}
-            <div className="lg:col-span-3 grid grid-cols-1 md:grid-cols-2 gap-6">
-              <div className="space-y-3">
-                <h4 className="font-semibold flex items-center gap-2">
-                  🤝 Shared Responsibility
-                </h4>
-                <div className="space-y-2">
-                  <div className="flex items-start gap-3 p-3 bg-primary/10 rounded-lg border border-primary/20">
-                    <Flame className="h-4 w-4 text-primary mt-0.5" />
-                    <div className="text-sm">
-                      <div className="font-medium">Anyone can feed</div>
-                      <div className="text-muted-foreground">
-                        Burn CHOW tokens to feed the pet
-                      </div>
-                    </div>
-                  </div>
-                  <div className="flex items-start gap-3 p-3 bg-secondary/20 rounded-lg border border-border/50">
-                    <Heart className="h-4 w-4 text-red-500 mt-0.5" />
-                    <div className="text-sm">
-                      <div className="font-medium">Shared health</div>
-                      <div className="text-muted-foreground">
-                        Pet health affects everyone equally
-                      </div>
-                    </div>
-                  </div>
-                  <div className="flex items-start gap-3 p-3 bg-accent/20 rounded-lg border border-border/50">
-                    <Timer className="h-4 w-4 text-orange-500 mt-0.5" />
-                    <div className="text-sm">
-                      <div className="font-medium">Automatic decay</div>
-                      <div className="text-muted-foreground">
-                        Health decreases by 1 every hour
-                      </div>
-                    </div>
+        <CardContent>
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <div
+              className={`p-4 rounded-lg border ${
+                petStats.totalFeedings >= 100
+                  ? "bg-green-100 dark:bg-green-900/30 border-green-500/50"
+                  : "bg-muted/30 border-muted/50"
+              }`}
+            >
+              <div className="flex items-center gap-3">
+                <div className="text-2xl">🎯</div>
+                <div>
+                  <div className="font-medium">Century Club</div>
+                  <div className="text-sm text-muted-foreground">
+                    100+ Community Feedings
                   </div>
                 </div>
-              </div>
-
-              <div className="space-y-3">
-                <h4 className="font-semibold flex items-center gap-2">
-                  👑 Ownership & Revival
-                </h4>
-                <div className="space-y-2">
-                  <div className="flex items-start gap-3 p-3 bg-primary/10 rounded-lg border border-primary/20">
-                    <Crown className="h-4 w-4 text-primary mt-0.5" />
-                    <div className="text-sm">
-                      <div className="font-medium">Caretaker privileges</div>
-                      <div className="text-muted-foreground">
-                        Current owner can rename the pet
-                      </div>
-                    </div>
-                  </div>
-                  <div className="flex items-start gap-3 p-3 bg-secondary/20 rounded-lg border border-border/50">
-                    <Skull className="h-4 w-4 text-red-500 mt-0.5" />
-                    <div className="text-sm">
-                      <div className="font-medium">Revival system</div>
-                      <div className="text-muted-foreground">
-                        Anyone can revive and become owner
-                      </div>
-                    </div>
-                  </div>
-                  <div className="flex items-start gap-3 p-3 bg-accent/20 rounded-lg border border-border/50">
-                    <TrendingUp className="h-4 w-4 text-blue-500 mt-0.5" />
-                    <div className="text-sm">
-                      <div className="font-medium">Rising costs</div>
-                      <div className="text-muted-foreground">
-                        Revival cost doubles each death
-                      </div>
-                    </div>
-                  </div>
-                </div>
+                {petStats.totalFeedings >= 100 && (
+                  <Badge className="ml-auto bg-green-500/20 text-green-500">
+                    ✓ Unlocked
+                  </Badge>
+                )}
               </div>
             </div>
 
-            {/* Recognition Levels - 2 columns, more compact */}
-            <div className="lg:col-span-2 space-y-3">
-              <h4 className="font-semibold flex items-center gap-2">
-                <Award className="h-4 w-4 text-primary" />
-                Recognition Levels
-              </h4>
-
-              <div className="space-y-1.5">
-                {[
-                  { level: "New", icon: "🆕", range: "0" },
-                  { level: "Newcomer", icon: "🌱", range: "1-4" },
-                  { level: "Friend", icon: "💙", range: "5-9" },
-                  { level: "Helper", icon: "🤝", range: "10-19" },
-                  { level: "Hero", icon: "⭐", range: "20-49" },
-                  { level: "Champion", icon: "👑", range: "50+" },
-                ].map((levelInfo) => (
-                  <div
-                    key={levelInfo.level}
-                    className={`flex items-center gap-2 p-2 rounded-lg border text-sm transition-all ${
-                      contributionLevel.level === levelInfo.level
-                        ? "bg-primary/20 border-primary/50 ring-1 ring-primary/30"
-                        : "bg-muted/30 border-border/50 hover:bg-muted/50"
-                    }`}
-                  >
-                    <div className="text-base">{levelInfo.icon}</div>
-                    <div className="flex-1 min-w-0">
-                      <div className="font-medium truncate">
-                        {levelInfo.level}
-                      </div>
-                      <div className="text-xs text-muted-foreground">
-                        {levelInfo.range} feeds
-                      </div>
-                    </div>
-                    {contributionLevel.level === levelInfo.level && (
-                      <Badge className="bg-primary/20 text-primary border-primary/30 text-xs px-1.5 py-0">
-                        You
-                      </Badge>
-                    )}
+            <div
+              className={`p-4 rounded-lg border ${
+                survivalRate >= 90
+                  ? "bg-green-100 dark:bg-green-900/30 border-green-500/50"
+                  : "bg-muted/30 border-muted/50"
+              }`}
+            >
+              <div className="flex items-center gap-3">
+                <div className="text-2xl">💚</div>
+                <div>
+                  <div className="font-medium">Life Savers</div>
+                  <div className="text-sm text-muted-foreground">
+                    90%+ Survival Rate
                   </div>
-                ))}
+                </div>
+                {survivalRate >= 90 && (
+                  <Badge className="ml-auto bg-green-500/20 text-green-500">
+                    ✓ Unlocked
+                  </Badge>
+                )}
               </div>
+            </div>
 
-              <div className="text-xs text-muted-foreground p-2 bg-muted/20 rounded-lg text-center">
-                🏆 Earn levels through feeding contributions
+            <div
+              className={`p-4 rounded-lg border ${
+                estimatedCommunitySize >= 20
+                  ? "bg-green-100 dark:bg-green-900/30 border-green-500/50"
+                  : "bg-muted/30 border-muted/50"
+              }`}
+            >
+              <div className="flex items-center gap-3">
+                <div className="text-2xl">👥</div>
+                <div>
+                  <div className="font-medium">Growing Community</div>
+                  <div className="text-sm text-muted-foreground">
+                    20+ Active Members
+                  </div>
+                </div>
+                {estimatedCommunitySize >= 20 && (
+                  <Badge className="ml-auto bg-green-500/20 text-green-500">
+                    ✓ Unlocked
+                  </Badge>
+                )}
+              </div>
+            </div>
+
+            <div
+              className={`p-4 rounded-lg border ${
+                petStats.deathCount === 0
+                  ? "bg-green-100 dark:bg-green-900/30 border-green-500/50"
+                  : "bg-muted/30 border-muted/50"
+              }`}
+            >
+              <div className="flex items-center gap-3">
+                <div className="text-2xl">🛡️</div>
+                <div>
+                  <div className="font-medium">Guardian Angels</div>
+                  <div className="text-sm text-muted-foreground">
+                    Zero Deaths
+                  </div>
+                </div>
+                {petStats.deathCount === 0 && (
+                  <Badge className="ml-auto bg-green-500/20 text-green-500">
+                    ✓ Unlocked
+                  </Badge>
+                )}
               </div>
             </div>
           </div>
@@ -552,8 +412,7 @@ export const CommunityStats: React.FC<CommunityStatsProps> = ({
               healthy. Your contributions matter and are recognized by the
               entire community!
             </p>
-            <Separator className="my-6" />
-            <div className="flex flex-wrap justify-center gap-6 text-sm text-muted-foreground">
+            <div className="flex flex-wrap justify-center gap-6 text-sm text-muted-foreground pt-4">
               <span className="flex items-center gap-2">
                 🔗 <span>On-chain pet care</span>
               </span>

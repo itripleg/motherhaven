@@ -1,6 +1,7 @@
 import { Metadata } from "next";
 import "./pet-styles.css";
 import { PetEventWatcher } from "./components/PetEventWatcher";
+import {AnimatedTestyPeek} from "./components/AnimatedTestyPeek"
 
 export const metadata: Metadata = {
   title: "Community Pet | Testy the Dog",
