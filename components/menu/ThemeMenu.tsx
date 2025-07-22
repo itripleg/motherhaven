@@ -4,7 +4,7 @@
 import { Check, Palette } from "lucide-react";
 import { useColorTheme } from "@/contexts/ColorThemeProvider";
 import { getCurrentThemeName, applyThemePreset } from "./menuUtils";
-import { presetThemes } from "@/app/theme/page";
+import { presetThemes } from "@/app/theme/presetThemes";
 import { cn } from "@/lib/utils";
 
 interface ThemeMenuProps {
