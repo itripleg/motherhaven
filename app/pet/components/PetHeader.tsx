@@ -293,21 +293,48 @@ export const PetHeader: React.FC<EnhancedPetHeaderProps> = ({
               {/* Animated Pet Walking Area - Center Space */}
               <div className="flex-1 relative h-24 hidden sm:block overflow-hidden">
                 
-                {/* Pet container with sporadic random animation */}
+                {/* Pet container with enhanced chill animation */}
                 <motion.div
                   className="absolute top-[15%] -translate-y-1/2 z-10"
                   animate={{
-                    x: [0, 300, 150, 800, 1200, 600, 950, 200, 0],
-                    scaleX: [-1, -1, 1, -1, -1, 1, -1, 1, -1]
+                    // Enhanced movement pattern: walk, pause, chill, walk, pause home, chill, repeat
+                    x: [
+                      0,      // start at home
+                      200,    // walk right
+                      200,    // pause (stay)
+                      200,    // chill in place
+                      400,    // continue walking
+                      800,    // walk far right
+                      800,    // pause there
+                      500,    // walk back some
+                      500,    // pause
+                      200,    // walk back more
+                      50,     // almost home
+                      0       // return home
+                    ],
+                    scaleX: [
+                      -1,     // face right
+                      -1,     // still facing right
+                      -1,     // chill facing right
+                      1,      // flip during chill
+                      -1,     // face right again
+                      -1,     // keep facing right
+                      -1,     // pause facing right
+                      1,      // turn to face left (going home)
+                      1,      // keep facing left
+                      1,      // still left
+                      1,      // almost home
+                      -1      // flip to face right at home
+                    ]
                   }}
                   transition={{
-                    duration: 18,
+                    duration: 20,
                     repeat: Infinity,
                     ease: "easeInOut",
-                    times: [0, 0.15, 0.25, 0.4, 0.55, 0.7, 0.8, 0.9, 1]
+                    times: [0, 0.1, 0.2, 0.25, 0.35, 0.5, 0.6, 0.7, 0.75, 0.85, 0.95, 1]
                   }}
                 >
-                  {/* Pet with its status indicator */}
+                  {/* Pet with its status indicator and subtle idle animation */}
                   <div className="relative">
                     <motion.div
                       className={`text-7xl transition-all duration-300 leading-none ${
@@ -317,11 +344,29 @@ export const PetHeader: React.FC<EnhancedPetHeaderProps> = ({
                             : ""
                           : "grayscale opacity-60"
                       }`}
+                      // Subtle idle breathing/bobbing animation when not critically ill
+                      animate={
+                        isAlive && healthStatus.urgency !== "high"
+                          ? {
+                              y: [0, -2, 0, -1, 0],
+                              rotate: [0, 1, 0, -1, 0]
+                            }
+                          : {}
+                      }
+                      transition={
+                        isAlive && healthStatus.urgency !== "high"
+                          ? {
+                              duration: 4,
+                              repeat: Infinity,
+                              ease: "easeInOut"
+                            }
+                          : {}
+                      }
                     >
                       {petEmoji}
                     </motion.div>
 
-                    {/* Status indicator */}
+                    {/* Status indicator with enhanced animation */}
                     <motion.div
                       className={`absolute -bottom-1 -right-1 w-5 h-5 rounded-full border-4 border-background flex items-center justify-center ${
                         isAlive ? "bg-green-500" : "bg-red-500"
@@ -348,7 +393,7 @@ export const PetHeader: React.FC<EnhancedPetHeaderProps> = ({
 
               {/* Mobile Pet - Static when small */}
               <div className="relative flex-shrink-0 sm:hidden">
-                <div
+                <motion.div
                   className={`text-6xl transition-all duration-300 ${
                     isAlive
                       ? healthStatus.urgency === "high"
@@ -356,9 +401,26 @@ export const PetHeader: React.FC<EnhancedPetHeaderProps> = ({
                         : ""
                       : "grayscale opacity-60"
                   }`}
+                  // Mobile gets subtle idle animation too
+                  animate={
+                    isAlive && healthStatus.urgency !== "high"
+                      ? {
+                          rotate: [0, 2, 0, -2, 0]
+                        }
+                      : {}
+                  }
+                  transition={
+                    isAlive && healthStatus.urgency !== "high"
+                      ? {
+                          duration: 5,
+                          repeat: Infinity,
+                          ease: "easeInOut"
+                        }
+                      : {}
+                  }
                 >
                   {petEmoji}
-                </div>
+                </motion.div>
 
                 {/* Status indicator */}
                 <div

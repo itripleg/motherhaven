@@ -11,6 +11,7 @@ import { FactoryConfigProvider } from "@/contexts/FactoryConfigProvider";
 import { ColorThemeProvider } from "@/contexts/ColorThemeProvider";
 import { NetworkGuard } from "@/components/NetworkGuard";
 import { NetworkDebug } from "@/components/NetworkDebug";
+import {AnimatedTestyPeek} from "@/app/pet/components/AnimatedTestyPeek"
 import Script from "next/script";
 
 const geistSans = localFont({
@@ -110,11 +111,10 @@ export default function RootLayout({
   return (
     <html lang="en" suppressHydrationWarning>
       <head>
-        {/* Favicon */}
-        <link
-          rel="icon"
-          href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='12 0 100 100'><text y='.9em' font-size='90'>🐱‍🚀</text></svg>"
-        />
+        {/* FOXHOUND Favicon */}
+        <link rel="icon" href="/foxhound.png" type="image/png" />
+        <link rel="shortcut icon" href="/foxhound.png" type="image/png" />
+        <link rel="apple-touch-icon" href="/foxhound.png" />
 
         {/* Manifest for PWA */}
         <link rel="manifest" href="/manifest.json" />
@@ -167,6 +167,11 @@ export default function RootLayout({
                 <main id="main-content" className="min-h-screen">
                   <FactoryConfigProvider>
                     <EventWatcher />
+                    <AnimatedTestyPeek 
+  petIsAlive={true} 
+  petName={"Testy"} 
+  isOnStatusTab={false} // Always show on community tab
+/>
                     {children}
                     <Toaster />
                   </FactoryConfigProvider>

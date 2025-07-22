@@ -10,7 +10,7 @@ html {
   :root {
     /* Single unified theme - dark mode optimized */
     --background: 240 10% 3.9%;
-    --foreground: 0 0% 98%;
+    /* --foreground is now controlled by ColorThemeProvider */
     --card: 240 10% 7.8%;
     --card-foreground: 0 0% 98%;
     --popover: 240 10% 7.8%;

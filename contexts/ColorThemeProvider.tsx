@@ -1,3 +1,4 @@
+// contexts/ColorThemeProvider.tsx
 "use client";
 
 import React, { createContext, useContext, useEffect, useState } from "react";
@@ -50,6 +51,15 @@ const defaultColors: ThemeColor[] = [
     saturation: 6,
     lightness: 8,
     cssVar: "--accent",
+  },
+  {
+    name: "foreground",
+    label: "Text Color",
+    description: "Primary text and content color",
+    hue: 0,
+    saturation: 0,
+    lightness: 98,
+    cssVar: "--foreground",
   },
 ];
 
@@ -163,8 +173,20 @@ export const ColorThemeProvider: React.FC<ColorThemeProviderProps> = ({
             console.log("🎨 Loading saved colors for user:", address);
 
             const savedColors = userData.theme.colors;
-            setColors(savedColors);
-            applyColorsToCSS(savedColors, true); // Animate user colors
+            
+            // Handle migration from 3 colors to 4 colors
+            if (savedColors.length === 3) {
+              console.log("🎨 Migrating from 3 colors to 4 colors");
+              const migratedColors = [
+                ...savedColors,
+                defaultColors[3] // Add default text color
+              ];
+              setColors(migratedColors);
+              applyColorsToCSS(migratedColors, true);
+            } else {
+              setColors(savedColors);
+              applyColorsToCSS(savedColors, true); // Animate user colors
+            }
           } else {
             console.log("🎨 No saved colors found, using defaults");
             applyColorsToCSS(colors, false);

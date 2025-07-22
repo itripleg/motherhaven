@@ -4,7 +4,7 @@
 import { Check, Palette } from "lucide-react";
 import { useColorTheme } from "@/contexts/ColorThemeProvider";
 import { getCurrentThemeName, applyThemePreset } from "./menuUtils";
-import { themePresets } from "./menuData";
+import { presetThemes } from "@/app/theme/page";
 import { cn } from "@/lib/utils";
 
 interface ThemeMenuProps {
@@ -15,7 +15,7 @@ export function ThemeMenu({ isDesktop = false }: ThemeMenuProps) {
   const { colors, applyColors } = useColorTheme();
   const currentThemeName = getCurrentThemeName(colors);
 
-  const handleThemeChange = (preset: (typeof themePresets)[0]) => {
+  const handleThemeChange = (preset: (typeof presetThemes)[0]) => {
     applyThemePreset(preset, colors, applyColors);
   };
 
@@ -34,7 +34,7 @@ export function ThemeMenu({ isDesktop = false }: ThemeMenuProps) {
         )}
       />
 
-      {themePresets.map((preset) => (
+      {presetThemes.map((preset) => (
         <div
           key={preset.name}
           onClick={() => handleThemeChange(preset)}

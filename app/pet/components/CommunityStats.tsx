@@ -17,6 +17,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Progress } from "@/components/ui/progress";
 import { CommunityStatsProps } from "../types";
+import {AnimatedTestyPeek} from "./AnimatedTestyPeek"
 
 export const CommunityStats: React.FC<CommunityStatsProps> = ({
   petStats,
@@ -126,7 +127,7 @@ export const CommunityStats: React.FC<CommunityStatsProps> = ({
 
   return (
     <div className="space-y-8">
-            {/* Community Overview */}
+     {/* Community Overview */}
       <Card className="unified-card">
         <CardHeader className="text-center">
           <CardTitle className="flex items-center justify-center gap-2 text-2xl">

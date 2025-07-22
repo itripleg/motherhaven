@@ -1,3 +1,4 @@
+// app/theme/page.tsx
 "use client";
 import React, { useState, useEffect } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -33,6 +34,60 @@ interface ThemeColor {
   cssVar: string;
 }
 
+// Preset themes with Metal Gear Solid / Kojima inspiration - exported for use in other components
+export const presetThemes = [
+  {
+    name: "MotherHaven",
+    description: "The original Mother Haven",
+    colors: [
+      { hue: 263, saturation: 60, lightness: 50 },
+      { hue: 240, saturation: 5, lightness: 11 },
+      { hue: 240, saturation: 6, lightness: 5 },
+      { hue: 0, saturation: 0, lightness: 95 },
+    ],
+  },
+  {
+    name: "FOXHOUND",
+    description: "Elite unit stealth operations",
+    colors: [
+      { hue: 25, saturation: 85, lightness: 55 },
+      { hue: 30, saturation: 8, lightness: 12 },
+      { hue: 45, saturation: 75, lightness: 20 },
+      { hue: 30, saturation: 10, lightness: 90 },
+    ],
+  },
+  {
+    name: "Shadow Moses",
+    description: "Arctic infiltration protocol",
+    colors: [
+      { hue: 200, saturation: 80, lightness: 55 },
+      { hue: 210, saturation: 15, lightness: 12 },
+      { hue: 180, saturation: 70, lightness: 10 },
+      { hue: 200, saturation: 15, lightness: 85 },
+    ],
+  },
+  {
+    name: "Snake Eater",
+    description: "Jungle survival operations",
+    colors: [
+      { hue: 85, saturation: 35, lightness: 40 },
+      { hue: 30, saturation: 25, lightness: 15 },
+      { hue: 120, saturation: 20, lightness: 25 },
+      { hue: 60, saturation: 10, lightness: 80 },
+    ],
+  },
+  {
+    name: "Liquid Red",
+    description: "Revolutionary war machine",
+    colors: [
+      { hue: 0, saturation: 70, lightness: 45 },
+      { hue: 10, saturation: 8, lightness: 12 },
+      { hue: 350, saturation: 60, lightness: 25 },
+      { hue: 0, saturation: 5, lightness: 90 },
+    ],
+  },
+];
+
 const ThemeCustomizer = () => {
   const { address, isConnected } = useAccount();
   const { toast } = useToast();
@@ -53,55 +108,6 @@ const ThemeCustomizer = () => {
   useEffect(() => {
     setLocalColors(colors);
   }, [colors]);
-
-  // Preset themes (simplified)
-  const presetThemes = [
-    {
-      name: "Motherhaven Classic",
-      description: "Original purple theme",
-      colors: [
-        { hue: 263, saturation: 60, lightness: 50 },
-        { hue: 240, saturation: 5, lightness: 11 },
-        { hue: 240, saturation: 6, lightness: 5 },
-      ],
-    },
-    {
-      name: "Ocean Blue",
-      description: "Deep ocean vibes",
-      colors: [
-        { hue: 200, saturation: 80, lightness: 55 },
-        { hue: 210, saturation: 15, lightness: 12 },
-        { hue: 180, saturation: 70, lightness: 10 },
-      ],
-    },
-    {
-      name: "Forest Green",
-      description: "Natural and calming",
-      colors: [
-        { hue: 140, saturation: 60, lightness: 45 },
-        { hue: 150, saturation: 10, lightness: 10 },
-        { hue: 120, saturation: 50, lightness: 15 },
-      ],
-    },
-    {
-      name: "Sunset Orange",
-      description: "Warm and energetic",
-      colors: [
-        { hue: 25, saturation: 85, lightness: 55 },
-        { hue: 30, saturation: 8, lightness: 12 },
-        { hue: 45, saturation: 75, lightness: 20 },
-      ],
-    },
-    {
-      name: "Royal Purple",
-      description: "Elegant and premium",
-      colors: [
-        { hue: 280, saturation: 75, lightness: 50 },
-        { hue: 270, saturation: 8, lightness: 9 },
-        { hue: 290, saturation: 65, lightness: 35 },
-      ],
-    },
-  ];
 
   const updateColor = (
     index: number,
@@ -483,6 +489,15 @@ const ThemeCustomizer = () => {
                   </h4>
                   <p className="text-sm text-accent-foreground/80">
                     Special highlighted content area.
+                  </p>
+                </div>
+
+                <div className="p-4 bg-background/50 rounded-lg border border-border/30">
+                  <h4 className="font-semibold text-foreground mb-2">
+                    Text Color Preview
+                  </h4>
+                  <p className="text-sm text-foreground/80">
+                    This text uses the foreground color variable and will change with your theme.
                   </p>
                 </div>
 
