@@ -1,7 +1,11 @@
-// app/dex/components/roadmap/components/DroppableColumn.tsx - COMPLETE: Added collection support
+// app/dex/components/roadmap/components/DroppableColumn.tsx - UPDATED: Added editable column titles
 "use client";
 
+import * as React from "react";
 import { Badge } from "@/components/ui/badge";
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { Pencil, Check, X } from "lucide-react";
 import {
   SortableContext,
   verticalListSortingStrategy,
@@ -19,9 +23,13 @@ interface DroppableColumnProps {
   expandedItemId: string | null;
   onExpand: (itemId: string | null) => void;
   collection?: "roadmap" | "tokenRoadmapItems";
+  // New props for editable titles
+  isCreator?: boolean;
+  columnTitle?: string;
+  onTitleUpdate?: (status: RoadmapItemType["status"], newTitle: string) => void;
 }
 
-const statusConfig = {
+const defaultStatusConfig = {
   considering: {
     label: "Considering",
     color: "text-blue-400",
@@ -62,8 +70,15 @@ export function DroppableColumn({
   expandedItemId,
   onExpand,
   collection = "roadmap",
+  isCreator = false,
+  columnTitle,
+  onTitleUpdate,
 }: DroppableColumnProps) {
-  const config = statusConfig[status];
+  const config = defaultStatusConfig[status];
+  const displayTitle = columnTitle || config.label;
+  
+  const [isEditing, setIsEditing] = React.useState(false);
+  const [editTitle, setEditTitle] = React.useState(displayTitle);
 
   // Create droppable zone for the entire column
   const { setNodeRef, isOver } = useDroppable({
@@ -74,27 +89,112 @@ export function DroppableColumn({
     },
   });
 
+  const handleStartEdit = () => {
+    setEditTitle(displayTitle);
+    setIsEditing(true);
+  };
+
+  const handleSaveTitle = () => {
+    const trimmedTitle = editTitle.trim();
+    if (trimmedTitle && trimmedTitle !== displayTitle && onTitleUpdate) {
+      onTitleUpdate(status, trimmedTitle);
+    }
+    setIsEditing(false);
+  };
+
+  const handleCancelEdit = () => {
+    setEditTitle(displayTitle);
+    setIsEditing(false);
+  };
+
+  const handleKeyDown = (e: React.KeyboardEvent) => {
+    if (e.key === "Enter") {
+      handleSaveTitle();
+    } else if (e.key === "Escape") {
+      handleCancelEdit();
+    }
+  };
+
   return (
     <div className="space-y-4">
       {/* Column Header */}
       <div
-        className={`p-4 rounded-lg ${config.bgColor} border ${config.borderColor}`}
+        className={`p-4 rounded-lg ${config.bgColor} border ${config.borderColor} group`}
       >
         <div className="flex items-center justify-between">
-          <h2 className={`font-semibold ${config.color}`}>{config.label}</h2>
-          <Badge
-            variant="outline"
-            className={`${config.color} border-current bg-transparent`}
-          >
-            {items.length}
-          </Badge>
+          {isEditing ? (
+            // Edit Mode
+            <div className="flex items-center gap-2 flex-1">
+              <Input
+                value={editTitle}
+                onChange={(e) => setEditTitle(e.target.value)}
+                onKeyDown={handleKeyDown}
+                className={`text-sm font-semibold ${config.color} bg-transparent border-none p-0 h-auto focus-visible:ring-1 focus-visible:ring-primary`}
+                maxLength={50}
+                autoFocus
+                onBlur={handleSaveTitle}
+              />
+              <div className="flex items-center gap-1">
+                <Button
+                  variant="ghost"
+                  size="icon"
+                  className="h-6 w-6 text-green-500 hover:bg-green-500/20"
+                  onClick={handleSaveTitle}
+                >
+                  <Check className="h-3 w-3" />
+                </Button>
+                <Button
+                  variant="ghost"
+                  size="icon"
+                  className="h-6 w-6 text-muted-foreground hover:bg-muted/20"
+                  onClick={handleCancelEdit}
+                >
+                  <X className="h-3 w-3" />
+                </Button>
+              </div>
+            </div>
+          ) : (
+            // Display Mode
+            <div className="flex items-center gap-2 flex-1">
+              <h2 className={`font-semibold ${config.color} flex-1`}>
+                {displayTitle}
+              </h2>
+              {isCreator && onTitleUpdate && (
+                <Button
+                  variant="ghost"
+                  size="icon"
+                  className="h-6 w-6 text-muted-foreground/60 hover:text-muted-foreground hover:bg-muted/20 opacity-70 hover:opacity-100 transition-all duration-200"
+                  onClick={handleStartEdit}
+                  title="Edit column title"
+                >
+                  <Pencil className="h-3 w-3" />
+                </Button>
+              )}
+            </div>
+          )}
+          
+          {!isEditing && (
+            <Badge
+              variant="outline"
+              className={`${config.color} border-current bg-transparent ml-2`}
+            >
+              {items.length}
+            </Badge>
+          )}
         </div>
+
+        {/* Character count during editing */}
+        {isEditing && (
+          <div className="text-xs text-muted-foreground/70 mt-1 text-right">
+            {editTitle.length}/50 characters
+          </div>
+        )}
       </div>
 
       {/* Droppable Items Container */}
       <div
         ref={setNodeRef}
-        className={`relative transition-all duration-200 ${
+        className={`relative transition-all duration-200 group ${
           isOver
             ? "ring-2 ring-primary/50 ring-offset-2 ring-offset-background"
             : ""

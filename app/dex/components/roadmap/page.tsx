@@ -1,4 +1,4 @@
-// app/dex/components/roadmap/page.tsx - COMPLETE: Fixed collection support
+// app/dex/components/roadmap/page.tsx - UPDATED: Added editable column titles for global roadmap
 "use client";
 
 import * as React from "react";
@@ -12,6 +12,8 @@ import {
   orderBy,
   arrayUnion,
   arrayRemove,
+  setDoc,
+  getDoc,
 } from "firebase/firestore";
 import { db } from "@/firebase";
 import { useAccount } from "wagmi";
@@ -46,6 +48,21 @@ import { DroppableColumn } from "./components/DroppableColumn";
 import { RoadmapItem } from "./components/RoadmapItem";
 import { AdminForm } from "./components/AdminForm";
 
+// --- TYPES ---
+interface GlobalColumnTitles {
+  considering: string;
+  planned: string;
+  "in-progress": string;
+  completed: string;
+}
+
+const defaultGlobalColumnTitles: GlobalColumnTitles = {
+  considering: "Considering",
+  planned: "Planned",
+  "in-progress": "In Progress",
+  completed: "Completed",
+};
+
 // --- HOOKS ---
 function useMediaQuery(query: string): boolean {
   const [matches, setMatches] = React.useState(false);
@@ -66,6 +83,7 @@ function useMediaQuery(query: string): boolean {
 // --- MAIN ROADMAP COMPONENT ---
 export default function Roadmap() {
   const [items, setItems] = React.useState<RoadmapItemType[]>([]);
+  const [columnTitles, setColumnTitles] = React.useState<GlobalColumnTitles>(defaultGlobalColumnTitles);
   const [expandedItemId, setExpandedItemId] = React.useState<string | null>(
     null
   );
@@ -88,6 +106,26 @@ export default function Roadmap() {
   React.useEffect(() => {
     setMounted(true);
   }, []);
+
+  // Fetch global column titles
+  React.useEffect(() => {
+    if (!mounted) return;
+
+    const fetchGlobalColumnTitles = async () => {
+      try {
+        const titlesDoc = await getDoc(doc(db, "globalRoadmapSettings", "columnTitles"));
+        if (titlesDoc.exists()) {
+          const data = titlesDoc.data();
+          setColumnTitles(data.columnTitles || defaultGlobalColumnTitles);
+        }
+      } catch (error) {
+        console.error("Error fetching global column titles:", error);
+        // Use default titles on error
+      }
+    };
+
+    fetchGlobalColumnTitles();
+  }, [mounted]);
 
   React.useEffect(() => {
     if (!mounted) return;
@@ -127,6 +165,40 @@ export default function Roadmap() {
 
     return () => unsubscribe();
   }, [mounted, toast, filter]);
+
+  // Handle global column title updates
+  const handleGlobalTitleUpdate = async (status: RoadmapItemType["status"], newTitle: string) => {
+    if (!isAdmin) return;
+
+    try {
+      const updatedTitles = { ...columnTitles, [status]: newTitle };
+      
+      // Update Firestore
+      await setDoc(
+        doc(db, "globalRoadmapSettings", "columnTitles"),
+        {
+          columnTitles: updatedTitles,
+          updatedAt: new Date().toISOString(),
+        },
+        { merge: true }
+      );
+
+      // Update local state
+      setColumnTitles(updatedTitles);
+
+      toast({
+        title: "Column updated",
+        description: `Global column renamed to "${newTitle}"`,
+      });
+    } catch (error) {
+      console.error("Error updating global column title:", error);
+      toast({
+        title: "Error",
+        description: "Failed to update column title. Please try again.",
+        variant: "destructive",
+      });
+    }
+  };
 
   const handleUpvote = async (itemId: string) => {
     if (isConnecting) return;
@@ -215,7 +287,7 @@ export default function Roadmap() {
 
         toast({
           title: "Status updated",
-          description: `Item moved to ${newStatus.replace("-", " ")}`,
+          description: `"${activeItem.title}" moved to ${columnTitles[newStatus]}`,
         });
       } catch (error) {
         console.error("Error updating item status:", error);
@@ -286,11 +358,6 @@ export default function Roadmap() {
                 <p className="text-muted-foreground text-lg">
                   Vote on features and help shape the future of our platform
                 </p>
-                {isAdmin && (
-                  <p className="text-sm text-primary mt-1">
-                    ✨ Drag items between columns to change their status
-                  </p>
-                )}
               </div>
 
               <div className="flex items-center gap-3">
@@ -366,6 +433,9 @@ export default function Roadmap() {
                         expandedItemId={expandedItemId}
                         onExpand={setExpandedItemId}
                         collection="roadmap"
+                        isCreator={!!isAdmin}
+                        columnTitle={columnTitles[status]}
+                        onTitleUpdate={handleGlobalTitleUpdate}
                       />
                     </motion.div>
                   );

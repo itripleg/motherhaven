@@ -1,11 +1,12 @@
-// app/dex/components/roadmap/components/TokenRoadmap.tsx - COMPLETE: Fixed collection support
+// app/dex/components/roadmap/components/TokenRoadmap.tsx - UPDATED: Added editable column titles
 "use client";
 
 import * as React from "react";
 import { motion, AnimatePresence } from "framer-motion";
-import { Plus, Map, Crown } from "lucide-react";
+import { Plus, Map, Crown, Pencil, Check, X } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
 import {
   collection,
   onSnapshot,
@@ -17,6 +18,8 @@ import {
   arrayUnion,
   arrayRemove,
   addDoc,
+  setDoc,
+  getDoc,
 } from "firebase/firestore";
 import { db } from "@/firebase";
 import { useAccount } from "wagmi";
@@ -44,6 +47,30 @@ const statusKeys: RoadmapItemType["status"][] = [
   "completed",
 ];
 
+interface TokenColumnTitles {
+  considering: string;
+  planned: string;
+  "in-progress": string;
+  completed: string;
+}
+
+interface TokenRoadmapHeaders {
+  title: string;
+  subtitle: string;
+}
+
+const defaultColumnTitles: TokenColumnTitles = {
+  considering: "Considering",
+  planned: "Planned",
+  "in-progress": "In Progress",
+  completed: "Completed",
+};
+
+const defaultHeaders: TokenRoadmapHeaders = {
+  title: "Development Roadmap",
+  subtitle: "Track progress and vote on features",
+};
+
 interface TokenRoadmapProps {
   tokenAddress: string;
   creatorAddress?: string;
@@ -58,6 +85,8 @@ export function TokenRoadmap({
   compact = true,
 }: TokenRoadmapProps) {
   const [items, setItems] = React.useState<RoadmapItemType[]>([]);
+  const [columnTitles, setColumnTitles] = React.useState<TokenColumnTitles>(defaultColumnTitles);
+  const [headers, setHeaders] = React.useState<TokenRoadmapHeaders>(defaultHeaders);
   const [expandedItemId, setExpandedItemId] = React.useState<string | null>(
     null
   );
@@ -66,6 +95,12 @@ export function TokenRoadmap({
   );
   const [mounted, setMounted] = React.useState(false);
   const [showAdminForm, setShowAdminForm] = React.useState(false);
+  
+  // Header editing state
+  const [isEditingTitle, setIsEditingTitle] = React.useState(false);
+  const [isEditingSubtitle, setIsEditingSubtitle] = React.useState(false);
+  const [editTitle, setEditTitle] = React.useState("");
+  const [editSubtitle, setEditSubtitle] = React.useState("");
 
   const { toast } = useToast();
   const { address, isConnecting, isDisconnected } = useAccount();
@@ -76,6 +111,27 @@ export function TokenRoadmap({
   React.useEffect(() => {
     setMounted(true);
   }, []);
+
+  // Fetch column titles and headers for this token
+  React.useEffect(() => {
+    if (!mounted || !tokenAddress) return;
+
+    const fetchTokenSettings = async () => {
+      try {
+        const settingsDoc = await getDoc(doc(db, "tokenRoadmapSettings", tokenAddress.toLowerCase()));
+        if (settingsDoc.exists()) {
+          const data = settingsDoc.data();
+          setColumnTitles(data.columnTitles || defaultColumnTitles);
+          setHeaders(data.headers || defaultHeaders);
+        }
+      } catch (error) {
+        console.error("Error fetching token settings:", error);
+        // Use default settings on error
+      }
+    };
+
+    fetchTokenSettings();
+  }, [mounted, tokenAddress]);
 
   // Fetch roadmap items for this specific token
   React.useEffect(() => {
@@ -114,6 +170,130 @@ export function TokenRoadmap({
 
     return () => unsubscribe();
   }, [mounted, tokenAddress, toast]);
+
+  // Handle header updates
+  const handleHeaderUpdate = async (type: 'title' | 'subtitle', newValue: string) => {
+    if (!isCreator) return;
+
+    try {
+      const updatedHeaders = { ...headers, [type]: newValue };
+      
+      // Update Firestore
+      await setDoc(
+        doc(db, "tokenRoadmapSettings", tokenAddress.toLowerCase()),
+        {
+          tokenAddress: tokenAddress.toLowerCase(),
+          headers: updatedHeaders,
+          columnTitles: columnTitles, // Preserve existing column titles
+          updatedAt: new Date().toISOString(),
+        },
+        { merge: true }
+      );
+
+      // Update local state
+      setHeaders(updatedHeaders);
+
+      toast({
+        title: `${type === 'title' ? 'Title' : 'Subtitle'} updated`,
+        description: `${type === 'title' ? 'Title' : 'Subtitle'} updated to "${newValue}"`,
+      });
+    } catch (error) {
+      console.error(`Error updating ${type}:`, error);
+      toast({
+        title: "Error",
+        description: `Failed to update ${type}. Please try again.`,
+        variant: "destructive",
+      });
+    }
+  };
+
+  // Header editing handlers
+  const handleStartTitleEdit = () => {
+    setEditTitle(headers.title);
+    setIsEditingTitle(true);
+  };
+
+  const handleStartSubtitleEdit = () => {
+    setEditSubtitle(headers.subtitle);
+    setIsEditingSubtitle(true);
+  };
+
+  const handleSaveTitle = () => {
+    const trimmedTitle = editTitle.trim();
+    if (trimmedTitle && trimmedTitle !== headers.title) {
+      handleHeaderUpdate('title', trimmedTitle);
+    }
+    setIsEditingTitle(false);
+  };
+
+  const handleSaveSubtitle = () => {
+    const trimmedSubtitle = editSubtitle.trim();
+    if (trimmedSubtitle && trimmedSubtitle !== headers.subtitle) {
+      handleHeaderUpdate('subtitle', trimmedSubtitle);
+    }
+    setIsEditingSubtitle(false);
+  };
+
+  const handleCancelTitleEdit = () => {
+    setEditTitle(headers.title);
+    setIsEditingTitle(false);
+  };
+
+  const handleCancelSubtitleEdit = () => {
+    setEditSubtitle(headers.subtitle);
+    setIsEditingSubtitle(false);
+  };
+
+  const handleTitleKeyDown = (e: React.KeyboardEvent) => {
+    if (e.key === "Enter") {
+      handleSaveTitle();
+    } else if (e.key === "Escape") {
+      handleCancelTitleEdit();
+    }
+  };
+
+  const handleSubtitleKeyDown = (e: React.KeyboardEvent) => {
+    if (e.key === "Enter") {
+      handleSaveSubtitle();
+    } else if (e.key === "Escape") {
+      handleCancelSubtitleEdit();
+    }
+  };
+  // Handle column title updates
+  const handleTitleUpdate = async (status: RoadmapItemType["status"], newTitle: string) => {
+    if (!isCreator) return;
+
+    try {
+      const updatedTitles = { ...columnTitles, [status]: newTitle };
+      
+      // Update Firestore
+      await setDoc(
+        doc(db, "tokenRoadmapSettings", tokenAddress.toLowerCase()),
+        {
+          tokenAddress: tokenAddress.toLowerCase(),
+          columnTitles: updatedTitles,
+          headers: headers, // Preserve existing headers
+          updatedAt: new Date().toISOString(),
+        },
+        { merge: true }
+      );
+
+      // Update local state
+      setColumnTitles(updatedTitles);
+
+      toast({
+        title: "Column updated",
+        description: `Column renamed to "${newTitle}"`,
+      });
+    } catch (error) {
+      console.error("Error updating column title:", error);
+      toast({
+        title: "Error",
+        description: "Failed to update column title. Please try again.",
+        variant: "destructive",
+      });
+    }
+  };
 
   // Custom form handler for token-specific road maps
   const handleAddTokenRoadmapItem = async (formData: {
@@ -234,7 +414,7 @@ export function TokenRoadmap({
 
         toast({
           title: "Status updated",
-          description: `Item moved to ${newStatus.replace("-", " ")}`,
+          description: `"${activeItem.title}" moved to ${columnTitles[newStatus]}`,
         });
       } catch (error) {
         console.error("Error updating item status:", error);
@@ -289,7 +469,50 @@ export function TokenRoadmap({
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-2">
               <Map className="h-4 w-4 text-primary" />
-              <span className="font-medium text-sm">Development Roadmap</span>
+              {isEditingTitle ? (
+                <div className="flex items-center gap-2 flex-1">
+                  <Input
+                    value={editTitle}
+                    onChange={(e) => setEditTitle(e.target.value)}
+                    onKeyDown={handleTitleKeyDown}
+                    className="font-medium text-sm bg-transparent border-none p-0 h-auto focus-visible:ring-1 focus-visible:ring-primary"
+                    maxLength={60}
+                    autoFocus
+                    onBlur={handleSaveTitle}
+                  />
+                  <Button
+                    variant="ghost"
+                    size="icon"
+                    className="h-4 w-4 text-green-500 hover:bg-green-500/20"
+                    onClick={handleSaveTitle}
+                  >
+                    <Check className="h-3 w-3" />
+                  </Button>
+                  <Button
+                    variant="ghost"
+                    size="icon"
+                    className="h-4 w-4 text-muted-foreground hover:bg-muted/20"
+                    onClick={handleCancelTitleEdit}
+                  >
+                    <X className="h-3 w-3" />
+                  </Button>
+                </div>
+              ) : (
+                <div className="flex items-center gap-2 group">
+                  <span className="font-medium text-sm">{headers.title}</span>
+                  {isCreator && (
+                    <Button
+                      variant="ghost"
+                      size="icon"
+                      className="h-4 w-4 text-muted-foreground/60 hover:text-muted-foreground hover:bg-muted/20 opacity-70 hover:opacity-100 transition-all duration-200"
+                      onClick={handleStartTitleEdit}
+                      title="Edit title"
+                    >
+                      <Pencil className="h-3 w-3" />
+                    </Button>
+                  )}
+                </div>
+              )}
               {isCreator && <Crown className="h-3 w-3 text-primary" />}
             </div>
 
@@ -348,7 +571,7 @@ export function TokenRoadmap({
                   return (
                     <div key={status} className="space-y-2">
                       <h4 className="text-xs font-medium text-muted-foreground uppercase tracking-wide">
-                        {status.replace("-", " ")} ({statusItems.length})
+                        {columnTitles[status]} ({statusItems.length})
                       </h4>
                       <div className="space-y-2">
                         {statusItems.map((item) => (
@@ -400,14 +623,99 @@ export function TokenRoadmap({
             🗺️
           </div>
           <div>
-            <h2 className="text-2xl font-bold text-foreground">
-              Development Roadmap
-            </h2>
-            <p className="text-muted-foreground">
-              Track progress and vote on features
-            </p>
+            {isEditingTitle ? (
+              <div className="flex items-center gap-2 mb-2">
+                <Input
+                  value={editTitle}
+                  onChange={(e) => setEditTitle(e.target.value)}
+                  onKeyDown={handleTitleKeyDown}
+                  className="text-2xl font-bold text-foreground bg-transparent border-none p-0 h-auto focus-visible:ring-1 focus-visible:ring-primary"
+                  maxLength={60}
+                  autoFocus
+                  onBlur={handleSaveTitle}
+                />
+                <Button
+                  variant="ghost"
+                  size="icon"
+                  className="h-6 w-6 text-green-500 hover:bg-green-500/20"
+                  onClick={handleSaveTitle}
+                >
+                  <Check className="h-4 w-4" />
+                </Button>
+                <Button
+                  variant="ghost"
+                  size="icon"
+                  className="h-6 w-6 text-muted-foreground hover:bg-muted/20"
+                  onClick={handleCancelTitleEdit}
+                >
+                  <X className="h-4 w-4" />
+                </Button>
+              </div>
+            ) : (
+              <div className="flex items-center gap-2 group mb-2">
+                <h2 className="text-2xl font-bold text-foreground">{headers.title}</h2>
+                {isCreator && (
+                  <Button
+                    variant="ghost"
+                    size="icon"
+                    className="h-6 w-6 text-muted-foreground/60 hover:text-muted-foreground hover:bg-muted/20 opacity-70 hover:opacity-100 transition-all duration-200"
+                    onClick={handleStartTitleEdit}
+                    title="Edit title"
+                  >
+                    <Pencil className="h-4 w-4" />
+                  </Button>
+                )}
+              </div>
+            )}
+            
+            {isEditingSubtitle ? (
+              <div className="flex items-center gap-2">
+                <Input
+                  value={editSubtitle}
+                  onChange={(e) => setEditSubtitle(e.target.value)}
+                  onKeyDown={handleSubtitleKeyDown}
+                  className="text-muted-foreground bg-transparent border-none p-0 h-auto focus-visible:ring-1 focus-visible:ring-primary"
+                  maxLength={100}
+                  autoFocus
+                  onBlur={handleSaveSubtitle}
+                />
+                <Button
+                  variant="ghost"
+                  size="icon"
+                  className="h-5 w-5 text-green-500 hover:bg-green-500/20"
+                  onClick={handleSaveSubtitle}
+                >
+                  <Check className="h-3 w-3" />
+                </Button>
+                <Button
+                  variant="ghost"
+                  size="icon"
+                  className="h-5 w-5 text-muted-foreground hover:bg-muted/20"
+                  onClick={handleCancelSubtitleEdit}
+                >
+                  <X className="h-3 w-3" />
+                </Button>
+              </div>
+            ) : (
+              <div className="flex items-center gap-2 group">
+                <p className="text-muted-foreground">
+                  {headers.subtitle}
+                </p>
+                {isCreator && (
+                  <Button
+                    variant="ghost"
+                    size="icon"
+                    className="h-5 w-5 text-muted-foreground/60 hover:text-muted-foreground hover:bg-muted/20 opacity-70 hover:opacity-100 transition-all duration-200"
+                    onClick={handleStartSubtitleEdit}
+                    title="Edit subtitle"
+                  >
+                    <Pencil className="h-3 w-3" />
+                  </Button>
+                )}
+              </div>
+            )}
           </div>
-          {isCreator && (
+          {/* {isCreator && (
             <Badge
               className="bg-primary/20 text-primary border-primary/30"
               variant="outline"
@@ -422,7 +730,7 @@ export function TokenRoadmap({
             >
               Read Only
             </Badge>
-          )}
+          )} */}
         </div>
       </div>
 
@@ -452,6 +760,9 @@ export function TokenRoadmap({
               expandedItemId={expandedItemId}
               onExpand={setExpandedItemId}
               collection="tokenRoadmapItems"
+              isCreator={isCreator}
+              columnTitle={columnTitles[status]}
+              onTitleUpdate={handleTitleUpdate}
             />
           ))}
         </div>
