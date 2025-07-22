@@ -1,0 +1,16 @@
+# public/robots.txt
+
+User-agent: *
+Allow: /
+
+# Block API endpoints
+Disallow: /api/
+
+# Block debug pages
+Disallow: /debug/
+
+# Crawl delay to be respectful
+Crawl-delay: 1
+
+# Sitemap location (add when you create one)
+# Sitemap: https://motherhaven.com/sitemap.xml

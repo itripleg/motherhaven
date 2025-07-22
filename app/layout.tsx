@@ -1,3 +1,4 @@
+// app/layout.tsx
 import type { Metadata } from "next";
 import localFont from "next/font/local";
 import "./globals.css";
@@ -26,33 +27,36 @@ const geistMono = localFont({
 
 export const metadata: Metadata = {
   title: {
-    default: "Token Factory - Launch Your Token in Minutes",
-    template: "%s | Token Factory",
+    default: "Motherhaven - Web3 Playground",
+    template: "%s | Motherhaven",
   },
   description:
-    "Create, trade, and manage tokens with our no-code platform. Fair launch, instant liquidity, and community-driven tokenomics on Avalanche.",
+    "Explore Web3 with Motherhaven - featuring DEX trading, token factory, and more blockchain fun in one playground.",
   keywords: [
-    "token factory",
+    "motherhaven",
+    "web3",
+    "playground",
     "avalanche",
     "defi",
+    "dex",
     "token creation",
     "bonding curve",
     "fair launch",
-    "no-code",
     "crypto",
     "blockchain",
-    "dex",
+    "memecoin",
+    "tokenomics"
   ],
-  authors: [{ name: "Token Factory Team" }],
-  creator: "Token Factory",
-  publisher: "Token Factory",
+  authors: [{ name: "Motherhaven Team" }],
+  creator: "Motherhaven",
+  publisher: "Motherhaven",
   formatDetection: {
     email: false,
     address: false,
     telephone: false,
   },
   metadataBase: new URL(
-    process.env.NEXT_PUBLIC_BASE_URL || "https://your-domain.com"
+    process.env.NEXT_PUBLIC_BASE_URL || "https://motherhaven.app"
   ),
   alternates: {
     canonical: "/",
@@ -61,26 +65,26 @@ export const metadata: Metadata = {
     type: "website",
     locale: "en_US",
     url: "/",
-    title: "Token Factory - Launch Your Token in Minutes",
+    title: "Motherhaven - Web3 Playground",
     description:
-      "Create, trade, and manage tokens with our no-code platform. Fair launch, instant liquidity, and community-driven tokenomics.",
-    siteName: "Token Factory",
+      "Explore Web3 with Motherhaven - featuring DEX trading, token factory, and more blockchain tools in one playground.",
+    siteName: "Motherhaven",
     images: [
       {
-        url: "/og-image.png", // You'll need to add this image
+        url: "/og-image.png",
         width: 1200,
         height: 630,
-        alt: "Token Factory - No-Code Token Creation Platform",
+        alt: "Motherhaven - Web3 Playground",
       },
     ],
   },
   twitter: {
     card: "summary_large_image",
-    title: "Token Factory - Launch Your Token in Minutes",
+    title: "Motherhaven - Web3 Playground",
     description:
-      "Create, trade, and manage tokens with our no-code platform. Fair launch, instant liquidity, and community-driven tokenomics.",
+      "Explore Web3 with Motherhaven - featuring DEX trading, token factory, and more blockchain tools in one playground.",
     images: ["/og-image.png"],
-    creator: "@tokenfactory", // Replace with your Twitter handle
+    creator: "@motherhaven",
   },
   robots: {
     index: true,
@@ -95,7 +99,6 @@ export const metadata: Metadata = {
   },
   verification: {
     google: process.env.NEXT_PUBLIC_GOOGLE_VERIFICATION_ID,
-    // Add other verification IDs as needed
   },
 };
 
@@ -110,14 +113,7 @@ export default function RootLayout({
         {/* Favicon */}
         <link
           rel="icon"
-          href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='12 0 100 100'><text y='.9em' font-size='90'>🤑</text></svg>"
-        />
-
-        {/* Apple Touch Icon */}
-        <link
-          rel="apple-touch-icon"
-          sizes="180x180"
-          href="/apple-touch-icon.png"
+          href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='12 0 100 100'><text y='.9em' font-size='90'>🐱‍🚀</text></svg>"
         />
 
         {/* Manifest for PWA */}
