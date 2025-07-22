@@ -1,4 +1,4 @@
-// app/roadmap/components/DroppableColumn.tsx - FIXED: Added droppable zones and sortable functionality
+// app/roadmap/DroppableColumn.tsx - FIXED: Added droppable zones and sortable functionality
 "use client";
 
 import { Badge } from "@/components/ui/badge";

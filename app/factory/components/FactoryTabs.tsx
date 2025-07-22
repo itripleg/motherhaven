@@ -1,4 +1,4 @@
-// app/factory/components/FactoryTabs.tsx
+// app/factory/components/FactoryTabs.tsx - UPDATED: Added dedicated Purchase tab
 import { motion, AnimatePresence } from "framer-motion";
 import {
   Card,
@@ -11,6 +11,7 @@ import { Badge } from "@/components/ui/badge";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import { TokenInfoForm } from "./TokenInfoForm";
 import { TokenomicsForm } from "./TokenomicsForm";
+import { PurchaseTab } from "./PurchaseTab";
 import { FactoryImageUploadWithEditor } from "./editor/FactoryImageUploadWithEditor";
 import { MobileImageUpload } from "./MobileImageUpload";
 import { TokenCreationInfo } from "@/types";
@@ -29,8 +30,10 @@ import {
   Loader2,
   Star,
   Smartphone,
+  ShoppingCart,
+  AlertTriangle,
 } from "lucide-react";
-import { useEffect, useState } from "react";
+import { useEffect, useState, useCallback } from "react";
 
 interface FactoryTabsProps {
   activeTab: string;
@@ -93,6 +96,13 @@ export function FactoryTabs({
           return "partial";
         }
         return "empty";
+      case "purchase":
+        // Purchase is valid if disabled OR enabled with amount > 0
+        const isPurchaseValid =
+          !tokenInfo.purchase.enabled ||
+          (tokenInfo.purchase.enabled &&
+            parseFloat(tokenInfo.purchase.amount || "0") > 0);
+        return isPurchaseValid ? "complete" : "partial";
       case "tokenomics":
         return "complete"; // Tokenomics are pre-configured
       case "preview":
@@ -102,70 +112,112 @@ export function FactoryTabs({
     }
   };
 
-  // Handle image position changes
-  const handleImagePositionChange = (position: ImagePosition) => {
-    console.log("handleImagePositionChange called with:", position);
-    onTokenInfoChange({
-      ...tokenInfo,
-      imagePosition: position,
-    });
-  };
+  // Individual handlers to prevent conflicts
+  const handleImagePositionChange = useCallback(
+    (position: ImagePosition) => {
+      console.log(
+        "FactoryTabs: handleImagePositionChange called with:",
+        position
+      );
+      onTokenInfoChange({
+        ...tokenInfo,
+        imagePosition: position,
+      });
+    },
+    [tokenInfo, onTokenInfoChange]
+  );
 
-  // Handle description changes
-  const handleDescriptionChange = (description: string) => {
-    console.log("handleDescriptionChange called with:", description);
-    onTokenInfoChange({
-      ...tokenInfo,
-      description,
-    });
-  };
+  const handleDescriptionChange = useCallback(
+    (description: string) => {
+      console.log(
+        "FactoryTabs: handleDescriptionChange called with:",
+        description
+      );
+      onTokenInfoChange({
+        ...tokenInfo,
+        description,
+      });
+    },
+    [tokenInfo, onTokenInfoChange]
+  );
 
-  // Handle token info changes (for basic form fields) - PRESERVE existing image and other fields
-  const handleTokenInfoFormChange = (basicTokenInfo: TokenCreationInfo) => {
-    console.log("handleTokenInfoFormChange called with:", basicTokenInfo);
-    // IMPORTANT: Don't override image, imagePosition, or description from the preview tab
-    onTokenInfoChange({
-      ...tokenInfo, // Keep existing image, imagePosition, description
-      ...basicTokenInfo, // Update the basic form fields
-      // Explicitly preserve these fields that come from the preview tab
-      image: tokenInfo.image,
-      imagePosition: tokenInfo.imagePosition,
-      description: tokenInfo.description,
-    });
-  };
+  const handleImageChange = useCallback(
+    (file: File | null) => {
+      console.log("FactoryTabs: handleImageChange called with:", file);
+      onTokenInfoChange({
+        ...tokenInfo,
+        image: file,
+        // Reset position when changing image to avoid conflicts
+        imagePosition: file
+          ? { x: 0, y: 0, scale: 1, rotation: 0, fit: "cover" as const }
+          : tokenInfo.imagePosition,
+      });
+    },
+    [tokenInfo, onTokenInfoChange]
+  );
 
-  // Handle image changes from the preview tab - SIMPLIFIED
-  const handleImageChange = (file: File | null) => {
-    console.log("handleImageChange called with:", file);
-    console.log("Current tokenInfo before update:", tokenInfo);
+  const handleTokenInfoUpdateFromPreview = useCallback(
+    (info: { name?: string; ticker?: string }) => {
+      console.log(
+        "FactoryTabs: handleTokenInfoUpdateFromPreview called with:",
+        info
+      );
+      onTokenInfoChange({
+        ...tokenInfo,
+        ...(info.name !== undefined && { name: info.name }),
+        ...(info.ticker !== undefined && { ticker: info.ticker }),
+      });
+    },
+    [tokenInfo, onTokenInfoChange]
+  );
 
-    const updatedTokenInfo = {
-      ...tokenInfo,
-      image: file,
-      // Reset position when changing image to avoid conflicts
-      imagePosition: file
-        ? { x: 0, y: 0, scale: 1, rotation: 0, fit: "cover" as const }
-        : tokenInfo.imagePosition,
-    };
+  // Direct pass-through handler for token info form to prevent overwrites
+  const handleTokenInfoFormChange = useCallback(
+    (basicTokenInfo: TokenCreationInfo) => {
+      console.log(
+        "FactoryTabs: handleTokenInfoFormChange called with:",
+        basicTokenInfo
+      );
 
-    console.log("Updated tokenInfo being passed:", updatedTokenInfo);
-    onTokenInfoChange(updatedTokenInfo);
-  };
+      // CRITICAL: Only update the fields that changed, preserve everything else
+      const fieldsToUpdate: any = {};
 
-  // Handle token info changes for name and ticker from the preview tab
-  const handleTokenInfoUpdateFromPreview = (info: {
-    name?: string;
-    ticker?: string;
-  }) => {
-    console.log("handleTokenInfoUpdateFromPreview called with:", info);
-    const updatedTokenInfo = {
-      ...tokenInfo,
-      ...(info.name !== undefined && { name: info.name }),
-      ...(info.ticker !== undefined && { ticker: info.ticker }),
-    };
-    console.log("Updated tokenInfo from preview:", updatedTokenInfo);
-    onTokenInfoChange(updatedTokenInfo);
-  };
+      if (basicTokenInfo.name !== tokenInfo.name) {
+        fieldsToUpdate.name = basicTokenInfo.name;
+      }
+      if (basicTokenInfo.ticker !== tokenInfo.ticker) {
+        fieldsToUpdate.ticker = basicTokenInfo.ticker;
+      }
+      if (basicTokenInfo.description !== tokenInfo.description) {
+        fieldsToUpdate.description = basicTokenInfo.description;
+      }
+      if (basicTokenInfo.burnManager !== tokenInfo.burnManager) {
+        fieldsToUpdate.burnManager = basicTokenInfo.burnManager;
+      }
+
+      console.log("FactoryTabs: Only updating changed fields:", fieldsToUpdate);
+
+      if (Object.keys(fieldsToUpdate).length > 0) {
+        onTokenInfoChange({
+          ...tokenInfo,
+          ...fieldsToUpdate,
+        });
+      }
+    },
+    [tokenInfo, onTokenInfoChange]
+  );
+
+  // NEW: Purchase handler
+  const handlePurchaseChange = useCallback(
+    (purchase: any) => {
+      console.log("FactoryTabs: handlePurchaseChange called with:", purchase);
+      onTokenInfoChange({
+        ...tokenInfo,
+        purchase,
+      });
+    },
+    [tokenInfo, onTokenInfoChange]
+  );
 
   return (
     <TooltipProvider delayDuration={100}>
@@ -177,7 +229,7 @@ export function FactoryTabs({
           exit={{ opacity: 0, y: -20 }}
           transition={{ duration: 0.3 }}
         >
-          {/* Token Information Tab - Simplified to just basic info */}
+          {/* Token Information Tab - Simplified, no purchase */}
           {activeTab === "info" && (
             <Card className="unified-card border-primary/20">
               <CardHeader className="text-center border-b border-border/50">
@@ -191,14 +243,47 @@ export function FactoryTabs({
                   )}
                 </CardTitle>
                 <CardDescription className="text-base">
-                  Start with the essentials - your token's name and symbol
+                  Essential token details - name, symbol, and description
                 </CardDescription>
               </CardHeader>
               <CardContent className="p-8">
-                {/* Basic Token Information Form Only */}
                 <TokenInfoForm
                   tokenInfo={tokenInfo}
                   onTokenInfoChange={handleTokenInfoFormChange}
+                />
+              </CardContent>
+            </Card>
+          )}
+
+          {/* NEW: Purchase Tab */}
+          {activeTab === "purchase" && (
+            <Card className="unified-card border-primary/20">
+              <CardHeader className="text-center border-b border-border/50">
+                <CardTitle className="flex items-center justify-center gap-3 text-2xl">
+                  <ShoppingCart className="h-7 w-7 text-primary" />
+                  Initial Purchase
+                  {getTabStatus("purchase") === "complete" ? (
+                    <Badge className="bg-green-500/20 text-green-400 border-green-400/30">
+                      <CheckCircle className="h-3 w-3 mr-1" />
+                      Ready
+                    </Badge>
+                  ) : (
+                    <Badge className="bg-yellow-500/20 text-yellow-400 border-yellow-400/30">
+                      <AlertTriangle className="h-3 w-3 mr-1" />
+                      Configure
+                    </Badge>
+                  )}
+                </CardTitle>
+                <CardDescription className="text-base">
+                  Set up your initial token purchase (optional but recommended)
+                </CardDescription>
+              </CardHeader>
+              <CardContent className="p-8">
+                <PurchaseTab
+                  purchaseOption={tokenInfo.purchase}
+                  onPurchaseChange={handlePurchaseChange}
+                  tokenName={tokenInfo.name || "Your Token"}
+                  tokenSymbol={tokenInfo.ticker || "TOKEN"}
                 />
               </CardContent>
             </Card>
@@ -382,7 +467,7 @@ export function FactoryTabs({
             </Card>
           )}
 
-          {/* Preview Tab - Now handles all visual customization with mobile optimization */}
+          {/* Preview Tab - Visual customization */}
           {activeTab === "preview" && (
             <Card className="unified-card border-primary/20">
               <CardHeader className="text-center border-b border-border/50">

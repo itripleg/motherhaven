@@ -1,14 +1,12 @@
-// app/factory/components/TokenInfoForm.tsx
+// app/factory/components/TokenInfoForm.tsx - SIMPLIFIED: Removed purchase options
 "use client";
 
 import type React from "react";
-import { useState, useCallback } from "react";
+import { useState } from "react";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { isAddress } from "viem";
-import { useBalance, useAccount } from "wagmi";
-import { PurchaseOptionsSection } from "./PurchaseOptionsSection";
 
 interface PurchaseOption {
   enabled: boolean;
@@ -36,41 +34,53 @@ export function TokenInfoForm({
 }: TokenInfoFormProps) {
   const [burnManagerError, setBurnManagerError] = useState<string>("");
 
-  // Wagmi hooks for balance
-  const { address } = useAccount();
-  const { data: balanceData } = useBalance({ address });
+  // Simple handlers without useCallback to avoid stale closure issues
+  const handleNameChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const value = e.target.value;
+    onTokenInfoChange({
+      ...tokenInfo,
+      name: value,
+    });
+  };
 
-  const handleChange = useCallback(
-    (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) => {
-      const { name, value } = e.target;
+  const handleTickerChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const value = e.target.value.toUpperCase();
+    onTokenInfoChange({
+      ...tokenInfo,
+      ticker: value,
+    });
+  };
 
-      if (name === "burnManager") {
-        if (!value) {
-          setBurnManagerError("");
-          onTokenInfoChange({ ...tokenInfo, burnManager: undefined });
-          return;
-        }
+  const handleDescriptionChange = (
+    e: React.ChangeEvent<HTMLTextAreaElement>
+  ) => {
+    const value = e.target.value;
+    console.log("Description input detected:", value);
+    onTokenInfoChange({
+      ...tokenInfo,
+      description: value,
+    });
+  };
 
-        if (!value.startsWith("0x")) {
-          setBurnManagerError("Address must start with 0x");
-        } else if (!isAddress(value)) {
-          setBurnManagerError("Invalid address");
-        } else {
-          setBurnManagerError("");
-        }
-      }
+  const handleBurnManagerChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const value = e.target.value;
 
-      onTokenInfoChange({ ...tokenInfo, [name]: value });
-    },
-    [tokenInfo, onTokenInfoChange]
-  );
+    if (!value) {
+      setBurnManagerError("");
+      onTokenInfoChange({ ...tokenInfo, burnManager: undefined });
+      return;
+    }
 
-  const handlePurchaseChange = useCallback(
-    (purchase: PurchaseOption) => {
-      onTokenInfoChange({ ...tokenInfo, purchase });
-    },
-    [tokenInfo, onTokenInfoChange]
-  );
+    if (!value.startsWith("0x")) {
+      setBurnManagerError("Address must start with 0x");
+    } else if (!isAddress(value)) {
+      setBurnManagerError("Invalid address");
+    } else {
+      setBurnManagerError("");
+    }
+
+    onTokenInfoChange({ ...tokenInfo, burnManager: value as `0x${string}` });
+  };
 
   return (
     <div className="space-y-6">
@@ -83,11 +93,11 @@ export function TokenInfoForm({
           id="name"
           name="name"
           value={tokenInfo.name}
-          onChange={handleChange}
-          placeholder="My Awesome Token"
+          onChange={handleNameChange}
+          placeholder="FOXHOUND"
           maxLength={32}
           required
-          className="mt-2"
+          className="mt-2 focus:border-primary focus:ring-primary focus:ring-2 focus:ring-offset-0"
         />
       </div>
 
@@ -100,12 +110,11 @@ export function TokenInfoForm({
           id="ticker"
           name="ticker"
           value={tokenInfo.ticker}
-          onChange={handleChange}
-          placeholder="MAT"
+          onChange={handleTickerChange}
+          placeholder="FOX"
           maxLength={8}
-          style={{ textTransform: "uppercase" }}
           required
-          className="mt-2"
+          className="mt-2 focus:border-primary focus:ring-primary focus:ring-2 focus:ring-offset-0"
         />
       </div>
 
@@ -118,13 +127,15 @@ export function TokenInfoForm({
           id="description"
           name="description"
           value={tokenInfo.description || ""}
-          onChange={handleChange}
-          placeholder="Describe your token..."
+          onChange={handleDescriptionChange}
+          placeholder="Describe your token's purpose, features, or community..."
           maxLength={280}
-          className="mt-2 min-h-[100px]"
+          className="mt-2 min-h-[100px] focus:border-primary focus:ring-primary focus:ring-2 focus:ring-offset-0"
+          autoComplete="off"
+          spellCheck="true"
         />
-        <div className="text-xs text-muted-foreground mt-1">
-          {(tokenInfo.description || "").length}/280
+        <div className="text-xs text-muted-foreground mt-1 flex justify-between">
+          <span>{(tokenInfo.description || "").length}/280</span>
         </div>
       </div>
 
@@ -137,25 +148,22 @@ export function TokenInfoForm({
           id="burnManager"
           name="burnManager"
           value={tokenInfo.burnManager || ""}
-          onChange={handleChange}
+          onChange={handleBurnManagerChange}
           placeholder="0x... (leave empty for none)"
-          className={`mt-2 ${
+          className={`mt-2 focus:border-primary focus:ring-primary focus:ring-2 focus:ring-offset-0 ${
             burnManagerError
-              ? "border-destructive focus:border-destructive"
+              ? "border-destructive focus:border-destructive focus:ring-destructive"
               : ""
           }`}
         />
         {burnManagerError && (
           <p className="text-sm text-destructive mt-1">{burnManagerError}</p>
         )}
+        <div className="text-xs text-muted-foreground mt-1">
+          Optional: Address that can burn tokens (creates deflationary
+          mechanics)
+        </div>
       </div>
-
-      {/* Purchase Options */}
-      <PurchaseOptionsSection
-        purchaseOption={tokenInfo.purchase}
-        onPurchaseChange={handlePurchaseChange}
-        userBalance={balanceData?.formatted || "0"}
-      />
     </div>
   );
 }

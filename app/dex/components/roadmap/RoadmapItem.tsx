@@ -1,4 +1,4 @@
-// app/dex/components/roadmap/components/RoadmapItem.tsx - FIXED: Pass collection to CommentsSection
+// app/dex/components/roadmap/RoadmapItem.tsx - FIXED: Pass collection to CommentsSection
 "use client";
 
 import * as React from "react";
@@ -8,7 +8,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { useSortable } from "@dnd-kit/sortable";
 import { CSS } from "@dnd-kit/utilities";
 import { motion, AnimatePresence } from "framer-motion";
-import { RoadmapItem as RoadmapItemType } from "../types";
+import { RoadmapItem as RoadmapItemType } from "./types";
 import { CommentsSection } from "./CommentsSection";
 
 interface RoadmapItemProps {

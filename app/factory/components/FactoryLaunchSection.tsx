@@ -1,4 +1,4 @@
-// app/factory/components/FactoryLaunchSection.tsx
+// app/factory/components/FactoryLaunchSection.tsx - FIXED: Readable Max Supply formatting
 import { motion, AnimatePresence } from "framer-motion";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -73,6 +73,34 @@ export function FactoryLaunchSection({
   const buttonRef = useRef<HTMLButtonElement>(null);
   const containerRef = useRef<HTMLDivElement>(null);
 
+  // Format large numbers for display - handles wei conversion
+  const formatSupply = (supply: number): string => {
+    // Convert from wei to actual token units (divide by 10^18)
+    const actualSupply = supply / 1e18;
+
+    if (actualSupply >= 1e9) {
+      return `${(actualSupply / 1e9).toFixed(0)} Billion`;
+    } else if (actualSupply >= 1e6) {
+      return `${(actualSupply / 1e6).toFixed(0)} Million`;
+    } else if (actualSupply >= 1e3) {
+      return `${(actualSupply / 1e3).toFixed(0)} Thousand`;
+    } else {
+      return actualSupply.toLocaleString();
+    }
+  };
+
+  // Format price to remove trailing zeros
+  const formatPrice = (price: number): string => {
+    return `${parseFloat(price.toFixed(8))} AVAX`;
+  };
+
+  // Check if tokens were purchased during creation
+  const tokensPurchasedAtCreation = receipt?.logs?.some(
+    (log: any) =>
+      log.topics?.[0]?.includes("TokensPurchased") ||
+      (receipt.ethSpent && parseFloat(receipt.ethSpent) > 0)
+  );
+
   // Simplified ready-to-launch animations - only when ready
   useEffect(() => {
     if (isFormValid && !isCreating && !isPending && !isConfirming && !error) {
@@ -109,10 +137,15 @@ export function FactoryLaunchSection({
     }
   }, [isFormValid, isCreating, isPending, isConfirming, error]);
 
-  // Parse error message for better user experience
+  // CLEANED: Simplified error parsing - no duplicate display
   const parseErrorMessage = (
     error: any
-  ): { title: string; message: string; code?: string } => {
+  ): {
+    title: string;
+    message: string;
+    code?: string;
+    isBalanceError?: boolean;
+  } => {
     if (!error) return { title: "", message: "" };
 
     const errorObj = error as any;
@@ -151,10 +184,16 @@ export function FactoryLaunchSection({
     if (errorObj?.message) {
       let message = errorObj.message;
       let title = "Transaction Failed";
+      let isBalanceError = false;
 
-      if (message.includes("insufficient funds")) {
+      if (
+        message.includes("insufficient funds") ||
+        message.includes("exceeds the balance")
+      ) {
         title = "Insufficient Funds";
-        message = "You don't have enough AVAX to complete this transaction.";
+        message =
+          "You don't have enough AVAX to cover the transaction cost (including gas fees).";
+        isBalanceError = true;
       } else if (message.includes("user rejected")) {
         title = "Transaction Rejected";
         message = "You cancelled the transaction in your wallet.";
@@ -176,6 +215,7 @@ export function FactoryLaunchSection({
         title,
         message,
         code: errorObj.code,
+        isBalanceError,
       };
     }
 
@@ -280,8 +320,46 @@ export function FactoryLaunchSection({
               initial={{ opacity: 0, y: 20, scale: 0.95 }}
               animate={{ opacity: 1, y: 0, scale: 1 }}
               transition={{ type: "spring", stiffness: 100 }}
-              className="text-center space-y-6"
+              className="text-center space-y-6 relative"
             >
+              {/* Confetti Animation */}
+              <div className="absolute inset-0 pointer-events-none overflow-hidden">
+                {[...Array(50)].map((_, i) => (
+                  <motion.div
+                    key={i}
+                    className="absolute w-2 h-2 rounded-full"
+                    style={{
+                      backgroundColor: [
+                        "#ff6b6b",
+                        "#4ecdc4",
+                        "#45b7d1",
+                        "#96ceb4",
+                        "#ffeaa7",
+                        "#dda0dd",
+                        "#98d8c8",
+                        "#f7dc6f",
+                        "#bb8fce",
+                        "#85c1e9",
+                      ][i % 10],
+                      left: `${Math.random() * 100}%`,
+                      top: `${Math.random() * 100}%`,
+                    }}
+                    animate={{
+                      y: [0, -30, 0],
+                      x: [0, Math.random() * 40 - 20, 0],
+                      rotate: [0, 360, 720],
+                      scale: [0, 1, 0],
+                      opacity: [0, 1, 0],
+                    }}
+                    transition={{
+                      duration: 3,
+                      repeat: Infinity,
+                      delay: Math.random() * 2,
+                      ease: "easeInOut",
+                    }}
+                  />
+                ))}
+              </div>
               {/* Success Header */}
               <div className="relative">
                 <motion.div
@@ -385,11 +463,13 @@ export function FactoryLaunchSection({
                       },
                       {
                         label: "Max Supply",
-                        value: tokenomics.maxSupply.toLocaleString(),
+                        value: formatSupply(tokenomics.maxSupply),
                       },
                       {
-                        label: "Initial Price",
-                        value: `${tokenomics.initialPrice.toFixed(8)} AVAX`,
+                        label: "Starting Price",
+                        value: tokensPurchasedAtCreation
+                          ? "Check on DEX"
+                          : formatPrice(tokenomics.initialPrice),
                       },
                     ].map((item) => (
                       <div
@@ -426,11 +506,12 @@ export function FactoryLaunchSection({
               )}
             </motion.div>
           ) : (
-            /* Launch Interface */
             <div className="text-center space-y-6 md:space-y-8 relative">
               {/* Status Header */}
               <motion.div
-                key={`${isCreating}-${isPending}-${isConfirming}-${isFormValid}-${error}-${errorDetails.title}`}
+                key={`${isCreating}-${isPending}-${isConfirming}-${isFormValid}-${
+                  error ? "error" : "no-error"
+                }-${errorDetails.title}`}
                 initial={{ opacity: 0, y: 20 }}
                 animate={{ opacity: 1, y: 0 }}
                 transition={{ duration: 0.6 }}
@@ -452,6 +533,15 @@ export function FactoryLaunchSection({
                         <p className="text-red-400/60 text-sm">
                           Error Code: {errorDetails.code}
                         </p>
+                      )}
+                      {/* CLEANED: Additional helpful info for balance errors */}
+                      {errorDetails.isBalanceError && (
+                        <div className="mt-4 p-3 bg-red-950/20 rounded-lg border border-red-400/20 max-w-md mx-auto">
+                          <p className="text-red-300/90 text-sm">
+                            💡 Try reducing your purchase amount or disable the
+                            initial purchase to launch without buying tokens.
+                          </p>
+                        </div>
                       )}
                     </div>
                   ) : isCreating || isPending || isConfirming ? (
@@ -499,7 +589,7 @@ export function FactoryLaunchSection({
                         >
                           <Rocket className="h-10 md:h-12 w-10 md:w-12 text-primary" />
                         </motion.div>
-                        <h3 className="text-3xl md:text-4xl font-bold text-gradient bg-gradient-to-r from-primary via-purple-400 to-primary bg-clip-text text-transparent">
+                        <h3 className="text-3xl md:text-4xl font-bold bg-gradient-to-r from-primary via-purple-400 to-primary bg-clip-text text-transparent">
                           Ready for Launch
                         </h3>
                         <motion.div
@@ -605,54 +695,6 @@ export function FactoryLaunchSection({
               </motion.div>
             </div>
           )}
-
-          {/* Enhanced Error Details */}
-          <AnimatePresence>
-            {error && (
-              <motion.div
-                initial={{ opacity: 0, height: 0 }}
-                animate={{ opacity: 1, height: "auto" }}
-                exit={{ opacity: 0, height: 0 }}
-                className="mt-6"
-              >
-                <div className="unified-card border-red-400/30 bg-red-400/5 p-4 md:p-6 space-y-4">
-                  <div className="flex items-center gap-3 mb-4">
-                    <AlertTriangle className="h-5 w-5 text-red-400" />
-                    <h4 className="font-semibold text-red-400 text-base md:text-lg">
-                      {errorDetails.title}
-                    </h4>
-                  </div>
-
-                  <div className="space-y-3">
-                    <div className="p-4 bg-red-950/20 rounded-lg border border-red-400/20">
-                      <p className="text-red-300/90 text-sm leading-relaxed">
-                        {errorDetails.message}
-                      </p>
-                    </div>
-
-                    {errorDetails.code && (
-                      <div className="flex items-center gap-2 text-xs text-red-400/70">
-                        <span>Error Code:</span>
-                        <code className="bg-red-950/30 px-2 py-1 rounded font-mono">
-                          {errorDetails.code}
-                        </code>
-                      </div>
-                    )}
-
-                    {transactionData && (
-                      <div className="flex items-center gap-2 pt-2 border-t border-red-400/20 flex-wrap">
-                        <ExternalLink className="h-4 w-4 text-red-400/70" />
-                        <span className="text-xs text-red-400/70">
-                          Failed Transaction:
-                        </span>
-                        <AddressComponent hash={transactionData} type="tx" />
-                      </div>
-                    )}
-                  </div>
-                </div>
-              </motion.div>
-            )}
-          </AnimatePresence>
         </CardContent>
       </Card>
     </div>

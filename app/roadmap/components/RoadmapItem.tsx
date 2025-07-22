@@ -1,4 +1,4 @@
-// app/roadmap/components/RoadmapItem.tsx
+// app/roadmap/RoadmapItem.tsx
 "use client";
 
 import * as React from "react";

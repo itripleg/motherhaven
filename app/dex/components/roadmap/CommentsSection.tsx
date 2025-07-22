@@ -1,4 +1,4 @@
-// app/dex/components/roadmap/components/CommentsSection.tsx - FIXED: Support both roadmap collections
+// app/dex/components/roadmap/CommentsSection.tsx - FIXED: Support both roadmap collections
 "use client";
 
 import * as React from "react";
@@ -8,7 +8,7 @@ import { Input } from "@/components/ui/input";
 import { useToast } from "@/hooks/use-toast";
 import { doc, updateDoc, arrayUnion } from "firebase/firestore";
 import { db } from "@/firebase";
-import { Comment } from "../types";
+import { Comment } from "./types";
 
 interface CommentsSectionProps {
   itemId: string;

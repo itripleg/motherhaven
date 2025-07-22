@@ -1,4 +1,4 @@
-// app/factory/components/FactoryProgress.tsx
+// app/factory/components/FactoryProgress.tsx - UPDATED: Added Purchase tab to progress tracking
 import { motion } from "framer-motion";
 import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
@@ -13,6 +13,13 @@ import {
   ShoppingCart,
 } from "lucide-react";
 
+interface PlatformStats {
+  totalTokens: number;
+  activeTraders: number;
+  totalVolume: string;
+  loading: boolean;
+}
+
 interface FactoryProgressProps {
   completionPercentage: number;
   activeTab: string;
@@ -22,8 +29,6 @@ interface FactoryProgressProps {
     name: string;
     ticker: string;
     image: File | null;
-    description?: string;
-    burnManager?: string;
     purchase?: {
       enabled: boolean;
       amount: string;
@@ -44,7 +49,7 @@ const progressSteps = [
     id: "purchase",
     label: "Initial Purchase",
     icon: ShoppingCart,
-    description: "Set purchase amount",
+    description: "Set purchase options",
     threshold: 40,
   },
   {
@@ -71,14 +76,10 @@ export function FactoryProgress({
   tokenInfo,
 }: FactoryProgressProps) {
   // Check if there's a valid burn manager
-  const hasValidBurnManager =
-    tokenInfo.burnManager &&
-    tokenInfo.burnManager.startsWith("0x") &&
-    tokenInfo.burnManager.length === 42;
+  const hasValidBurnManager = false; // This would need to be passed down if needed
 
   // Check purchase step completion
   const isPurchaseComplete = () => {
-    // Handle case where purchase might not be defined
     if (!tokenInfo.purchase) return false;
     if (!tokenInfo.purchase.enabled) return true; // Disabled = complete
     return (
@@ -98,6 +99,7 @@ export function FactoryProgress({
     // Purchase step completion
     if (stepId === "purchase") {
       if (isPurchaseComplete()) return "completed";
+      if (tokenInfo.purchase?.enabled !== undefined) return "current";
       return "pending";
     }
 
@@ -106,7 +108,7 @@ export function FactoryProgress({
 
     // Preview/Customize step - completed if has any customization
     if (stepId === "preview") {
-      if (tokenInfo.image || tokenInfo.description) return "completed";
+      if (tokenInfo.image) return "completed";
       return "pending";
     }
 
@@ -150,6 +152,37 @@ export function FactoryProgress({
     return false;
   };
 
+  // Calculate updated completion percentage
+  const calculateCompletionPercentage = () => {
+    let completed = 0;
+
+    // Info step (30%)
+    if (tokenInfo.name && tokenInfo.ticker) {
+      completed += 30;
+    } else if (tokenInfo.name || tokenInfo.ticker) {
+      completed += 15;
+    }
+
+    // Purchase step (25%)
+    if (isPurchaseComplete()) {
+      completed += 25;
+    } else if (tokenInfo.purchase?.enabled !== undefined) {
+      completed += 12;
+    }
+
+    // Tokenomics (25% - always complete)
+    completed += 25;
+
+    // Preview (20%)
+    if (tokenInfo.image) {
+      completed += 20;
+    }
+
+    return Math.min(completed, 100);
+  };
+
+  const actualCompletionPercentage = calculateCompletionPercentage();
+
   return (
     <Card className="unified-card border-primary/30 overflow-hidden">
       <CardContent className="p-6">
@@ -157,7 +190,7 @@ export function FactoryProgress({
         <div className="flex items-center justify-between mb-6">
           <div className="flex items-center gap-3">
             <motion.div
-              animate={{ rotate: completionPercentage === 100 ? 360 : 0 }}
+              animate={{ rotate: actualCompletionPercentage === 100 ? 360 : 0 }}
               transition={{ duration: 1, ease: "easeInOut" }}
               className="p-2 bg-primary/20 rounded-lg border border-primary/30"
             >
@@ -174,7 +207,7 @@ export function FactoryProgress({
           </div>
 
           <motion.div
-            key={completionPercentage}
+            key={actualCompletionPercentage}
             initial={{ scale: 0.8 }}
             animate={{ scale: 1 }}
             transition={{ type: "spring", stiffness: 200, damping: 15 }}
@@ -186,7 +219,7 @@ export function FactoryProgress({
                 ${
                   hasValidBurnManager
                     ? "bg-orange-500/20 text-orange-400 border-orange-400/50 shadow-orange-400/20 shadow-lg animate-pulse"
-                    : completionPercentage >= 90
+                    : actualCompletionPercentage >= 90
                     ? "bg-green-500/20 text-green-400 border-green-400/50 shadow-green-400/20 shadow-lg"
                     : "bg-primary/20 text-primary border-primary/50"
                 }
@@ -194,7 +227,7 @@ export function FactoryProgress({
             >
               {hasValidBurnManager
                 ? "🔥 Deflationary"
-                : `${completionPercentage}%`}
+                : `${actualCompletionPercentage}%`}
             </Badge>
           </motion.div>
         </div>
@@ -205,11 +238,11 @@ export function FactoryProgress({
             <motion.div
               className={`h-full bg-gradient-to-r ${getProgressColor()} relative`}
               initial={{ width: 0 }}
-              animate={{ width: `${completionPercentage}%` }}
+              animate={{ width: `${actualCompletionPercentage}%` }}
               transition={{ duration: 1, ease: "easeOut" }}
             >
               {/* Shimmer Effect */}
-              {completionPercentage > 0 && (
+              {actualCompletionPercentage > 0 && (
                 <motion.div
                   className="absolute inset-0 bg-gradient-to-r from-transparent via-white/30 to-transparent"
                   animate={{
@@ -226,7 +259,7 @@ export function FactoryProgress({
               )}
 
               {/* Burn Animation */}
-              {hasValidBurnManager && completionPercentage > 0 && (
+              {hasValidBurnManager && actualCompletionPercentage > 0 && (
                 <>
                   {[...Array(8)].map((_, i) => (
                     <motion.div
@@ -396,7 +429,7 @@ export function FactoryProgress({
         </div>
 
         {/* Desktop Only Tips */}
-        {completionPercentage < 100 && (
+        {actualCompletionPercentage < 100 && (
           <motion.div
             initial={{ opacity: 0, y: 10 }}
             animate={{ opacity: 1, y: 0 }}
@@ -417,9 +450,13 @@ export function FactoryProgress({
                       <p className="mb-1">Getting started:</p>
                       <ul className="text-xs space-y-1 ml-4">
                         <li>
-                          • Choose a memorable token name (e.g., "Doge Coin")
+                          • Choose a memorable token name (e.g.,
+                          &ldquo;FOXHOUND&rdquo;)
                         </li>
-                        <li>• Pick a 3-8 character symbol (e.g., "DOGE")</li>
+                        <li>
+                          • Pick a 3-8 character symbol (e.g.,
+                          &ldquo;FOX&rdquo;)
+                        </li>
                         <li>• Set initial purchase amount or disable it</li>
                         <li>
                           • You can customize images and description anytime
@@ -458,7 +495,7 @@ export function FactoryProgress({
                           </li>
                           <li>
                             • Consider adding a description to explain your
-                            token's purpose
+                            token&apos;s purpose
                           </li>
                           <li>
                             • Upload an image to make your token stand out
@@ -466,7 +503,7 @@ export function FactoryProgress({
                         </ul>
                       </div>
                     )}
-                  {isFormValid && completionPercentage < 100 && (
+                  {isFormValid && actualCompletionPercentage < 100 && (
                     <div>
                       <p className="mb-1">
                         Ready to launch or keep customizing:

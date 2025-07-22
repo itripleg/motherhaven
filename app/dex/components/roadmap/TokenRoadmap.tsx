@@ -1,10 +1,9 @@
-// app/dex/components/roadmap/components/TokenRoadmap.tsx - UPDATED: Added editable column titles
+// app/dex/components/roadmap/TokenRoadmap.tsx - UPDATED: Added editable column titles
 "use client";
 
 import * as React from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { Plus, Map, Crown, Pencil, Check, X } from "lucide-react";
-import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import {
@@ -26,7 +25,7 @@ import { useAccount } from "wagmi";
 import { useToast } from "@/hooks/use-toast";
 
 // Import from the roadmap components in the same directory structure
-import { RoadmapItem as RoadmapItemType } from "../types";
+import { RoadmapItem as RoadmapItemType } from "./types";
 import { DroppableColumn } from "./DroppableColumn";
 import { AdminForm } from "./AdminForm";
 import { RoadmapItem } from "./RoadmapItem";
@@ -85,8 +84,10 @@ export function TokenRoadmap({
   compact = true,
 }: TokenRoadmapProps) {
   const [items, setItems] = React.useState<RoadmapItemType[]>([]);
-  const [columnTitles, setColumnTitles] = React.useState<TokenColumnTitles>(defaultColumnTitles);
-  const [headers, setHeaders] = React.useState<TokenRoadmapHeaders>(defaultHeaders);
+  const [columnTitles, setColumnTitles] =
+    React.useState<TokenColumnTitles>(defaultColumnTitles);
+  const [headers, setHeaders] =
+    React.useState<TokenRoadmapHeaders>(defaultHeaders);
   const [expandedItemId, setExpandedItemId] = React.useState<string | null>(
     null
   );
@@ -95,7 +96,7 @@ export function TokenRoadmap({
   );
   const [mounted, setMounted] = React.useState(false);
   const [showAdminForm, setShowAdminForm] = React.useState(false);
-  
+
   // Header editing state
   const [isEditingTitle, setIsEditingTitle] = React.useState(false);
   const [isEditingSubtitle, setIsEditingSubtitle] = React.useState(false);
@@ -118,7 +119,9 @@ export function TokenRoadmap({
 
     const fetchTokenSettings = async () => {
       try {
-        const settingsDoc = await getDoc(doc(db, "tokenRoadmapSettings", tokenAddress.toLowerCase()));
+        const settingsDoc = await getDoc(
+          doc(db, "tokenRoadmapSettings", tokenAddress.toLowerCase())
+        );
         if (settingsDoc.exists()) {
           const data = settingsDoc.data();
           setColumnTitles(data.columnTitles || defaultColumnTitles);
@@ -172,12 +175,15 @@ export function TokenRoadmap({
   }, [mounted, tokenAddress, toast]);
 
   // Handle header updates
-  const handleHeaderUpdate = async (type: 'title' | 'subtitle', newValue: string) => {
+  const handleHeaderUpdate = async (
+    type: "title" | "subtitle",
+    newValue: string
+  ) => {
     if (!isCreator) return;
 
     try {
       const updatedHeaders = { ...headers, [type]: newValue };
-      
+
       // Update Firestore
       await setDoc(
         doc(db, "tokenRoadmapSettings", tokenAddress.toLowerCase()),
@@ -194,8 +200,10 @@ export function TokenRoadmap({
       setHeaders(updatedHeaders);
 
       toast({
-        title: `${type === 'title' ? 'Title' : 'Subtitle'} updated`,
-        description: `${type === 'title' ? 'Title' : 'Subtitle'} updated to "${newValue}"`,
+        title: `${type === "title" ? "Title" : "Subtitle"} updated`,
+        description: `${
+          type === "title" ? "Title" : "Subtitle"
+        } updated to "${newValue}"`,
       });
     } catch (error) {
       console.error(`Error updating ${type}:`, error);
@@ -221,7 +229,7 @@ export function TokenRoadmap({
   const handleSaveTitle = () => {
     const trimmedTitle = editTitle.trim();
     if (trimmedTitle && trimmedTitle !== headers.title) {
-      handleHeaderUpdate('title', trimmedTitle);
+      handleHeaderUpdate("title", trimmedTitle);
     }
     setIsEditingTitle(false);
   };
@@ -229,7 +237,7 @@ export function TokenRoadmap({
   const handleSaveSubtitle = () => {
     const trimmedSubtitle = editSubtitle.trim();
     if (trimmedSubtitle && trimmedSubtitle !== headers.subtitle) {
-      handleHeaderUpdate('subtitle', trimmedSubtitle);
+      handleHeaderUpdate("subtitle", trimmedSubtitle);
     }
     setIsEditingSubtitle(false);
   };
@@ -260,12 +268,15 @@ export function TokenRoadmap({
     }
   };
   // Handle column title updates
-  const handleTitleUpdate = async (status: RoadmapItemType["status"], newTitle: string) => {
+  const handleTitleUpdate = async (
+    status: RoadmapItemType["status"],
+    newTitle: string
+  ) => {
     if (!isCreator) return;
 
     try {
       const updatedTitles = { ...columnTitles, [status]: newTitle };
-      
+
       // Update Firestore
       await setDoc(
         doc(db, "tokenRoadmapSettings", tokenAddress.toLowerCase()),
@@ -653,7 +664,9 @@ export function TokenRoadmap({
               </div>
             ) : (
               <div className="flex items-center gap-2 group mb-2">
-                <h2 className="text-2xl font-bold text-foreground">{headers.title}</h2>
+                <h2 className="text-2xl font-bold text-foreground">
+                  {headers.title}
+                </h2>
                 {isCreator && (
                   <Button
                     variant="ghost"
@@ -667,7 +680,7 @@ export function TokenRoadmap({
                 )}
               </div>
             )}
-            
+
             {isEditingSubtitle ? (
               <div className="flex items-center gap-2">
                 <Input
@@ -698,9 +711,7 @@ export function TokenRoadmap({
               </div>
             ) : (
               <div className="flex items-center gap-2 group">
-                <p className="text-muted-foreground">
-                  {headers.subtitle}
-                </p>
+                <p className="text-muted-foreground">{headers.subtitle}</p>
                 {isCreator && (
                   <Button
                     variant="ghost"

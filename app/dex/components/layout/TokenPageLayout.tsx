@@ -8,7 +8,7 @@ import { TokenHeader } from "../token-header/TokenHeader";
 import { TokenMainArea } from "./TokenMainArea";
 import { TokenSidebar } from "./TokenSidebar";
 import { MobileChatModal } from "../MobileChatModal";
-import { TokenRoadmap } from "../roadmap/components/TokenRoadmap";
+import { TokenRoadmap } from "../roadmap/TokenRoadmap";
 import { useAccount } from "wagmi";
 
 interface TokenPageLayoutProps {
@@ -101,7 +101,10 @@ export function TokenPageLayout({ token }: TokenPageLayoutProps) {
                   exit={{ opacity: 0, y: -20 }}
                   transition={{ duration: 0.4 }}
                 >
-                  <TokenMainArea token={token} />
+                  <TokenMainArea
+                    token={token}
+                    onRoadmapClick={handleRoadmapClick}
+                  />
                 </motion.div>
               )}
             </AnimatePresence>

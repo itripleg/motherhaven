@@ -1,4 +1,4 @@
-// app/roadmap/components/AdminForm.tsx
+// app/roadmap/AdminForm.tsx
 "use client";
 
 import * as React from "react";
@@ -18,7 +18,7 @@ import {
 import { useToast } from "@/hooks/use-toast";
 import { collection, addDoc } from "firebase/firestore";
 import { db } from "@/firebase";
-import { RoadmapItem } from "../types";
+import { RoadmapItem } from "./types";
 
 interface AdminFormProps {
   isAdmin: boolean;

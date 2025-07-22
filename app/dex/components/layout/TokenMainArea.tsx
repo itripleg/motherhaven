@@ -2,18 +2,35 @@
 "use client";
 
 import React from "react";
-import { BarChart3, TrendingUp } from "lucide-react";
+import { BarChart3, TrendingUp, Map } from "lucide-react";
+import { motion } from "framer-motion";
 import { Token } from "@/types";
 import { TokenPriceCharts } from "../trading/TokenPriceCharts";
 import { OptimizedTokenTradeCard } from "../OptimizedTokenTradeCard";
 
 interface TokenMainAreaProps {
   token: Token;
+  onRoadmapClick?: () => void;
 }
 
-export function TokenMainArea({ token }: TokenMainAreaProps) {
+export function TokenMainArea({ token, onRoadmapClick }: TokenMainAreaProps) {
   return (
     <>
+      {/* Roadmap Button */}
+      {onRoadmapClick && (
+        <div className="flex justify-end mb-6">
+          <motion.button
+            whileHover={{ scale: 1.05 }}
+            whileTap={{ scale: 0.95 }}
+            onClick={onRoadmapClick}
+            className="flex items-center gap-2 px-4 py-2 text-sm bg-primary/20 hover:bg-primary/30 text-primary rounded-lg transition-colors border border-primary/30"
+          >
+            <Map className="h-4 w-4" />
+            View Roadmap
+          </motion.button>
+        </div>
+      )}
+
       {/* Price Charts Section */}
       <div className="space-y-4">
         <div className="flex items-center gap-3 mb-2">

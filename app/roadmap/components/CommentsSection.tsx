@@ -1,4 +1,4 @@
-// app/roadmap/components/CommentsSection.tsx
+// app/roadmap/CommentsSection.tsx
 "use client";
 
 import * as React from "react";

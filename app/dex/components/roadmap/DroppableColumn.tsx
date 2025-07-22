@@ -1,4 +1,4 @@
-// app/dex/components/roadmap/components/DroppableColumn.tsx - UPDATED: Added editable column titles
+// app/dex/components/roadmap/DroppableColumn.tsx - UPDATED: Added editable column titles
 "use client";
 
 import * as React from "react";
@@ -11,7 +11,7 @@ import {
   verticalListSortingStrategy,
 } from "@dnd-kit/sortable";
 import { useDroppable } from "@dnd-kit/core";
-import { RoadmapItem as RoadmapItemType } from "../types";
+import { RoadmapItem as RoadmapItemType } from "./types";
 import { RoadmapItem } from "./RoadmapItem";
 
 interface DroppableColumnProps {
@@ -76,7 +76,7 @@ export function DroppableColumn({
 }: DroppableColumnProps) {
   const config = defaultStatusConfig[status];
   const displayTitle = columnTitle || config.label;
-  
+
   const [isEditing, setIsEditing] = React.useState(false);
   const [editTitle, setEditTitle] = React.useState(displayTitle);
 
@@ -172,7 +172,7 @@ export function DroppableColumn({
               )}
             </div>
           )}
-          
+
           {!isEditing && (
             <Badge
               variant="outline"

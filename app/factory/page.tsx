@@ -1,4 +1,4 @@
-// app/factory/page.tsx - FIXED: Properly saves image position to Firebase
+// app/factory/page.tsx - FINAL: Complete integration with Purchase tab
 "use client";
 
 import { useState, useEffect, useCallback } from "react";
@@ -9,7 +9,13 @@ import { useWriteContract, useWaitForTransactionReceipt } from "wagmi";
 import { zeroAddress, parseEther } from "viem";
 import { storage, db } from "@/firebase";
 import { ref, uploadBytes, getDownloadURL } from "firebase/storage";
-import { collection, getDocs, getCountFromServer, doc, setDoc } from "firebase/firestore";
+import {
+  collection,
+  getDocs,
+  getCountFromServer,
+  doc,
+  setDoc,
+} from "firebase/firestore";
 import { FACTORY_ADDRESS, FACTORY_ABI, FACTORY_CONSTANTS } from "@/types";
 import { useFactoryConfigContext } from "@/contexts/FactoryConfigProvider";
 
@@ -65,7 +71,7 @@ export default function FactoryPage() {
     loading: true,
   });
 
-  // Token creation state
+  // Token creation state with better state management
   const [tokenInfo, setTokenInfo] =
     useState<TokenCreationInfo>(DEFAULT_TOKEN_INFO);
 
@@ -116,11 +122,32 @@ export default function FactoryPage() {
       hash: transactionData,
     });
 
-  // Handle token info changes with proper typing
+  // Robust state handler that preserves all fields
   const handleTokenInfoChange = useCallback(
-    (updatedInfo: TokenCreationInfo) => {
-      console.log("handleTokenInfoChange called with:", updatedInfo);
-      setTokenInfo(updatedInfo);
+    (updatedInfo: TokenCreationInfo | Partial<TokenCreationInfo>) => {
+      console.log(
+        "Factory page: handleTokenInfoChange called with:",
+        updatedInfo
+      );
+      setTokenInfo((prevInfo) => {
+        const newInfo = {
+          ...prevInfo,
+          ...updatedInfo,
+          // Always preserve these nested objects if they exist
+          purchase:
+            (updatedInfo as TokenCreationInfo).purchase || prevInfo.purchase,
+          imagePosition:
+            (updatedInfo as TokenCreationInfo).imagePosition ||
+            prevInfo.imagePosition,
+        };
+        console.log(
+          "Factory page: State update - prev purchase:",
+          prevInfo.purchase,
+          "new purchase:",
+          newInfo.purchase
+        );
+        return newInfo;
+      });
     },
     []
   );
@@ -244,28 +271,29 @@ export default function FactoryPage() {
     }
   }, [error, toast]);
 
-  // FIXED: Handle successful transaction with proper Firebase save
+  // FIXED: Handle successful transaction with proper Firebase save (prevent infinite loop)
   useEffect(() => {
-    if (receipt && !isConfirming) {
+    if (receipt && !isConfirming && transactionData) {
       // Extract token address from transaction receipt
       const tokenAddress = receipt.logs?.[0]?.address || transactionData;
-      
+
       if (tokenAddress) {
         // Save complete token data to Firebase including image position
         const saveTokenToFirebase = async () => {
           try {
             const tokenDocRef = doc(db, "tokens", tokenAddress.toLowerCase());
-            
+
             const tokenData = {
               name: tokenInfo.name,
               symbol: tokenInfo.ticker,
-              imageUrl: tokenInfo.image ? await uploadImage(tokenInfo.image) : "",
+              imageUrl: tokenInfo.image
+                ? await uploadImage(tokenInfo.image)
+                : "",
               address: tokenAddress,
               creator: receipt.from,
               blockNumber: Number(receipt.blockNumber),
               transactionHash: receipt.transactionHash,
               createdAt: new Date().toISOString(),
-              // FIXED: Include all the missing fields
               currentState: 1, // TRADING state
               state: 1,
               fundingGoal: tokenomics.fundingGoal.toString(),
@@ -273,7 +301,7 @@ export default function FactoryPage() {
               virtualSupply: "0",
               lastPrice: tokenomics.initialPrice.toString(),
               description: tokenInfo.description || "",
-              imagePosition: tokenInfo.imagePosition, // FIXED: Save image position
+              imagePosition: tokenInfo.imagePosition,
               burnManager: tokenInfo.burnManager || zeroAddress,
               statistics: {
                 currentPrice: tokenomics.initialPrice.toString(),
@@ -284,9 +312,10 @@ export default function FactoryPage() {
             };
 
             await setDoc(tokenDocRef, tokenData);
-            
+
             console.log("Token data saved to Firebase:", tokenData);
-            
+
+            // FIXED: Only show toast once by using transaction hash as key
             toast({
               title: "🎉 Token Created Successfully!",
               description: "Your token is now live and ready for trading!",
@@ -296,7 +325,8 @@ export default function FactoryPage() {
             console.error("Error saving to Firebase:", saveError);
             toast({
               title: "Token Created",
-              description: "Token created but failed to save metadata. The token is still functional.",
+              description:
+                "Token created but failed to save metadata. The token is still functional.",
               variant: "destructive",
             });
           }
@@ -308,7 +338,7 @@ export default function FactoryPage() {
       setIsCreating(false);
       setUploadingImage(false);
     }
-  }, [receipt, isConfirming, toast, tokenInfo, tokenomics, transactionData]);
+  }, [receipt?.transactionHash, isConfirming]); // FIXED: Only depend on transaction hash and confirming state
 
   // Upload image to Firebase Storage
   const uploadImage = async (file: File): Promise<string> => {
@@ -317,20 +347,57 @@ export default function FactoryPage() {
     return await getDownloadURL(uploadTask.ref);
   };
 
-  // Calculate completion percentage
+  // UPDATED: Calculate completion percentage including purchase validation
   const getCompletionPercentage = () => {
-    let completed = 25; // Tokenomics is always complete (25%)
-    if (tokenInfo.name) completed += 40; // Name adds 40%
-    if (tokenInfo.ticker) completed += 35; // Ticker adds 35%
+    let completed = 0;
+
+    // Info step (30%)
+    if (tokenInfo.name && tokenInfo.ticker) {
+      completed += 30;
+    } else if (tokenInfo.name || tokenInfo.ticker) {
+      completed += 15;
+    }
+
+    // Purchase step (25%) - valid if disabled OR enabled with amount
+    const isPurchaseValid =
+      !tokenInfo.purchase.enabled ||
+      (tokenInfo.purchase.enabled &&
+        parseFloat(tokenInfo.purchase.amount || "0") > 0);
+
+    if (isPurchaseValid) {
+      completed += 25;
+    } else if (tokenInfo.purchase.enabled !== undefined) {
+      completed += 12;
+    }
+
+    // Tokenomics (25% - always complete)
+    completed += 25;
+
+    // Preview (20%)
+    if (tokenInfo.image) {
+      completed += 20;
+    }
+
     return Math.min(completed, 100);
   };
 
-  // Check if form is valid for submission
-  const isFormValid = !!(tokenInfo.name && tokenInfo.ticker);
+  // UPDATED: Check if form is valid for submission (includes purchase validation)
+  const isFormValid = () => {
+    // Basic info is required
+    if (!tokenInfo.name || !tokenInfo.ticker) return false;
 
-  // FIXED: Handle token creation with proper image upload timing
+    // Purchase must be valid (either disabled or enabled with amount)
+    const isPurchaseValid =
+      !tokenInfo.purchase.enabled ||
+      (tokenInfo.purchase.enabled &&
+        parseFloat(tokenInfo.purchase.amount || "0") > 0);
+
+    return isPurchaseValid;
+  };
+
+  // Handle token creation with proper image upload timing
   const handleTokenCreation = useCallback(async () => {
-    if (!mounted || !isFormValid) return;
+    if (!mounted || !isFormValid()) return;
 
     try {
       setIsCreating(true);
@@ -423,7 +490,7 @@ export default function FactoryPage() {
       setIsCreating(false);
       setUploadingImage(false);
     }
-  }, [mounted, isFormValid, tokenInfo, writeContract, resetContract, toast, tokenomics]);
+  }, [mounted, isFormValid, tokenInfo, writeContract, resetContract, toast]);
 
   // Retry function
   const handleRetry = useCallback(() => {
@@ -486,11 +553,12 @@ export default function FactoryPage() {
               completionPercentage={getCompletionPercentage()}
               activeTab={activeTab}
               onTabChange={setActiveTab}
-              isFormValid={isFormValid}
+              isFormValid={isFormValid()}
               tokenInfo={{
                 name: tokenInfo.name,
                 ticker: tokenInfo.ticker,
                 image: tokenInfo.image,
+                purchase: tokenInfo.purchase,
               }}
             />
           </motion.div>
@@ -519,7 +587,7 @@ export default function FactoryPage() {
             transition={{ delay: 0.6 }}
           >
             <FactoryLaunchSection
-              isFormValid={isFormValid}
+              isFormValid={isFormValid()}
               isCreating={isCreating}
               uploadingImage={uploadingImage}
               isPending={isPending}
