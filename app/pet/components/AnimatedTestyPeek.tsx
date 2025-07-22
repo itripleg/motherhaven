@@ -3,164 +3,264 @@
 
 import React, { useState, useEffect } from "react";
 import { motion, AnimatePresence } from "framer-motion";
-import { usePathname } from "next/navigation";
 
 interface AnimatedTestyPeekProps {
   petIsAlive?: boolean;
   petName?: string;
+  isOnStatusTab?: boolean;
 }
 
 export const AnimatedTestyPeek: React.FC<AnimatedTestyPeekProps> = ({
   petIsAlive = true,
   petName = "Testy",
+  isOnStatusTab = false,
 }) => {
-  const pathname = usePathname();
   const [isVisible, setIsVisible] = useState(false);
+  const [peekPosition, setPeekPosition] = useState<'left' | 'right'>('right');
+  const [peekHeight, setPeekHeight] = useState<number>(50);
   const [mounted, setMounted] = useState(false);
+  const [showTooltip, setShowTooltip] = useState(false);
+  const [showHearts, setShowHearts] = useState(false);
 
-  // Calculate isStatusTab first
-  const isStatusTab = pathname === "/pet" || (pathname?.includes("/pet") && !pathname.includes("community") && !pathname.includes("feeding"));
+  // Show everywhere except when explicitly on status tab
+  const shouldShow = !isOnStatusTab;
 
-  // ALL HOOKS MUST BE AT THE TOP - NO CONDITIONAL HOOKS
   useEffect(() => {
     setMounted(true);
-    console.log("AnimatedTestyPeek mounted!");
   }, []);
 
-  // Interval effect - always runs but checks conditions inside
-  useEffect(() => {    
-    if (!mounted) return; // Check condition inside the effect
-    
-    console.log("Setting up interval, isStatusTab:", isStatusTab);
-    
-    const interval = setInterval(() => {
-      console.log("Interval tick - isStatusTab:", isStatusTab);
-      if (!isStatusTab) {
-        console.log("Auto-showing peek!");
-        setIsVisible(true);
+  useEffect(() => {
+    if (!mounted || !shouldShow) return;
+
+    let timeoutId: NodeJS.Timeout;
+
+    const scheduleNextPeek = () => {
+      const delay = 60000 + Math.random() * 60000; // 1-2 minutes
+      timeoutId = setTimeout(() => {
+        showRandomPeek();
+      }, delay);
+    };
+
+    const showRandomPeek = () => {
+      if (isVisible) return; // Don't show if already visible
+      
+      const positions: Array<'left' | 'right'> = ['left', 'right'];
+      const randomPosition = positions[Math.floor(Math.random() * positions.length)];
+      const randomHeight = 20 + Math.random() * 60;
+      
+      setPeekPosition(randomPosition);
+      setPeekHeight(randomHeight);
+      setIsVisible(true);
+      
+      setTimeout(() => setShowTooltip(true), 300);
+      
+      const hideDelay = 3000 + Math.random() * 1000;
+      setTimeout(() => {
+        setShowTooltip(false);
         setTimeout(() => {
-          console.log("Auto-hiding peek!");
           setIsVisible(false);
-        }, 2000);
-      } else {
-        console.log("On status tab, skipping auto-peek");
-      }
-    }, 3000);
+          // Schedule next peek after this one hides
+          scheduleNextPeek();
+        }, 200);
+      }, hideDelay);
+    };
+
+    // Initial delay between 1-2 minutes
+    scheduleNextPeek();
 
     return () => {
-      console.log("Cleaning up interval");
-      clearInterval(interval);
+      if (timeoutId) {
+        clearTimeout(timeoutId);
+      }
     };
-  }, [mounted, isStatusTab]);
+  }, [mounted, shouldShow]);
 
-  // Log every render
-  console.log("RENDER - Pathname:", pathname);
-  console.log("RENDER - Is status tab:", isStatusTab);
-  console.log("RENDER - Should show component:", !isStatusTab);
-  console.log("RENDER - isVisible:", isVisible);
-
-  // Early returns AFTER all hooks
-  if (!mounted) {
-    console.log("Not mounted yet");
-    return null;
-  }
-
-  if (isStatusTab) {
-    console.log("On status tab, hiding component");
-    return null;
-  }
-
-  const showPeek = () => {
-    console.log("Showing peek!");
+  const triggerPeek = () => {
+    if (!shouldShow) return;
+    const positions: Array<'left' | 'right'> = ['left', 'right'];
+    const randomPosition = positions[Math.floor(Math.random() * positions.length)];
+    const randomHeight = 20 + Math.random() * 60;
+    setPeekPosition(randomPosition);
+    setPeekHeight(randomHeight);
     setIsVisible(true);
+    setTimeout(() => setShowTooltip(true), 300);
     setTimeout(() => {
-      console.log("Hiding peek!");
-      setIsVisible(false);
+      setShowTooltip(false);
+      setTimeout(() => setIsVisible(false), 200);
     }, 3000);
   };
 
+  const handlePetClick = () => {
+    setShowHearts(true);
+    setShowTooltip(false);
+    
+    // Hide hearts and then pet after animation, then schedule next peek
+    setTimeout(() => {
+      setShowHearts(false);
+      setTimeout(() => {
+        setIsVisible(false);
+        // Schedule next peek after clicking
+        setTimeout(() => {
+          const delay = 60000 + Math.random() * 60000; // 1-2 minutes
+          setTimeout(() => {
+            if (!isVisible) {
+              triggerPeek();
+            }
+          }, delay);
+        }, 100);
+      }, 200);
+    }, 2000);
+  };
+
+  useEffect(() => {
+    if (mounted && typeof window !== 'undefined') {
+      (window as any).triggerPetPeek = triggerPeek;
+    }
+  }, [mounted]);
+
+  if (!mounted || !shouldShow) {
+    return null;
+  }
+
+  const getPositionStyles = () => {
+    const baseClasses = "fixed z-[9998]";
+    
+    if (peekPosition === 'left') {
+      return {
+        className: `${baseClasses} left-0`,
+        style: { top: `${peekHeight}%`, transform: 'translateY(-50%)' },
+        initial: { x: "-100%", opacity: 0 },
+        animate: { x: "0%", opacity: 1 },
+        exit: { x: "-100%", opacity: 0 }
+      };
+    } else {
+      return {
+        className: `${baseClasses} right-0`,
+        style: { top: `${peekHeight}%`, transform: 'translateY(-50%)' },
+        initial: { x: "100%", opacity: 0 },
+        animate: { x: "0%", opacity: 1 },
+        exit: { x: "100%", opacity: 0 }
+      };
+    }
+  };
+
+  const positionConfig = getPositionStyles();
+
   return (
-    <div>
-      {/* Always visible test button */}
-      <button
-        onClick={showPeek}
-        className="fixed top-4 right-4 z-[9999] bg-red-500 text-white px-4 py-2 rounded font-bold"
-        style={{ 
-          position: 'fixed',
-          top: '16px',
-          right: '16px',
-          zIndex: 9999,
-          backgroundColor: 'red',
-          color: 'white',
-          padding: '8px 16px',
-          borderRadius: '4px',
-          border: 'none',
-          cursor: 'pointer'
-        }}
-      >
-        TEST PEEK
-      </button>
-
-      {/* Always visible indicator */}
-      <div
-        className="fixed top-20 right-4 z-[9999] bg-blue-500 text-white px-2 py-1 rounded text-xs"
-        style={{
-          position: 'fixed',
-          top: '80px',
-          right: '16px',
-          zIndex: 9999,
-          backgroundColor: 'blue',
-          color: 'white',
-          padding: '4px 8px',
-          borderRadius: '4px',
-          fontSize: '12px'
-        }}
-      >
-        Component Active: {mounted ? 'YES' : 'NO'}
-      </div>
-
-      <AnimatePresence>
-        {isVisible && (
+    <AnimatePresence>
+      {isVisible && (
+        <motion.div
+          initial={positionConfig.initial}
+          animate={positionConfig.animate}
+          exit={positionConfig.exit}
+          transition={{ 
+            type: "spring", 
+            stiffness: 300, 
+            damping: 25,
+            duration: 0.5
+          }}
+          className={positionConfig.className}
+          style={positionConfig.style}
+          onClick={handlePetClick}
+        >
           <motion.div
-            initial={{ x: "100%", opacity: 0 }}
-            animate={{ x: "0%", opacity: 1 }}
-            exit={{ x: "100%", opacity: 0 }}
-            className="fixed right-4 top-1/2 -translate-y-1/2 z-[9998]"
-            style={{
-              position: 'fixed',
-              right: '16px',
-              top: '50%',
-              transform: 'translateY(-50%)',
-              zIndex: 9998
+            className="relative cursor-pointer select-none"
+            animate={{ 
+              scale: [1, 1.05, 1],
+              rotate: [0, 2, 0, -2, 0]
             }}
+            transition={{ 
+              duration: 2, 
+              repeat: Infinity,
+              ease: "easeInOut" 
+            }}
+            whileHover={{ scale: 1.1 }}
+            whileTap={{ scale: 0.95 }}
           >
-            <div
-              className="bg-white dark:bg-gray-800 p-6 rounded-2xl shadow-2xl border-2 border-primary max-w-sm"
-              style={{
-                backgroundColor: 'white',
-                padding: '24px',
-                borderRadius: '16px',
-                boxShadow: '0 25px 50px -12px rgba(0, 0, 0, 0.25)',
-                border: '2px solid #3b82f6',
-                maxWidth: '320px'
+            {/* Pet emoji */}
+            <motion.div
+              className="text-6xl"
+              initial={{
+                rotateY: peekPosition === 'left' ? 180 : 0
+              }}
+              animate={{
+                rotate: [0, -5, 0],
+                scale: [1, 1.05, 1],
+                rotateY: peekPosition === 'left' ? 180 : 0
+              }}
+              transition={{
+                duration: 1.5,
+                repeat: Infinity,
+                ease: "easeInOut",
+                rotateY: { duration: 0 }
               }}
             >
-              <div className="flex items-center gap-3 mb-3">
-                <div className="text-4xl">🐕</div>
-                <div>
-                  <div className="font-bold text-lg">{petName}</div>
-                  <div className="text-sm text-gray-600">
-                    {petIsAlive ? "Your pet" : "Needs revival"}
-                  </div>
+              {petIsAlive ? "🐕" : "💀"}
+            </motion.div>
+
+            {/* Hearts animation */}
+            <AnimatePresence>
+              {showHearts && (
+                <div className="absolute inset-0 pointer-events-none">
+                  {[...Array(3)].map((_, i) => (
+                    <motion.div
+                      key={i}
+                      className="absolute text-2xl"
+                      initial={{ 
+                        opacity: 0, 
+                        scale: 0.5,
+                        x: 20 + (i * 5),
+                        y: 20
+                      }}
+                      animate={{ 
+                        opacity: [0, 1, 1, 0], 
+                        scale: [0.5, 1.2, 1.2, 0.8],
+                        x: 20 + (i * 5) + (Math.random() - 0.5) * 40,
+                        y: -30 - (i * 10)
+                      }}
+                      transition={{
+                        duration: 2,
+                        delay: i * 0.3,
+                        ease: "easeOut"
+                      }}
+                    >
+                      💖
+                    </motion.div>
+                  ))}
                 </div>
-              </div>
-              <div className="text-sm">
-                Hey there! This is a test peek! 👋
-              </div>
-            </div>
+              )}
+            </AnimatePresence>
+
+            {/* Tooltip */}
+            <AnimatePresence>
+              {showTooltip && !showHearts && (
+                <motion.div
+                  initial={{ opacity: 0, scale: 0.8, y: 10 }}
+                  animate={{ opacity: 1, scale: 1, y: 0 }}
+                  exit={{ opacity: 0, scale: 0.8, y: 10 }}
+                  className={`absolute whitespace-nowrap px-2 py-1 bg-gray-800 text-white text-sm rounded-lg shadow-lg pointer-events-none ${
+                    peekPosition === 'left' ? 'left-full ml-2' : 'right-full mr-2'
+                  }`}
+                  style={{
+                    top: '50%',
+                    transform: 'translateY(-50%)',
+                  }}
+                >
+                  Woof! 🐾
+                  
+                  <div 
+                    className={`absolute w-0 h-0 border-4 border-transparent top-1/2 -translate-y-1/2 ${
+                      peekPosition === 'left'
+                        ? 'left-0 -translate-x-full border-r-gray-800'
+                        : 'right-0 translate-x-full border-l-gray-800'
+                    }`}
+                  />
+                </motion.div>
+              )}
+            </AnimatePresence>
           </motion.div>
-        )}
-      </AnimatePresence>
-    </div>
+        </motion.div>
+      )}
+    </AnimatePresence>
   );
 };
