@@ -14,8 +14,7 @@ import {
   TrendingUp,
   TrendingDown,
   Plus,
-  Pause,
-  Bell,
+  BarChart3,
 } from "lucide-react";
 
 // Event types
@@ -76,7 +75,7 @@ export function EventWatcher() {
       }
       lastToastTime.current = now;
 
-      const { eventName, data, transactionHash } = event;
+      const { eventName, data, transactionHash, tokenAddress } = event;
 
       // Format address for display (you can enhance this with vanity names later)
       const formatAddress = (address: string) => {
@@ -96,20 +95,15 @@ export function EventWatcher() {
       // Get event-specific details
       let title = "";
       let description = "";
-      let variant: "default" | "success" | "destructive" | "warning" | "info" = "default";
+      let icon = <Coins className="h-4 w-4" />;
 
       switch (eventName) {
         case "TokenCreated":
-          title = (
-            <div className="flex items-center gap-2">
-              <Plus className="h-4 w-4 text-green-500" />
-              New Token Created!
-            </div>
-          );
+          title = "🚀 New Token Created!";
           description = `${formatAddress(data.creator)} created ${data.name} (${
             data.symbol
           })`;
-          variant = "success";
+          icon = <Plus className="h-4 w-4 text-green-500" />;
           break;
 
         case "TokensPurchased":
@@ -117,16 +111,11 @@ export function EventWatcher() {
           const tokenAmountPurchased = data.amount
             ? formatEther(data.amount)
             : "0";
-          title = (
-            <div className="flex items-center gap-2">
-              <TrendingUp className="h-4 w-4 text-green-500" />
-              Token Purchase
-            </div>
-          );
+          title = "📈 Token Purchase";
           description = `${formatAddress(data.buyer)} bought ${formatNumber(
             tokenAmountPurchased
           )} tokens for ${formatNumber(ethAmountPurchased)} AVAX`;
-          variant = "success";
+          icon = <TrendingUp className="h-4 w-4 text-green-500" />;
           break;
 
         case "TokensSold":
@@ -134,40 +123,24 @@ export function EventWatcher() {
           const tokensSold = data.tokenAmount
             ? formatEther(data.tokenAmount)
             : "0";
-          title = (
-            <div className="flex items-center gap-2">
-              <TrendingDown className="h-4 w-4 text-red-500" />
-              Token Sale
-            </div>
-          );
+          title = "📉 Token Sale";
           description = `${formatAddress(data.seller)} sold ${formatNumber(
             tokensSold
           )} tokens for ${formatNumber(ethSold)} AVAX`;
-          variant = "destructive";
+          icon = <TrendingDown className="h-4 w-4 text-red-500" />;
           break;
 
         case "TradingHalted":
-          title = (
-            <div className="flex items-center gap-2">
-              <Pause className="h-4 w-4 text-yellow-500" />
-              Trading Halted
-            </div>
-          );
+          title = "⏸️ Trading Halted";
           description = `Trading halted for token ${formatAddress(
             data.token || data.tokenAddress
           )}`;
-          variant = "warning";
+          icon = <Coins className="h-4 w-4 text-yellow-500" />;
           break;
 
         default:
-          title = (
-            <div className="flex items-center gap-2">
-              <Bell className="h-4 w-4 text-primary" />
-              Factory Event
-            </div>
-          );
+          title = "🔔 Factory Event";
           description = `Event: ${eventName}`;
-          variant = "info";
       }
 
       toast({
@@ -175,9 +148,26 @@ export function EventWatcher() {
         description: (
           <div className="space-y-2">
             <p className="text-sm">{description}</p>
-            {transactionHash && (
-              <div className="flex items-center gap-2 pt-2 border-t border-border/50">
-                <ExternalLink className="h-3 w-3 text-muted-foreground" />
+            <div className="flex items-center gap-4 pt-2 border-t border-border/50">
+              {/* View on DEX Link */}
+              {tokenAddress && (
+                <button
+                  onClick={() => {
+                    window.open(
+                      `/dex/${tokenAddress}`,
+                      "_blank",
+                      "noopener,noreferrer"
+                    );
+                  }}
+                  className="flex items-center gap-2 text-xs text-primary hover:underline"
+                >
+                  <BarChart3 className="h-3 w-3" />
+                  View on DEX
+                </button>
+              )}
+              
+              {/* Transaction Link */}
+              {transactionHash && (
                 <button
                   onClick={() => {
                     window.open(
@@ -186,15 +176,15 @@ export function EventWatcher() {
                       "noopener,noreferrer"
                     );
                   }}
-                  className="text-xs text-primary hover:underline"
+                  className="flex items-center gap-2 text-xs text-primary hover:underline"
                 >
+                  <ExternalLink className="h-3 w-3" />
                   View Transaction
                 </button>
-              </div>
-            )}
+              )}
+            </div>
           </div>
         ),
-        variant,
         duration: 6000, // Show for 6 seconds
       });
     },

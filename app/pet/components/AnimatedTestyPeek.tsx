@@ -35,7 +35,7 @@ export const AnimatedTestyPeek: React.FC<AnimatedTestyPeekProps> = ({
     let timeoutId: NodeJS.Timeout;
 
     const scheduleNextPeek = () => {
-      const delay = 60000 + Math.random() * 60000; // 1-2 minutes
+      const delay = 240000 + Math.random() * 120000; // 4-6 minutes
       timeoutId = setTimeout(() => {
         showRandomPeek();
       }, delay);
@@ -101,7 +101,7 @@ export const AnimatedTestyPeek: React.FC<AnimatedTestyPeekProps> = ({
         setIsVisible(false);
         // Schedule next peek after clicking
         setTimeout(() => {
-          const delay = 60000 + Math.random() * 60000; // 1-2 minutes
+          const delay = 240000 + Math.random() * 120000; // 4-6 minutes
           setTimeout(() => {
             if (!isVisible) {
               triggerPeek();
@@ -129,16 +129,16 @@ export const AnimatedTestyPeek: React.FC<AnimatedTestyPeekProps> = ({
       return {
         className: `${baseClasses} left-0`,
         style: { top: `${peekHeight}%`, transform: 'translateY(-50%)' },
-        initial: { x: "-100%", opacity: 0 },
-        animate: { x: "0%", opacity: 1 },
+        initial: { x: "-50%", opacity: 0 },
+        animate: { x: "-50%", opacity: 1 },
         exit: { x: "-100%", opacity: 0 }
       };
     } else {
       return {
         className: `${baseClasses} right-0`,
         style: { top: `${peekHeight}%`, transform: 'translateY(-50%)' },
-        initial: { x: "100%", opacity: 0 },
-        animate: { x: "0%", opacity: 1 },
+        initial: { x: "50%", opacity: 0 },
+        animate: { x: "50%", opacity: 1 },
         exit: { x: "100%", opacity: 0 }
       };
     }
@@ -198,35 +198,32 @@ export const AnimatedTestyPeek: React.FC<AnimatedTestyPeekProps> = ({
               {petIsAlive ? "🐕" : "💀"}
             </motion.div>
 
-            {/* Hearts animation */}
+            {/* Hearts animation - over the tooltip */}
             <AnimatePresence>
               {showHearts && (
-                <div className="absolute inset-0 pointer-events-none">
-                  {[...Array(3)].map((_, i) => (
-                    <motion.div
-                      key={i}
-                      className="absolute text-2xl"
-                      initial={{ 
-                        opacity: 0, 
-                        scale: 0.5,
-                        x: 20 + (i * 5),
-                        y: 20
-                      }}
-                      animate={{ 
-                        opacity: [0, 1, 1, 0], 
-                        scale: [0.5, 1.2, 1.2, 0.8],
-                        x: 20 + (i * 5) + (Math.random() - 0.5) * 40,
-                        y: -30 - (i * 10)
-                      }}
-                      transition={{
-                        duration: 2,
-                        delay: i * 0.3,
-                        ease: "easeOut"
-                      }}
-                    >
-                      💖
-                    </motion.div>
-                  ))}
+                <div className={`absolute whitespace-nowrap px-2 py-1 bg-gray-800 text-white text-sm rounded-lg shadow-lg pointer-events-none ${
+                  peekPosition === 'left' ? 'left-full ml-2' : 'right-full mr-2'
+                }`}
+                style={{
+                  top: '50%',
+                  transform: 'translateY(-50%)',
+                }}>
+                  <motion.div
+                    initial={{ opacity: 0, scale: 0.5 }}
+                    animate={{ opacity: 1, scale: [0.5, 1.2, 1] }}
+                    transition={{ duration: 0.5 }}
+                    className="flex items-center gap-1"
+                  >
+                    💖 Love you! 💖
+                  </motion.div>
+                  
+                  <div 
+                    className={`absolute w-0 h-0 border-4 border-transparent top-1/2 -translate-y-1/2 ${
+                      peekPosition === 'left'
+                        ? 'left-0 -translate-x-full border-r-gray-800'
+                        : 'right-0 translate-x-full border-l-gray-800'
+                    }`}
+                  />
                 </div>
               )}
             </AnimatePresence>

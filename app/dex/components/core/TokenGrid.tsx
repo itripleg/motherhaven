@@ -1,4 +1,4 @@
-// app/dex/components/core/TokenGrid.tsx - Fixed for mobile scrolling
+// app/dex/components/core/TokenGrid.tsx - FIXED: Conditional scroll strategy
 import { motion } from "framer-motion";
 import { TokenCard } from "./TokenCard";
 import { Token } from "@/types";
@@ -53,14 +53,17 @@ export const TokenGrid = ({ tokens, gridLayout = 3 }: TokenGridProps) => {
   // Get layout configuration
   const config = LAYOUT_CONFIG[gridLayout];
 
-  // Calculate container styles for breakout layouts (4 & 5 columns) - MOBILE AWARE
-  const getContainerStyles = (): React.CSSProperties => {
-    // Always use responsive layout on mobile regardless of gridLayout setting
-    const isMobile = typeof window !== "undefined" && window.innerWidth < 1024; // lg breakpoint
+  // Check if we're on mobile
+  const isMobile = typeof window !== "undefined" && window.innerWidth < 1024;
 
+  // Determine scroll strategy based on layout
+  const useInternalScroll = gridLayout === 3 || isMobile;
+  const usePageScroll = !useInternalScroll;
+
+  // Calculate container styles for breakout layouts (4 & 5 columns)
+  const getContainerStyles = (): React.CSSProperties => {
     if (gridLayout === 3 || isMobile) {
       return {
-        overflow: "visible",
         position: "relative",
         maxWidth: "100%",
         width: "100%",
@@ -69,21 +72,18 @@ export const TokenGrid = ({ tokens, gridLayout = 3 }: TokenGridProps) => {
 
     // Desktop breakout layout for 4 & 5 columns
     const totalWidth =
-      config.cardWidth * gridLayout + config.gap * (gridLayout - 1) + 80; // 80px padding
+      config.cardWidth * gridLayout + config.gap * (gridLayout - 1) + 80;
     return {
       position: "relative",
       width: `${totalWidth}px`,
       left: "50%",
       transform: "translateX(-50%)",
       margin: "0 auto",
-      overflow: "visible",
     };
   };
 
-  // Get grid styles - MOBILE AWARE
+  // Get grid styles
   const getGridStyles = (): React.CSSProperties => {
-    const isMobile = typeof window !== "undefined" && window.innerWidth < 1024;
-
     if (gridLayout === 3 || isMobile) {
       return {};
     }
@@ -96,19 +96,16 @@ export const TokenGrid = ({ tokens, gridLayout = 3 }: TokenGridProps) => {
     };
   };
 
-  // Apply masking for 3-column layout after transition - MOBILE AWARE
-  const shouldApplyMask = gridLayout === 3 && !isTransitioning;
-  const isMobile = typeof window !== "undefined" && window.innerWidth < 1024;
-  const maskStyles =
-    shouldApplyMask && !isMobile
-      ? {
-          maskImage:
-            "linear-gradient(to bottom, rgb(0, 0, 0) 0%, rgb(0, 0, 0) 92%, transparent 100%)",
-          WebkitMaskImage:
-            "linear-gradient(to bottom, rgb(0, 0, 0) 0%, rgb(0, 0, 0) 92%, transparent 100%)",
-          maxHeight: "80vh",
-        }
-      : {};
+  // Apply gradient mask for fade effect (only for 3-column with internal scroll)
+  const shouldApplyMask = useInternalScroll && !isTransitioning;
+  const maskStyles = shouldApplyMask
+    ? {
+        maskImage:
+          "linear-gradient(to bottom, rgb(0, 0, 0) 0%, rgb(0, 0, 0) 92%, transparent 100%)",
+        WebkitMaskImage:
+          "linear-gradient(to bottom, rgb(0, 0, 0) 0%, rgb(0, 0, 0) 92%, transparent 100%)",
+      }
+    : {};
 
   // Loading state
   if (isLoading && Object.keys(prices).length === 0) {
@@ -155,60 +152,150 @@ export const TokenGrid = ({ tokens, gridLayout = 3 }: TokenGridProps) => {
     );
   }
 
-  return (
-    <div className="space-y-4 overflow-visible relative">
-      <div style={getContainerStyles()}>
-        <motion.div
-          className={`${config.classes} overflow-visible`}
-          style={{ ...getGridStyles(), ...maskStyles }}
-          initial={{ opacity: 0 }}
-          animate={{ opacity: 1 }}
-          transition={{
-            duration: 0.3,
-            type: "spring",
-            stiffness: 300,
-            damping: 25,
-          }}
-        >
-          {tokens.map((token) => {
-            const priceData = prices[token.address.toLowerCase()];
+  // SOLUTION: Conditional scroll strategy
+  if (useInternalScroll) {
+    // 3-COLUMN LAYOUT: Use internal scrolling with contained height
+    return (
+      <div 
+        className="h-full max-h-[80vh] overflow-y-scroll relative"
+        style={{
+          scrollbarWidth: 'thin',
+          scrollbarColor: 'hsl(var(--border)) transparent'
+        }}
+      >
+        <div style={getContainerStyles()}>
+          <motion.div
+            className={`${config.classes}`}
+            style={{ 
+              ...getGridStyles(), 
+              ...maskStyles
+            }}
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            transition={{
+              duration: 0.3,
+              type: "spring",
+              stiffness: 300,
+              damping: 25,
+            }}
+          >
+            {tokens.map((token) => {
+              const priceData = prices[token.address.toLowerCase()];
 
-            return (
-              <motion.div
-                key={token.address}
-                layoutId={`token-card-${token.address}`}
-                layout
-                transition={{
-                  layout: {
-                    type: "spring",
-                    stiffness: 300,
-                    damping: 25,
-                    mass: 1.5,
-                  },
-                }}
-                style={{
-                  width: `${config.cardWidth}px`,
-                  minWidth: `${config.cardWidth}px`,
-                  maxWidth: `${config.cardWidth}px`,
-                  flexShrink: 0,
-                  overflow: "visible",
-                  position: "relative",
-                  zIndex: 1,
-                  transform: "translateZ(0)",
-                }}
-              >
-                <TokenCard
-                  token={token}
-                  price={priceData?.formatted || "0.000000"}
-                  rawPrice={priceData?.raw || "0"}
-                  isLoading={isLoading}
-                  lastUpdated={priceData?.lastUpdated}
-                />
-              </motion.div>
-            );
-          })}
-        </motion.div>
+              return (
+                <motion.div
+                  key={token.address}
+                  layoutId={`token-card-${token.address}`}
+                  layout
+                  transition={{
+                    layout: {
+                      type: "spring",
+                      stiffness: 300,
+                      damping: 25,
+                      mass: 1.5,
+                    },
+                  }}
+                  style={{
+                    width: `${config.cardWidth}px`,
+                    minWidth: `${config.cardWidth}px`,
+                    maxWidth: `${config.cardWidth}px`,
+                    flexShrink: 0,
+                    position: "relative",
+                    zIndex: 1,
+                    transform: "translateZ(0)",
+                  }}
+                >
+                  <TokenCard
+                    token={token}
+                    price={priceData?.formatted || "0.000000"}
+                    rawPrice={priceData?.raw || "0"}
+                    isLoading={isLoading}
+                    lastUpdated={priceData?.lastUpdated}
+                  />
+                </motion.div>
+              );
+            })}
+          </motion.div>
+        </div>
+
+        {/* Custom Scrollbar Styles for 3-column */}
+        <style jsx>{`
+          div::-webkit-scrollbar {
+            width: 6px;
+          }
+          div::-webkit-scrollbar-track {
+            background: transparent;
+          }
+          div::-webkit-scrollbar-thumb {
+            background-color: hsl(var(--border));
+            border-radius: 3px;
+            transition: background-color 0.2s ease;
+          }
+          div::-webkit-scrollbar-thumb:hover {
+            background-color: hsl(var(--border) / 0.8);
+          }
+        `}</style>
       </div>
-    </div>
-  );
+    );
+  } else {
+    // 4 & 5 COLUMN LAYOUTS: Use natural page scroll with horizontal breakout
+    return (
+      <div className="relative" style={{ overflow: 'visible' }}>
+        <div style={getContainerStyles()}>
+          <motion.div
+            className={`${config.classes}`}
+            style={{ 
+              ...getGridStyles(),
+              overflow: 'visible'
+            }}
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            transition={{
+              duration: 0.3,
+              type: "spring",
+              stiffness: 300,
+              damping: 25,
+            }}
+          >
+            {tokens.map((token) => {
+              const priceData = prices[token.address.toLowerCase()];
+
+              return (
+                <motion.div
+                  key={token.address}
+                  layoutId={`token-card-${token.address}`}
+                  layout
+                  transition={{
+                    layout: {
+                      type: "spring",
+                      stiffness: 300,
+                      damping: 25,
+                      mass: 1.5,
+                    },
+                  }}
+                  style={{
+                    width: `${config.cardWidth}px`,
+                    minWidth: `${config.cardWidth}px`,
+                    maxWidth: `${config.cardWidth}px`,
+                    flexShrink: 0,
+                    position: "relative",
+                    zIndex: 1,
+                    transform: "translateZ(0)",
+                  }}
+                >
+                  <TokenCard
+                    token={token}
+                    price={priceData?.formatted || "0.000000"}
+                    rawPrice={priceData?.raw || "0"}
+                    isLoading={isLoading}
+                    lastUpdated={priceData?.lastUpdated}
+                  />
+                </motion.div>
+              );
+            })}
+          </motion.div>
+        </div>
+      </div>
+    );
+  }
 };
