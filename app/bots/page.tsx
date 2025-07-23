@@ -26,8 +26,8 @@ interface CachedData {
   isValid: boolean;
 }
 
-const CACHE_DURATION = 30000; // 30 seconds cache
-const REFRESH_INTERVAL = 30000; // 30 seconds refresh (reduced from 15s)
+const CACHE_DURATION = 15000; // 15 seconds cache (reduced from 30s)
+const REFRESH_INTERVAL = 10000; // 10 seconds refresh (reduced from 30s)
 const OFFLINE_THRESHOLD = 4 * 60 * 1000; // 4 minutes offline threshold
 const MAX_CONSECUTIVE_FAILURES = 3;
 
@@ -51,7 +51,36 @@ const TVBPage = () => {
   const isPageVisibleRef = useRef<boolean>(true);
   const abortControllerRef = useRef<AbortController | null>(null);
 
-  // OPTIMIZATION: Generate fixed star positions that won't change on re-renders
+  // OPTIMIZATION: Request deduplication to prevent duplicate API calls
+  const requestCacheRef = useRef<Map<string, Promise<any>>>(new Map());
+
+  // OPTIMIZATION: Request deduplication helper
+  const fetchWithDeduplication = useCallback(
+    async (url: string, options: RequestInit = {}) => {
+      const cacheKey = `${url}_${JSON.stringify(options.headers || {})}`;
+
+      // Return existing promise if request is already in flight
+      if (requestCacheRef.current.has(cacheKey)) {
+        console.log("🤖 TVB: Using deduplicated request for", url);
+        return requestCacheRef.current.get(cacheKey);
+      }
+
+      // Create new request
+      const promise = fetch(url, options)
+        .then((response) => response.json())
+        .finally(() => {
+          // Clean up cache entry when request completes
+          requestCacheRef.current.delete(cacheKey);
+        });
+
+      // Cache the promise
+      requestCacheRef.current.set(cacheKey, promise);
+      console.log("🤖 TVB: Starting new request for", url);
+
+      return promise;
+    },
+    []
+  );
   const fixedStars = useMemo(() => {
     return Array.from({ length: 30 }).map((_, i) => ({
       id: i,
@@ -101,7 +130,7 @@ const TVBPage = () => {
     };
   }, []);
 
-  // OPTIMIZATION: Enhanced bot data processing with offline detection
+  // OPTIMIZATION: Generate fixed star positions that won't change on re-renders
   const processBotsData = useCallback((rawBots: any[]): TVBBot[] => {
     const currentTime = Date.now();
 
@@ -128,7 +157,7 @@ const TVBPage = () => {
     });
   }, []);
 
-  // OPTIMIZATION: Enhanced fetch with retry logic and smart caching
+  // OPTIMIZATION: Enhanced bot data processing with offline detection
   const fetchBots = useCallback(
     async (force: boolean = false) => {
       // Don't fetch if page is hidden and not forced
@@ -192,7 +221,7 @@ const TVBPage = () => {
           setIsLoading(true);
         }
 
-        const response = await fetch("/api/tvb/webhook", {
+        const response = await fetchWithDeduplication("/api/tvb/webhook", {
           method: "GET",
           headers: {
             "X-Request-Source": "bots-page-optimized",
@@ -201,11 +230,11 @@ const TVBPage = () => {
           signal: abortControllerRef.current.signal,
         });
 
-        if (!response.ok) {
-          throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+        if (!response.success) {
+          throw new Error(`API Error: ${response.error || "Unknown error"}`);
         }
 
-        const data = await response.json();
+        const data = response;
         console.log("🤖 TVB: API Response:", {
           success: data.success,
           totalBots: data.totalBots,
@@ -290,6 +319,8 @@ const TVBPage = () => {
       if (abortControllerRef.current) {
         abortControllerRef.current.abort();
       }
+      // Clear request cache on unmount
+      requestCacheRef.current.clear();
     };
   }, [fetchBots]);
 
@@ -444,7 +475,7 @@ const TVBPage = () => {
             <div className="grid grid-cols-2 md:grid-cols-4 gap-4 text-xs text-muted-foreground">
               <div>
                 <p className="font-medium">Refresh Interval</p>
-                <p>{REFRESH_INTERVAL / 1000}s</p>
+                <p>{REFRESH_INTERVAL / 1000}s (faster for trading)</p>
               </div>
               <div>
                 <p className="font-medium">Cache Duration</p>
@@ -456,7 +487,7 @@ const TVBPage = () => {
               </div>
               <div>
                 <p className="font-medium">Request Management</p>
-                <p>Smart caching + visibility detection</p>
+                <p>Smart caching + visibility detection + deduplication</p>
               </div>
             </div>
           </div>

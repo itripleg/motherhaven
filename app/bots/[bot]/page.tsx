@@ -34,8 +34,8 @@ interface CachedBotStatus {
   isValid: boolean;
 }
 
-const BOT_STATUS_CACHE_DURATION = 45000; // 45 seconds
-const BOT_STATUS_REFRESH_INTERVAL = 60000; // 1 minute
+const BOT_STATUS_CACHE_DURATION = 8000; // 8 seconds
+const BOT_STATUS_REFRESH_INTERVAL = 5000; // 5 seconds for near real-time updates
 const MAX_REFRESH_FAILURES = 3;
 
 const BotDetailPage = () => {
@@ -57,6 +57,9 @@ const BotDetailPage = () => {
   const refreshTimeoutRef = useRef<NodeJS.Timeout | null>(null);
   const isPageVisibleRef = useRef<boolean>(true);
   const abortControllerRef = useRef<AbortController | null>(null);
+
+  // OPTIMIZATION: Request deduplication to prevent duplicate API calls
+  const requestCacheRef = useRef<Map<string, Promise<any>>>(new Map());
 
   // OPTIMIZATION: Use optimized hook with polling instead of realtime
   const {
@@ -86,6 +89,34 @@ const BotDetailPage = () => {
       animationDuration: 2 + Math.random() * 3,
     }));
   }, []);
+
+  // OPTIMIZATION: Request deduplication helper
+  const fetchWithDeduplication = useCallback(
+    async (url: string, options: RequestInit = {}) => {
+      const cacheKey = `${url}_${JSON.stringify(options.headers || {})}`;
+
+      // Return existing promise if request is already in flight
+      if (requestCacheRef.current.has(cacheKey)) {
+        console.log(`🤖 TVB: Using deduplicated request for bot ${botName}`);
+        return requestCacheRef.current.get(cacheKey);
+      }
+
+      // Create new request
+      const promise = fetch(url, options)
+        .then((response) => response.json())
+        .finally(() => {
+          // Clean up cache entry when request completes
+          requestCacheRef.current.delete(cacheKey);
+        });
+
+      // Cache the promise
+      requestCacheRef.current.set(cacheKey, promise);
+      console.log(`🤖 TVB: Starting new request for bot ${botName}`);
+
+      return promise;
+    },
+    [botName]
+  );
 
   // OPTIMIZATION: Smart cache management for bot status
   const isBotCacheValid = useCallback(() => {
@@ -149,7 +180,7 @@ const BotDetailPage = () => {
           force ? "(forced)" : ""
         );
 
-        const response = await fetch("/api/tvb/webhook", {
+        const response = await fetchWithDeduplication("/api/tvb/webhook", {
           method: "GET",
           headers: {
             "X-Request-Source": "bot-detail-page",
@@ -159,10 +190,11 @@ const BotDetailPage = () => {
           signal: abortControllerRef.current.signal,
         });
 
-        if (!response.ok)
-          throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+        if (!response.success) {
+          throw new Error(`API Error: ${response.error || "Unknown error"}`);
+        }
 
-        const data = await response.json();
+        const data = response;
 
         if (data.success && Array.isArray(data.bots)) {
           const specificBot = data.bots.find((b: any) => b.name === botName);
@@ -284,6 +316,8 @@ const BotDetailPage = () => {
       if (abortControllerRef.current) {
         abortControllerRef.current.abort();
       }
+      // Clear request cache on unmount
+      requestCacheRef.current.clear();
     };
   }, [fetchBotDetails]);
 
