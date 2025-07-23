@@ -3,7 +3,7 @@
 
 export const presetThemes = [
   {
-    name: "MotherHaven Classic",
+    name: "Mother Haven",
     description: "The original Outer Heaven",
     colors: [
       { hue: 263, saturation: 60, lightness: 50 },
@@ -13,7 +13,7 @@ export const presetThemes = [
     ],
   },
   {
-    name: "FOXHOUND",
+    name: "FOX HOUND",
     description: "Elite unit stealth operations",
     colors: [
       { hue: 25, saturation: 85, lightness: 55 },
