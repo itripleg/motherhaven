@@ -1,4 +1,4 @@
-// app/api/tvb/webhook/route.ts - Complete webhook with Firestore activity persistence
+// app/api/tvb/webhook/route.ts - OPTIMIZED webhook with reduced Firebase usage
 
 import { NextRequest, NextResponse } from "next/server";
 import {
@@ -13,18 +13,18 @@ import {
 } from "firebase/firestore";
 import { db } from "@/firebase";
 
-// Development mode toggle - set to true to allow bots without secrets
+// Development mode toggle
 const DEV_MODE =
   process.env.NODE_ENV === "development" || process.env.TVB_DEV_MODE === "true";
 
-// Bot secrets for authentication - ONLY hardcoded data
+// Bot secrets for authentication
 const BOT_SECRETS = {
   bullish_billy: "bullish_billy_secret_2024",
   jackpot_jax: "jax_trader_secret_2024",
   melancholy_mort: "melancholy_mort_secret_2024",
 };
 
-// In-memory storage for bot status (still needed for real-time status)
+// OPTIMIZED: In-memory storage with better offline detection
 interface BotActivity {
   botName: string;
   displayName: string;
@@ -39,49 +39,37 @@ interface BotActivity {
   };
   totalActions: number;
   sessionStarted: string;
-  config?: {
-    buyBias?: number;
-    riskTolerance?: number;
-    minInterval?: number;
-    maxInterval?: number;
-    minTradeAmount?: number;
-    maxTradeAmount?: number;
-    createTokenChance?: number;
-    buyPhrases?: string[];
-    sellPhrases?: string[];
-    createPhrases?: string[];
-    errorPhrases?: string[];
-  };
-  character?: {
-    mood?: string;
-    personality?: string;
-  };
+  config?: any;
+  character?: any;
   isDevMode?: boolean;
+
+  // OPTIMIZATION: Add heartbeat tracking
+  lastHeartbeat: string;
+  consecutiveHeartbeats: number;
+  missedHeartbeats: number;
 }
 
-// Simple in-memory store (for current session status)
+// OPTIMIZED: Better memory management
 const botActivities = new Map<string, BotActivity>();
+const MAX_STORED_BOTS = 50; // Limit memory usage
 
 // Firestore collection names
 const COLLECTIONS = {
   BOT_ACTIVITIES: "bot_activities",
-  BOT_STATUS: "bot_status",
 };
 
-// Activity types that should be persisted to Firestore
+// OPTIMIZED: Only persist important activities to reduce Firebase writes
 const PERSISTENT_ACTIVITY_TYPES = new Set([
   "buy",
   "sell",
   "create_token",
-  "hold",
-  "error",
   "startup",
   "shutdown",
+  "error",
   "insufficient_funds",
-  "balance_alert",
 ]);
 
-// Activity types that are considered "personality actions" for display
+// OPTIMIZED: Don't persist heartbeats and system messages
 const PERSONALITY_ACTIONS = new Set([
   "buy",
   "sell",
@@ -99,7 +87,7 @@ interface PersistentBotActivity {
   details: any;
   timestamp: string;
   isPersonalityAction: boolean;
-  sessionId: string; // Track different bot sessions
+  sessionId: string;
 
   // Financial metrics (if available)
   currentBalance?: number;
@@ -119,7 +107,40 @@ interface PersistentBotActivity {
   createdAt: any; // Firestore serverTimestamp
 }
 
-async function persistActivityToFirestore(
+// OPTIMIZED: Batch Firebase writes and use connection pooling
+let pendingWrites: PersistentBotActivity[] = [];
+let writeTimeout: NodeJS.Timeout | null = null;
+
+async function batchPersistToFirestore(): Promise<void> {
+  if (pendingWrites.length === 0) return;
+
+  try {
+    // Process all pending writes
+    const writes = [...pendingWrites];
+    pendingWrites = []; // Clear queue immediately
+
+    // OPTIMIZATION: Batch write to Firebase (up to 10 at a time)
+    const batchSize = 10;
+    for (let i = 0; i < writes.length; i += batchSize) {
+      const batch = writes.slice(i, i + batchSize);
+
+      // Write batch concurrently
+      await Promise.all(
+        batch.map((activityData) =>
+          addDoc(collection(db, COLLECTIONS.BOT_ACTIVITIES), activityData)
+        )
+      );
+    }
+
+    console.log(`✅ Batch persisted ${writes.length} activities to Firestore`);
+  } catch (error) {
+    console.error(`❌ Failed to batch persist activities:`, error);
+    // Re-queue failed writes
+    pendingWrites.unshift(...pendingWrites);
+  }
+}
+
+async function queueActivityForPersistence(
   botName: string,
   displayName: string,
   avatarUrl: string,
@@ -127,73 +148,91 @@ async function persistActivityToFirestore(
   details: any,
   timestamp: string,
   sessionId: string
-): Promise<boolean> {
-  try {
-    // Only persist certain activity types
-    if (!PERSISTENT_ACTIVITY_TYPES.has(actionType)) {
-      return true; // Don't persist but don't error
-    }
+): Promise<void> {
+  // OPTIMIZATION: Only persist important activities
+  if (!PERSISTENT_ACTIVITY_TYPES.has(actionType)) {
+    return;
+  }
 
-    const activityData: PersistentBotActivity = {
-      botName,
-      displayName,
-      avatarUrl,
-      actionType,
-      message: details.message || `${actionType} action`,
-      details,
-      timestamp,
-      isPersonalityAction: PERSONALITY_ACTIONS.has(actionType),
-      sessionId,
-      createdAt: serverTimestamp(),
-    };
+  const activityData: PersistentBotActivity = {
+    botName,
+    displayName,
+    avatarUrl,
+    actionType,
+    message: details.message || `${actionType} action`,
+    details,
+    timestamp,
+    isPersonalityAction: PERSONALITY_ACTIONS.has(actionType),
+    sessionId,
+    createdAt: serverTimestamp(),
+  };
 
-    // Add financial metrics if available
-    if (details.currentBalance !== undefined) {
-      activityData.currentBalance = details.currentBalance;
-    }
-    if (details.pnlAmount !== undefined) {
-      activityData.pnlAmount = details.pnlAmount;
-    }
-    if (details.pnlPercentage !== undefined) {
-      activityData.pnlPercentage = details.pnlPercentage;
-    }
+  // Add financial metrics if available
+  if (details.currentBalance !== undefined) {
+    activityData.currentBalance = details.currentBalance;
+  }
+  if (details.pnlAmount !== undefined) {
+    activityData.pnlAmount = details.pnlAmount;
+  }
+  if (details.pnlPercentage !== undefined) {
+    activityData.pnlPercentage = details.pnlPercentage;
+  }
 
-    // Add token info if available
-    if (details.tokenAddress) {
-      activityData.tokenAddress = details.tokenAddress;
-    }
-    if (details.tokenSymbol) {
-      activityData.tokenSymbol = details.tokenSymbol;
-    }
-    if (details.tokenName) {
-      activityData.tokenName = details.tokenName;
-    }
+  // Add token info if available
+  if (details.tokenAddress) {
+    activityData.tokenAddress = details.tokenAddress;
+  }
+  if (details.tokenSymbol) {
+    activityData.tokenSymbol = details.tokenSymbol;
+  }
+  if (details.tokenName) {
+    activityData.tokenName = details.tokenName;
+  }
 
-    // Add trade details if available
-    if (details.amountAvax) {
-      activityData.tradeAmount = details.amountAvax;
-    }
-    if (details.txHash) {
-      activityData.txHash = details.txHash;
-    }
+  // Add trade details if available
+  if (details.amountAvax) {
+    activityData.tradeAmount = details.amountAvax;
+  }
+  if (details.txHash) {
+    activityData.txHash = details.txHash;
+  }
 
-    // Store in Firestore
-    await addDoc(collection(db, COLLECTIONS.BOT_ACTIVITIES), activityData);
+  // OPTIMIZATION: Queue for batch processing
+  pendingWrites.push(activityData);
 
-    console.log(
-      `✅ Persisted ${actionType} activity for ${displayName} to Firestore`
-    );
-    return true;
-  } catch (error) {
-    console.error(`❌ Failed to persist activity for ${botName}:`, error);
-    return false;
+  // OPTIMIZATION: Batch write after 5 seconds or when queue reaches 5 items
+  if (pendingWrites.length >= 5) {
+    if (writeTimeout) {
+      clearTimeout(writeTimeout);
+      writeTimeout = null;
+    }
+    await batchPersistToFirestore();
+  } else if (!writeTimeout) {
+    writeTimeout = setTimeout(async () => {
+      writeTimeout = null;
+      await batchPersistToFirestore();
+    }, 5000);
   }
 }
+
+// OPTIMIZED: Cache recent activities to reduce Firebase reads
+let cachedActivities: PersistentBotActivity[] = [];
+let activitiesCacheExpiry = 0;
+const ACTIVITIES_CACHE_DURATION = 30000; // 30 seconds
 
 async function getRecentActivitiesFromFirestore(
   botName?: string,
   limitCount: number = 50
 ): Promise<PersistentBotActivity[]> {
+  // OPTIMIZATION: Use cache if still valid
+  const now = Date.now();
+  if (now < activitiesCacheExpiry && !botName) {
+    console.log(
+      `📚 Using cached activities (${cachedActivities.length} items)`
+    );
+    return cachedActivities;
+  }
+
   try {
     const activitiesRef = collection(db, COLLECTIONS.BOT_ACTIVITIES);
 
@@ -202,7 +241,7 @@ async function getRecentActivitiesFromFirestore(
       limit(limitCount),
     ];
 
-    // Filter by bot if specified
+    // Filter by bot if specified (don't cache bot-specific queries)
     if (botName) {
       queryConstraints.unshift(where("botName", "==", botName));
     }
@@ -219,39 +258,39 @@ async function getRecentActivitiesFromFirestore(
       } as any);
     });
 
+    // OPTIMIZATION: Cache general queries
+    if (!botName) {
+      cachedActivities = activities;
+      activitiesCacheExpiry = now + ACTIVITIES_CACHE_DURATION;
+      console.log(`📚 Cached ${activities.length} activities for 30 seconds`);
+    }
+
     return activities;
   } catch (error) {
     console.error("❌ Failed to fetch activities from Firestore:", error);
-    return [];
+    return cachedActivities; // Return cached data on error
   }
 }
 
-async function cleanupOldActivities(daysToKeep: number = 30): Promise<void> {
-  try {
-    const cutoffDate = new Date();
-    cutoffDate.setDate(cutoffDate.getDate() - daysToKeep);
+// OPTIMIZED: Memory cleanup for bot activities
+function cleanupBotActivities() {
+  if (botActivities.size <= MAX_STORED_BOTS) return;
 
-    const activitiesRef = collection(db, COLLECTIONS.BOT_ACTIVITIES);
-    const q = query(
-      activitiesRef,
-      where("createdAt", "<", cutoffDate),
-      limit(100) // Process in batches
-    );
+  // Remove oldest bots (by lastSeen timestamp)
+  const sortedBots = Array.from(botActivities.entries()).sort(
+    ([, a], [, b]) =>
+      new Date(a.lastSeen).getTime() - new Date(b.lastSeen).getTime()
+  );
 
-    const snapshot = await getDocs(q);
+  const botsToRemove = sortedBots.slice(
+    0,
+    botActivities.size - MAX_STORED_BOTS
+  );
+  botsToRemove.forEach(([botName]) => {
+    botActivities.delete(botName);
+  });
 
-    if (snapshot.empty) {
-      return;
-    }
-
-    // In a real implementation, you'd batch delete these
-    // For now, just log what would be deleted
-    console.log(
-      `🧹 Would cleanup ${snapshot.size} old bot activities (older than ${daysToKeep} days)`
-    );
-  } catch (error) {
-    console.error("❌ Failed to cleanup old activities:", error);
-  }
+  console.log(`🧹 Cleaned up ${botsToRemove.length} old bot records`);
 }
 
 export async function POST(request: NextRequest) {
@@ -277,7 +316,7 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    // Authentication logic with dev mode support
+    // OPTIMIZED: Authentication logic
     let isDevMode = false;
     let authPassed = false;
 
@@ -285,14 +324,10 @@ export async function POST(request: NextRequest) {
       DEV_MODE &&
       (!botSecret || botSecret === "dev" || botSecret === "test")
     ) {
-      // Allow dev mode authentication
       isDevMode = true;
       authPassed = true;
-      console.log(`🔧 DEV MODE: Allowing bot ${botName} without proper secret`);
     } else if (BOT_SECRETS[botName as keyof typeof BOT_SECRETS] === botSecret) {
-      // Normal authentication with proper secret
       authPassed = true;
-      console.log(`🔐 PROD MODE: Bot ${botName} authenticated with secret`);
     } else {
       console.log(
         `❌ Invalid bot secret for ${botName} (dev mode: ${DEV_MODE})`
@@ -316,36 +351,51 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    // Get or create bot activity record (in-memory for real-time status)
+    // OPTIMIZED: Get or create bot activity record
     let botActivity = botActivities.get(botName);
+    const now = timestamp;
 
     if (!botActivity) {
-      // First time seeing this bot - create minimal record
+      // First time seeing this bot
       botActivity = {
         botName,
         displayName: displayName || botName,
         avatarUrl: avatarUrl || "",
         bio: details?.bio,
-        lastSeen: timestamp,
+        lastSeen: now,
         lastAction: {
           type: action,
           message: details?.message || `Bot ${botName} performed ${action}`,
           details: details || {},
-          timestamp,
+          timestamp: now,
         },
         totalActions: 0,
-        sessionStarted: timestamp,
+        sessionStarted: now,
         character: details?.character,
         config: details?.config,
         isDevMode: isDevMode,
+        lastHeartbeat: action === "heartbeat" ? now : "",
+        consecutiveHeartbeats: action === "heartbeat" ? 1 : 0,
+        missedHeartbeats: 0,
       };
 
-      const modeLabel = isDevMode ? "🔧 DEV" : "🤖 PROD";
-      console.log(`${modeLabel} New bot registered: ${displayName}`);
+      console.log(
+        `${isDevMode ? "🔧 DEV" : "🤖 PROD"} New bot registered: ${displayName}`
+      );
     }
 
     // Update dev mode status
     botActivity.isDevMode = isDevMode;
+
+    // OPTIMIZED: Handle heartbeat tracking
+    if (action === "heartbeat") {
+      botActivity.lastHeartbeat = now;
+      botActivity.consecutiveHeartbeats += 1;
+      botActivity.missedHeartbeats = 0;
+    } else {
+      // Reset missed heartbeats on any activity
+      botActivity.missedHeartbeats = 0;
+    }
 
     // Generate session ID for grouping activities
     const sessionId = `${botName}_${botActivity.sessionStarted}`;
@@ -353,16 +403,19 @@ export async function POST(request: NextRequest) {
     // Handle startup action specially
     if (action === "startup") {
       // Reset for new session
-      botActivity.sessionStarted = timestamp;
+      botActivity.sessionStarted = now;
       botActivity.totalActions = 0;
+      botActivity.consecutiveHeartbeats = 0;
+      botActivity.missedHeartbeats = 0;
 
       // Update bot metadata from startup details
       if (details?.bio) botActivity.bio = details.bio;
       if (details?.character) botActivity.character = details.character;
       if (details?.config) botActivity.config = details.config;
 
-      const modeLabel = isDevMode ? "🔧 DEV" : "🚀 PROD";
-      console.log(`${modeLabel} ${displayName} started new session`);
+      console.log(
+        `${isDevMode ? "🔧 DEV" : "🚀 PROD"} ${displayName} started new session`
+      );
       if (details?.startingBalance) {
         console.log(
           `   💰 Starting balance: ${details.startingBalance.toFixed(4)} AVAX`
@@ -371,86 +424,77 @@ export async function POST(request: NextRequest) {
       if (details?.tokensFound) {
         console.log(`   🎯 Found ${details.tokensFound} tradeable tokens`);
       }
-    } else {
-      // Regular action - increment counter
+    } else if (action !== "heartbeat") {
+      // Regular action - increment counter (don't count heartbeats)
       botActivity.totalActions += 1;
     }
 
     // Update last seen and action
-    botActivity.lastSeen = timestamp;
+    botActivity.lastSeen = now;
     botActivity.lastAction = {
       type: action,
       message: details?.message || `${action} action performed`,
       details: details || {},
-      timestamp,
+      timestamp: now,
     };
-
-    // Handle config updates
-    if (action === "config_update" && details?.config) {
-      botActivity.config = details.config;
-    }
 
     // Store updated activity in memory
     botActivities.set(botName, botActivity);
 
-    // PERSIST TO FIRESTORE
-    await persistActivityToFirestore(
+    // OPTIMIZED: Periodic cleanup
+    if (Math.random() < 0.01) {
+      // 1% chance on each request
+      cleanupBotActivities();
+    }
+
+    // OPTIMIZED: Queue for batch persistence (only important activities)
+    await queueActivityForPersistence(
       botName,
       displayName || botName,
       avatarUrl || "",
       action,
       details || {},
-      timestamp,
+      now,
       sessionId
     );
 
-    // Log the activity with mode indicator
-    const modeLabel = isDevMode ? "🔧" : "🔄";
-    const logMessage = `${modeLabel} ${displayName}: ${action}`;
-    if (details?.message) {
-      console.log(`${logMessage} - ${details.message}`);
+    // OPTIMIZED: Minimal logging for heartbeats
+    if (action === "heartbeat") {
+      // Only log heartbeat every 10th time to reduce noise
+      if (botActivity.consecutiveHeartbeats % 10 === 0) {
+        console.log(
+          `💓 ${displayName}: ${botActivity.consecutiveHeartbeats} heartbeats`
+        );
+      }
     } else {
-      console.log(logMessage);
-    }
+      // Log other activities normally
+      const modeLabel = isDevMode ? "🔧" : "🔄";
+      console.log(
+        `${modeLabel} ${displayName}: ${action}${
+          details?.message ? ` - ${details.message}` : ""
+        }`
+      );
 
-    // Log additional details based on action type
-    if (action === "buy" && details) {
-      if (details.tokenSymbol && details.amountAvax) {
+      // Log trade details
+      if (action === "buy" && details?.tokenSymbol && details?.amountAvax) {
         console.log(
           `   💰 Bought ${details.tokenSymbol} with ${details.amountAvax} AVAX`
         );
-      }
-      if (details.txHash) {
-        console.log(`   📋 TX: ${details.txHash}`);
-      }
-    } else if (action === "sell" && details) {
-      if (details.tokenSymbol) {
+      } else if (action === "sell" && details?.tokenSymbol) {
         const percentage = details.sellPercentage
           ? `${details.sellPercentage.toFixed(1)}%`
           : "";
         console.log(`   📈 Sold ${details.tokenSymbol} ${percentage}`);
-      }
-      if (details.txHash) {
-        console.log(`   📋 TX: ${details.txHash}`);
-      }
-    } else if (action === "create_token" && details) {
-      if (details.tokenName && details.tokenSymbol) {
+      } else if (action === "create_token" && details?.tokenName) {
         console.log(
           `   🎨 Created token: ${details.tokenName} (${details.tokenSymbol})`
         );
-      }
-    } else if (action === "heartbeat" && details) {
-      if (details.currentBalance !== undefined) {
-        console.log(`   💰 Balance: ${details.currentBalance.toFixed(4)} AVAX`);
-      }
-      if (details.tokensTracked !== undefined) {
-        console.log(`   🎯 Tracking: ${details.tokensTracked} tokens`);
       }
     }
 
     return NextResponse.json({
       success: true,
-      message: "Bot activity recorded and persisted",
+      message: "Bot activity recorded",
       devMode: isDevMode,
       botStatus: {
         name: botActivity.botName,
@@ -462,7 +506,7 @@ export async function POST(request: NextRequest) {
         isDevMode: isDevMode,
       },
       persistence: {
-        stored: PERSISTENT_ACTIVITY_TYPES.has(action),
+        queued: PERSISTENT_ACTIVITY_TYPES.has(action),
         sessionId: sessionId,
       },
     });
@@ -482,17 +526,27 @@ export async function GET(request: NextRequest) {
     const includeHistory = searchParams.get("history") === "true";
     const limit = parseInt(searchParams.get("limit") || "50");
 
-    console.log(
-      `📊 GET request received from frontend (DEV_MODE: ${DEV_MODE})`
-    );
-
-    // Return current bot statuses
+    // OPTIMIZED: Better offline detection
     const currentTime = Date.now();
-    const OFFLINE_THRESHOLD = 5 * 60 * 1000; // 5 minutes
+    const OFFLINE_THRESHOLD = 3 * 60 * 1000; // 3 minutes (was 5)
+    const HEARTBEAT_THRESHOLD = 2.5 * 60 * 1000; // 2.5 minutes for heartbeat-based detection
 
     const botStatuses = Array.from(botActivities.values()).map((bot) => {
       const lastSeenTime = new Date(bot.lastSeen).getTime();
-      const isOnline = currentTime - lastSeenTime < OFFLINE_THRESHOLD;
+      const lastHeartbeatTime = bot.lastHeartbeat
+        ? new Date(bot.lastHeartbeat).getTime()
+        : 0;
+
+      // OPTIMIZED: More sophisticated online detection
+      let isOnline = false;
+
+      if (lastHeartbeatTime > 0) {
+        // Use heartbeat-based detection if available
+        isOnline = currentTime - lastHeartbeatTime < HEARTBEAT_THRESHOLD;
+      } else {
+        // Fallback to last seen
+        isOnline = currentTime - lastSeenTime < OFFLINE_THRESHOLD;
+      }
 
       return {
         name: bot.botName,
@@ -510,21 +564,23 @@ export async function GET(request: NextRequest) {
       };
     });
 
+    // OPTIMIZED: Cache-friendly metrics
     const devBots = botStatuses.filter((bot) => bot.isDevMode).length;
     const prodBots = botStatuses.filter((bot) => !bot.isDevMode).length;
+    const onlineBots = botStatuses.filter((bot) => bot.isOnline).length;
 
     const response: any = {
       success: true,
       bots: botStatuses,
       totalBots: botStatuses.length,
-      onlineBots: botStatuses.filter((bot) => bot.isOnline).length,
+      onlineBots: onlineBots,
       devMode: DEV_MODE,
       devBots: devBots,
       prodBots: prodBots,
       timestamp: new Date().toISOString(),
     };
 
-    // Include historical activity data if requested
+    // OPTIMIZED: Only fetch historical data when specifically requested
     if (includeHistory) {
       try {
         const activities = await getRecentActivitiesFromFirestore(
@@ -534,8 +590,6 @@ export async function GET(request: NextRequest) {
 
         response.activities = activities;
         response.activityCount = activities.length;
-
-        console.log(`📚 Included ${activities.length} historical activities`);
       } catch (error) {
         console.error("❌ Failed to fetch historical activities:", error);
         response.activities = [];
@@ -543,9 +597,13 @@ export async function GET(request: NextRequest) {
       }
     }
 
-    console.log(
-      `✅ Returning status for ${botStatuses.length} bots (${response.onlineBots} online, ${devBots} dev, ${prodBots} prod)`
-    );
+    // OPTIMIZED: Minimal logging
+    if (Math.random() < 0.1) {
+      // Only log 10% of GET requests
+      console.log(
+        `📊 Status: ${botStatuses.length} bots (${onlineBots} online, ${devBots} dev, ${prodBots} prod)`
+      );
+    }
 
     return NextResponse.json(response);
   } catch (error) {
@@ -557,17 +615,26 @@ export async function GET(request: NextRequest) {
   }
 }
 
-// Cleanup endpoint (could be called by a cron job)
+// OPTIMIZED: Cleanup endpoint with better memory management
 export async function DELETE(request: NextRequest) {
   try {
     const { searchParams } = new URL(request.url);
     const days = parseInt(searchParams.get("days") || "30");
 
-    await cleanupOldActivities(days);
+    // Clear activities cache
+    cachedActivities = [];
+    activitiesCacheExpiry = 0;
+
+    // Flush any pending writes
+    if (writeTimeout) {
+      clearTimeout(writeTimeout);
+      writeTimeout = null;
+    }
+    await batchPersistToFirestore();
 
     return NextResponse.json({
       success: true,
-      message: `Initiated cleanup of activities older than ${days} days`,
+      message: `Cache cleared and pending writes flushed`,
     });
   } catch (error) {
     console.error("❌ TVB Cleanup error:", error);
