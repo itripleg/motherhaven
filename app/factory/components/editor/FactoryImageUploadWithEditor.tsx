@@ -1,10 +1,11 @@
-// app/factory/components/editor/FactoryImageUploadWithEditor.tsx - FIXED: Unified with DEX version
+// app/factory/components/editor/FactoryImageUploadWithEditor.tsx - FIXED: Inline editing for text, overlay only for image positioning
 "use client";
 
 import React, { useState, useRef } from "react";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
-import { Badge } from "@/components/ui/badge";
+import { Input } from "@/components/ui/input";
+import { Textarea } from "@/components/ui/textarea";
 import {
   X,
   Upload,
@@ -13,7 +14,8 @@ import {
   MessageSquare,
   Type,
   Hash,
-  Sparkles,
+  Check,
+  Edit3,
 } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
 import { FactoryImagePositionEditor } from "./ImagePositionEditor";
@@ -50,10 +52,13 @@ export const FactoryImageUploadWithEditor: React.FC<
   tokenName = "Your Token",
   tokenSymbol = "TOKEN",
 }) => {
-  const [isEditing, setIsEditing] = useState(false);
-  const [editMode, setEditMode] = useState<
-    "position" | "description" | "name" | "ticker" | null
-  >(null);
+  const [isEditingImage, setIsEditingImage] = useState(false);
+  const [editingField, setEditingField] = useState<string | null>(null);
+  const [tempValues, setTempValues] = useState({
+    name: tokenName,
+    symbol: tokenSymbol,
+    description: description,
+  });
   const [imageUrl, setImageUrl] = useState<string | undefined>(undefined);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
@@ -67,6 +72,15 @@ export const FactoryImageUploadWithEditor: React.FC<
       setImageUrl(undefined);
     }
   }, [imageFile]);
+
+  // Update temp values when props change
+  React.useEffect(() => {
+    setTempValues({
+      name: tokenName,
+      symbol: tokenSymbol,
+      description: description,
+    });
+  }, [tokenName, tokenSymbol, description]);
 
   const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
@@ -95,16 +109,45 @@ export const FactoryImageUploadWithEditor: React.FC<
     }
   };
 
-  const handleEditSave = () => {
-    setIsEditing(false);
-    setEditMode(null);
-    // Note: Position changes are handled immediately via onPositionChange
-    // No need to save to Firebase here - that happens during token creation
+  const handleSaveField = (field: string) => {
+    switch (field) {
+      case "name":
+        if (onTokenInfoChange && tempValues.name !== tokenName) {
+          onTokenInfoChange({ name: tempValues.name });
+        }
+        break;
+      case "symbol":
+        if (onTokenInfoChange && tempValues.symbol !== tokenSymbol) {
+          onTokenInfoChange({ ticker: tempValues.symbol });
+        }
+        break;
+      case "description":
+        if (tempValues.description !== description) {
+          onDescriptionChange(tempValues.description);
+        }
+        break;
+    }
+    setEditingField(null);
   };
 
-  const handleEditCancel = () => {
-    setIsEditing(false);
-    setEditMode(null);
+  const handleCancelEdit = () => {
+    setTempValues({
+      name: tokenName,
+      symbol: tokenSymbol,
+      description: description,
+    });
+    setEditingField(null);
+  };
+
+  const handleKeyDown = (e: React.KeyboardEvent, field: string) => {
+    if (e.key === "Escape") {
+      handleCancelEdit();
+    } else if (
+      e.key === "Enter" &&
+      (e.metaKey || e.ctrlKey || field !== "description")
+    ) {
+      handleSaveField(field);
+    }
   };
 
   return (
@@ -118,20 +161,20 @@ export const FactoryImageUploadWithEditor: React.FC<
       />
 
       <AnimatePresence mode="wait">
-        {isEditing ? (
+        {isEditingImage ? (
           <FactoryImagePositionEditor
             position={imagePosition}
             onPositionChange={onPositionChange}
             description={description}
             onDescriptionChange={onDescriptionChange}
             onTokenInfoChange={onTokenInfoChange}
-            onSave={handleEditSave}
-            onCancel={handleEditCancel}
+            onSave={() => setIsEditingImage(false)}
+            onCancel={() => setIsEditingImage(false)}
             isUpdating={false}
             imageUrl={imageUrl}
             tokenName={tokenName}
             tokenSymbol={tokenSymbol}
-            initialMode={editMode}
+            initialMode="position"
           />
         ) : (
           <motion.div
@@ -148,94 +191,26 @@ export const FactoryImageUploadWithEditor: React.FC<
               overlayOpacity={0.6}
             />
 
-            {/* Content Layer - Matches DEX TokenHeaderContent exactly */}
+            {/* Content Layer */}
             <div className="relative z-10 flex flex-col justify-between h-full p-4 lg:p-6">
               {/* Top Bar */}
               <div className="flex justify-between items-start mb-4 lg:mb-0">
                 <div className="min-w-0 flex-1">
-                  <div className="text-xs text-white/80 font-mono">0x1234...5678</div>
+                  <div className="text-xs text-white/80 font-mono">
+                    0x1234...5678
+                  </div>
                 </div>
 
                 <div className="flex items-center gap-2 lg:gap-3 ml-2 flex-shrink-0">
-                  <Badge
-                    className="bg-emerald-500/80 text-white border-0 text-xs lg:text-sm"
-                    variant="outline"
-                  >
-                    <Sparkles className="h-3 w-3 lg:h-4 lg:w-4 mr-1" />
-                    Trading
-                  </Badge>
-
-                  {/* Icon group - always visible */}
                   <div className="flex items-center gap-1 lg:gap-2 p-1 lg:p-1.5 bg-black/30 border border-white/40 rounded-lg backdrop-blur-sm">
-                    {/* Token Name Edit Button */}
-                    {onTokenInfoChange && (
-                      <Tooltip>
-                        <TooltipTrigger asChild>
-                          <Button
-                            variant="ghost"
-                            size="icon"
-                            onClick={() => {
-                              setEditMode("name");
-                              setIsEditing(true);
-                            }}
-                            className="text-white hover:text-primary hover:bg-primary/20 h-6 w-6 lg:h-7 lg:w-7 border border-white/40 hover:border-primary/50 transition-all duration-200"
-                          >
-                            <Type className="h-3 w-3 lg:h-4 lg:w-4" />
-                          </Button>
-                        </TooltipTrigger>
-                        <TooltipContent>Edit token name</TooltipContent>
-                      </Tooltip>
-                    )}
-
-                    {/* Token Symbol Edit Button */}
-                    {onTokenInfoChange && (
-                      <Tooltip>
-                        <TooltipTrigger asChild>
-                          <Button
-                            variant="ghost"
-                            size="icon"
-                            onClick={() => {
-                              setEditMode("ticker");
-                              setIsEditing(true);
-                            }}
-                            className="text-white hover:text-primary hover:bg-primary/20 h-6 w-6 lg:h-7 lg:w-7 border border-white/40 hover:border-primary/50 transition-all duration-200"
-                          >
-                            <Hash className="h-3 w-3 lg:h-4 lg:w-4" />
-                          </Button>
-                        </TooltipTrigger>
-                        <TooltipContent>Edit token symbol</TooltipContent>
-                      </Tooltip>
-                    )}
-
-                    {/* Description Edit Button */}
-                    <Tooltip>
-                      <TooltipTrigger asChild>
-                        <Button
-                          variant="ghost"
-                          size="icon"
-                          onClick={() => {
-                            setEditMode("description");
-                            setIsEditing(true);
-                          }}
-                          className="text-white hover:text-primary hover:bg-primary/20 h-6 w-6 lg:h-7 lg:w-7 border border-white/40 hover:border-primary/50 transition-all duration-200"
-                        >
-                          <MessageSquare className="h-3 w-3 lg:h-4 lg:w-4" />
-                        </Button>
-                      </TooltipTrigger>
-                      <TooltipContent>Edit description</TooltipContent>
-                    </Tooltip>
-
-                    {/* Image Position Edit Button */}
+                    {/* Image Position Edit Button - Only if image exists */}
                     {imageUrl && (
                       <Tooltip>
                         <TooltipTrigger asChild>
                           <Button
                             variant="ghost"
                             size="icon"
-                            onClick={() => {
-                              setEditMode("position");
-                              setIsEditing(true);
-                            }}
+                            onClick={() => setIsEditingImage(true)}
                             className="text-white hover:text-primary hover:bg-primary/20 h-6 w-6 lg:h-7 lg:w-7 border border-white/40 hover:border-primary/50 transition-all duration-200"
                           >
                             <Camera className="h-3 w-3 lg:h-4 lg:w-4" />
@@ -292,22 +267,182 @@ export const FactoryImageUploadWithEditor: React.FC<
                 </div>
               </div>
 
-              {/* Token Info */}
+              {/* Token Info with Inline Editing */}
               <div className="space-y-4 lg:space-y-6 flex-1">
                 <div className="space-y-2 lg:space-y-3">
-                  <h1 className="text-2xl lg:text-4xl font-bold text-white leading-tight">
-                    {tokenName}
-                    {tokenSymbol && (
-                      <span className="text-lg lg:text-2xl text-white/70 ml-2 lg:ml-3">
-                        ({tokenSymbol})
-                      </span>
-                    )}
-                  </h1>
+                  {/* Token Name - Inline Editing */}
+                  {editingField === "name" ? (
+                    <div className="space-y-2">
+                      <Input
+                        value={tempValues.name}
+                        onChange={(e) =>
+                          setTempValues({ ...tempValues, name: e.target.value })
+                        }
+                        onKeyDown={(e) => handleKeyDown(e, "name")}
+                        placeholder="Token Name"
+                        maxLength={32}
+                        className="text-lg lg:text-4xl font-bold bg-black/40 border-primary/30 text-white placeholder:text-white/50 h-12 lg:h-16"
+                        autoFocus
+                      />
+                      <div className="flex gap-2">
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          onClick={handleCancelEdit}
+                          className="text-white/80 hover:bg-red-500/20"
+                        >
+                          Cancel
+                        </Button>
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          onClick={() => handleSaveField("name")}
+                          className="text-primary hover:bg-primary/20"
+                        >
+                          <Check className="h-4 w-4 mr-1" />
+                          Save
+                        </Button>
+                      </div>
+                    </div>
+                  ) : (
+                    <div className="group flex items-start gap-2">
+                      <h1 className="text-2xl lg:text-4xl font-bold text-white leading-tight flex-1">
+                        {tokenName}
+                        {tokenSymbol && (
+                          <span className="text-lg lg:text-2xl text-white/70 ml-2 lg:ml-3">
+                            ({tokenSymbol})
+                          </span>
+                        )}
+                      </h1>
+                      {onTokenInfoChange && (
+                        <Button
+                          variant="ghost"
+                          size="icon"
+                          onClick={() => setEditingField("name")}
+                          className="h-8 w-8 opacity-0 group-hover:opacity-100 transition-opacity text-primary hover:bg-primary/20 flex-shrink-0"
+                        >
+                          <Edit3 className="h-4 w-4" />
+                        </Button>
+                      )}
+                    </div>
+                  )}
 
-                  {description && (
-                    <p className="text-white/70 text-sm lg:text-base max-w-2xl line-clamp-2">
-                      "{description}"
-                    </p>
+                  {/* Token Symbol - Inline Editing */}
+                  {editingField === "symbol" && onTokenInfoChange ? (
+                    <div className="space-y-2">
+                      <Input
+                        value={tempValues.symbol}
+                        onChange={(e) =>
+                          setTempValues({
+                            ...tempValues,
+                            symbol: e.target.value.toUpperCase(),
+                          })
+                        }
+                        onKeyDown={(e) => handleKeyDown(e, "symbol")}
+                        placeholder="TOKEN"
+                        maxLength={8}
+                        className="text-base bg-black/40 border-primary/30 text-white placeholder:text-white/50"
+                        autoFocus
+                      />
+                      <div className="flex gap-2">
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          onClick={handleCancelEdit}
+                          className="text-white/80 hover:bg-red-500/20"
+                        >
+                          Cancel
+                        </Button>
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          onClick={() => handleSaveField("symbol")}
+                          className="text-primary hover:bg-primary/20"
+                        >
+                          <Check className="h-4 w-4 mr-1" />
+                          Save
+                        </Button>
+                      </div>
+                    </div>
+                  ) : (
+                    onTokenInfoChange && (
+                      <div className="group flex items-center gap-2">
+                        <p className="text-white/70 text-sm">
+                          Symbol: ${tokenSymbol}
+                        </p>
+                        <Button
+                          variant="ghost"
+                          size="icon"
+                          onClick={() => setEditingField("symbol")}
+                          className="h-6 w-6 opacity-0 group-hover:opacity-100 transition-opacity text-primary hover:bg-primary/20"
+                        >
+                          <Edit3 className="h-3 w-3" />
+                        </Button>
+                      </div>
+                    )
+                  )}
+
+                  {/* Description - Inline Editing */}
+                  {editingField === "description" ? (
+                    <div className="space-y-2">
+                      <Textarea
+                        value={tempValues.description}
+                        onChange={(e) =>
+                          setTempValues({
+                            ...tempValues,
+                            description: e.target.value,
+                          })
+                        }
+                        onKeyDown={(e) => handleKeyDown(e, "description")}
+                        placeholder="Describe your token..."
+                        maxLength={280}
+                        className="min-h-[80px] resize-none bg-black/40 border-primary/30 text-white placeholder:text-white/50"
+                        autoFocus
+                      />
+                      <div className="flex items-center justify-between text-xs text-white/60 mb-2">
+                        <span>Press Esc to cancel, Ctrl+Enter to save</span>
+                        <span>{tempValues.description.length}/280</span>
+                      </div>
+                      <div className="flex gap-2">
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          onClick={handleCancelEdit}
+                          className="text-white/80 hover:bg-red-500/20"
+                        >
+                          Cancel
+                        </Button>
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          onClick={() => handleSaveField("description")}
+                          className="text-primary hover:bg-primary/20"
+                        >
+                          <Check className="h-4 w-4 mr-1" />
+                          Save
+                        </Button>
+                      </div>
+                    </div>
+                  ) : (
+                    <div className="group flex items-start gap-2">
+                      <p className="text-white/70 text-sm lg:text-base max-w-2xl line-clamp-2 flex-1">
+                        {description ? (
+                          `"${description}"`
+                        ) : (
+                          <span className="italic text-white/50">
+                            Click to add description
+                          </span>
+                        )}
+                      </p>
+                      <Button
+                        variant="ghost"
+                        size="icon"
+                        onClick={() => setEditingField("description")}
+                        className="h-6 w-6 opacity-0 group-hover:opacity-100 transition-opacity text-primary hover:bg-primary/20 flex-shrink-0"
+                      >
+                        <Edit3 className="h-3 w-3" />
+                      </Button>
+                    </div>
                   )}
                 </div>
 
@@ -317,29 +452,14 @@ export const FactoryImageUploadWithEditor: React.FC<
                     <span className="text-white/80 text-sm">Current Price</span>
                   </div>
                   <p className="text-white text-lg lg:text-xl font-bold">
-                    0.00001 <span className="text-white/70 text-sm lg:text-base">AVAX</span>
+                    0.00001{" "}
+                    <span className="text-white/70 text-sm lg:text-base">
+                      AVAX
+                    </span>
                   </p>
                 </div>
               </div>
             </div>
-
-            {/* Upload prompt when no image */}
-            {!imageUrl && (
-              <div className="absolute inset-0 flex items-center justify-center z-20">
-                <div
-                  onClick={handleUploadClick}
-                  className="bg-black/60 backdrop-blur-sm p-6 lg:p-8 rounded-xl border border-white/20 text-center cursor-pointer hover:bg-black/70 transition-colors active:scale-95"
-                >
-                  <Upload className="h-8 w-8 lg:h-12 lg:w-12 text-white mx-auto mb-3 lg:mb-4" />
-                  <p className="text-white text-base lg:text-lg font-medium mb-2">
-                    Upload Token Image
-                  </p>
-                  <p className="text-white/70 text-sm lg:text-base">
-                    Click to add a background image
-                  </p>
-                </div>
-              </div>
-            )}
           </motion.div>
         )}
       </AnimatePresence>
