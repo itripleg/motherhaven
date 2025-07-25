@@ -1,9 +1,6 @@
 // app/dex/components/TokenPriceCharts.tsx
 "use client";
 import React from "react";
-import { Card } from "@/components/ui/card";
-import RechartsLineChart from "./RechartsLineChart";
-// FINAL-HOOKS: Updated to use consolidated final-hooks
 import { useTokenData } from "@/final-hooks/useTokenData";
 import { useTrades } from "@/final-hooks/useTrades";
 import { Address } from "viem";
