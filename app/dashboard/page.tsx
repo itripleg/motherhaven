@@ -29,6 +29,7 @@ import { useRouter } from "next/navigation";
 // Import simplified components
 import { UserTokensCreated } from "./components/UserTokensCreated";
 import { UserTradingActivity } from "./components/UserTradingActivity";
+import { UserTokenBalances } from "./components/UserTokenBalances";
 
 export default function Dashboard() {
   const { address, isConnected } = useAccount();
@@ -75,6 +76,7 @@ export default function Dashboard() {
               <div className="flex flex-wrap gap-4 justify-center">
                 {[
                   { icon: Crown, text: "My Tokens" },
+                  { icon: Coins, text: "Token Balances" },
                   { icon: Activity, text: "Trading History" },
                 ].map((feature, index) => (
                   <motion.div
@@ -169,17 +171,27 @@ export default function Dashboard() {
               onValueChange={setActiveTab}
               className="w-full"
             >
-              <TabsList className="grid w-full grid-cols-2 mb-8">
+              <TabsList className="grid w-full grid-cols-3 mb-8">
                 <TabsTrigger value="tokens" className="flex items-center gap-2">
                   <Crown className="h-4 w-4" />
-                  <span>My Tokens</span>
+                  <span className="hidden sm:inline">My Tokens</span>
+                  <span className="sm:hidden">Tokens</span>
+                </TabsTrigger>
+                <TabsTrigger
+                  value="balances"
+                  className="flex items-center gap-2"
+                >
+                  <Coins className="h-4 w-4" />
+                  <span className="hidden sm:inline">Balances</span>
+                  <span className="sm:hidden">Balances</span>
                 </TabsTrigger>
                 <TabsTrigger
                   value="trading"
                   className="flex items-center gap-2"
                 >
                   <TrendingUp className="h-4 w-4" />
-                  <span>Trading</span>
+                  <span className="hidden sm:inline">Trading</span>
+                  <span className="sm:hidden">Trading</span>
                 </TabsTrigger>
               </TabsList>
 
@@ -194,6 +206,11 @@ export default function Dashboard() {
                   {/* My Tokens Tab */}
                   <TabsContent value="tokens" className="mt-0">
                     <UserTokensCreated />
+                  </TabsContent>
+
+                  {/* Token Balances Tab */}
+                  <TabsContent value="balances" className="mt-0">
+                    <UserTokenBalances />
                   </TabsContent>
 
                   {/* Trading Tab */}

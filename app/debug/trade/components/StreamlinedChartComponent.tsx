@@ -2,7 +2,7 @@
 
 "use client";
 
-import React from "react";
+import React, { useState } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -15,7 +15,8 @@ import {
 } from "lucide-react";
 // FINAL-HOOKS: Updated import to use consolidated final-hooks
 import { useTrades } from "@/final-hooks/useTrades";
-import RechartsLineChart from "@/app/dex/components/trading/RechartsLineChart";
+// NEW: Use the modular TokenChart component
+import { TokenChart } from "@/app/dex/components/trading/chart/TokenChart";
 import { formatDistanceToNow, parseISO } from "date-fns";
 
 interface StreamlinedChartComponentProps {
@@ -31,6 +32,7 @@ export function StreamlinedChartComponent({
 }: StreamlinedChartComponentProps) {
   // FINAL-HOOKS: Use consolidated trades hook with enhanced analytics
   const { trades, loading, error, analytics } = useTrades(token?.address);
+  const [chartKey, setChartKey] = useState(0);
 
   if (!tokenExists) {
     return (
@@ -51,6 +53,11 @@ export function StreamlinedChartComponent({
   const sellTrades = analytics.sellCount;
   const latestTrade = trades[0];
 
+  const handleRefresh = () => {
+    setChartKey((prev) => prev + 1);
+    window.location.reload();
+  };
+
   return (
     <div className="space-y-6">
       {/* Chart Header with Quick Stats using final-hooks analytics */}
@@ -59,9 +66,9 @@ export function StreamlinedChartComponent({
           <div className="flex items-center justify-between">
             <CardTitle className="flex items-center gap-2">
               <BarChart3 className="h-5 w-5 text-purple-500" />
-              Price Chart & Trade Data (Final-Hooks)
+              Advanced Price Chart (Modular Architecture)
               <Badge variant="outline" className="text-green-600">
-                final-hooks ✓
+                TokenChart ✓
               </Badge>
             </CardTitle>
             <div className="flex items-center gap-3">
@@ -99,7 +106,7 @@ export function StreamlinedChartComponent({
                 )}
 
                 <Button
-                  onClick={() => window.location.reload()}
+                  onClick={handleRefresh}
                   variant="outline"
                   size="sm"
                   className="gap-1"
@@ -136,44 +143,36 @@ export function StreamlinedChartComponent({
         </CardHeader>
       </Card>
 
-      {/* Main Chart */}
+      {/* Main Chart - Now using TokenChart component */}
       <Card>
         <CardHeader>
-          <CardTitle className="flex items-center gap-2 text-sm">
-            Real-time Chart Data
-            <Badge variant="outline" className="text-green-600">
-              Firestore + Events
-            </Badge>
+          <CardTitle className="flex items-center justify-between">
+            <div className="flex items-center gap-2 text-sm">
+              Modular Chart with Time Frames
+              <Badge variant="outline" className="text-green-600">
+                Time Frames + Analytics
+              </Badge>
+            </div>
           </CardTitle>
         </CardHeader>
-        <CardContent className="h-[400px] p-6">
+        <CardContent className="p-0">
           {error ? (
-            <div className="flex items-center justify-center h-full">
+            <div className="flex items-center justify-center h-[400px]">
               <div className="text-center">
                 <AlertCircle className="h-12 w-12 mx-auto text-red-500 mb-4" />
                 <p className="text-red-500 font-medium">Chart Error</p>
                 <p className="text-muted-foreground text-sm">{error}</p>
               </div>
             </div>
-          ) : trades.length === 0 && !loading ? (
-            <div className="flex items-center justify-center h-full">
-              <div className="text-center">
-                <BarChart3 className="h-12 w-12 mx-auto text-gray-400 mb-4" />
-                <h3 className="text-lg font-medium mb-2">No Trade Data</h3>
-                <p className="text-muted-foreground mb-4">
-                  This token hasn't been traded yet. The chart will appear once
-                  trades are made.
-                </p>
-                <Badge variant="outline" className="text-green-600">
-                  final-hooks ready for real-time updates
-                </Badge>
-              </div>
-            </div>
           ) : (
-            <RechartsLineChart
-              trades={trades}
-              loading={loading}
+            <TokenChart
+              key={chartKey}
               token={token}
+              height="h-[500px]"
+              showTimeFrames={true}
+              showAnalytics={true}
+              defaultTimeFrame="7d"
+              className="p-6"
             />
           )}
         </CardContent>
@@ -271,23 +270,55 @@ export function StreamlinedChartComponent({
         </Card>
       )}
 
-      {/* Final-Hooks Benefits Display */}
-      <Card className="bg-green-50 dark:bg-green-950/20 border-green-200">
+      {/* Modular Architecture Benefits Display */}
+      <Card className="bg-blue-50 dark:bg-blue-950/20 border-blue-200">
         <CardContent className="p-4">
-          <h5 className="font-medium text-green-700 dark:text-green-400 mb-2">
-            ✅ Final-Hooks Chart Benefits:
+          <h5 className="font-medium text-blue-700 dark:text-blue-400 mb-2">
+            ✅ Modular TokenChart Benefits:
           </h5>
-          <div className="grid md:grid-cols-2 gap-4 text-sm text-green-600 dark:text-green-300">
+          <div className="grid md:grid-cols-2 gap-4 text-sm text-blue-600 dark:text-blue-300">
             <ul className="space-y-1">
-              <li>• Real-time Firestore sync for instant updates</li>
-              <li>• Built-in analytics (buy pressure, avg size, etc.)</li>
-              <li>• Optimistic updates via EventWatcher</li>
+              <li>• Multiple time frame support (1H, 4H, 1D, 7D, 30D, ALL)</li>
+              <li>• Built-in analytics cards with buy pressure</li>
+              <li>• Reactive color theming that adapts to your theme</li>
+              <li>• Smart X-axis label density based on data points</li>
             </ul>
             <ul className="space-y-1">
-              <li>• Consistent data structure across all components</li>
-              <li>• Time-window filtering capabilities</li>
-              <li>• Reduced complexity with single import</li>
+              <li>• Separated concerns: data, UI, and logic</li>
+              <li>• Easy to extend with new time frames</li>
+              <li>• Reusable across different pages</li>
+              <li>• Genesis point support for token creation</li>
             </ul>
+          </div>
+        </CardContent>
+      </Card>
+
+      {/* Architecture Overview */}
+      <Card className="bg-purple-50 dark:bg-purple-950/20 border-purple-200">
+        <CardContent className="p-4">
+          <h5 className="font-medium text-purple-700 dark:text-purple-400 mb-2">
+            🏗️ Modular Architecture:
+          </h5>
+          <div className="text-sm text-purple-600 dark:text-purple-300 space-y-2">
+            <div className="font-mono text-xs bg-purple-100 dark:bg-purple-900/30 p-2 rounded">
+              components/trading/chart/
+              <br />
+              ├── TokenChart.tsx (main component)
+              <br />
+              ├── ChartCore.tsx (pure chart rendering)
+              <br />
+              ├── ChartAnalytics.tsx (metrics display)
+              <br />
+              ├── TimeFrameSelector.tsx (time switching)
+              <br />
+              ├── types.ts (interfaces)
+              <br />
+              └── hooks/ (data processing)
+            </div>
+            <p className="text-xs">
+              Each component has a single responsibility, making the system easy
+              to maintain and extend.
+            </p>
           </div>
         </CardContent>
       </Card>

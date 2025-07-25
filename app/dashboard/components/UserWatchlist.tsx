@@ -951,7 +951,7 @@ export function UserWatchlist() {
         {watchlistStats.topGainer && watchlistStats.topLoser && (
           <div className="pt-4 border-t border-border/50">
             <h4 className="text-sm font-semibold text-foreground mb-3">
-              Today's Highlights
+              Today&apos;s Highlights
             </h4>
             <div className="grid grid-cols-2 gap-4">
               <div className="unified-card border-green-400/30 bg-green-500/10 p-3">

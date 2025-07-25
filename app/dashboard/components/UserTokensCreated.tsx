@@ -31,11 +31,11 @@ import {
   BarChart3,
   DollarSign,
   Clock,
+  Sparkles,
 } from "lucide-react";
 import { collection, query, where, onSnapshot } from "firebase/firestore";
 import { db } from "@/firebase";
 import { formatTokenPrice } from "@/utils/tokenPriceFormatter";
-import Image from "next/image";
 
 interface CreatedToken {
   address: string;
@@ -52,7 +52,73 @@ interface CreatedToken {
     tradeCount: number;
     uniqueHolders: number;
   };
+  imagePosition?: {
+    x: number;
+    y: number;
+    scale: number;
+    rotation: number;
+    fit?: "cover" | "contain" | "fill";
+  };
 }
+
+// Background component similar to TokenHeaderBackground
+const TokenCardBackground: React.FC<{
+  imageUrl?: string;
+  position?: {
+    x: number;
+    y: number;
+    scale: number;
+    rotation: number;
+    fit?: "cover" | "contain" | "fill";
+  };
+  className?: string;
+}> = ({
+  imageUrl,
+  position = { x: 0, y: 0, scale: 1, rotation: 0, fit: "cover" },
+  className = "",
+}) => {
+  const getBackgroundStyle = () => {
+    if (!imageUrl) return {};
+
+    const { x, y, scale, rotation, fit = "cover" } = position;
+    const baseStyle = {
+      backgroundImage: `url(${imageUrl})`,
+      backgroundRepeat: "no-repeat",
+      transform: `rotate(${rotation}deg)`,
+      transformOrigin: "center center",
+      transition:
+        "transform 0.2s ease-out, background-position 0.2s ease-out, background-size 0.2s ease-out",
+    };
+
+    if (fit === "fill") {
+      return {
+        ...baseStyle,
+        backgroundSize: "100% 100%",
+        backgroundPosition: "center",
+      };
+    }
+
+    return {
+      ...baseStyle,
+      backgroundSize: `${100 * scale}% auto`,
+      backgroundPosition: `${50 + x}% ${50 + y}%`,
+    };
+  };
+
+  return (
+    <div className={`absolute inset-0 z-0 ${className}`}>
+      {imageUrl ? (
+        <div
+          className="absolute inset-0 bg-cover bg-center"
+          style={getBackgroundStyle()}
+        />
+      ) : (
+        <div className="absolute inset-0 bg-gradient-to-br from-primary/20 via-primary/10 to-primary/5" />
+      )}
+      <div className="absolute inset-0 bg-gradient-to-b from-black/60 via-black/40 to-black/70" />
+    </div>
+  );
+};
 
 export function UserTokensCreated() {
   const { address, isConnected } = useAccount();
@@ -91,6 +157,7 @@ export function UserTokensCreated() {
                 data.statistics?.currentPrice || data.lastPrice || "0.000001",
               state: data.currentState || data.state || 1,
               statistics: data.statistics,
+              imagePosition: data.imagePosition,
             };
           });
 
@@ -125,13 +192,15 @@ export function UserTokensCreated() {
 
     if (token.state === 2 || progress >= 100) {
       return (
-        <Badge className="bg-green-500/20 text-green-400 border-green-400/30">
+        <Badge className="bg-green-500/80 text-white border-0">
+          <Sparkles className="h-3 w-3 mr-1" />
           Completed
         </Badge>
       );
     } else if (progress >= 80) {
       return (
-        <Badge className="bg-yellow-500/20 text-yellow-400 border-yellow-400/30">
+        <Badge className="bg-yellow-500/80 text-white border-0">
+          <Target className="h-3 w-3 mr-1" />
           Near Goal
         </Badge>
       );
@@ -140,13 +209,15 @@ export function UserTokensCreated() {
       token.statistics.tradeCount > 10
     ) {
       return (
-        <Badge className="bg-blue-500/20 text-blue-400 border-blue-400/30">
+        <Badge className="bg-blue-500/80 text-white border-0">
+          <Activity className="h-3 w-3 mr-1" />
           Active
         </Badge>
       );
     }
     return (
-      <Badge className="bg-gray-500/20 text-gray-400 border-gray-400/30">
+      <Badge className="bg-gray-500/80 text-white border-0">
+        <Clock className="h-3 w-3 mr-1" />
         Funding
       </Badge>
     );
@@ -264,7 +335,7 @@ export function UserTokensCreated() {
           </div>
         )}
 
-        {/* Tokens List */}
+        {/* Tokens Grid */}
         <div className="space-y-4">
           {isLoading ? (
             <div className="flex items-center justify-center py-8">
@@ -301,209 +372,118 @@ export function UserTokensCreated() {
               </div>
             </motion.div>
           ) : (
-            <AnimatePresence>
-              {tokens.map((token, index) => {
-                const progress =
-                  (parseFloat(token.collateral) /
-                    parseFloat(token.fundingGoal)) *
-                  100;
-                const clampedProgress = Math.min(progress, 100);
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+              <AnimatePresence>
+                {tokens.map((token, index) => {
+                  const progress =
+                    (parseFloat(token.collateral) /
+                      parseFloat(token.fundingGoal)) *
+                    100;
+                  const clampedProgress = Math.min(progress, 100);
 
-                return (
-                  <motion.div
-                    key={token.address}
-                    initial={{ opacity: 0, y: 20 }}
-                    animate={{ opacity: 1, y: 0 }}
-                    transition={{ delay: index * 0.1 }}
-                    className="unified-card border-primary/20 bg-primary/5 p-3 sm:p-4 hover:bg-primary/10 transition-all duration-300 cursor-pointer group"
-                    onClick={() => router.push(`/dex/${token.address}`)}
-                  >
-                    {/* Mobile Layout */}
-                    <div className="block sm:hidden space-y-3">
-                      {/* Header Row - Image, Name, Progress */}
-                      <div className="flex items-start gap-3">
-                        <div className="relative w-10 h-10 rounded-full overflow-hidden bg-primary/20 flex-shrink-0">
-                          {token.imageUrl ? (
-                            <Image
-                              src={token.imageUrl}
-                              alt={token.name}
-                              fill
-                              className="object-cover"
-                              unoptimized
-                            />
-                          ) : (
-                            <div className="w-full h-full flex items-center justify-center">
-                              <span className="text-sm font-bold text-primary">
-                                {token.symbol[0]}
-                              </span>
-                            </div>
-                          )}
-                        </div>
-                        <div className="flex-1 min-w-0">
-                          <div className="flex items-center justify-between mb-1">
-                            <h3 className="font-semibold text-foreground text-sm truncate pr-2">
-                              {token.name} ({token.symbol})
+                  return (
+                    <motion.div
+                      key={token.address}
+                      initial={{ opacity: 0, y: 20 }}
+                      animate={{ opacity: 1, y: 0 }}
+                      transition={{ delay: index * 0.1 }}
+                      className="relative h-48 rounded-xl overflow-hidden border border-primary/20 cursor-pointer group hover:scale-105 transition-transform duration-300"
+                      onClick={() => router.push(`/dex/${token.address}`)}
+                    >
+                      {/* Background Image */}
+                      <TokenCardBackground
+                        imageUrl={token.imageUrl}
+                        position={token.imagePosition}
+                      />
+
+                      {/* Content */}
+                      <div className="relative z-10 p-4 h-full flex flex-col justify-between">
+                        {/* Header */}
+                        <div className="flex items-start justify-between">
+                          <div className="min-w-0 flex-1">
+                            <h3 className="font-bold text-white text-lg leading-tight mb-1 truncate">
+                              {token.name}
                             </h3>
-                            <p
-                              className={`text-sm font-bold ${getPerformanceColor(
-                                progress
-                              )} flex-shrink-0`}
-                            >
-                              {clampedProgress.toFixed(1)}%
+                            <p className="text-white/70 text-sm truncate">
+                              ${token.symbol}
                             </p>
                           </div>
-                          {getTokenStatusBadge(token)}
-                        </div>
-                      </div>
-
-                      {/* Progress Bar */}
-                      <div>
-                        <Progress
-                          value={clampedProgress}
-                          className="h-2 mb-1"
-                        />
-                        <div className="flex justify-between text-xs text-muted-foreground">
-                          <span>{token.collateral} AVAX</span>
-                          <span>Goal: {token.fundingGoal} AVAX</span>
-                        </div>
-                      </div>
-
-                      {/* Stats and Actions */}
-                      <div className="flex items-center justify-between">
-                        <div className="flex items-center gap-3 text-xs text-muted-foreground">
-                          <span className="flex items-center gap-1">
-                            <Activity className="h-3 w-3" />
-                            {token.statistics?.tradeCount || 0}
-                          </span>
-                          <span className="flex items-center gap-1">
-                            <Users className="h-3 w-3" />
-                            {token.statistics?.uniqueHolders || 0}
-                          </span>
-                          <span className="flex items-center gap-1">
-                            <Clock className="h-3 w-3" />
-                            {timeAgo(token.createdAt)}
-                          </span>
-                        </div>
-                        <Button
-                          variant="ghost"
-                          size="sm"
-                          onClick={(e) => {
-                            e.stopPropagation();
-                            router.push(`/dex/${token.address}`);
-                          }}
-                          className="h-7 px-2 text-xs hover:bg-primary/20"
-                        >
-                          <Eye className="h-3 w-3" />
-                        </Button>
-                      </div>
-                    </div>
-
-                    {/* Desktop Layout */}
-                    <div className="hidden sm:flex items-start gap-4">
-                      {/* Token Image */}
-                      <div className="relative w-12 h-12 rounded-full overflow-hidden bg-primary/20 flex-shrink-0">
-                        {token.imageUrl ? (
-                          <Image
-                            src={token.imageUrl}
-                            alt={token.name}
-                            fill
-                            className="object-cover"
-                            unoptimized
-                          />
-                        ) : (
-                          <div className="w-full h-full flex items-center justify-center">
-                            <span className="text-lg font-bold text-primary">
-                              {token.symbol[0]}
-                            </span>
+                          <div className="flex-shrink-0 ml-2">
+                            {getTokenStatusBadge(token)}
                           </div>
-                        )}
-                      </div>
+                        </div>
 
-                      {/* Token Info */}
-                      <div className="flex-1 min-w-0">
-                        <div className="flex items-start justify-between mb-2">
+                        {/* Progress Section */}
+                        <div className="space-y-3">
+                          {/* Progress Bar */}
                           <div>
-                            <div className="flex items-center gap-2 mb-1">
-                              <h3 className="font-semibold text-foreground truncate">
-                                {token.name}
-                              </h3>
-                              <span className="text-sm text-muted-foreground">
-                                ({token.symbol})
+                            <div className="flex items-center justify-between mb-2">
+                              <span className="text-white/80 text-sm">
+                                Funding Progress
                               </span>
-                              {getTokenStatusBadge(token)}
+                              <span
+                                className={`text-sm font-bold ${getPerformanceColor(
+                                  progress
+                                )}`}
+                              >
+                                {clampedProgress.toFixed(1)}%
+                              </span>
                             </div>
-                            <div className="flex items-center gap-4 text-sm text-muted-foreground">
-                              <span className="flex items-center gap-1">
-                                <Clock className="h-3 w-3" />
-                                {timeAgo(token.createdAt)}
-                              </span>
-                              <span className="flex items-center gap-1">
-                                <DollarSign className="h-3 w-3" />
-                                {formatTokenPrice(token.currentPrice)} AVAX
-                              </span>
+                            <Progress
+                              value={clampedProgress}
+                              className="h-2 bg-black/30"
+                            />
+                            <div className="flex justify-between text-xs text-white/60 mt-1">
+                              <span>{token.collateral} AVAX</span>
+                              <span>Goal: {token.fundingGoal} AVAX</span>
                             </div>
                           </div>
-                          <div className="text-right">
-                            <p
-                              className={`text-lg font-bold ${getPerformanceColor(
-                                progress
-                              )}`}
-                            >
-                              {clampedProgress.toFixed(1)}%
-                            </p>
-                            <p className="text-xs text-muted-foreground">
-                              {token.collateral} / {token.fundingGoal} AVAX
-                            </p>
+
+                          {/* Stats Row */}
+                          <div className="flex items-center justify-between text-xs text-white/80">
+                            <div className="flex items-center gap-3">
+                              <span className="flex items-center gap-1">
+                                <Activity className="h-3 w-3" />
+                                {token.statistics?.tradeCount || 0}
+                              </span>
+                              <span className="flex items-center gap-1">
+                                <Users className="h-3 w-3" />
+                                {token.statistics?.uniqueHolders || 0}
+                              </span>
+                            </div>
+                            <span className="flex items-center gap-1">
+                              <Clock className="h-3 w-3" />
+                              {timeAgo(token.createdAt)}
+                            </span>
+                          </div>
+
+                          {/* Current Price */}
+                          <div className="flex items-center justify-between">
+                            <span className="text-white/80 text-sm">
+                              Current Price
+                            </span>
+                            <span className="text-white font-semibold">
+                              {formatTokenPrice(token.currentPrice)} AVAX
+                            </span>
                           </div>
                         </div>
 
-                        {/* Progress Bar */}
-                        <div className="mb-3">
-                          <Progress value={clampedProgress} className="h-2" />
-                        </div>
-
-                        {/* Stats Row */}
-                        <div className="flex items-center justify-between">
-                          <div className="flex items-center gap-4 text-xs text-muted-foreground">
-                            <span className="flex items-center gap-1">
-                              <Activity className="h-3 w-3" />
-                              {token.statistics?.tradeCount || 0} trades
-                            </span>
-                            <span className="flex items-center gap-1">
-                              <Users className="h-3 w-3" />
-                              {token.statistics?.uniqueHolders || 0} holders
-                            </span>
-                            <span className="flex items-center gap-1">
-                              <BarChart3 className="h-3 w-3" />
-                              {formatTokenPrice(
-                                token.statistics?.volumeETH || "0"
-                              )}{" "}
-                              vol
-                            </span>
-                          </div>
-
-                          <div className="flex items-center gap-2">
-                            <Button
-                              variant="ghost"
-                              size="sm"
-                              onClick={(e) => {
-                                e.stopPropagation();
-                                router.push(`/dex/${token.address}`);
-                              }}
-                              className="h-7 px-3 text-xs hover:bg-primary/20"
-                            >
-                              <Eye className="h-3 w-3 mr-1" />
-                              View
-                            </Button>
-                            <ArrowUpRight className="h-4 w-4 text-muted-foreground group-hover:text-primary transition-colors" />
+                        {/* Hover Overlay */}
+                        <div className="absolute inset-0 bg-primary/20 opacity-0 group-hover:opacity-100 transition-opacity duration-300 flex items-center justify-center">
+                          <div className="bg-black/80 backdrop-blur-sm px-4 py-2 rounded-lg border border-white/20">
+                            <div className="flex items-center gap-2 text-white">
+                              <Eye className="h-4 w-4" />
+                              <span className="font-medium">View Token</span>
+                              <ArrowUpRight className="h-4 w-4" />
+                            </div>
                           </div>
                         </div>
                       </div>
-                    </div>
-                  </motion.div>
-                );
-              })}
-            </AnimatePresence>
+                    </motion.div>
+                  );
+                })}
+              </AnimatePresence>
+            </div>
           )}
         </div>
 
@@ -514,6 +494,13 @@ export function UserTokensCreated() {
               <p className="text-sm text-muted-foreground">
                 Manage your token portfolio and track performance
               </p>
+              <Button
+                onClick={() => router.push("/dex/factory")}
+                className="btn-primary"
+              >
+                <Plus className="h-4 w-4 mr-2" />
+                Create New Token
+              </Button>
             </div>
           </div>
         )}

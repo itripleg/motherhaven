@@ -1,4 +1,4 @@
-// app/dex/components/trading/SellTokenFormOptimized.tsx - SIMPLIFIED: Cleaner, more maintainable code
+// app/dex/components/trading/SellTokenFormOptimized.tsx - FIXED: Success message shows amount
 "use client";
 
 import { useState, useEffect, useMemo, useRef, useCallback } from "react";
@@ -81,6 +81,12 @@ export function SellTokenFormOptimized({
 
   // Transaction state
   const [transactionError, setTransactionError] = useState<string | null>(null);
+
+  // 🔧 NEW: Store pending transaction details to fix success message
+  const [pendingTransaction, setPendingTransaction] = useState<{
+    amount: string;
+    symbol: string;
+  } | null>(null);
 
   // Refs for optimization
   const debounceTimeoutRef = useRef<NodeJS.Timeout | null>(null);
@@ -239,6 +245,8 @@ export function SellTokenFormOptimized({
       const errorMessage = parseContractError(error);
       setTransactionError(errorMessage);
       reset();
+      // Clear pending transaction on error
+      setPendingTransaction(null);
       toast({
         title: "Transaction Failed",
         description: errorMessage,
@@ -257,23 +265,32 @@ export function SellTokenFormOptimized({
     }
   }, [simulationError, amount, validation.valid, transactionError]);
 
-  // Success handling
+  // 🔧 FIXED: Success handling with stored transaction details
   useEffect(() => {
     if (sellReceipt?.status === "success") {
       const txHash = sellReceipt.transactionHash;
       if (lastSuccessfulTxRef.current !== txHash) {
         lastSuccessfulTxRef.current = txHash;
         setTransactionError(null);
+
+        // Use stored transaction details
+        const transactionDetails = pendingTransaction || {
+          amount: "unknown",
+          symbol: token?.symbol || "tokens",
+        };
+
         toast({
           title: "Sale Successful!",
-          description: `Successfully sold ${amount} ${
-            token?.symbol || "tokens"
-          }`,
+          description: `Successfully sold ${transactionDetails.amount} ${transactionDetails.symbol}`,
         });
+
+        // Clear everything
         setAmount("");
         setEstimatedEthOut("0");
+        setPendingTransaction(null);
       }
     } else if (sellReceipt?.status === "reverted") {
+      setPendingTransaction(null); // Clear on revert
       setTransactionError("Transaction was reverted");
       toast({
         title: "Transaction Reverted",
@@ -281,7 +298,7 @@ export function SellTokenFormOptimized({
         variant: "destructive",
       });
     }
-  }, [sellReceipt, amount, token?.symbol, toast]);
+  }, [sellReceipt, pendingTransaction, token?.symbol, toast]);
 
   // Event handlers
   const handleSubmit = async (e: React.FormEvent) => {
@@ -298,6 +315,12 @@ export function SellTokenFormOptimized({
     setTransactionError(null);
     reset();
 
+    // 🔧 NEW: Store transaction details before submitting
+    setPendingTransaction({
+      amount,
+      symbol: token.symbol,
+    });
+
     try {
       const amountWei = parseEther(amount);
       const minEthWei = parseEther(minEthOut);
@@ -311,11 +334,12 @@ export function SellTokenFormOptimized({
 
       toast({
         title: "Transaction Submitted",
-        description: `Selling with ${slippageTolerance}% slippage protection...`,
+        description: `Selling ${amount} ${token.symbol} with ${slippageTolerance}% slippage protection...`,
       });
     } catch (error) {
       const errorMessage = parseContractError(error);
       setTransactionError(errorMessage);
+      setPendingTransaction(null); // Clear on submit error
       toast({
         title: "Transaction Failed",
         description: errorMessage,
@@ -495,6 +519,7 @@ export function SellTokenFormOptimized({
             type="button"
             onClick={() => {
               setTransactionError(null);
+              setPendingTransaction(null);
               reset();
             }}
             className="text-xs text-destructive/70 hover:text-destructive underline mt-1"
@@ -514,15 +539,15 @@ export function SellTokenFormOptimized({
         </div>
       )}
 
-      {/* Success Receipt */}
-      {sellReceipt?.status === "success" && sellData && (
+      {/* 🔧 FIXED: Success Receipt now shows correct amount */}
+      {sellReceipt?.status === "success" && sellData && pendingTransaction && (
         <div className="p-3 bg-primary/10 border border-primary/20 rounded-lg">
           <p className="font-semibold text-foreground mb-2">Sale Successful!</p>
           <div className="text-sm space-y-1">
             <div className="flex justify-between">
               <span>Tokens Sold:</span>
               <span>
-                {amount} {token.symbol}
+                {pendingTransaction.amount} {pendingTransaction.symbol}
               </span>
             </div>
             <div className="flex justify-between">

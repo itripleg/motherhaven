@@ -11,7 +11,7 @@ import { FactoryConfigProvider } from "@/contexts/FactoryConfigProvider";
 import { ColorThemeProvider } from "@/contexts/ColorThemeProvider";
 import { NetworkGuard } from "@/components/NetworkGuard";
 import { NetworkDebug } from "@/components/NetworkDebug";
-import {AnimatedTestyPeek} from "@/app/pet/components/AnimatedTestyPeek"
+import { AnimatedTestyPeek } from "@/app/pet/components/AnimatedTestyPeek";
 import Script from "next/script";
 
 const geistSans = localFont({
@@ -46,7 +46,7 @@ export const metadata: Metadata = {
     "crypto",
     "blockchain",
     "memecoin",
-    "tokenomics"
+    "tokenomics",
   ],
   authors: [{ name: "Motherhaven Team" }],
   creator: "Motherhaven",
@@ -167,11 +167,11 @@ export default function RootLayout({
                 <main id="main-content" className="min-h-screen">
                   <FactoryConfigProvider>
                     <EventWatcher />
-                    <AnimatedTestyPeek 
-  petIsAlive={false} 
-  petName={"Testy"}
-  isOnStatusTab={false}
-/>
+                    <AnimatedTestyPeek
+                      petIsAlive={true}
+                      petName={"Testy"}
+                      isOnStatusTab={false}
+                    />
                     {children}
                     <Toaster />
                   </FactoryConfigProvider>
