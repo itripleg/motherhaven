@@ -1,4 +1,4 @@
-// app/factory/components/MobileImageUpload.tsx - FIXED: Unified with DEX version
+// app/factory/components/MobileImageUpload.tsx - FIXED: Allow both camera and file upload
 "use client";
 
 import React, { useState, useRef } from "react";
@@ -8,7 +8,16 @@ import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { Badge } from "@/components/ui/badge";
 import { motion, AnimatePresence } from "framer-motion";
-import { X, Upload, Camera, Edit3, Check, Crown, Sparkles } from "lucide-react";
+import {
+  X,
+  Upload,
+  Camera,
+  Edit3,
+  Check,
+  Crown,
+  Sparkles,
+  Image as ImageIcon,
+} from "lucide-react";
 import { ImagePosition } from "./editor/types";
 
 interface MobileImageUploadProps {
@@ -42,6 +51,7 @@ export const MobileImageUpload: React.FC<MobileImageUploadProps> = ({
     description: description,
   });
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const cameraInputRef = useRef<HTMLInputElement>(null);
 
   // Create preview URL from file
   React.useEffect(() => {
@@ -83,10 +93,17 @@ export const MobileImageUpload: React.FC<MobileImageUploadProps> = ({
     fileInputRef.current?.click();
   };
 
+  const handleCameraClick = () => {
+    cameraInputRef.current?.click();
+  };
+
   const removeImage = () => {
     onImageChange(null);
     if (fileInputRef.current) {
       fileInputRef.current.value = "";
+    }
+    if (cameraInputRef.current) {
+      cameraInputRef.current.value = "";
     }
   };
 
@@ -151,9 +168,16 @@ export const MobileImageUpload: React.FC<MobileImageUploadProps> = ({
 
   return (
     <div className="space-y-6">
-      {/* Hidden file input */}
+      {/* Hidden file inputs - FIXED: Separated camera and file upload */}
       <input
         ref={fileInputRef}
+        type="file"
+        accept="image/*"
+        onChange={handleFileChange}
+        className="hidden"
+      />
+      <input
+        ref={cameraInputRef}
         type="file"
         accept="image/*"
         capture="environment"
@@ -187,22 +211,26 @@ export const MobileImageUpload: React.FC<MobileImageUploadProps> = ({
             </div>
 
             <div className="flex items-center gap-2 ml-2 flex-shrink-0">
-              <Badge
-                className="bg-emerald-500/80 text-white border-0 text-xs"
-                variant="outline"
-              >
-                <Sparkles className="h-3 w-3 mr-1" />
-                Trading
-              </Badge>
-
               <div className="flex items-center gap-1 p-1 bg-black/30 border border-white/40 rounded-lg backdrop-blur-sm">
+                {/* FIXED: Separate camera and upload buttons */}
+                <Button
+                  variant="ghost"
+                  size="icon"
+                  onClick={handleCameraClick}
+                  className="text-white hover:text-primary hover:bg-primary/20 h-6 w-6 border border-white/40 hover:border-primary/50"
+                  title="Take Photo"
+                >
+                  <Camera className="h-3 w-3" />
+                </Button>
+
                 <Button
                   variant="ghost"
                   size="icon"
                   onClick={handleUploadClick}
                   className="text-white hover:text-primary hover:bg-primary/20 h-6 w-6 border border-white/40 hover:border-primary/50"
+                  title="Upload Image"
                 >
-                  <Camera className="h-3 w-3" />
+                  <ImageIcon className="h-3 w-3" />
                 </Button>
 
                 {imageFile && (
@@ -410,26 +438,7 @@ export const MobileImageUpload: React.FC<MobileImageUploadProps> = ({
           </div>
         </div>
 
-        {/* Upload Prompt Overlay (when no image) */}
-        {!imageUrl && (
-          <div className="absolute inset-0 flex items-center justify-center z-20">
-            <div
-              onClick={handleUploadClick}
-              className="bg-black/60 backdrop-blur-sm p-6 rounded-xl border border-white/20 text-center cursor-pointer hover:bg-black/70 transition-colors active:scale-95"
-            >
-              <div className="flex items-center gap-2 mb-3">
-                <Upload className="h-6 w-6 text-white" />
-                <Camera className="h-6 w-6 text-white" />
-              </div>
-              <p className="text-white text-lg font-medium mb-2">
-                Add Token Image
-              </p>
-              <p className="text-white/70 text-sm">
-                Tap to upload or take photo
-              </p>
-            </div>
-          </div>
-        )}
+        {/* Upload prompt when no image - Mobile: Use top bar buttons only */}
       </Card>
 
       {/* Upload Status */}
