@@ -168,9 +168,9 @@ export default function RootLayout({
                   <FactoryConfigProvider>
                     <EventWatcher />
                     <AnimatedTestyPeek 
-  petIsAlive={true} 
-  petName={"Testy"} 
-  isOnStatusTab={false} // Always show on community tab
+  petIsAlive={false} 
+  petName={"Testy"}
+  isOnStatusTab={false}
 />
                     {children}
                     <Toaster />

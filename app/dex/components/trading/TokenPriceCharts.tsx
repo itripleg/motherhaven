@@ -7,6 +7,7 @@ import RechartsLineChart from "./RechartsLineChart";
 import { useTokenData } from "@/final-hooks/useTokenData";
 import { useTrades } from "@/final-hooks/useTrades";
 import { Address } from "viem";
+import { TokenChart } from "./chart/TokenChart";
 
 interface TokenPriceChartsProps {
   address: string;
@@ -20,7 +21,6 @@ export function TokenPriceCharts({ address }: TokenPriceChartsProps) {
     error: tokenError,
   } = useTokenData(address as Address);
 
-  // FINAL-HOOKS: Use consolidated trades hook with enhanced analytics
   const {
     trades,
     loading: tradesLoading,
@@ -46,22 +46,9 @@ export function TokenPriceCharts({ address }: TokenPriceChartsProps) {
     return null;
   }
 
-  // FINAL-HOOKS: Component is now much simpler - let the chart handle its own analytics
   return (
     <div className="grid gap-4 md:grid-cols-1 ">
-      {/* Chart with built-in analytics */}{" "}
-      {/* Let chart control its own height */}
-      <RechartsLineChart trades={trades} loading={loading} token={token} />
-      {/* Optional: Add TradingView chart if available */}
-      {/* 
-      <Card className="h-[400px] p-6">
-        <TVChart 
-          trades={trades}
-          token={token}
-          analytics={analytics}
-        />
-      </Card>
-      */}
+      <TokenChart token={token} />
     </div>
   );
 }

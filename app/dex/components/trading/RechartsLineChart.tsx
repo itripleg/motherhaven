@@ -1,4 +1,4 @@
-// Fixed RechartsLineChart.tsx - Proper genesis point handling + Theme reactivity
+// Fixed RechartsLineChart.tsx - Proper genesis point handling + Theme reactivity + Reduced X-axis labels
 "use client";
 import React, { useMemo, useState, useEffect } from "react";
 import {
@@ -119,6 +119,15 @@ const validateTrade = (trade: Trade): boolean => {
   return true;
 };
 
+// Function to calculate smart tick interval for X-axis
+const calculateTickInterval = (dataLength: number): number => {
+  if (dataLength <= 5) return 0; // Show all ticks
+  if (dataLength <= 10) return 1; // Show every other tick
+  if (dataLength <= 20) return Math.floor(dataLength / 10); // Show ~10 ticks
+  if (dataLength <= 50) return Math.floor(dataLength / 8); // Show ~8 ticks
+  return Math.floor(dataLength / 6); // Show ~6 ticks for large datasets
+};
+
 // The main chart component
 export default function RechartsLineChart({
   trades,
@@ -236,6 +245,11 @@ export default function RechartsLineChart({
     // If no creation time, just return trade points
     return tradePoints;
   }, [trades, token.createdAt]);
+
+  // Calculate smart interval for X-axis ticks
+  const tickInterval = useMemo(() => {
+    return calculateTickInterval(chartData.length);
+  }, [chartData.length]);
 
   // Enhanced analytics calculation with validation
   const analytics = useMemo(() => {
@@ -438,7 +452,7 @@ export default function RechartsLineChart({
                 fontSize={11}
                 tickLine={false}
                 axisLine={false}
-                interval="preserveStartEnd"
+                interval={tickInterval}
                 angle={-45}
                 textAnchor="end"
                 height={40}
