@@ -16,7 +16,7 @@ import {
 } from "lucide-react";
 // FINAL-HOOKS: Updated import to use consolidated final-hooks
 import { useTrades } from "@/final-hooks/useTrades";
-import RechartsLineChart from "@/app/dex/components/trading/RechartsLineChart";
+// import RechartsLineChart from "@/app/dex/components/trading/RechartsLineChart";
 import { formatDistanceToNow, parseISO } from "date-fns";
 
 interface ChartVerificationProps {
@@ -167,12 +167,12 @@ export function ChartVerification({
                 <p className="text-muted-foreground text-sm">{error}</p>
               </div>
             </div>
-          ) : (
-            <RechartsLineChart
-              trades={trades}
-              loading={loading}
-              token={token}
-            />
+          ) : (<div>old chart</div>
+            // <RechartsLineChart
+            //   trades={trades}
+            //   loading={loading}
+            //   token={token}
+            // />
           )}
         </CardContent>
       </Card>
