@@ -1,4 +1,4 @@
-// app/factory/components/FactoryHeader.tsx
+// app/factory/components/FactoryHeader.tsx - UPDATED: Contract stats only, no Firebase reads
 import { motion } from "framer-motion";
 import {
   Rocket,
@@ -14,8 +14,6 @@ import {
 
 interface PlatformStats {
   totalTokens: number;
-  activeTraders: number;
-  totalVolume: string;
   loading: boolean;
 }
 
@@ -167,69 +165,41 @@ export function FactoryHeader({ platformStats }: FactoryHeaderProps) {
         ))}
       </motion.div>
 
-      {/* Real Platform Stats - Optimized for mobile */}
+      {/* Contract-based Platform Stats - Just token count */}
       <motion.div
         initial={{ y: 40, opacity: 0 }}
         animate={{ y: 0, opacity: 1 }}
         transition={{ delay: 1.2, duration: 0.8 }}
-        className="grid grid-cols-3 gap-4 md:gap-8 max-w-xs md:max-w-md mx-auto"
+        className="flex justify-center"
       >
-        {platformStats.loading
-          ? // Loading state
-            [...Array(3)].map((_, index) => (
-              <div key={index} className="text-center">
-                <div className="flex items-center justify-center mb-2">
-                  <Loader2 className="h-5 w-5 md:h-6 md:w-6 text-primary animate-spin" />
-                </div>
-                <div className="text-xs md:text-sm text-muted-foreground">
-                  Loading...
-                </div>
-              </div>
-            ))
-          : // Real stats
-            [
-              {
-                value: platformStats.totalTokens,
-                label: "Tokens Created",
-                suffix: platformStats.totalTokens >= 1000 ? "+" : "",
-                formatValue: (val: number) =>
-                  val >= 1000 ? `${(val / 1000).toFixed(1)}K` : val.toString(),
-              },
-              {
-                value: platformStats.activeTraders,
-                label: "Active Traders",
-                suffix: "",
-                formatValue: (val: number) =>
-                  val >= 1000 ? `${(val / 1000).toFixed(1)}K` : val.toString(),
-              },
-              {
-                value: parseFloat(platformStats.totalVolume),
-                label: "Volume (AVAX)",
-                suffix: platformStats.totalVolume.includes(".") ? "" : "+",
-                formatValue: (val: number) =>
-                  val >= 1000 ? `${(val / 1000).toFixed(1)}K` : val.toFixed(1),
-              },
-            ].map((stat, index) => (
-              <motion.div
-                key={stat.label}
-                initial={{ scale: 0.8, opacity: 0 }}
-                animate={{ scale: 1, opacity: 1 }}
-                transition={{
-                  delay: 1.3 + index * 0.1,
-                  duration: 0.6,
-                  type: "spring",
-                }}
-                className="text-center"
-              >
-                <div className="text-xl md:text-2xl font-bold text-primary">
-                  {stat.formatValue(stat.value)}
-                  <span className="text-primary/70">{stat.suffix}</span>
-                </div>
-                <div className="text-xs md:text-sm text-muted-foreground mt-1">
-                  {stat.label}
-                </div>
-              </motion.div>
-            ))}
+        {platformStats.loading ? (
+          <div className="text-center">
+            <div className="flex items-center justify-center mb-2">
+              <Loader2 className="h-6 w-6 text-primary animate-spin" />
+            </div>
+            <div className="text-sm text-muted-foreground">Loading...</div>
+          </div>
+        ) : (
+          <motion.div
+            initial={{ scale: 0.8, opacity: 0 }}
+            animate={{ scale: 1, opacity: 1 }}
+            transition={{
+              delay: 1.3,
+              duration: 0.6,
+              type: "spring",
+            }}
+            className="text-center"
+          >
+            <div className="text-3xl md:text-4xl font-bold text-primary mb-2">
+              {platformStats.totalTokens >= 1000
+                ? `${(platformStats.totalTokens / 1000).toFixed(1)}K`
+                : platformStats.totalTokens.toString()}
+            </div>
+            <div className="text-sm md:text-base text-muted-foreground">
+              Tokens Created
+            </div>
+          </motion.div>
+        )}
       </motion.div>
 
       {/* Call-to-Action Hint - Simplified for mobile */}
