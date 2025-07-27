@@ -17,6 +17,58 @@ interface NetworkGuardProps {
 const REQUIRED_CHAIN_ID = avalancheFuji.id; // 43113
 const REQUIRED_NETWORK_NAME = "Avalanche Fuji Testnet";
 
+// Browser detection
+const detectBrowser = (): string => {
+  if (typeof window === "undefined") return "unknown";
+
+  const userAgent = window.navigator.userAgent;
+
+  if (userAgent.includes("Chrome") && userAgent.includes("Brave")) {
+    return "brave";
+  }
+  if (userAgent.includes("Chrome") && !userAgent.includes("Edg")) {
+    return "chrome";
+  }
+  if (userAgent.includes("Firefox")) {
+    return "firefox";
+  }
+  if (userAgent.includes("Safari") && !userAgent.includes("Chrome")) {
+    return "safari";
+  }
+  if (userAgent.includes("Edg")) {
+    return "edge";
+  }
+
+  return "unknown";
+};
+
+// Check if browser is Brave (more reliable detection)
+const isBraveBrowser = async (): Promise<boolean> => {
+  if (typeof window === "undefined") return false;
+
+  // Method 1: Check for Brave-specific API
+  if ((navigator as any).brave && (navigator as any).brave.isBrave) {
+    try {
+      return await (navigator as any).brave.isBrave();
+    } catch (e) {
+      // Continue to other methods
+    }
+  }
+
+  // Method 2: Check user agent
+  const userAgent = navigator.userAgent;
+  if (userAgent.includes("Brave")) {
+    return true;
+  }
+
+  // Method 3: Check for Brave wallet
+  if (window.ethereum?.isBraveWallet) {
+    return true;
+  }
+
+  return false;
+};
+
 // Enhanced wallet detection for Brave compatibility
 const getWalletProvider = () => {
   if (typeof window === "undefined") return null;
@@ -47,6 +99,8 @@ export function NetworkGuard({ children }: NetworkGuardProps) {
     number | undefined
   >(undefined);
   const [walletProvider, setWalletProvider] = useState<any>(null);
+  const [browserType, setBrowserType] = useState<string>("unknown");
+  const [isBrave, setIsBrave] = useState<boolean>(false);
 
   const { isConnected } = useAccount();
   const wagmiChainId = useChainId();
@@ -57,11 +111,26 @@ export function NetworkGuard({ children }: NetworkGuardProps) {
   const effectiveChainId = actualWalletChainId ?? wagmiChainId;
   const isWrongNetwork = isConnected && effectiveChainId !== REQUIRED_CHAIN_ID;
 
-  // Initialize wallet provider on mount
+  // Initialize browser detection and wallet provider on mount
   useEffect(() => {
+    const initializeBrowserDetection = async () => {
+      const browser = detectBrowser();
+      const brave = await isBraveBrowser();
+
+      setBrowserType(browser);
+      setIsBrave(brave);
+
+      console.log("🔍 Browser detection:", {
+        browser,
+        isBrave: brave,
+        userAgent: navigator.userAgent,
+      });
+    };
+
     const provider = getWalletProvider();
     setWalletProvider(provider);
     setMounted(true);
+    initializeBrowserDetection();
 
     if (provider) {
       console.log("🔍 Detected wallet provider:", {
@@ -105,7 +174,33 @@ export function NetworkGuard({ children }: NetworkGuardProps) {
         setBannerDismissed(false); // Reset dismissal on chain change
       };
 
-      // Check if provider supports event listeners
+      // Skip event listeners on Brave browser to prevent issues (affects all wallets)
+      if (isBrave) {
+        console.log(
+          "🦁 Brave browser detected - using polling instead of events"
+        );
+
+        // Use polling for Brave browser
+        const pollInterval = setInterval(async () => {
+          try {
+            const chainId = await walletProvider.request({
+              method: "eth_chainId",
+            });
+            const numericChainId = parseInt(chainId, 16);
+            if (numericChainId !== actualWalletChainId) {
+              console.log("🔄 Polling detected chain change:", numericChainId);
+              setActualWalletChainId(numericChainId);
+              setBannerDismissed(false);
+            }
+          } catch (error) {
+            console.error("Error polling chain ID:", error);
+          }
+        }, 3000); // Poll every 3 seconds on Brave
+
+        return () => clearInterval(pollInterval);
+      }
+
+      // Use event listeners for non-Brave browsers
       if (typeof walletProvider.on === "function") {
         walletProvider.on("chainChanged", handleChainChanged);
         return () => {
@@ -116,7 +211,6 @@ export function NetworkGuard({ children }: NetworkGuardProps) {
           }
         };
       } else if (typeof walletProvider.addEventListener === "function") {
-        // Fallback for providers that use addEventListener
         walletProvider.addEventListener("chainChanged", handleChainChanged);
         return () => {
           if (typeof walletProvider.removeEventListener === "function") {
@@ -145,13 +239,14 @@ export function NetworkGuard({ children }: NetworkGuardProps) {
         return () => clearInterval(pollInterval);
       }
     }
-  }, [isConnected, wagmiChainId, walletProvider]);
+  }, [isConnected, wagmiChainId, walletProvider, isBrave, actualWalletChainId]);
 
   useEffect(() => {
     if (!mounted) return;
 
     console.log(`
     📊 NetworkGuard Status:
+    - Browser: ${browserType} ${isBrave ? "(Brave)" : ""}
     - Connected: ${isConnected}
     - Wagmi Chain ID: ${wagmiChainId}
     - Actual Wallet Chain ID: ${actualWalletChainId}
@@ -163,15 +258,31 @@ export function NetworkGuard({ children }: NetworkGuardProps) {
     - Wallet Provider: ${walletProvider ? "Available" : "Not Available"}
     `);
 
-    // Show banner if wrong network and not dismissed
-    if (isWrongNetwork && !bannerDismissed && !isSwitching) {
-      setShowBanner(true);
+    // Show banner logic
+    // For Brave browser: Always show if connected and not dismissed (network detection unreliable)
+    // For others: Only show if wrong network
+    const shouldShowBanner =
+      isConnected &&
+      !bannerDismissed &&
+      !isSwitching &&
+      (isBrave || isWrongNetwork);
+
+    if (shouldShowBanner) {
+      // For Brave browser, add a slight delay to prevent rapid banner toggling
+      if (isBrave) {
+        const timer = setTimeout(() => {
+          setShowBanner(true);
+        }, 1000);
+        return () => clearTimeout(timer);
+      } else {
+        setShowBanner(true);
+      }
     } else {
       setShowBanner(false);
     }
 
-    // Reset banner dismissal when switching to correct network
-    if (!isWrongNetwork) {
+    // Reset banner dismissal when switching to correct network (non-Brave only)
+    if (!isWrongNetwork && !isBrave) {
       setBannerDismissed(false);
     }
   }, [
@@ -184,6 +295,8 @@ export function NetworkGuard({ children }: NetworkGuardProps) {
     bannerDismissed,
     isSwitching,
     walletProvider,
+    browserType,
+    isBrave,
   ]);
 
   const handleSwitchNetwork = async () => {
@@ -203,7 +316,9 @@ export function NetworkGuard({ children }: NetworkGuardProps) {
       console.error("Failed to switch network:", error);
       toast({
         title: "Switch Failed",
-        description: "Please manually switch networks in your wallet",
+        description: isBrave
+          ? "Please manually switch networks in your wallet - Brave has network detection issues"
+          : "Please manually switch networks in your wallet",
         variant: "destructive",
       });
     }
@@ -212,7 +327,22 @@ export function NetworkGuard({ children }: NetworkGuardProps) {
   const handleDismissBanner = () => {
     setBannerDismissed(true);
     setShowBanner(false);
+
+    // On Brave browser, store dismissal in sessionStorage to prevent re-showing
+    if (isBrave) {
+      sessionStorage.setItem("networkBannerDismissed", "true");
+    }
   };
+
+  // Check sessionStorage for Brave browser dismissal
+  useEffect(() => {
+    if (isBrave && mounted) {
+      const dismissed = sessionStorage.getItem("networkBannerDismissed");
+      if (dismissed === "true") {
+        setBannerDismissed(true);
+      }
+    }
+  }, [isBrave, mounted]);
 
   const getNetworkName = (chainId: number) => {
     switch (chainId) {
@@ -257,28 +387,49 @@ export function NetworkGuard({ children }: NetworkGuardProps) {
                   <AlertTriangle className="h-5 w-5 text-yellow-500 mt-0.5 flex-shrink-0" />
                   <div className="flex-1 min-w-0">
                     <h3 className="text-sm font-semibold text-yellow-600 mb-1">
-                      Wrong Network
+                      {isBrave ? "Brave Browser Detected" : "Wrong Network"}
                     </h3>
                     <p className="text-xs text-muted-foreground mb-3">
-                      You're on {getNetworkName(effectiveChainId)}. Switch to{" "}
-                      {REQUIRED_NETWORK_NAME} to use all features.
+                      {isBrave ? (
+                        <>
+                          We can't reliably detect your network on Brave
+                          browser. Please ensure you're connected to{" "}
+                          <strong>{REQUIRED_NETWORK_NAME}</strong>!
+                        </>
+                      ) : (
+                        <>
+                          You're on {getNetworkName(effectiveChainId)}. Switch
+                          to {REQUIRED_NETWORK_NAME} to use all features.
+                        </>
+                      )}
                     </p>
                     <div className="flex items-center gap-2">
-                      <Button
-                        size="sm"
-                        onClick={handleSwitchNetwork}
-                        disabled={isSwitching}
-                        className="bg-yellow-600 hover:bg-yellow-700 text-white text-xs h-8"
-                      >
-                        {isSwitching ? (
-                          <>Switching...</>
-                        ) : (
-                          <>
-                            <Wifi className="h-3 w-3 mr-1" />
-                            Switch Network
-                          </>
-                        )}
-                      </Button>
+                      {isBrave ? (
+                        <Button
+                          size="sm"
+                          variant="ghost"
+                          onClick={handleDismissBanner}
+                          className="text-yellow-600 hover:text-yellow-700 hover:bg-yellow-500/20 text-xs h-8"
+                        >
+                          Got it, I'm on Fuji
+                        </Button>
+                      ) : (
+                        <Button
+                          size="sm"
+                          onClick={handleSwitchNetwork}
+                          disabled={isSwitching}
+                          className="bg-yellow-600 hover:bg-yellow-700 text-white text-xs h-8"
+                        >
+                          {isSwitching ? (
+                            <>Switching...</>
+                          ) : (
+                            <>
+                              <Wifi className="h-3 w-3 mr-1" />
+                              Switch Network
+                            </>
+                          )}
+                        </Button>
+                      )}
                       <Button
                         size="sm"
                         variant="ghost"
