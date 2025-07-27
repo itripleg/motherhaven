@@ -147,14 +147,6 @@ export const ShopItemGrid = ({
                 key={item.id}
                 layoutId={`shop-item-card-${item.id}`}
                 layout
-                transition={{
-                  layout: {
-                    type: "spring",
-                    stiffness: 300,
-                    damping: 25,
-                    mass: 1.5,
-                  },
-                }}
                 style={{
                   width: `${config.cardWidth}px`,
                   minWidth: `${config.cardWidth}px`,
@@ -167,8 +159,20 @@ export const ShopItemGrid = ({
                 initial={{ opacity: 0, y: 20 }}
                 animate={{ opacity: 1, y: 0 }}
                 transition={{
-                  delay: index * 0.1,
-                  duration: 0.4,
+                  layout: {
+                    type: "spring",
+                    stiffness: 300,
+                    damping: 25,
+                    mass: 1.5,
+                  },
+                  opacity: {
+                    delay: index * 0.1,
+                    duration: 0.4,
+                  },
+                  y: {
+                    delay: index * 0.1,
+                    duration: 0.4,
+                  },
                 }}
               >
                 <ShopItemCard
@@ -226,14 +230,6 @@ export const ShopItemGrid = ({
                 key={item.id}
                 layoutId={`shop-item-card-${item.id}`}
                 layout
-                transition={{
-                  layout: {
-                    type: "spring",
-                    stiffness: 300,
-                    damping: 25,
-                    mass: 1.5,
-                  },
-                }}
                 style={{
                   width: `${config.cardWidth}px`,
                   minWidth: `${config.cardWidth}px`,
@@ -246,8 +242,20 @@ export const ShopItemGrid = ({
                 initial={{ opacity: 0, y: 20 }}
                 animate={{ opacity: 1, y: 0 }}
                 transition={{
-                  delay: index * 0.1,
-                  duration: 0.4,
+                  layout: {
+                    type: "spring",
+                    stiffness: 300,
+                    damping: 25,
+                    mass: 1.5,
+                  },
+                  opacity: {
+                    delay: index * 0.1,
+                    duration: 0.4,
+                  },
+                  y: {
+                    delay: index * 0.1,
+                    duration: 0.4,
+                  },
                 }}
               >
                 <ShopItemCard

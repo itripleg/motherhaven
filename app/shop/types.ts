@@ -21,6 +21,7 @@ export interface ShopItem {
   stock?: number; // New: limited quantity items (optional)
   salePrice?: number; // New: discounted price (optional)
   tags?: string[]; // New: for advanced search/filtering
+  position?: { x: number; y: number }; // New: for MerchantShop positioning
 }
 
 export type ItemRarity = "common" | "rare" | "epic" | "legendary";
@@ -196,6 +197,7 @@ export const SHOP_ITEMS: ShopItem[] = [
     requiresBurnBalance: 1000,
     createdAt: "2024-01-01T00:00:00Z",
     tags: ["name", "identity", "customization"],
+    position: { x: 25, y: 30 },
   },
   {
     id: "premium_name_reservation",
@@ -210,6 +212,7 @@ export const SHOP_ITEMS: ShopItem[] = [
     requiresBurnBalance: 2500,
     createdAt: "2024-01-15T00:00:00Z",
     tags: ["name", "reservation", "premium"],
+    position: { x: 65, y: 45 },
   },
 
   // Effect Items
@@ -225,6 +228,7 @@ export const SHOP_ITEMS: ShopItem[] = [
     requiresBurnBalance: 5000,
     createdAt: "2024-02-01T00:00:00Z",
     tags: ["rainbow", "effect", "animation"],
+    position: { x: 45, y: 70 },
   },
   {
     id: "sparkle_effect",
@@ -238,6 +242,7 @@ export const SHOP_ITEMS: ShopItem[] = [
     requiresBurnBalance: 3000,
     createdAt: "2024-02-15T00:00:00Z",
     tags: ["sparkle", "effect", "profile"],
+    position: { x: 75, y: 25 },
   },
 
   // Upgrade Items
@@ -253,6 +258,7 @@ export const SHOP_ITEMS: ShopItem[] = [
     requiresBurnBalance: 10000,
     createdAt: "2024-03-01T00:00:00Z",
     tags: ["premium", "upgrade", "features"],
+    position: { x: 15, y: 65 },
   },
 
   // Collectible Items
@@ -269,6 +275,7 @@ export const SHOP_ITEMS: ShopItem[] = [
     stock: 100, // Limited quantity
     createdAt: "2024-01-01T00:00:00Z",
     tags: ["founder", "badge", "exclusive", "limited"],
+    position: { x: 85, y: 60 },
   },
 
   // Utility Items
@@ -284,6 +291,7 @@ export const SHOP_ITEMS: ShopItem[] = [
     requiresBurnBalance: 7500,
     createdAt: "2024-03-15T00:00:00Z",
     tags: ["analytics", "trading", "insights"],
+    position: { x: 35, y: 15 },
   },
 ];
 

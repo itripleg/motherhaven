@@ -1,10 +1,11 @@
 // app/shop/hooks/useVanityBalance.ts
 "use client";
 
-import { useState, useEffect } from "react";
-import { useAccount, useReadContract } from "wagmi";
+import { useState, useEffect, useCallback } from "react";
+import { useAccount, useReadContract, useBalance } from "wagmi";
 import { Address } from "viem";
 import { VANITY_BURN_MANAGER_ABI, VANITY_BURN_MANAGER_ADDRESS } from "../types";
+import { useUserTokenBalances } from "@/hooks/token/useUserTokenBalances";
 
 interface VanityBalanceData {
   totalBurned: bigint;
@@ -14,12 +15,12 @@ interface VanityBalanceData {
 }
 
 interface UseVanityBalanceReturn {
-  // Balance data
-  balanceData: VanityBalanceData | null;
-  availableBalance: number; // Formatted as number for display
+  // Token balances
+  vainTokenBalance: number; // User's actual VAIN token balance from dashboard system
+  burnedBalance: number; // Amount burned (available for shop purchases)
   totalBurned: number;
   totalSpent: number;
-  possibleNameChanges: number;
+  avaxBalance: number; // Native AVAX balance
 
   // User state
   canSetName: boolean;
@@ -32,6 +33,11 @@ interface UseVanityBalanceReturn {
 
   // Actions
   refetch: () => void;
+
+  // Additional helper states
+  hasTokens: boolean;
+  hasBurnedTokens: boolean;
+  hasAvax: boolean;
 }
 
 export function useVanityBalance(): UseVanityBalanceReturn {
@@ -42,6 +48,27 @@ export function useVanityBalance(): UseVanityBalanceReturn {
   useEffect(() => {
     setMounted(true);
   }, []);
+
+  // Get user's token balances from the dashboard system
+  const {
+    balances,
+    totalTokens,
+    refetch: refetchTokenBalances,
+  } = useUserTokenBalances();
+
+  // Get native AVAX balance
+  const { data: avaxBalance, refetch: refetchAvaxBalance } = useBalance({
+    address,
+  });
+
+  // Look for VAIN token in user's balances (you might need to adjust the search criteria)
+  const vainToken = balances.find(
+    (token) =>
+      token.symbol.toLowerCase().includes("vain") ||
+      token.name.toLowerCase().includes("vain") ||
+      // Add your specific VAIN token address here if you know it
+      token.address.toLowerCase() === "your_vain_token_address_here"
+  );
 
   // Fetch user's burn info from contract
   const {
@@ -57,8 +84,8 @@ export function useVanityBalance(): UseVanityBalanceReturn {
     args: address ? [address] : undefined,
     query: {
       enabled: !!address && mounted && isConnected,
-      refetchInterval: 30000, // Refetch every 30 seconds
-      staleTime: 15000, // Consider data stale after 15 seconds
+      refetchInterval: 30000,
+      staleTime: 15000,
     },
   });
 
@@ -74,7 +101,7 @@ export function useVanityBalance(): UseVanityBalanceReturn {
     args: address ? [address] : undefined,
     query: {
       enabled: !!address && mounted && isConnected,
-      refetchInterval: 60000, // Refetch every minute (names change less frequently)
+      refetchInterval: 60000,
       staleTime: 30000,
     },
   });
@@ -97,16 +124,19 @@ export function useVanityBalance(): UseVanityBalanceReturn {
   });
 
   // Calculate formatted values
-  const formatBigIntToNumber = (value: bigint | undefined): number => {
-    if (!value) return 0;
-    try {
-      // Convert from wei to ether (divide by 10^18)
-      return Number(value) / 1e18;
-    } catch (error) {
-      console.error("Error formatting BigInt:", error);
-      return 0;
-    }
-  };
+  const formatBigIntToNumber = useCallback(
+    (value: bigint | undefined): number => {
+      if (!value) return 0;
+      try {
+        // Convert from wei to ether (divide by 10^18)
+        return Number(value) / 1e18;
+      } catch (error) {
+        console.error("Error formatting BigInt:", error);
+        return 0;
+      }
+    },
+    []
+  );
 
   // Prepare return data
   const balanceData: VanityBalanceData | null = burnInfo
@@ -118,13 +148,24 @@ export function useVanityBalance(): UseVanityBalanceReturn {
       }
     : null;
 
-  const availableBalance = formatBigIntToNumber(balanceData?.availableBalance);
+  // Use token balance from dashboard system
+  const vainTokenBalance = vainToken
+    ? parseFloat(vainToken.formattedBalance)
+    : 0;
+  const burnedBalance = formatBigIntToNumber(balanceData?.availableBalance);
   const totalBurned = formatBigIntToNumber(balanceData?.totalBurned);
   const totalSpent = formatBigIntToNumber(balanceData?.totalSpent);
-  const possibleNameChanges = balanceData?.possibleNameChanges || 0;
+  const avaxBalanceFormatted = avaxBalance
+    ? parseFloat(avaxBalance.formatted)
+    : 0;
 
   const currentVanityName = (vanityName as string) || "";
   const userCanSetName = Boolean(canSetName);
+
+  // Helper states
+  const hasTokens = vainTokenBalance > 0;
+  const hasBurnedTokens = burnedBalance > 0;
+  const hasAvax = avaxBalanceFormatted > 0;
 
   const isLoading =
     !mounted || isBurnInfoLoading || isVanityNameLoading || isCanSetNameLoading;
@@ -133,19 +174,56 @@ export function useVanityBalance(): UseVanityBalanceReturn {
   const error = burnInfoError;
 
   // Combined refetch function
-  const refetch = () => {
+  const refetch = useCallback(() => {
+    refetchTokenBalances();
+    refetchAvaxBalance();
     refetchBurnInfo();
     refetchVanityName();
     refetchCanSetName();
-  };
+  }, [
+    refetchTokenBalances,
+    refetchAvaxBalance,
+    refetchBurnInfo,
+    refetchVanityName,
+    refetchCanSetName,
+  ]);
 
-  return {
-    // Balance data
-    balanceData,
-    availableBalance,
+  // Debug logging in development
+  useEffect(() => {
+    if (process.env.NODE_ENV === "development") {
+      console.log("VanityBalance Debug:", {
+        address,
+        vainTokenBalance,
+        burnedBalance,
+        totalBurned,
+        totalSpent,
+        avaxBalance: avaxBalanceFormatted,
+        currentVanityName,
+        canSetName: userCanSetName,
+        totalTokensInWallet: totalTokens,
+        vainTokenFound: !!vainToken,
+      });
+    }
+  }, [
+    address,
+    vainTokenBalance,
+    burnedBalance,
     totalBurned,
     totalSpent,
-    possibleNameChanges,
+    avaxBalanceFormatted,
+    currentVanityName,
+    userCanSetName,
+    totalTokens,
+    vainToken,
+  ]);
+
+  return {
+    // Token balances
+    vainTokenBalance,
+    burnedBalance,
+    totalBurned,
+    totalSpent,
+    avaxBalance: avaxBalanceFormatted,
 
     // User state
     canSetName: userCanSetName,
@@ -158,5 +236,10 @@ export function useVanityBalance(): UseVanityBalanceReturn {
 
     // Actions
     refetch,
+
+    // Additional helper states
+    hasTokens,
+    hasBurnedTokens,
+    hasAvax,
   };
 }

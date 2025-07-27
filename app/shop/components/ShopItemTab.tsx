@@ -3,15 +3,7 @@
 
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { FilterBy } from "./ShopItemsContainer";
-import {
-  ShoppingBag,
-  User,
-  Sparkles,
-  Star,
-  Trophy,
-  CheckCircle,
-  DollarSign,
-} from "lucide-react";
+import { ShoppingBag, User, Sparkles, Crown } from "lucide-react";
 
 interface ShopItemTabsProps {
   onCategoryChange: (category: string) => void;
@@ -27,18 +19,12 @@ export const ShopItemTabs = ({
     switch (filter) {
       case FilterBy.ALL:
         return "all";
-      case FilterBy.VANITY:
-        return "vanity";
-      case FilterBy.UPGRADES:
-        return "upgrades";
+      case FilterBy.NAMES:
+        return "names";
       case FilterBy.EFFECTS:
         return "effects";
-      case FilterBy.COLLECTIBLES:
-        return "collectibles";
-      case FilterBy.AVAILABLE:
-        return "available";
-      case FilterBy.AFFORDABLE:
-        return "affordable";
+      case FilterBy.PREMIUM:
+        return "premium";
       default:
         return "all";
     }
@@ -54,7 +40,7 @@ export const ShopItemTabs = ({
       onValueChange={handleTabChange}
       className="mb-8 opacity-90"
     >
-      <TabsList className="grid w-full grid-cols-7 h-auto bg-secondary/30">
+      <TabsList className="grid w-full grid-cols-4 h-auto bg-secondary/30">
         <TabsTrigger
           value="all"
           className="text-xs sm:text-sm px-2 py-2 flex items-center gap-1"
@@ -65,21 +51,12 @@ export const ShopItemTabs = ({
         </TabsTrigger>
 
         <TabsTrigger
-          value="vanity"
+          value="names"
           className="text-xs sm:text-sm px-2 py-2 flex items-center gap-1"
         >
           <User className="h-3 w-3 sm:h-4 sm:w-4" />
-          <span className="hidden sm:inline">Vanity</span>
-          <span className="sm:hidden">Name</span>
-        </TabsTrigger>
-
-        <TabsTrigger
-          value="upgrades"
-          className="text-xs sm:text-sm px-2 py-2 flex items-center gap-1"
-        >
-          <Star className="h-3 w-3 sm:h-4 sm:w-4" />
-          <span className="hidden sm:inline">Upgrades</span>
-          <span className="sm:hidden">Up</span>
+          <span className="hidden sm:inline">Names</span>
+          <span className="sm:hidden">Names</span>
         </TabsTrigger>
 
         <TabsTrigger
@@ -88,34 +65,16 @@ export const ShopItemTabs = ({
         >
           <Sparkles className="h-3 w-3 sm:h-4 sm:w-4" />
           <span className="hidden sm:inline">Effects</span>
-          <span className="sm:hidden">FX</span>
+          <span className="sm:hidden">Effects</span>
         </TabsTrigger>
 
         <TabsTrigger
-          value="collectibles"
+          value="premium"
           className="text-xs sm:text-sm px-2 py-2 flex items-center gap-1"
         >
-          <Trophy className="h-3 w-3 sm:h-4 sm:w-4" />
-          <span className="hidden sm:inline">Collectibles</span>
-          <span className="sm:hidden">Rare</span>
-        </TabsTrigger>
-
-        <TabsTrigger
-          value="available"
-          className="text-xs sm:text-sm px-2 py-2 flex items-center gap-1"
-        >
-          <CheckCircle className="h-3 w-3 sm:h-4 sm:w-4" />
-          <span className="hidden sm:inline">Available</span>
-          <span className="sm:hidden">Live</span>
-        </TabsTrigger>
-
-        <TabsTrigger
-          value="affordable"
-          className="text-xs sm:text-sm px-2 py-2 flex items-center gap-1"
-        >
-          <DollarSign className="h-3 w-3 sm:h-4 sm:w-4" />
-          <span className="hidden sm:inline">Affordable</span>
-          <span className="sm:hidden">$$$</span>
+          <Crown className="h-3 w-3 sm:h-4 sm:w-4" />
+          <span className="hidden sm:inline">Premium</span>
+          <span className="sm:hidden">Premium</span>
         </TabsTrigger>
       </TabsList>
     </Tabs>

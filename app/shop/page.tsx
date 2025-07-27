@@ -1,9 +1,10 @@
-// app/shop/page.tsx - Updated to use new shop container system
+// app/shop/page.tsx
 "use client";
 
 import React, { useState, useEffect } from "react";
 import { useAccount } from "wagmi";
-import { motion } from "framer-motion";
+import { useRouter } from "next/navigation";
+import { AnimatePresence, motion } from "framer-motion";
 import { Card, CardContent } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
@@ -13,6 +14,9 @@ import {
   RefreshCw,
   ShoppingBag,
   AlertCircle,
+  User,
+  ArrowUpRight,
+  Flame,
 } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 
@@ -23,6 +27,7 @@ import { type ShopItem, type PurchaseResult } from "./types";
 
 export default function ShopPage() {
   const { address, isConnected } = useAccount();
+  const router = useRouter();
   const { toast } = useToast();
 
   // State management
@@ -32,15 +37,19 @@ export default function ShopPage() {
 
   // Use the vanity balance hook
   const {
-    availableBalance,
+    vainTokenBalance,
+    burnedBalance,
+    avaxBalance,
     totalBurned,
     currentVanityName,
-    possibleNameChanges,
     canSetName,
     isLoading: isBalanceLoading,
     isError: isBalanceError,
     error: balanceError,
     refetch: refetchBalance,
+    hasTokens,
+    hasBurnedTokens,
+    hasAvax,
   } = useVanityBalance();
 
   // Handle hydration
@@ -72,12 +81,18 @@ export default function ShopPage() {
       return;
     }
 
-    if (availableBalance < item.cost) {
+    // Special handling for vanity name token - redirect to name manager
+    if (item.id === "vanity_name_change") {
+      router.push("/VanityNameManager");
+      return;
+    }
+
+    if (burnedBalance < item.cost) {
       toast({
-        title: "Insufficient balance",
+        title: "Insufficient burned VAIN",
         description: `You need ${(
-          item.cost - availableBalance
-        ).toLocaleString()} more VAIN tokens`,
+          item.cost - burnedBalance
+        ).toLocaleString()} more burned VAIN tokens`,
         variant: "destructive",
       });
       return;
@@ -144,6 +159,11 @@ export default function ShopPage() {
     } finally {
       setIsRefreshing(false);
     }
+  };
+
+  // Navigate to name manager
+  const handleNameManager = () => {
+    router.push("/VanityNameManager");
   };
 
   // Don't render until mounted to prevent hydration mismatch
@@ -238,78 +258,179 @@ export default function ShopPage() {
             </p>
           </div>
 
-          {/* User Balance & Info */}
+          {/* Balance Cards */}
           <div className="flex flex-col sm:flex-row gap-4 justify-center items-center">
-            {/* Balance Card */}
-            <Card className="w-fit bg-card/80 backdrop-blur border-primary/30">
-              <CardContent className="p-4">
-                <div className="flex items-center gap-3">
-                  <Coins className="h-6 w-6 text-primary" />
-                  <div className="text-left">
-                    <div className="flex items-baseline gap-2">
-                      {isBalanceLoading ? (
-                        <div className="flex items-center gap-2">
-                          <div className="h-6 w-16 bg-muted animate-pulse rounded" />
-                          <span className="text-sm text-muted-foreground">
-                            VAIN
-                          </span>
-                        </div>
-                      ) : isBalanceError ? (
-                        <div className="flex items-center gap-2 text-destructive">
-                          <AlertCircle className="h-4 w-4" />
-                          <span className="text-sm">Error loading balance</span>
-                        </div>
-                      ) : (
-                        <>
-                          <span className="text-2xl font-bold text-primary">
-                            {availableBalance.toLocaleString()}
-                          </span>
-                          <span className="text-sm text-muted-foreground">
-                            VAIN
-                          </span>
-                        </>
-                      )}
-                    </div>
-                    <div className="text-xs text-muted-foreground">
-                      Available Balance
-                    </div>
-                  </div>
-                  <Button
-                    variant="ghost"
-                    size="icon"
-                    onClick={handleRefresh}
-                    disabled={isRefreshing || isBalanceLoading}
-                    className="h-8 w-8"
-                  >
-                    <RefreshCw
-                      className={`h-4 w-4 ${
-                        isRefreshing ? "animate-spin" : ""
-                      }`}
-                    />
-                  </Button>
-                </div>
-              </CardContent>
-            </Card>
-
-            {/* User Status */}
-            {isConnected && !isBalanceLoading && (
-              <Card className="w-fit bg-card/80 backdrop-blur border-accent/30">
+            {/* AVAX Balance - Always show when connected but keep it subtle */}
+            {isConnected && (
+              <Card className="w-fit bg-card/80 backdrop-blur border-border/50">
                 <CardContent className="p-4">
                   <div className="flex items-center gap-3">
-                    <ShoppingBag className="h-5 w-5 text-accent" />
+                    <Coins className="h-6 w-6 text-muted-foreground" />
                     <div className="text-left">
-                      <div className="text-sm font-medium text-accent">
-                        {currentVanityName || "No name set"}
+                      <div className="flex items-baseline gap-2">
+                        {isBalanceLoading ? (
+                          <div className="flex items-center gap-2">
+                            <div className="h-6 w-16 bg-muted animate-pulse rounded" />
+                            <span className="text-sm text-muted-foreground">
+                              AVAX
+                            </span>
+                          </div>
+                        ) : (
+                          <>
+                            <span className="text-2xl font-bold text-foreground">
+                              {avaxBalance.toFixed(4)}
+                            </span>
+                            <span className="text-sm text-muted-foreground">
+                              AVAX
+                            </span>
+                          </>
+                        )}
                       </div>
                       <div className="text-xs text-muted-foreground">
-                        {possibleNameChanges} name changes available
+                        AVAX Balance
                       </div>
                     </div>
                   </div>
                 </CardContent>
               </Card>
             )}
+
+            {/* VAIN Token Balance - Show if user has VAIN tokens */}
+            {isConnected && hasTokens && (
+              <Card className="w-fit bg-card/80 backdrop-blur border-primary/30">
+                <CardContent className="p-4">
+                  <div className="flex items-center gap-3">
+                    <Coins className="h-6 w-6 text-primary" />
+                    <div className="text-left">
+                      <div className="flex items-baseline gap-2">
+                        <span className="text-2xl font-bold text-primary">
+                          {vainTokenBalance.toLocaleString()}
+                        </span>
+                        <span className="text-sm text-muted-foreground">
+                          VAIN
+                        </span>
+                      </div>
+                      <div className="text-xs text-muted-foreground">
+                        Token Balance
+                      </div>
+                    </div>
+                  </div>
+                </CardContent>
+              </Card>
+            )}
+
+            {/* Burned Balance (Shop Credits) - Always show when connected */}
+            {isConnected && (
+              <Card className="w-fit bg-card/80 backdrop-blur border-orange-500/30">
+                <CardContent className="p-4">
+                  <div className="flex items-center gap-3">
+                    <Flame className="h-6 w-6 text-orange-500" />
+                    <div className="text-left">
+                      <div className="flex items-baseline gap-2">
+                        {isBalanceLoading ? (
+                          <div className="flex items-center gap-2">
+                            <div className="h-6 w-16 bg-muted animate-pulse rounded" />
+                            <span className="text-sm text-muted-foreground">
+                              VAIN
+                            </span>
+                          </div>
+                        ) : isBalanceError ? (
+                          <div className="flex items-center gap-2 text-destructive">
+                            <AlertCircle className="h-4 w-4" />
+                            <span className="text-sm">
+                              Error loading balance
+                            </span>
+                          </div>
+                        ) : (
+                          <>
+                            <span className="text-2xl font-bold text-orange-500">
+                              {burnedBalance.toLocaleString()}
+                            </span>
+                            <span className="text-sm text-muted-foreground">
+                              VAIN
+                            </span>
+                          </>
+                        )}
+                      </div>
+                      <div className="text-xs text-muted-foreground">
+                        Shop Credits (Burned)
+                      </div>
+                    </div>
+                    <Button
+                      variant="ghost"
+                      size="icon"
+                      onClick={handleRefresh}
+                      disabled={isRefreshing || isBalanceLoading}
+                      className="h-8 w-8"
+                    >
+                      <RefreshCw
+                        className={`h-4 w-4 ${
+                          isRefreshing ? "animate-spin" : ""
+                        }`}
+                      />
+                    </Button>
+                  </div>
+                </CardContent>
+              </Card>
+            )}
           </div>
+
+          {/* Balance Explanation - Brief loading state then minimal messaging */}
+          {isConnected && (
+            <div className="flex justify-center">
+              <AnimatePresence mode="wait">
+                {isBalanceLoading ? (
+                  <motion.div
+                    key="loading"
+                    initial={{ opacity: 0 }}
+                    animate={{ opacity: 1 }}
+                    exit={{ opacity: 0 }}
+                    transition={{ duration: 0.3 }}
+                    className="flex items-center gap-2 text-muted-foreground"
+                  >
+                    <motion.div
+                      animate={{ rotate: 360 }}
+                      transition={{
+                        duration: 1,
+                        repeat: Infinity,
+                        ease: "linear",
+                      }}
+                      className="w-4 h-4 border-2 border-primary border-t-transparent rounded-full"
+                    />
+                    <span className="text-sm">Loading balances...</span>
+                  </motion.div>
+                ) : !hasBurnedTokens && hasTokens ? (
+                  <motion.div
+                    key="burn-vain"
+                    initial={{ opacity: 0, y: 10 }}
+                    animate={{ opacity: 1, y: 0 }}
+                    exit={{ opacity: 0, y: -10 }}
+                    transition={{ duration: 0.3 }}
+                    className="text-center"
+                  >
+                    <p className="text-sm text-muted-foreground">
+                      🔥 <span className="text-blue-400">Burn VAIN tokens</span>{" "}
+                      to earn shop credits
+                    </p>
+                  </motion.div>
+                ) : !hasTokens && hasAvax ? (
+                  <motion.div
+                    key="get-vain"
+                    initial={{ opacity: 0, y: 10 }}
+                    animate={{ opacity: 1, y: 0 }}
+                    exit={{ opacity: 0, y: -10 }}
+                    transition={{ duration: 0.3 }}
+                    className="text-center"
+                  >
+                    <p className="text-sm text-muted-foreground">
+                      💰 <span className="text-green-400">Get VAIN tokens</span>{" "}
+                      to use in the shop
+                    </p>
+                  </motion.div>
+                ) : null}
+              </AnimatePresence>
+            </div>
+          )}
         </motion.div>
 
         {/* Search Bar */}
@@ -366,7 +487,7 @@ export default function ShopPage() {
         >
           <ShopItemsContainer
             searchQuery={searchQuery}
-            userBalance={availableBalance}
+            userBalance={burnedBalance} // Use burned balance for purchases
             onPurchase={handlePurchase}
           />
         </motion.div>

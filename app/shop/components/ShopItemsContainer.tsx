@@ -27,6 +27,53 @@ import { ShopItemTabs } from "./ShopItemTab";
 import { ShopItemGrid } from "./ShopItemGrid";
 import { type ShopItem, type ItemRarity } from "../types";
 
+// Import the shop items directly here to debug
+const SHOP_ITEMS_DEBUG: ShopItem[] = [
+  {
+    id: "vanity_name_change",
+    name: "Vanity Name Token",
+    description: "Change your display name in the app",
+    cost: 1000,
+    rarity: "common",
+    category: "vanity",
+    preview: "📛",
+    isAvailable: true,
+    requiresBurnBalance: 1000,
+    createdAt: "2024-01-01T00:00:00Z",
+    tags: ["name", "identity", "customization"],
+    position: { x: 25, y: 30 }, // Add position for MerchantShop
+  },
+  {
+    id: "premium_name_reservation",
+    name: "Premium Name Reserve",
+    description:
+      "Reserve a premium name for 30 days before it becomes available",
+    cost: 2500,
+    rarity: "rare",
+    category: "vanity",
+    preview: "🛡️",
+    isAvailable: false, // Disabled for now
+    requiresBurnBalance: 2500,
+    createdAt: "2024-01-15T00:00:00Z",
+    tags: ["name", "reservation", "premium"],
+    position: { x: 65, y: 45 }, // Add position for MerchantShop
+  },
+  {
+    id: "rainbow_name_effect",
+    name: "Rainbow Name Effect",
+    description: "Make your name shimmer with rainbow colors",
+    cost: 5000,
+    rarity: "epic",
+    category: "effects",
+    preview: "🌈",
+    isAvailable: false, // Disabled for now
+    requiresBurnBalance: 5000,
+    createdAt: "2024-02-01T00:00:00Z",
+    tags: ["rainbow", "effect", "animation"],
+    position: { x: 45, y: 70 }, // Add position for MerchantShop
+  },
+];
+
 interface ShopItemsContainerProps {
   searchQuery?: string;
   userBalance?: number;
@@ -36,12 +83,9 @@ interface ShopItemsContainerProps {
 // Filter categories for shop items
 export enum FilterBy {
   ALL = "all",
-  VANITY = "vanity",
-  UPGRADES = "upgrades",
-  EFFECTS = "effects",
-  COLLECTIBLES = "collectibles",
-  AVAILABLE = "available",
-  AFFORDABLE = "affordable",
+  NAMES = "names", // Name changes and customization
+  EFFECTS = "effects", // Visual effects and animations
+  PREMIUM = "premium", // Premium features and rare items
 }
 
 // Sort options for shop items
@@ -73,7 +117,9 @@ const STORAGE_KEYS = {
 // Helper functions for localStorage
 const saveToStorage = (key: string, value: string) => {
   try {
-    localStorage.setItem(key, value);
+    if (typeof window !== "undefined") {
+      localStorage.setItem(key, value);
+    }
   } catch (error) {
     console.warn("Failed to save to localStorage:", error);
   }
@@ -81,8 +127,11 @@ const saveToStorage = (key: string, value: string) => {
 
 const loadFromStorage = (key: string, defaultValue: string) => {
   try {
-    const saved = localStorage.getItem(key);
-    return saved !== null ? saved : defaultValue;
+    if (typeof window !== "undefined") {
+      const saved = localStorage.getItem(key);
+      return saved !== null ? saved : defaultValue;
+    }
+    return defaultValue;
   } catch (error) {
     console.warn("Failed to load from localStorage:", error);
     return defaultValue;
@@ -265,18 +314,33 @@ export const ShopItemsContainer: React.FC<ShopItemsContainerProps> = ({
     saveToStorage(STORAGE_KEYS.GRID_LAYOUT, gridLayout.toString());
   }, [gridLayout]);
 
-  // TODO: Replace with actual data fetching
+  // Load shop items immediately - no more empty array!
   useEffect(() => {
     setLoading(true);
-    // Simulate loading
+    console.log("Loading shop items...");
+
+    // Simulate loading but use real data
     setTimeout(() => {
-      setShopItems([]); // Will be populated with real data
+      console.log("Setting shop items:", SHOP_ITEMS_DEBUG);
+      setShopItems(SHOP_ITEMS_DEBUG);
       setLoading(false);
-    }, 1000);
+    }, 500); // Reduced loading time
   }, []);
+
+  // Debug log
+  useEffect(() => {
+    console.log("ShopItemsContainer state:", {
+      shopItems: shopItems.length,
+      loading,
+      filter,
+      searchQuery,
+    });
+  }, [shopItems, loading, filter, searchQuery]);
 
   // Sorting and filtering logic
   const filteredAndSortedItems = useMemo(() => {
+    console.log("Filtering items. Starting with:", shopItems.length);
+
     let items = [...shopItems];
 
     // Apply search filter
@@ -287,22 +351,24 @@ export const ShopItemsContainer: React.FC<ShopItemsContainerProps> = ({
           item.name.toLowerCase().includes(query) ||
           item.description.toLowerCase().includes(query)
       );
+      console.log("After search filter:", items.length);
     }
 
     // Apply category filters
-    if (filter === FilterBy.VANITY) {
+    if (filter === FilterBy.NAMES) {
       items = items.filter((item) => item.category === "vanity");
-    } else if (filter === FilterBy.UPGRADES) {
-      items = items.filter((item) => item.category === "upgrades");
     } else if (filter === FilterBy.EFFECTS) {
       items = items.filter((item) => item.category === "effects");
-    } else if (filter === FilterBy.COLLECTIBLES) {
-      items = items.filter((item) => item.category === "collectibles");
-    } else if (filter === FilterBy.AVAILABLE) {
-      items = items.filter((item) => item.isAvailable);
-    } else if (filter === FilterBy.AFFORDABLE) {
-      items = items.filter((item) => userBalance >= item.cost);
+    } else if (filter === FilterBy.PREMIUM) {
+      items = items.filter(
+        (item) =>
+          item.rarity === "epic" ||
+          item.rarity === "legendary" ||
+          item.cost >= 5000
+      );
     }
+
+    console.log("After category filter:", items.length);
 
     // Apply sorting
     items.sort((a, b) => {
@@ -349,32 +415,25 @@ export const ShopItemsContainer: React.FC<ShopItemsContainerProps> = ({
       }
     });
 
+    console.log("Final filtered items:", items.length);
     return items;
   }, [shopItems, searchQuery, filter, sortBy, sortDirection, userBalance]);
 
   // Map tab categories to FilterBy enum
   const handleTabChange = (category: string) => {
+    console.log("Tab changed to:", category);
     switch (category) {
       case "all":
         setFilter(FilterBy.ALL);
         break;
-      case "vanity":
-        setFilter(FilterBy.VANITY);
-        break;
-      case "upgrades":
-        setFilter(FilterBy.UPGRADES);
+      case "names":
+        setFilter(FilterBy.NAMES);
         break;
       case "effects":
         setFilter(FilterBy.EFFECTS);
         break;
-      case "collectibles":
-        setFilter(FilterBy.COLLECTIBLES);
-        break;
-      case "available":
-        setFilter(FilterBy.AVAILABLE);
-        break;
-      case "affordable":
-        setFilter(FilterBy.AFFORDABLE);
+      case "premium":
+        setFilter(FilterBy.PREMIUM);
         break;
       default:
         setFilter(FilterBy.ALL);
@@ -448,8 +507,11 @@ export const ShopItemsContainer: React.FC<ShopItemsContainerProps> = ({
               size="sm"
               onClick={() => {
                 setLoading(true);
-                // TODO: Implement refresh logic
-                setTimeout(() => setLoading(false), 1000);
+                console.log("Refreshing items...");
+                setTimeout(() => {
+                  setShopItems([...SHOP_ITEMS_DEBUG]); // Force re-render
+                  setLoading(false);
+                }, 500);
               }}
               className="w-full h-9"
             >

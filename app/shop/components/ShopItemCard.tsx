@@ -20,6 +20,8 @@ import {
   Sparkles,
   AlertTriangle,
   Check,
+  Star,
+  Zap,
 } from "lucide-react";
 import { useState } from "react";
 import { type ShopItem, RARITY_COLORS } from "../types";
@@ -45,7 +47,8 @@ export const ShopItemCard = ({
 
   const handlePurchaseClick = async (e: React.MouseEvent) => {
     e.stopPropagation();
-    if (!canPurchase || isPurchasing || !onPurchase) return;
+    if (!canPurchase || isPurchasing || !onPurchase || !item.isAvailable)
+      return;
 
     setIsPurchasing(true);
     try {
@@ -95,7 +98,7 @@ export const ShopItemCard = ({
 
     if (isPurchasing) {
       return {
-        text: "Purchasing...",
+        text: "Processing...",
         icon: null,
         disabled: true,
         variant: "default" as const,
@@ -116,19 +119,22 @@ export const ShopItemCard = ({
 
   return (
     <motion.div
-      whileHover={{ scale: 1.02, y: -5 }}
-      whileTap={{ scale: 0.98 }}
+      whileHover={item.isAvailable ? { scale: 1.02, y: -5 } : {}}
+      whileTap={item.isAvailable ? { scale: 0.98 } : {}}
       transition={{ type: "spring", stiffness: 300, damping: 20 }}
-      onHoverStart={() => setIsHovered(true)}
+      onHoverStart={() => setIsHovered(item.isAvailable)}
       onHoverEnd={() => setIsHovered(false)}
       layout
     >
       <Card
         className={cn(
-          "h-full relative overflow-hidden group cursor-pointer border-primary/40 transition-all duration-300",
-          !item.isAvailable && "opacity-75",
+          "h-full relative overflow-hidden group border-primary/40 transition-all duration-300",
+          !item.isAvailable && "opacity-90",
           !canAfford && item.isAvailable && "border-orange-400/30",
-          canPurchase && "hover:border-primary/60 hover:shadow-lg"
+          canPurchase &&
+            item.isAvailable &&
+            "hover:border-primary/60 hover:shadow-lg cursor-pointer",
+          !item.isAvailable && "cursor-not-allowed"
         )}
         style={{
           borderColor:
@@ -136,12 +142,14 @@ export const ShopItemCard = ({
         }}
       >
         {/* Rarity glow effect */}
-        <div
-          className="absolute inset-0 opacity-0 group-hover:opacity-20 transition-opacity duration-300 pointer-events-none"
-          style={{
-            background: `radial-gradient(circle at center, ${rarityColor}40 0%, transparent 70%)`,
-          }}
-        />
+        {item.isAvailable && (
+          <div
+            className="absolute inset-0 opacity-0 group-hover:opacity-20 transition-opacity duration-300 pointer-events-none"
+            style={{
+              background: `radial-gradient(circle at center, ${rarityColor}40 0%, transparent 70%)`,
+            }}
+          />
+        )}
 
         {/* Background pattern */}
         <div className="absolute inset-0 z-0">
@@ -154,6 +162,41 @@ export const ShopItemCard = ({
           </div>
         </div>
 
+        {/* Coming Soon Overlay */}
+        {!item.isAvailable && (
+          <div className="absolute inset-0 z-20 bg-gray-900/85 backdrop-blur-sm rounded-lg flex items-center justify-center">
+            <div className="text-center p-6">
+              <motion.div
+                initial={{ scale: 0.8, opacity: 0 }}
+                animate={{ scale: 1, opacity: 1 }}
+                transition={{ delay: 0.2 }}
+                className="inline-flex items-center justify-center w-16 h-16 bg-yellow-500/20 rounded-full mb-4"
+              >
+                <Clock className="h-8 w-8 text-yellow-400" />
+              </motion.div>
+              <motion.div
+                initial={{ y: 10, opacity: 0 }}
+                animate={{ y: 0, opacity: 1 }}
+                transition={{ delay: 0.3 }}
+                className="bg-gradient-to-r from-yellow-500/20 via-yellow-400/30 to-yellow-500/20 text-yellow-400 px-6 py-3 rounded-full border border-yellow-400/40"
+              >
+                <span className="text-sm font-bold flex items-center gap-2">
+                  <Sparkles className="h-4 w-4" />
+                  Coming Soon
+                </span>
+              </motion.div>
+              <motion.p
+                initial={{ opacity: 0 }}
+                animate={{ opacity: 1 }}
+                transition={{ delay: 0.4 }}
+                className="text-xs text-gray-300 mt-3 max-w-[200px] leading-relaxed"
+              >
+                This feature is in development and will be available soon!
+              </motion.p>
+            </div>
+          </div>
+        )}
+
         {/* Content Layer */}
         <div className="relative z-10 h-full flex flex-col">
           {/* Header */}
@@ -161,7 +204,11 @@ export const ShopItemCard = ({
             <div className="flex items-start justify-between mb-2">
               <div className="flex-1 min-w-0">
                 <div className="flex items-center gap-2 mb-1">
-                  <div className="text-3xl group-hover:scale-110 transition-transform duration-300">
+                  <div
+                    className={`text-3xl transition-transform duration-300 ${
+                      item.isAvailable ? "group-hover:scale-110" : ""
+                    }`}
+                  >
                     {item.preview}
                   </div>
                   <Badge
@@ -175,7 +222,11 @@ export const ShopItemCard = ({
                     {item.rarity}
                   </Badge>
                 </div>
-                <CardTitle className="text-foreground text-lg font-bold truncate group-hover:text-primary transition-colors">
+                <CardTitle
+                  className={`text-foreground text-lg font-bold truncate transition-colors ${
+                    item.isAvailable ? "group-hover:text-primary" : ""
+                  }`}
+                >
                   {item.name}
                 </CardTitle>
                 <CardDescription className="text-muted-foreground text-sm line-clamp-2">
@@ -183,10 +234,13 @@ export const ShopItemCard = ({
                 </CardDescription>
               </div>
 
-              {/* Availability indicator */}
+              {/* Status indicator */}
               {!item.isAvailable && (
                 <div className="flex-shrink-0 ml-2">
-                  <Badge variant="secondary" className="text-xs">
+                  <Badge
+                    variant="secondary"
+                    className="text-xs bg-yellow-500/20 text-yellow-400 border-yellow-400/30"
+                  >
                     <Clock className="h-3 w-3 mr-1" />
                     Soon
                   </Badge>
@@ -237,10 +291,11 @@ export const ShopItemCard = ({
           <CardFooter className="pt-0">
             <Button
               onClick={handlePurchaseClick}
-              disabled={buttonState.disabled || isLoading}
+              disabled={buttonState.disabled || isLoading || !item.isAvailable}
               variant={buttonState.variant}
               className={cn(
-                "w-full transition-all duration-300 group-hover:shadow-md",
+                "w-full transition-all duration-300",
+                item.isAvailable && "group-hover:shadow-md",
                 buttonState.className
               )}
             >
@@ -264,21 +319,21 @@ export const ShopItemCard = ({
           </CardFooter>
         </div>
 
-        {/* Hover effects */}
+        {/* Hover effects (only for available items) */}
         <AnimatePresence>
-          {isHovered && canPurchase && (
+          {isHovered && canPurchase && item.isAvailable && (
             <motion.div
               initial={{ opacity: 0 }}
               animate={{ opacity: 1 }}
               exit={{ opacity: 0 }}
-              className="absolute inset-0 bg-gradient-to-t from-primary/10 via-transparent to-transparent pointer-events-none"
+              className="absolute inset-0 bg-gradient-to-t from-primary/10 via-transparent to-transparent pointer-events-none z-5"
             />
           )}
         </AnimatePresence>
 
         {/* Purchased overlay (for future use) */}
         {item.isPurchased && (
-          <div className="absolute inset-0 bg-green-500/20 backdrop-blur-sm flex items-center justify-center">
+          <div className="absolute inset-0 bg-green-500/20 backdrop-blur-sm flex items-center justify-center z-20">
             <div className="bg-green-500 text-white px-4 py-2 rounded-full flex items-center gap-2">
               <Check className="h-4 w-4" />
               <span className="font-medium">Owned</span>
