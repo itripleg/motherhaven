@@ -172,7 +172,7 @@ export function BondingCurveVisualizer() {
           animate={{ opacity: 1, y: 0 }}
           transition={{ delay: 0.2 }}
         >
-          <Card className="bg-background/50 backdrop-blur-sm border-primary/20">
+          <Card className="unified-card border-primary/20">
             <CardHeader>
               <CardTitle className="flex items-center justify-between">
                 <div className="flex items-center gap-2">
@@ -276,7 +276,7 @@ export function BondingCurveVisualizer() {
           className="grid grid-cols-1 lg:grid-cols-3 gap-6"
         >
           {/* Curve Type Selection */}
-          <Card className="bg-background/50 backdrop-blur-sm border-primary/20">
+          <Card className="unified-card border-primary/20">
             <CardHeader>
               <CardTitle className="flex items-center gap-2 text-lg">
                 <TrendingUp className="h-5 w-5 text-primary" />
@@ -319,7 +319,7 @@ export function BondingCurveVisualizer() {
           </Card>
 
           {/* Price Settings */}
-          <Card className="bg-background/50 backdrop-blur-sm border-primary/20">
+          <Card className="unified-card border-primary/20">
             <CardHeader>
               <CardTitle className="flex items-center gap-2 text-lg">
                 <Target className="h-5 w-5 text-primary" />
@@ -406,7 +406,7 @@ export function BondingCurveVisualizer() {
           </Card>
 
           {/* Advanced Settings */}
-          <Card className="bg-background/50 backdrop-blur-sm border-primary/20">
+          <Card className="unified-card border-primary/20">
             <CardHeader>
               <CardTitle className="flex items-center gap-2 text-lg">
                 <Activity className="h-5 w-5 text-primary" />
@@ -484,7 +484,7 @@ export function BondingCurveVisualizer() {
           transition={{ delay: 0.6 }}
           className="grid grid-cols-1 md:grid-cols-3 gap-4"
         >
-          <Card className="bg-background/50 backdrop-blur-sm border-primary/20 bg-primary/5">
+          <Card className="unified-card border-primary/20 bg-primary/5">
             <CardContent className="p-4 text-center">
               <div className="space-y-2">
                 <Zap className="h-8 w-8 text-primary mx-auto" />
@@ -498,7 +498,7 @@ export function BondingCurveVisualizer() {
             </CardContent>
           </Card>
 
-          <Card className="bg-background/50 backdrop-blur-sm border-primary/20 bg-primary/5">
+          <Card className="unified-card border-primary/20 bg-primary/5">
             <CardContent className="p-4 text-center">
               <div className="space-y-2">
                 <Target className="h-8 w-8 text-primary mx-auto" />
@@ -512,7 +512,7 @@ export function BondingCurveVisualizer() {
             </CardContent>
           </Card>
 
-          <Card className="bg-background/50 backdrop-blur-sm border-primary/20 bg-primary/5">
+          <Card className="unified-card border-primary/20 bg-primary/5">
             <CardContent className="p-4 text-center">
               <div className="space-y-2">
                 <TrendingUp className="h-8 w-8 text-primary mx-auto" />
