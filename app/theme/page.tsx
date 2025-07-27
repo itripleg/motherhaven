@@ -23,7 +23,13 @@ import {
   CloudOff,
   Cloud,
 } from "lucide-react";
-import { motion, AnimatePresence } from "framer-motion";
+import {
+  motion,
+  AnimatePresence,
+  useSpring,
+  useMotionValue,
+  animate,
+} from "framer-motion";
 
 interface ThemeColor {
   name: string;
@@ -35,6 +41,90 @@ interface ThemeColor {
   cssVar: string;
 }
 
+interface AnimatedSliderProps {
+  value: number;
+  targetValue: number;
+  min: number;
+  max: number;
+  step: number;
+  onValueChange: (value: number) => void;
+  label: string;
+  suffix?: string;
+}
+
+const AnimatedSlider: React.FC<AnimatedSliderProps> = ({
+  value,
+  targetValue,
+  min,
+  max,
+  step,
+  onValueChange,
+  label,
+  suffix = "",
+}) => {
+  const [currentValue, setCurrentValue] = useState(value);
+  const [isAnimating, setIsAnimating] = useState(false);
+
+  // Animate to new value when targetValue changes
+  useEffect(() => {
+    if (Math.abs(targetValue - currentValue) > 0.1) {
+      setIsAnimating(true);
+
+      const controls = animate(currentValue, targetValue, {
+        duration: 0.8,
+        ease: [0.23, 1, 0.32, 1], // Custom easing for smooth feel
+        onUpdate: (latest) => {
+          setCurrentValue(Math.round(latest));
+        },
+        onComplete: () => {
+          setCurrentValue(targetValue);
+          setIsAnimating(false);
+        },
+      });
+
+      return controls.stop;
+    }
+  }, [targetValue, currentValue]);
+
+  // Update current value when manually changed
+  const handleValueChange = (newValues: number[]) => {
+    const newValue = newValues[0];
+    setCurrentValue(newValue);
+    onValueChange(newValue);
+  };
+
+  return (
+    <div className="space-y-2">
+      <div className="flex justify-between text-sm">
+        <Label className={isAnimating ? "text-primary" : ""}>{label}</Label>
+        <motion.span
+          className={`font-mono ${isAnimating ? "text-primary" : ""}`}
+          animate={isAnimating ? { scale: [1, 1.1, 1] } : {}}
+          transition={{ duration: 0.3 }}
+        >
+          {currentValue}
+          {suffix}
+        </motion.span>
+      </div>
+      <motion.div
+        animate={isAnimating ? { scale: [1, 1.02, 1] } : {}}
+        transition={{ duration: 0.8, ease: "easeInOut" }}
+      >
+        <Slider
+          value={[currentValue]}
+          onValueChange={handleValueChange}
+          min={min}
+          max={max}
+          step={step}
+          className={`w-full transition-all duration-300 ${
+            isAnimating ? "ring-2 ring-primary/30" : ""
+          }`}
+        />
+      </motion.div>
+    </div>
+  );
+};
+
 const ThemeCustomizer = () => {
   const { address, isConnected } = useAccount();
   const { toast } = useToast();
@@ -45,6 +135,8 @@ const ThemeCustomizer = () => {
   const [isSaving, setIsSaving] = useState(false);
   const [lastSaved, setLastSaved] = useState<Date | null>(null);
   const [localColors, setLocalColors] = useState(colors);
+  const [targetColors, setTargetColors] = useState(colors);
+  const [isPresetAnimating, setIsPresetAnimating] = useState(false);
 
   // Handle hydration
   useEffect(() => {
@@ -54,6 +146,7 @@ const ThemeCustomizer = () => {
   // Sync with global colors
   useEffect(() => {
     setLocalColors(colors);
+    setTargetColors(colors);
   }, [colors]);
 
   const updateColor = (
@@ -64,22 +157,61 @@ const ThemeCustomizer = () => {
     const newColors = [...localColors];
     newColors[index] = { ...newColors[index], [property]: value };
     setLocalColors(newColors);
+    setTargetColors(newColors);
 
     // Apply immediately to global theme
     applyColors(newColors);
   };
 
   const applyPreset = (preset: (typeof presetThemes)[0]) => {
+    setIsPresetAnimating(true);
+
     const newColors = localColors.map((color, index) => ({
       ...color,
       ...preset.colors[index],
     }));
-    setLocalColors(newColors);
-    applyColors(newColors);
+
+    // Set target values for animation
+    setTargetColors(newColors);
+
+    // Apply to global theme with a slight delay to show animation first
+    setTimeout(() => {
+      setLocalColors(newColors);
+      applyColors(newColors);
+    }, 100);
+
+    // Show preset animation feedback
+    setTimeout(() => {
+      setIsPresetAnimating(false);
+      toast({
+        title: `${preset.name} Applied! 🎨`,
+        description: preset.description,
+      });
+    }, 1000);
   };
 
   const resetToDefaults = () => {
-    resetToDefault();
+    setIsPresetAnimating(true);
+
+    // Get default colors and animate to them
+    const defaultColors = [
+      { hue: 263, saturation: 60, lightness: 50 },
+      { hue: 240, saturation: 5, lightness: 11 },
+      { hue: 240, saturation: 6, lightness: 5 },
+      { hue: 0, saturation: 0, lightness: 95 },
+    ];
+
+    const newColors = localColors.map((color, index) => ({
+      ...color,
+      ...defaultColors[index],
+    }));
+
+    setTargetColors(newColors);
+
+    setTimeout(() => {
+      resetToDefault();
+      setIsPresetAnimating(false);
+    }, 100);
   };
 
   // Save theme to Firebase
@@ -165,9 +297,20 @@ const ThemeCustomizer = () => {
           className="text-center space-y-4"
         >
           <div className="flex items-center justify-center gap-3">
-            <div className="p-3 bg-primary/20 rounded-xl border border-primary/30">
+            <motion.div
+              className="p-3 bg-primary/20 rounded-xl border border-primary/30"
+              animate={
+                isPresetAnimating
+                  ? {
+                      scale: [1, 1.1, 1],
+                      rotate: [0, 5, -5, 0],
+                    }
+                  : {}
+              }
+              transition={{ duration: 0.8 }}
+            >
               <Palette className="h-8 w-8 text-primary" />
-            </div>
+            </motion.div>
             <h1 className="text-4xl font-bold text-gradient">Theme Studio</h1>
             <Badge className="bg-purple-500/20 text-purple-400 border-purple-500/30">
               <Sparkles className="h-3 w-3 mr-1" />
@@ -217,26 +360,46 @@ const ThemeCustomizer = () => {
               </span>
             )}
 
-            <Button
-              onClick={saveTheme}
-              disabled={!isConnected || isSaving}
-              variant="outline"
-              size="sm"
-              className="flex items-center gap-2"
-            >
-              <Save className="h-4 w-4" />
-              {isSaving ? "Saving..." : "Save Theme"}
-            </Button>
+            <motion.div whileHover={{ scale: 1.02 }} whileTap={{ scale: 0.98 }}>
+              <Button
+                onClick={saveTheme}
+                disabled={!isConnected || isSaving}
+                variant="outline"
+                size="sm"
+                className="flex items-center gap-2 transition-all duration-300 hover:shadow-lg hover:shadow-primary/20"
+              >
+                <motion.div
+                  animate={isSaving ? { rotate: 360 } : {}}
+                  transition={{
+                    duration: 1,
+                    repeat: isSaving ? Infinity : 0,
+                    ease: "linear",
+                  }}
+                >
+                  <Save className="h-4 w-4" />
+                </motion.div>
+                {isSaving ? "Saving..." : "Save Theme"}
+              </Button>
+            </motion.div>
 
-            <Button
-              onClick={resetToDefaults}
-              variant="outline"
-              size="sm"
-              className="flex items-center gap-2"
-            >
-              <RotateCcw className="h-4 w-4" />
-              Reset
-            </Button>
+            <motion.div whileHover={{ scale: 1.02 }} whileTap={{ scale: 0.98 }}>
+              <Button
+                onClick={resetToDefaults}
+                variant="outline"
+                size="sm"
+                className="flex items-center gap-2 transition-all duration-300 hover:shadow-lg hover:shadow-orange-500/20"
+                disabled={isPresetAnimating}
+              >
+                <motion.div
+                  animate={isPresetAnimating ? { rotate: 360 } : {}}
+                  transition={{ duration: 0.8 }}
+                  whileHover={{ rotate: 15 }}
+                >
+                  <RotateCcw className="h-4 w-4" />
+                </motion.div>
+                Reset
+              </Button>
+            </motion.div>
           </div>
         </motion.div>
 
@@ -261,31 +424,67 @@ const ThemeCustomizer = () => {
                     {presetThemes.map((preset, index) => (
                       <motion.div
                         key={preset.name}
-                        whileHover={{ scale: 1.02 }}
-                        whileTap={{ scale: 0.98 }}
+                        whileHover={{
+                          scale: 1.02,
+                          y: -2,
+                        }}
+                        whileTap={{
+                          scale: 0.98,
+                          y: 0,
+                        }}
+                        initial={{ opacity: 0, y: 20 }}
+                        animate={{ opacity: 1, y: 0 }}
+                        transition={{
+                          delay: index * 0.1,
+                          type: "spring",
+                          stiffness: 300,
+                          damping: 30,
+                        }}
                       >
                         <Button
                           onClick={() => applyPreset(preset)}
                           variant="outline"
-                          className="w-full h-auto p-4 flex flex-col items-start gap-2"
+                          className="w-full h-auto p-4 flex flex-col items-start gap-2 transition-all duration-300 hover:shadow-lg hover:shadow-primary/10 hover:border-primary/50 group"
+                          disabled={isPresetAnimating}
                         >
                           <div className="flex items-center gap-2 w-full">
                             <div className="flex gap-1">
                               {preset.colors.map((color, i) => (
-                                <div
+                                <motion.div
                                   key={i}
                                   className="w-4 h-4 rounded-full border border-border/50"
                                   style={{
                                     backgroundColor: `hsl(${color.hue}deg ${color.saturation}% ${color.lightness}%)`,
                                   }}
+                                  whileHover={{
+                                    scale: 1.3,
+                                    rotate: 10,
+                                  }}
+                                  transition={{
+                                    duration: 0.2,
+                                    type: "spring",
+                                    stiffness: 400,
+                                    damping: 25,
+                                  }}
                                 />
                               ))}
                             </div>
-                            <span className="font-medium">{preset.name}</span>
+                            <motion.span
+                              className="font-medium"
+                              initial={{ x: 0 }}
+                              whileHover={{ x: 2 }}
+                              transition={{ duration: 0.2 }}
+                            >
+                              {preset.name}
+                            </motion.span>
                           </div>
-                          <span className="text-sm text-muted-foreground text-left">
+                          <motion.span
+                            className="text-sm text-muted-foreground text-left group-hover:text-foreground/80 transition-colors duration-300"
+                            initial={{ opacity: 0.7 }}
+                            whileHover={{ opacity: 1 }}
+                          >
                             {preset.description}
-                          </span>
+                          </motion.span>
                         </Button>
                       </motion.div>
                     ))}
@@ -319,10 +518,22 @@ const ThemeCustomizer = () => {
                       {/* Color Header */}
                       <div className="flex items-center justify-between">
                         <div className="flex items-center gap-3">
-                          <div
+                          <motion.div
                             className="w-8 h-8 rounded-lg border border-border/50 shadow-sm"
                             style={{
                               backgroundColor: `hsl(${color.hue}deg ${color.saturation}% ${color.lightness}%)`,
+                            }}
+                            animate={
+                              isPresetAnimating
+                                ? {
+                                    scale: [1, 1.1, 1],
+                                    rotate: [0, 10, -10, 0],
+                                  }
+                                : {}
+                            }
+                            transition={{
+                              duration: 0.8,
+                              delay: index * 0.1,
                             }}
                           />
                           <div>
@@ -332,64 +543,62 @@ const ThemeCustomizer = () => {
                             </p>
                           </div>
                         </div>
-                        <div className="text-xs text-muted-foreground font-mono">
+                        <motion.div
+                          className="text-xs text-muted-foreground font-mono"
+                          animate={
+                            isPresetAnimating ? { scale: [1, 1.05, 1] } : {}
+                          }
+                          transition={{ duration: 0.6, delay: index * 0.05 }}
+                        >
                           hsl({color.hue}°, {color.saturation}%,{" "}
                           {color.lightness}%)
-                        </div>
+                        </motion.div>
                       </div>
 
-                      {/* Sliders */}
+                      {/* Animated Sliders */}
                       <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                        <div className="space-y-2">
-                          <div className="flex justify-between text-sm">
-                            <Label>Hue</Label>
-                            <span>{color.hue}°</span>
-                          </div>
-                          <Slider
-                            value={[color.hue]}
-                            onValueChange={([value]) =>
-                              updateColor(index, "hue", value)
-                            }
-                            min={0}
-                            max={360}
-                            step={1}
-                            className="w-full"
-                          />
-                        </div>
+                        <AnimatedSlider
+                          value={color.hue}
+                          targetValue={targetColors[index]?.hue || color.hue}
+                          min={0}
+                          max={360}
+                          step={1}
+                          onValueChange={(value) =>
+                            updateColor(index, "hue", value)
+                          }
+                          label="Hue"
+                          suffix="°"
+                        />
 
-                        <div className="space-y-2">
-                          <div className="flex justify-between text-sm">
-                            <Label>Saturation</Label>
-                            <span>{color.saturation}%</span>
-                          </div>
-                          <Slider
-                            value={[color.saturation]}
-                            onValueChange={([value]) =>
-                              updateColor(index, "saturation", value)
-                            }
-                            min={0}
-                            max={100}
-                            step={1}
-                            className="w-full"
-                          />
-                        </div>
+                        <AnimatedSlider
+                          value={color.saturation}
+                          targetValue={
+                            targetColors[index]?.saturation || color.saturation
+                          }
+                          min={0}
+                          max={100}
+                          step={1}
+                          onValueChange={(value) =>
+                            updateColor(index, "saturation", value)
+                          }
+                          label="Saturation"
+                          suffix="%"
+                        />
 
-                        <div className="space-y-2">
-                          <div className="flex justify-between text-sm">
-                            <Label>Lightness</Label>
-                            <span>{color.lightness}%</span>
-                          </div>
-                          <Slider
-                            value={[color.lightness]}
-                            onValueChange={([value]) =>
-                              updateColor(index, "lightness", value)
-                            }
-                            min={5}
-                            max={95}
-                            step={1}
-                            className="w-full"
-                          />
-                        </div>
+                        <AnimatedSlider
+                          value={color.lightness}
+                          targetValue={
+                            targetColors[index]?.lightness || color.lightness
+                          }
+                          min={5}
+                          max={95}
+                          step={1}
+                          onValueChange={(value) =>
+                            updateColor(index, "lightness", value)
+                          }
+                          label="Lightness"
+                          suffix="%"
+                        />
                       </div>
                     </motion.div>
                   ))}
@@ -411,35 +620,81 @@ const ThemeCustomizer = () => {
               </CardHeader>
               <CardContent className="space-y-4">
                 {/* Sample Components */}
-                <div className="space-y-3">
-                  <Button className="w-full">Primary Button</Button>
-                  <Button variant="secondary" className="w-full">
-                    Secondary Button
-                  </Button>
-                  <Button variant="outline" className="w-full">
-                    Outline Button
-                  </Button>
-                </div>
+                <motion.div
+                  className="space-y-3"
+                  animate={isPresetAnimating ? { scale: [1, 1.02, 1] } : {}}
+                  transition={{ duration: 0.8 }}
+                >
+                  <motion.div
+                    whileHover={{ scale: 1.02, y: -1 }}
+                    whileTap={{ scale: 0.98 }}
+                    transition={{ type: "spring", stiffness: 400, damping: 25 }}
+                  >
+                    <Button className="w-full shadow-lg hover:shadow-xl hover:shadow-primary/25 transition-all duration-300">
+                      Primary Button
+                    </Button>
+                  </motion.div>
 
-                <Card className="unified-card">
-                  <CardContent className="p-4">
-                    <h4 className="font-semibold mb-2">Sample Card</h4>
-                    <p className="text-sm text-muted-foreground">
-                      This card shows how your theme affects nested components.
-                    </p>
-                  </CardContent>
-                </Card>
+                  <motion.div
+                    whileHover={{ scale: 1.02, y: -1 }}
+                    whileTap={{ scale: 0.98 }}
+                    transition={{ type: "spring", stiffness: 400, damping: 25 }}
+                  >
+                    <Button
+                      variant="secondary"
+                      className="w-full hover:shadow-lg transition-all duration-300"
+                    >
+                      Secondary Button
+                    </Button>
+                  </motion.div>
 
-                <div className="p-4 bg-accent/20 rounded-lg border border-accent/30">
+                  <motion.div
+                    whileHover={{ scale: 1.02, y: -1 }}
+                    whileTap={{ scale: 0.98 }}
+                    transition={{ type: "spring", stiffness: 400, damping: 25 }}
+                  >
+                    <Button
+                      variant="outline"
+                      className="w-full hover:shadow-lg hover:border-primary/50 transition-all duration-300"
+                    >
+                      Outline Button
+                    </Button>
+                  </motion.div>
+                </motion.div>
+
+                <motion.div
+                  animate={isPresetAnimating ? { scale: [1, 1.02, 1] } : {}}
+                  transition={{ duration: 0.8, delay: 0.1 }}
+                >
+                  <Card className="unified-card">
+                    <CardContent className="p-4">
+                      <h4 className="font-semibold mb-2">Sample Card</h4>
+                      <p className="text-sm text-muted-foreground">
+                        This card shows how your theme affects nested
+                        components.
+                      </p>
+                    </CardContent>
+                  </Card>
+                </motion.div>
+
+                <motion.div
+                  className="p-4 bg-accent/20 rounded-lg border border-accent/30"
+                  animate={isPresetAnimating ? { scale: [1, 1.02, 1] } : {}}
+                  transition={{ duration: 0.8, delay: 0.2 }}
+                >
                   <h4 className="font-semibold text-accent-foreground mb-2">
                     Accent Section
                   </h4>
                   <p className="text-sm text-accent-foreground/80">
                     Special highlighted content area.
                   </p>
-                </div>
+                </motion.div>
 
-                <div className="p-4 bg-background/50 rounded-lg border border-border/30">
+                <motion.div
+                  className="p-4 bg-background/50 rounded-lg border border-border/30"
+                  animate={isPresetAnimating ? { scale: [1, 1.02, 1] } : {}}
+                  transition={{ duration: 0.8, delay: 0.3 }}
+                >
                   <h4 className="font-semibold text-foreground mb-2">
                     Text Color Preview
                   </h4>
@@ -447,11 +702,16 @@ const ThemeCustomizer = () => {
                     This text uses the foreground color variable and will change
                     with your theme.
                   </p>
-                </div>
+                </motion.div>
 
-                <Badge className="bg-primary/20 text-primary border-primary/30">
-                  Primary Badge
-                </Badge>
+                <motion.div
+                  animate={isPresetAnimating ? { scale: [1, 1.1, 1] } : {}}
+                  transition={{ duration: 0.8, delay: 0.4 }}
+                >
+                  <Badge className="bg-primary/20 text-primary border-primary/30">
+                    Primary Badge
+                  </Badge>
+                </motion.div>
               </CardContent>
             </Card>
           </motion.div>
