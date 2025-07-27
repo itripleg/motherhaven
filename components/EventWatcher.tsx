@@ -15,6 +15,9 @@ import {
   TrendingDown,
   Plus,
   BarChart3,
+  Rocket,
+  Pause,
+  Bell,
 } from "lucide-react";
 
 // Event types
@@ -95,15 +98,15 @@ export function EventWatcher() {
       // Get event-specific details
       let title = "";
       let description = "";
-      let icon = <Coins className="h-4 w-4" />;
+      let titleIcon = <Coins className="h-4 w-4" />;
 
       switch (eventName) {
         case "TokenCreated":
-          title = "🚀 New Token Created!";
+          title = "New Token Created!";
           description = `${formatAddress(data.creator)} created ${data.name} (${
             data.symbol
           })`;
-          icon = <Plus className="h-4 w-4 text-green-500" />;
+          titleIcon = <Rocket className="h-4 w-4 text-green-500" />;
           break;
 
         case "TokensPurchased":
@@ -111,11 +114,11 @@ export function EventWatcher() {
           const tokenAmountPurchased = data.amount
             ? formatEther(data.amount)
             : "0";
-          title = "📈 Token Purchase";
+          title = "Token Purchase";
           description = `${formatAddress(data.buyer)} bought ${formatNumber(
             tokenAmountPurchased
           )} tokens for ${formatNumber(ethAmountPurchased)} AVAX`;
-          icon = <TrendingUp className="h-4 w-4 text-green-500" />;
+          titleIcon = <TrendingUp className="h-4 w-4 text-green-500" />;
           break;
 
         case "TokensSold":
@@ -123,28 +126,34 @@ export function EventWatcher() {
           const tokensSold = data.tokenAmount
             ? formatEther(data.tokenAmount)
             : "0";
-          title = "📉 Token Sale";
+          title = "Token Sale";
           description = `${formatAddress(data.seller)} sold ${formatNumber(
             tokensSold
           )} tokens for ${formatNumber(ethSold)} AVAX`;
-          icon = <TrendingDown className="h-4 w-4 text-red-500" />;
+          titleIcon = <TrendingDown className="h-4 w-4 text-red-500" />;
           break;
 
         case "TradingHalted":
-          title = "⏸️ Trading Halted";
+          title = "Trading Halted";
           description = `Trading halted for token ${formatAddress(
             data.token || data.tokenAddress
           )}`;
-          icon = <Coins className="h-4 w-4 text-yellow-500" />;
+          titleIcon = <Pause className="h-4 w-4 text-yellow-500" />;
           break;
 
         default:
-          title = "🔔 Factory Event";
+          title = "Factory Event";
           description = `Event: ${eventName}`;
+          titleIcon = <Bell className="h-4 w-4" />;
       }
 
       toast({
-        title,
+        title: (
+          <div className="flex items-center gap-2">
+            {titleIcon}
+            {title}
+          </div>
+        ),
         description: (
           <div className="space-y-2">
             <p className="text-sm">{description}</p>
@@ -165,7 +174,7 @@ export function EventWatcher() {
                   View on DEX
                 </button>
               )}
-              
+
               {/* Transaction Link */}
               {transactionHash && (
                 <button
