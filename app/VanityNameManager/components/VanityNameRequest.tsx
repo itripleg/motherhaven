@@ -52,18 +52,8 @@ const VANITY_BURN_MANAGER_ADDRESS = (process.env
 const VAIN_TOKEN_ADDRESS = (process.env.NEXT_PUBLIC_BURN_TOKEN_ADDRESS ||
   "0xYourVAINTokenAddressHere") as Address;
 
-// DEBUG: Log environment variables
-console.log("🔧 Debug Environment Variables:");
-console.log("VANITY_BURN_MANAGER_ADDRESS:", VANITY_BURN_MANAGER_ADDRESS);
-console.log("VAIN_TOKEN_ADDRESS:", VAIN_TOKEN_ADDRESS);
-console.log("All NEXT_PUBLIC env vars:", {
-  vanityManager: process.env.NEXT_PUBLIC_VANITY_BURN_MANAGER_ADDRESS,
-  burnToken: process.env.NEXT_PUBLIC_BURN_TOKEN_ADDRESS,
-});
-
 // CORRECTED Contract ABIs - Updated to match your actual contract
 const VANITY_BURN_MANAGER_ABI = [
-  // FIXED: Use the correct function name from your contract
   {
     inputs: [{ name: "newName", type: "string" }],
     name: "setVanityName",
@@ -71,7 +61,6 @@ const VANITY_BURN_MANAGER_ABI = [
     stateMutability: "nonpayable",
     type: "function",
   },
-  // FIXED: Use the correct property name
   {
     inputs: [],
     name: "costPerNameChange",
@@ -126,15 +115,6 @@ const VANITY_BURN_MANAGER_ABI = [
     stateMutability: "view",
     type: "function",
   },
-  // ADDED: setBurnToken function for debugging
-  {
-    inputs: [{ name: "_burnToken", type: "address" }],
-    name: "setBurnToken",
-    outputs: [],
-    stateMutability: "nonpayable",
-    type: "function",
-  },
-  // ADDED: getBurnToken function for debugging
   {
     inputs: [],
     name: "getBurnToken",
@@ -203,7 +183,7 @@ export function VanityNameRequest({
     args: address ? [address] : undefined,
     query: {
       enabled: !!address && !!VAIN_TOKEN_ADDRESS,
-      refetchInterval: 3000, // Refetch every 3 seconds for real-time updates
+      refetchInterval: 3000,
     },
   });
 
@@ -237,7 +217,7 @@ export function VanityNameRequest({
     args: address ? [address] : undefined,
     query: {
       enabled: !!address && !!VANITY_BURN_MANAGER_ADDRESS,
-      refetchInterval: 3000, // Real-time updates for burn balance
+      refetchInterval: 3000,
     },
   });
 
@@ -252,25 +232,36 @@ export function VanityNameRequest({
     },
   });
 
-  // DEBUG: Check burn token configuration
+  // Check contract vanity name to stay in sync
+  const { data: contractVanityName, refetch: refetchContractName } =
+    useReadContract({
+      address: VANITY_BURN_MANAGER_ADDRESS,
+      abi: VANITY_BURN_MANAGER_ABI,
+      functionName: "getUserVanityName",
+      args: address ? [address] : undefined,
+      query: {
+        enabled: !!address && !!VANITY_BURN_MANAGER_ADDRESS,
+        refetchInterval: 3000,
+      },
+    });
+
+  // Check name availability on contract
+  const { data: nameAvailable } = useReadContract({
+    address: VANITY_BURN_MANAGER_ADDRESS,
+    abi: VANITY_BURN_MANAGER_ABI,
+    functionName: "isNameAvailable",
+    args: requestedName.trim() ? [requestedName.trim()] : undefined,
+    query: {
+      enabled: !!requestedName.trim() && !!VANITY_BURN_MANAGER_ADDRESS,
+    },
+  });
+
   const { data: burnToken } = useReadContract({
     address: VANITY_BURN_MANAGER_ADDRESS,
     abi: VANITY_BURN_MANAGER_ABI,
     functionName: "getBurnToken",
     query: {
       enabled: !!VANITY_BURN_MANAGER_ADDRESS,
-    },
-  });
-
-  // DEBUG: Check if user already has a vanity name
-  const { data: existingVanityName } = useReadContract({
-    address: VANITY_BURN_MANAGER_ADDRESS,
-    abi: VANITY_BURN_MANAGER_ABI,
-    functionName: "getUserVanityName",
-    args: address ? [address] : undefined,
-    query: {
-      enabled: !!address && !!VANITY_BURN_MANAGER_ADDRESS,
-      refetchInterval: 3000,
     },
   });
 
@@ -307,6 +298,9 @@ export function VanityNameRequest({
   const availableBalance = burnInfo?.[2] ? formatEther(burnInfo[2]) : "0";
   const possibleNameChanges = burnInfo?.[3] ? Number(burnInfo[3]) : 0;
 
+  // Get the current name from contract or prop (contract takes precedence)
+  const displayCurrentName = contractVanityName || currentName || "";
+
   // Auto-refetch data when transactions complete
   useEffect(() => {
     if (burnSuccess) {
@@ -331,8 +325,8 @@ export function VanityNameRequest({
     if (setNameSuccess) {
       refetchBurnInfo();
       refetchCanSetName();
+      refetchContractName();
 
-      // Only show toast if we have a valid requested name
       if (requestedName && requestedName.trim()) {
         toast({
           title: "Name Set! 🎉",
@@ -352,6 +346,7 @@ export function VanityNameRequest({
     requestedName,
     refetchBurnInfo,
     refetchCanSetName,
+    refetchContractName,
   ]);
 
   // Client-side validation
@@ -396,7 +391,7 @@ export function VanityNameRequest({
     []
   );
 
-  // Validation effect with API call
+  // Validation effect with contract call
   useEffect(() => {
     const validateName = async () => {
       if (!requestedName.trim()) {
@@ -414,19 +409,22 @@ export function VanityNameRequest({
         return;
       }
 
-      // Check availability via contract directly for now (you can add API later)
-      try {
-        // For now, assume name is available if client validation passes
-        setValidationResult({
-          isValid: true,
-          message: "Name appears to be available!",
-        });
-      } catch (error) {
-        console.error("Error checking name availability:", error);
+      // Check availability via contract
+      if (nameAvailable === false) {
         setValidationResult({
           isValid: false,
           error: VanityNameValidationError.ALREADY_TAKEN,
-          message: "Unable to check availability. Please try again.",
+          message: "This name is already taken",
+        });
+      } else if (nameAvailable === true) {
+        setValidationResult({
+          isValid: true,
+          message: "Name is available!",
+        });
+      } else {
+        setValidationResult({
+          isValid: true,
+          message: "Checking availability...",
         });
       }
 
@@ -435,11 +433,12 @@ export function VanityNameRequest({
 
     const timeoutId = setTimeout(validateName, 500);
     return () => clearTimeout(timeoutId);
-  }, [requestedName, validateVanityNameClient]);
+  }, [requestedName, validateVanityNameClient, nameAvailable]);
 
-  // Handle errors
+  // Handle errors - reset submitting state on error
   useEffect(() => {
     if (burnError) {
+      console.error("Burn error:", burnError);
       toast({
         title: "Burn Failed",
         description: burnError.message,
@@ -451,6 +450,7 @@ export function VanityNameRequest({
 
   useEffect(() => {
     if (setNameError) {
+      console.error("Set name error:", setNameError);
       toast({
         title: "Name Setting Failed",
         description: setNameError.message,
@@ -508,7 +508,7 @@ export function VanityNameRequest({
     }
   };
 
-  // FIXED: Handle set vanity name with correct function
+  // Handle set vanity name
   const handleSetVanityName = async (e: React.FormEvent) => {
     e.preventDefault();
 
@@ -526,15 +526,10 @@ export function VanityNameRequest({
     setIsSubmitting(true);
 
     try {
-      console.log("🎭 Setting vanity name:", requestedName);
-      console.log("📋 Contract address:", VANITY_BURN_MANAGER_ADDRESS);
-      console.log("💰 Available balance:", availableBalance);
-      console.log("🎯 Can set name:", canSetName);
-
       await writeSetName({
         address: VANITY_BURN_MANAGER_ADDRESS,
         abi: VANITY_BURN_MANAGER_ABI,
-        functionName: "setVanityName", // This matches your contract
+        functionName: "setVanityName",
         args: [requestedName.trim()],
       });
 
@@ -574,10 +569,16 @@ export function VanityNameRequest({
   };
 
   const getProcessingStatus = () => {
-    if (isBurnPending || isWaitingForBurn) {
+    if (isBurnPending) {
+      return "Confirming burn...";
+    }
+    if (isWaitingForBurn) {
       return "Burning tokens...";
     }
-    if (isSetNamePending || isWaitingForSetName) {
+    if (isSetNamePending) {
+      return "Confirming name...";
+    }
+    if (isWaitingForSetName) {
       return "Setting name...";
     }
     if (isSubmitting) {
@@ -585,6 +586,13 @@ export function VanityNameRequest({
     }
     return "";
   };
+
+  const isProcessing =
+    isSubmitting ||
+    isBurnPending ||
+    isWaitingForBurn ||
+    isSetNamePending ||
+    isWaitingForSetName;
 
   // Show connection requirement
   if (!address) {
@@ -623,30 +631,6 @@ export function VanityNameRequest({
 
   return (
     <div className="space-y-6">
-      {/* DEBUG: Show contract configuration */}
-      {burnToken && (
-        <Card className="unified-card border-blue-400/20 bg-blue-500/5">
-          <CardContent className="p-4">
-            <div className="text-xs text-blue-300 space-y-1">
-              <p>
-                <strong>Debug Info:</strong>
-              </p>
-              <p>Burn Manager: {VANITY_BURN_MANAGER_ADDRESS}</p>
-              <p>VAIN Token: {VAIN_TOKEN_ADDRESS}</p>
-              <p>Configured Burn Token: {burnToken}</p>
-              <p>
-                Tokens Match:{" "}
-                {burnToken?.toLowerCase() === VAIN_TOKEN_ADDRESS?.toLowerCase()
-                  ? "✅ Yes"
-                  : "❌ No"}
-              </p>
-              <p>Existing Vanity Name: {existingVanityName || "None"}</p>
-              <p>Current Name Prop: {currentName || "None"}</p>
-            </div>
-          </CardContent>
-        </Card>
-      )}
-
       {/* Current Status */}
       <Card className="unified-card border-primary/20">
         <CardHeader>
@@ -660,6 +644,7 @@ export function VanityNameRequest({
                 refetchVainBalance();
                 refetchBurnInfo();
                 refetchCanSetName();
+                refetchContractName();
               }}
               className="ml-auto"
             >
@@ -674,11 +659,11 @@ export function VanityNameRequest({
                 Current Name
               </Label>
               <div className="flex items-center gap-2">
-                {currentName ? (
+                {displayCurrentName ? (
                   <>
                     <User className="h-4 w-4 text-green-400" />
                     <span className="font-medium text-foreground">
-                      {currentName}
+                      {displayCurrentName}
                     </span>
                   </>
                 ) : (
@@ -921,16 +906,12 @@ export function VanityNameRequest({
                 disabled={
                   !validationResult?.isValid ||
                   !canSetName ||
-                  isSubmitting ||
-                  isBurnPending ||
-                  isWaitingForBurn ||
-                  isSetNamePending ||
-                  isWaitingForSetName ||
+                  isProcessing ||
                   !requestedName.trim()
                 }
                 className="w-full h-12 text-lg font-semibold"
               >
-                {isSubmitting || isSetNamePending || isWaitingForSetName ? (
+                {isProcessing ? (
                   <div className="flex items-center gap-2">
                     <Loader2 className="h-5 w-5 animate-spin" />
                     <span>{getProcessingStatus()}</span>

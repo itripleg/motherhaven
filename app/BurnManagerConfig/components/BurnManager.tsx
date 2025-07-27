@@ -88,6 +88,31 @@ const ERC20_ABI = [
   },
 ] as const;
 
+// BurnToken ABI for getting the creator and setting burn manager
+const BURN_TOKEN_ABI = [
+  {
+    inputs: [],
+    name: "creator",
+    outputs: [{ name: "", type: "address" }],
+    stateMutability: "view",
+    type: "function",
+  },
+  {
+    inputs: [{ name: "newManager", type: "address" }],
+    name: "setBurnManager",
+    outputs: [],
+    stateMutability: "nonpayable",
+    type: "function",
+  },
+  {
+    inputs: [],
+    name: "burnManager",
+    outputs: [{ name: "", type: "address" }],
+    stateMutability: "view",
+    type: "function",
+  },
+] as const;
+
 export function BurnManager({ userAddress }: BurnManagerProps) {
   const { toast } = useToast();
   const [burnManagerAddress, setBurnManagerAddress] = useState("");
@@ -96,7 +121,7 @@ export function BurnManager({ userAddress }: BurnManagerProps) {
     useState(false);
   const [isValidTokenAddress, setIsValidTokenAddress] = useState(false);
 
-  // Read burn manager info
+  // Read burn manager info (owner of the burn manager contract)
   const { data: burnManagerOwner } = useReadContract({
     address: isValidBurnManagerAddress
       ? (burnManagerAddress as `0x${string}`)
@@ -136,7 +161,7 @@ export function BurnManager({ userAddress }: BurnManagerProps) {
     query: { enabled: isValidBurnManagerAddress && isValidTokenAddress },
   });
 
-  // Read token info
+  // Read token info (including creator for permission check)
   const { data: tokenName } = useReadContract({
     address: isValidTokenAddress ? (tokenAddress as `0x${string}`) : undefined,
     abi: ERC20_ABI,
@@ -151,9 +176,28 @@ export function BurnManager({ userAddress }: BurnManagerProps) {
     query: { enabled: isValidTokenAddress },
   });
 
-  // Contract write
+  // Get the token creator (the one who can set burn managers)
+  const { data: tokenCreator } = useReadContract({
+    address: isValidTokenAddress ? (tokenAddress as `0x${string}`) : undefined,
+    abi: BURN_TOKEN_ABI,
+    functionName: "creator",
+    query: { enabled: isValidTokenAddress },
+  });
+
+  // Get the current burn manager for this token
+  const { data: currentTokenBurnManager, refetch: refetchTokenBurnManager } =
+    useReadContract({
+      address: isValidTokenAddress
+        ? (tokenAddress as `0x${string}`)
+        : undefined,
+      abi: BURN_TOKEN_ABI,
+      functionName: "burnManager",
+      query: { enabled: isValidTokenAddress },
+    });
+
+  // Contract write (using BURN_TOKEN_ABI since we're calling the token contract)
   const {
-    writeContract: setBurnToken,
+    writeContract: setBurnManager,
     data: txHash,
     error: writeError,
     isPending: isWritePending,
@@ -177,13 +221,14 @@ export function BurnManager({ userAddress }: BurnManagerProps) {
   React.useEffect(() => {
     if (txSuccess) {
       toast({
-        title: "Burn Token Set! 🎯",
-        description: "The supported token has been successfully updated.",
+        title: "Burn Manager Set! 🎯",
+        description: "The burn manager has been successfully updated.",
       });
       refetchBurnToken();
-      setTokenAddress("");
+      refetchTokenBurnManager();
+      setBurnManagerAddress("");
     }
-  }, [txSuccess, toast, refetchBurnToken]);
+  }, [txSuccess, toast, refetchBurnToken, refetchTokenBurnManager]);
 
   // Handle errors
   React.useEffect(() => {
@@ -196,7 +241,7 @@ export function BurnManager({ userAddress }: BurnManagerProps) {
     }
   }, [writeError, toast]);
 
-  const handleSetBurnToken = async () => {
+  const handleSetBurnManager = async () => {
     if (!isValidBurnManagerAddress || !isValidTokenAddress) {
       toast({
         title: "Invalid Addresses",
@@ -206,20 +251,29 @@ export function BurnManager({ userAddress }: BurnManagerProps) {
       return;
     }
 
+    if (!isTokenCreator) {
+      toast({
+        title: "Permission Denied",
+        description: "Only the token creator can set the burn manager.",
+        variant: "destructive",
+      });
+      return;
+    }
+
     try {
-      await setBurnToken({
-        address: burnManagerAddress as `0x${string}`,
-        abi: BURN_MANAGER_ABI,
-        functionName: "setBurnToken",
-        args: [tokenAddress as `0x${string}`],
+      await setBurnManager({
+        address: tokenAddress as `0x${string}`, // Call the token contract, not the burn manager
+        abi: BURN_TOKEN_ABI,
+        functionName: "setBurnManager",
+        args: [burnManagerAddress as `0x${string}`],
       });
 
       toast({
-        title: "🔄 Setting Burn Token...",
+        title: "🔄 Setting Burn Manager...",
         description: "Transaction submitted. Please wait for confirmation.",
       });
     } catch (error: any) {
-      console.error("Failed to set burn token:", error);
+      console.error("Failed to set burn manager:", error);
       toast({
         title: "Failed to Submit",
         description: error.message || "Failed to submit transaction.",
@@ -240,7 +294,10 @@ export function BurnManager({ userAddress }: BurnManagerProps) {
     window.open(`https://testnet.snowtrace.io/address/${address}`, "_blank");
   };
 
-  const isOwner = burnManagerOwner?.toLowerCase() === userAddress.toLowerCase();
+  const isBurnManagerOwner =
+    burnManagerOwner?.toLowerCase() === userAddress.toLowerCase();
+  const isTokenCreator =
+    tokenCreator?.toLowerCase() === userAddress.toLowerCase();
 
   return (
     <div className="space-y-6">
@@ -250,15 +307,145 @@ export function BurnManager({ userAddress }: BurnManagerProps) {
           Burn Manager Configuration
         </h2>
         <p className="text-muted-foreground">
-          Set supported tokens for burn managers
+          Set burn managers for your tokens
         </p>
       </div>
+
+      {/* Token Info Card */}
+      <motion.div
+        initial={{ opacity: 0, y: 20 }}
+        animate={{ opacity: 1, y: 0 }}
+        transition={{ delay: 0.1 }}
+      >
+        <Card className="unified-card border-primary/20">
+          <CardHeader>
+            <CardTitle className="flex items-center gap-3">
+              <Coins className="h-5 w-5 text-primary" />
+              Token Information
+            </CardTitle>
+          </CardHeader>
+          <CardContent className="space-y-4">
+            <div className="space-y-2">
+              <Label htmlFor="tokenAddress">Token Contract Address</Label>
+              <Input
+                id="tokenAddress"
+                type="text"
+                value={tokenAddress}
+                onChange={(e) => setTokenAddress(e.target.value)}
+                placeholder="0x..."
+                className={
+                  tokenAddress
+                    ? isValidTokenAddress
+                      ? "border-green-400/50 focus:border-green-400"
+                      : "border-red-400/50 focus:border-red-400"
+                    : ""
+                }
+              />
+            </div>
+
+            {isValidTokenAddress && tokenName && (
+              <div className="p-4 bg-muted/30 rounded-lg space-y-3">
+                <div className="flex items-center justify-between">
+                  <span className="text-sm text-muted-foreground">
+                    Token Info
+                  </span>
+                  <div className="flex gap-2">
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      onClick={() =>
+                        copyToClipboard(tokenAddress, "Token Address")
+                      }
+                      className="h-6 w-6 p-0"
+                    >
+                      <Copy className="h-3 w-3" />
+                    </Button>
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      onClick={() => viewOnExplorer(tokenAddress)}
+                      className="h-6 w-6 p-0"
+                    >
+                      <ExternalLink className="h-3 w-3" />
+                    </Button>
+                  </div>
+                </div>
+
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4 text-sm">
+                  <div>
+                    <span className="text-muted-foreground">Name:</span>
+                    <span className="ml-2 font-medium text-foreground">
+                      {tokenName}
+                    </span>
+                  </div>
+                  <div>
+                    <span className="text-muted-foreground">Symbol:</span>
+                    <span className="ml-2 font-medium text-foreground">
+                      {tokenSymbol}
+                    </span>
+                  </div>
+                </div>
+
+                <div className="space-y-2">
+                  <div>
+                    <span className="text-muted-foreground text-sm">
+                      Token Creator:
+                    </span>
+                    <div className="flex items-center gap-2 mt-1">
+                      <code className="text-xs bg-muted px-2 py-1 rounded">
+                        {tokenCreator?.slice(0, 6)}...{tokenCreator?.slice(-4)}
+                      </code>
+                      {isTokenCreator && (
+                        <span className="text-xs bg-green-500/20 text-green-400 px-2 py-1 rounded">
+                          You
+                        </span>
+                      )}
+                    </div>
+                  </div>
+
+                  <div>
+                    <span className="text-muted-foreground text-sm">
+                      Current Burn Manager:
+                    </span>
+                    <div className="flex items-center gap-2 mt-1">
+                      <code className="text-xs bg-muted px-2 py-1 rounded">
+                        {currentTokenBurnManager &&
+                        currentTokenBurnManager !==
+                          "0x0000000000000000000000000000000000000000"
+                          ? `${currentTokenBurnManager.slice(
+                              0,
+                              6
+                            )}...${currentTokenBurnManager.slice(-4)}`
+                          : "None set"}
+                      </code>
+                      {currentTokenBurnManager &&
+                        currentTokenBurnManager !==
+                          "0x0000000000000000000000000000000000000000" && (
+                          <Button
+                            variant="ghost"
+                            size="sm"
+                            onClick={() =>
+                              viewOnExplorer(currentTokenBurnManager)
+                            }
+                            className="h-6 w-6 p-0"
+                          >
+                            <ExternalLink className="h-3 w-3" />
+                          </Button>
+                        )}
+                    </div>
+                  </div>
+                </div>
+              </div>
+            )}
+          </CardContent>
+        </Card>
+      </motion.div>
 
       {/* Burn Manager Info Card */}
       <motion.div
         initial={{ opacity: 0, y: 20 }}
         animate={{ opacity: 1, y: 0 }}
-        transition={{ delay: 0.1 }}
+        transition={{ delay: 0.2 }}
       >
         <Card className="unified-card border-primary/20">
           <CardHeader>
@@ -322,14 +509,14 @@ export function BurnManager({ userAddress }: BurnManagerProps) {
                 <div className="space-y-2">
                   <div>
                     <span className="text-muted-foreground text-sm">
-                      Owner:
+                      Burn Manager Owner:
                     </span>
                     <div className="flex items-center gap-2 mt-1">
                       <code className="text-xs bg-muted px-2 py-1 rounded">
                         {burnManagerOwner?.slice(0, 6)}...
                         {burnManagerOwner?.slice(-4)}
                       </code>
-                      {isOwner && (
+                      {isBurnManagerOwner && (
                         <span className="text-xs bg-green-500/20 text-green-400 px-2 py-1 rounded">
                           You
                         </span>
@@ -380,95 +567,94 @@ export function BurnManager({ userAddress }: BurnManagerProps) {
                     </div>
                   )}
                 </div>
-              </div>
-            )}
-          </CardContent>
-        </Card>
-      </motion.div>
 
-      {/* Set Burn Token Card */}
-      {isValidBurnManagerAddress && (
-        <motion.div
-          initial={{ opacity: 0, y: 20 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ delay: 0.2 }}
-        >
-          <Card className="unified-card border-primary/20">
-            <CardHeader>
-              <CardTitle className="flex items-center gap-3">
-                <Target className="h-5 w-5 text-primary" />
-                Set Supported Token
-              </CardTitle>
-            </CardHeader>
-            <CardContent className="space-y-4">
-              {!isOwner && (
-                <Alert variant="destructive">
-                  <AlertTriangle className="h-4 w-4" />
-                  <AlertDescription>
-                    You are not the owner of this burn manager. Only the owner
-                    can set supported tokens.
-                  </AlertDescription>
-                </Alert>
-              )}
-
-              <div className="space-y-2">
-                <Label htmlFor="tokenAddress">Token Contract Address</Label>
-                <Input
-                  id="tokenAddress"
-                  type="text"
-                  value={tokenAddress}
-                  onChange={(e) => setTokenAddress(e.target.value)}
-                  placeholder="0x..."
-                  disabled={!isOwner}
-                  className={
-                    tokenAddress
-                      ? isValidTokenAddress
-                        ? "border-green-400/50 focus:border-green-400"
-                        : "border-red-400/50 focus:border-red-400"
-                      : ""
-                  }
-                />
-              </div>
-
-              {isValidTokenAddress && tokenName && (
-                <div className="p-3 bg-muted/20 rounded-lg space-y-2">
-                  <div className="flex items-center gap-2">
-                    <Coins className="h-4 w-4 text-primary" />
-                    <span className="text-sm font-medium text-foreground">
-                      {tokenName} ({tokenSymbol})
-                    </span>
-                  </div>
-
-                  {supportsToken !== undefined && (
+                {/* Token compatibility check */}
+                {isValidTokenAddress && supportsToken !== undefined && (
+                  <div className="mt-3 p-3 rounded-lg border">
                     <div className="flex items-center gap-2">
                       {supportsToken ? (
                         <>
                           <CheckCircle className="h-4 w-4 text-green-400" />
                           <span className="text-sm text-green-400">
-                            Already supported
+                            This burn manager supports your token
                           </span>
                         </>
                       ) : (
                         <>
                           <AlertTriangle className="h-4 w-4 text-orange-400" />
                           <span className="text-sm text-orange-400">
-                            Not supported yet
+                            This burn manager does not support your token
                           </span>
                         </>
                       )}
                     </div>
-                  )}
-                </div>
+                  </div>
+                )}
+              </div>
+            )}
+          </CardContent>
+        </Card>
+      </motion.div>
+
+      {/* Set Burn Manager Card */}
+      {isValidTokenAddress && isValidBurnManagerAddress && (
+        <motion.div
+          initial={{ opacity: 0, y: 20 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ delay: 0.3 }}
+        >
+          <Card className="unified-card border-primary/20">
+            <CardHeader>
+              <CardTitle className="flex items-center gap-3">
+                <Target className="h-5 w-5 text-primary" />
+                Set Burn Manager
+              </CardTitle>
+            </CardHeader>
+            <CardContent className="space-y-4">
+              {!isTokenCreator && (
+                <Alert variant="destructive">
+                  <AlertTriangle className="h-4 w-4" />
+                  <AlertDescription>
+                    You are not the creator of this token. Only the token
+                    creator can set the burn manager.
+                  </AlertDescription>
+                </Alert>
               )}
 
+              <div className="p-4 bg-muted/20 rounded-lg">
+                <h4 className="font-medium mb-2">Transaction Summary</h4>
+                <div className="space-y-1 text-sm">
+                  <div>
+                    <span className="text-muted-foreground">Token:</span>
+                    <span className="ml-2">
+                      {tokenName} ({tokenSymbol})
+                    </span>
+                  </div>
+                  <div>
+                    <span className="text-muted-foreground">
+                      New Burn Manager:
+                    </span>
+                    <span className="ml-2 font-mono text-xs">
+                      {burnManagerAddress.slice(0, 6)}...
+                      {burnManagerAddress.slice(-4)}
+                    </span>
+                  </div>
+                  <div>
+                    <span className="text-muted-foreground">Action:</span>
+                    <span className="ml-2">
+                      Set burn manager for your token
+                    </span>
+                  </div>
+                </div>
+              </div>
+
               <Button
-                onClick={handleSetBurnToken}
+                onClick={handleSetBurnManager}
                 disabled={
-                  !isOwner ||
-                  !isValidTokenAddress ||
+                  !isTokenCreator ||
+                  !isValidBurnManagerAddress ||
                   isWritePending ||
-                  isWaitingForTx ||
-                  supportsToken === true
+                  isWaitingForTx
                 }
                 className="w-full h-12"
               >
@@ -480,9 +666,7 @@ export function BurnManager({ userAddress }: BurnManagerProps) {
                 ) : (
                   <div className="flex items-center gap-2">
                     <Target className="h-4 w-4" />
-                    {supportsToken === true
-                      ? "Token Already Supported"
-                      : "Set Supported Token"}
+                    Set Burn Manager
                   </div>
                 )}
               </Button>
@@ -495,7 +679,7 @@ export function BurnManager({ userAddress }: BurnManagerProps) {
       <motion.div
         initial={{ opacity: 0, y: 20 }}
         animate={{ opacity: 1, y: 0 }}
-        transition={{ delay: 0.3 }}
+        transition={{ delay: 0.4 }}
       >
         <Card className="unified-card border-blue-400/20 bg-blue-500/5">
           <CardContent className="p-6">
@@ -505,21 +689,22 @@ export function BurnManager({ userAddress }: BurnManagerProps) {
                 <h3 className="font-semibold text-blue-400">How it works</h3>
                 <div className="text-sm text-blue-300 space-y-1">
                   <p>
-                    <strong>Step 1:</strong> Enter your burn manager contract
+                    <strong>Step 1:</strong> Enter your token contract address
+                  </p>
+                  <p>
+                    <strong>Step 2:</strong> Verify you are the token creator
+                  </p>
+                  <p>
+                    <strong>Step 3:</strong> Enter the burn manager contract
                     address
                   </p>
                   <p>
-                    <strong>Step 2:</strong> Verify you are the burn manager
-                    owner
-                  </p>
-                  <p>
-                    <strong>Step 3:</strong> Set which token the burn manager
-                    should accept
+                    <strong>Step 4:</strong> Set the burn manager for your token
                   </p>
                   <p className="mt-2 text-xs text-blue-400">
-                    💡 <strong>Note:</strong> Only burn manager owners can set
-                    supported tokens. Users can only burn the supported token
-                    for this manager.
+                    💡 <strong>Note:</strong> Only token creators can set burn
+                    managers for their tokens. The burn manager will be notified
+                    when tokens are burned.
                   </p>
                 </div>
               </div>

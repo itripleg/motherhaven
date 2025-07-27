@@ -1,414 +1,392 @@
-// app/shop/page.tsx
-'use client';
+// app/shop/page.tsx - Updated to use new shop container system
+"use client";
 
-import React, { useState, useEffect } from 'react';
-import { useAccount, useReadContract } from 'wagmi';
-import { motion, AnimatePresence } from 'framer-motion';
-import { Card, CardContent } from '@/components/ui/card';
-import { Badge } from '@/components/ui/badge';
-import { Coins } from 'lucide-react';
+import React, { useState, useEffect } from "react";
+import { useAccount } from "wagmi";
+import { motion } from "framer-motion";
+import { Card, CardContent } from "@/components/ui/card";
+import { Input } from "@/components/ui/input";
+import { Button } from "@/components/ui/button";
+import {
+  Coins,
+  Search,
+  RefreshCw,
+  ShoppingBag,
+  AlertCircle,
+} from "lucide-react";
+import { useToast } from "@/hooks/use-toast";
 
-// Import types - adjust path as needed
-// import { type ShopItem, VANITY_BURN_MANAGER_ABI, VANITY_BURN_MANAGER_ADDRESS } from './types';
+// Import the new shop components
+import { ShopItemsContainer } from "./components/ShopItemsContainer";
+import { useVanityBalance } from "./hooks/useVanityBalance";
+import { type ShopItem, type PurchaseResult } from "./types";
 
-// Inline types for now to avoid import issues
-interface ShopItem {
-  id: string;
-  name: string;
-  description: string;
-  cost: number;
-  rarity: 'common' | 'rare' | 'epic' | 'legendary';
-  preview: string;
-  position: { x: number; y: number };
-  isAvailable: boolean;
-  requiresBurnBalance?: number;
-}
-
-const SHOP_ITEMS: ShopItem[] = [
-  {
-    id: 'vanity_name_change',
-    name: 'Vanity Name Token',
-    description: 'Change your display name',
-    cost: 1000,
-    rarity: 'common',
-    preview: '📛',
-    position: { x: 40, y: 40 },
-    isAvailable: true,
-    requiresBurnBalance: 1000,
-  },
-  {
-    id: 'premium_name_reservation', 
-    name: 'Premium Name Reserve',
-    description: 'Reserve a name for 30 days',
-    cost: 2500,
-    rarity: 'rare',
-    preview: '🛡️',
-    position: { x: 60, y: 30 },
-    isAvailable: false,
-    requiresBurnBalance: 2500,
-  },
-  {
-    id: 'rainbow_name_effect',
-    name: 'Rainbow Name Effect', 
-    description: 'Make your name shimmer',
-    cost: 5000,
-    rarity: 'epic',
-    preview: '🌈',
-    position: { x: 30, y: 60 },
-    isAvailable: false,
-    requiresBurnBalance: 5000,
-  },
-];
-
-const RARITY_COLORS = {
-  common: '#9CA3AF',
-  rare: '#60A5FA', 
-  epic: '#A78BFA',
-  legendary: '#FBBF24',
-} as const;
-
-// This is the page component - NO PROPS ALLOWED
 export default function ShopPage() {
-  const { address } = useAccount();
-  const [userBalance, setUserBalance] = useState(15000); // Default for testing
-  const [hoveredItem, setHoveredItem] = useState<ShopItem | null>(null);
-  const [merchantSays, setMerchantSays] = useState("Welcome, traveler...");
+  const { address, isConnected } = useAccount();
+  const { toast } = useToast();
 
-  // Uncomment when you have the contract setup
-  // const { data: burnInfo } = useReadContract({
-  //   address: VANITY_BURN_MANAGER_ADDRESS,
-  //   abi: VANITY_BURN_MANAGER_ABI,
-  //   functionName: 'getUserBurnInfo',
-  //   args: address ? [address] : undefined,
-  //   query: {
-  //     enabled: !!address,
-  //   },
-  // });
+  // State management
+  const [searchQuery, setSearchQuery] = useState("");
+  const [isRefreshing, setIsRefreshing] = useState(false);
+  const [mounted, setMounted] = useState(false);
 
-  // useEffect(() => {
-  //   if (burnInfo) {
-  //     const availableBalance = Number(burnInfo[2]) / 1e18;
-  //     setUserBalance(availableBalance);
-  //   }
-  // }, [burnInfo]);
+  // Use the vanity balance hook
+  const {
+    availableBalance,
+    totalBurned,
+    currentVanityName,
+    possibleNameChanges,
+    canSetName,
+    isLoading: isBalanceLoading,
+    isError: isBalanceError,
+    error: balanceError,
+    refetch: refetchBalance,
+  } = useVanityBalance();
 
-  const handleItemHover = (item: ShopItem | null) => {
-    setHoveredItem(item);
-    if (item) {
-      const canAfford = userBalance >= item.cost;
-      setMerchantSays(canAfford 
-        ? `${item.name} - ${item.cost.toLocaleString()} VAIN` 
-        : `Need ${(item.cost - userBalance).toLocaleString()} more VAIN`
-      );
-    } else {
-      setMerchantSays("Welcome, traveler...");
+  // Handle hydration
+  useEffect(() => {
+    setMounted(true);
+  }, []);
+
+  // Handle balance errors
+  useEffect(() => {
+    if (isBalanceError && balanceError) {
+      console.error("Vanity balance error:", balanceError);
+      toast({
+        title: "Balance Error",
+        description:
+          "Failed to load your VAIN balance. Please refresh the page.",
+        variant: "destructive",
+      });
+    }
+  }, [isBalanceError, balanceError, toast]);
+
+  // Handle item purchase
+  const handlePurchase = async (item: ShopItem): Promise<void> => {
+    if (!isConnected || !address) {
+      toast({
+        title: "Wallet not connected",
+        description: "Please connect your wallet to make purchases",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    if (availableBalance < item.cost) {
+      toast({
+        title: "Insufficient balance",
+        description: `You need ${(
+          item.cost - availableBalance
+        ).toLocaleString()} more VAIN tokens`,
+        variant: "destructive",
+      });
+      return;
+    }
+
+    if (!item.isAvailable) {
+      toast({
+        title: "Item not available",
+        description: "This item is not yet available for purchase",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    try {
+      // TODO: Implement actual purchase transaction
+      // For now, just show success message
+      toast({
+        title: "Purchase initiated",
+        description: `Purchasing ${
+          item.name
+        } for ${item.cost.toLocaleString()} VAIN...`,
+      });
+
+      // Simulate purchase delay
+      await new Promise((resolve) => setTimeout(resolve, 2000));
+
+      // TODO: Replace with actual contract call
+      console.log("Purchasing item:", item);
+
+      toast({
+        title: "Purchase successful!",
+        description: `You have successfully purchased ${item.name}`,
+      });
+
+      // Refresh user data
+      refetchBalance();
+    } catch (error) {
+      console.error("Purchase failed:", error);
+      toast({
+        title: "Purchase failed",
+        description:
+          error instanceof Error ? error.message : "An unknown error occurred",
+        variant: "destructive",
+      });
     }
   };
 
-  const handleItemClick = (item: ShopItem) => {
-    if (userBalance >= item.cost && item.isAvailable) {
-      console.log('Purchasing item:', item);
-      // TODO: Implement actual purchase logic
-      setUserBalance(prev => prev - item.cost);
-      alert(`Successfully purchased ${item.name}!`);
+  // Handle refresh
+  const handleRefresh = async () => {
+    setIsRefreshing(true);
+    try {
+      await refetchBalance();
+      toast({
+        title: "Data refreshed",
+        description: "Your balance and shop data have been updated",
+      });
+    } catch (error) {
+      toast({
+        title: "Refresh failed",
+        description: "Failed to refresh data. Please try again.",
+        variant: "destructive",
+      });
+    } finally {
+      setIsRefreshing(false);
     }
   };
 
-  const getRarityColor = (rarity: keyof typeof RARITY_COLORS) => {
-    return RARITY_COLORS[rarity];
-  };
+  // Don't render until mounted to prevent hydration mismatch
+  if (!mounted) {
+    return (
+      <div className="min-h-screen bg-gradient-to-br from-background via-muted/50 to-accent/20 flex items-center justify-center">
+        <div className="text-center">
+          <motion.div
+            animate={{ rotate: 360 }}
+            transition={{ duration: 2, repeat: Infinity, ease: "linear" }}
+            className="w-8 h-8 border-2 border-primary border-t-transparent rounded-full mx-auto mb-4"
+          />
+          <p className="text-muted-foreground">Loading shop...</p>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-background via-muted/50 to-accent/20">
-      {/* Background elements with falling coins */}
+      {/* Animated background elements */}
       <div className="fixed inset-0 z-0 overflow-hidden pointer-events-none">
-        {/* Static decorative elements */}
-        <div className="absolute top-20 left-10 text-6xl opacity-5 blur-sm rotate-12">🏪</div>
-        <div className="absolute bottom-20 right-10 text-5xl opacity-5 blur-sm -rotate-12">💎</div>
-        <div className="absolute top-1/2 right-20 text-4xl opacity-5 blur-sm">✨</div>
-        
-        {/* Falling coins - giant ones */}
-        {[
-          { left: 15, delay: 0, duration: 25, size: 'text-[8rem]', rotation: 0, spinType: 'flip' },
-          { left: 50, delay: 12, duration: 30, size: 'text-[10rem]', rotation: 180, spinType: 'spin' },
-          { left: 85, delay: 8, duration: 28, size: 'text-[7rem]', rotation: 90, spinType: 'wobble' },
-        ].map((coin, i) => (
+        {/* Floating coins */}
+        {Array.from({ length: 6 }).map((_, i) => (
           <motion.div
-            key={`giant-coin-${i}`}
-            className={`absolute ${coin.size} blur-sm opacity-15`}
-            style={{ left: `${coin.left}%` }}
-            initial={{
-              y: "-200vh",
-              opacity: 0,
-              rotate: coin.rotation,
-              scaleX: 1,
-            }}
-            animate={{
-              y: "200vh",
-              rotate: coin.spinType === 'spin' ? coin.rotation + 360 : coin.rotation,
-              scaleX: coin.spinType === 'flip' ? [1, 0.2, -1, 0.2, 1] : coin.spinType === 'wobble' ? [1, 0.7, 1, 0.7, 1] : 1,
-              opacity: [0, 0.15, 0.15, 0],
-            }}
-            transition={{
-              duration: coin.duration,
-              repeat: Infinity,
-              delay: coin.delay,
-              ease: "linear",
-              times: [0, 0.1, 0.9, 1],
-            }}
-          >
-            🪙
-          </motion.div>
-        ))}
-        
-        {/* Medium falling coins */}
-        {[
-          { left: 25, delay: 5, duration: 20, size: 'text-[4rem]', rotation: 45, spinType: 'flip' },
-          { left: 65, delay: 15, duration: 22, size: 'text-[5rem]', rotation: 270, spinType: 'wobble' },
-          { left: 35, delay: 20, duration: 18, size: 'text-[3rem]', rotation: 135, spinType: 'spin' },
-        ].map((coin, i) => (
-          <motion.div
-            key={`medium-coin-${i}`}
-            className={`absolute ${coin.size} blur-sm opacity-12`}
-            style={{ left: `${coin.left}%` }}
-            initial={{
-              y: "-150vh",
-              opacity: 0,
-              rotate: coin.rotation,
-              scaleX: 1,
-            }}
-            animate={{
-              y: "150vh",
-              rotate: coin.spinType === 'spin' ? coin.rotation + 360 : coin.rotation,
-              scaleX: coin.spinType === 'flip' ? [1, 0.3, -1, 0.3, 1] : coin.spinType === 'wobble' ? [1, 0.8, 1, 0.8, 1] : 1,
-              opacity: [0, 0.12, 0.12, 0],
-            }}
-            transition={{
-              duration: coin.duration,
-              repeat: Infinity,
-              delay: coin.delay,
-              ease: "linear",
-              times: [0, 0.15, 0.85, 1],
-            }}
-          >
-            🪙
-          </motion.div>
-        ))}
-        
-        {/* Small floating coins */}
-        {[
-          { left: 20, delay: 10, duration: 35, size: 'text-[2rem]', spinType: 'flip' },
-          { left: 70, delay: 25, duration: 40, size: 'text-[1.5rem]', spinType: 'wobble' },
-        ].map((coin, i) => (
-          <motion.div
-            key={`small-coin-${i}`}
-            className={`absolute ${coin.size} blur-sm opacity-8`}
-            style={{ left: `${coin.left}%`, top: '30%' }}
-            animate={{
-              y: [-10, 15, -10],
-              x: [-5, 8, -5],
-              rotate: [0, 180, 360],
-              scaleX: coin.spinType === 'flip' ? [1, 0.4, -1, 0.4, 1] : [1, 1.1, 1],
-              scale: [1, 1.1, 1],
-            }}
-            transition={{
-              duration: coin.duration,
-              repeat: Infinity,
-              delay: coin.delay,
-              ease: "easeInOut",
-            }}
-          >
-            🪙
-          </motion.div>
-        ))}
-        
-        {/* Floating particles */}
-        {Array.from({ length: 8 }).map((_, i) => (
-          <motion.div
-            key={`particle-${i}`}
-            className="absolute w-1 h-1 bg-primary/20 rounded-full"
+            key={`coin-${i}`}
+            className="absolute text-6xl opacity-5"
             style={{
               left: `${Math.random() * 100}%`,
               top: `${Math.random() * 100}%`,
             }}
             animate={{
-              opacity: [0, 0.6, 0],
-              scale: [0.5, 1.5, 0.5],
+              y: [-20, 20, -20],
+              x: [-10, 10, -10],
+              rotate: [0, 360],
             }}
             transition={{
-              duration: 3 + Math.random() * 2,
+              duration: 10 + Math.random() * 10,
               repeat: Infinity,
               delay: Math.random() * 5,
               ease: "easeInOut",
             }}
-          />
+          >
+            🪙
+          </motion.div>
+        ))}
+
+        {/* Floating shop items */}
+        {["🏪", "💎", "✨", "🛍️", "🎁"].map((emoji, i) => (
+          <motion.div
+            key={`shop-${i}`}
+            className="absolute text-4xl opacity-5"
+            style={{
+              left: `${Math.random() * 100}%`,
+              top: `${Math.random() * 100}%`,
+            }}
+            animate={{
+              scale: [1, 1.2, 1],
+              opacity: [0.05, 0.1, 0.05],
+            }}
+            transition={{
+              duration: 8 + Math.random() * 4,
+              repeat: Infinity,
+              delay: Math.random() * 3,
+              ease: "easeInOut",
+            }}
+          >
+            {emoji}
+          </motion.div>
         ))}
       </div>
 
       <div className="relative z-10 container mx-auto p-6 pt-24 space-y-8">
-        {/* Simple Header */}
-        <motion.div 
-          className="text-center space-y-4"
+        {/* Header */}
+        <motion.div
+          className="text-center space-y-6"
           initial={{ opacity: 0, y: -20 }}
           animate={{ opacity: 1, y: 0 }}
+          transition={{ duration: 0.6 }}
         >
-          <div className="text-6xl">🧙‍♂️</div>
-          
-          {/* Balance */}
-          <Card className="w-fit mx-auto bg-card/80 backdrop-blur border-primary/30">
-            <CardContent className="p-3">
-              <div className="flex items-center gap-2">
-                <Coins className="h-5 w-5 text-primary" />
-                <span className="font-bold text-lg">{userBalance.toLocaleString()}</span>
-                <span className="text-primary text-sm">VAIN</span>
-              </div>
-            </CardContent>
-          </Card>
-        </motion.div>
+          {/* Shop Icon */}
+          <div className="text-8xl">🏪</div>
 
-        {/* Shop Area */}
-        <Card className="bg-card/80 backdrop-blur border-primary/20">
-          <CardContent className="p-0">
-            <motion.div
-              className="relative w-full h-[500px] bg-gradient-to-br from-primary/5 via-accent/8 to-muted/15 rounded-lg"
-              onMouseLeave={() => handleItemHover(null)}
-              initial={{ opacity: 0 }}
-              animate={{ opacity: 1 }}
-              transition={{ duration: 0.6 }}
-            >
-              {/* Simple border decoration */}
-              <div className="absolute inset-6 border border-primary/20 rounded-lg"></div>
+          {/* Title */}
+          <div className="space-y-2">
+            <h1 className="text-4xl md:text-6xl font-bold bg-gradient-to-r from-primary via-accent to-primary bg-clip-text text-transparent">
+              VAIN Shop
+            </h1>
+            <p className="text-lg text-muted-foreground max-w-2xl mx-auto">
+              Customize your experience with exclusive items, upgrades, and
+              effects
+            </p>
+          </div>
 
-              {/* Pointing hand */}
-              {hoveredItem && (
-                <motion.div
-                  className="absolute text-3xl pointer-events-none z-20"
-                  style={{
-                    left: `calc(${hoveredItem.position.x}% - 40px)`,
-                    top: `calc(${hoveredItem.position.y}% + 80px)`,
-                  }}
-                  initial={{ scale: 0 }}
-                  animate={{ scale: 1 }}
-                  transition={{ type: "spring", stiffness: 300 }}
-                >
-                  👉
-                </motion.div>
-              )}
-
-              {/* Items */}
-              {SHOP_ITEMS.map((item, index) => (
-                <motion.div
-                  key={item.id}
-                  className={`absolute group ${item.isAvailable ? 'cursor-pointer' : 'cursor-not-allowed opacity-50'}`}
-                  style={{
-                    left: `${item.position.x}%`,
-                    top: `${item.position.y}%`,
-                    transform: 'translate(-50%, -50%)',
-                  }}
-                  whileHover={item.isAvailable ? { scale: 1.1, y: -5 } : {}}
-                  onHoverStart={() => handleItemHover(item)}
-                  onClick={() => handleItemClick(item)}
-                  initial={{ opacity: 0, scale: 0.8 }}
-                  animate={{ opacity: 1, scale: 1 }}
-                  transition={{ delay: index * 0.1 }}
-                >
-                  {/* Item */}
-                  <div className="relative">
-                    <div className="text-5xl mb-2 group-hover:scale-110 transition-transform">
-                      {item.preview}
+          {/* User Balance & Info */}
+          <div className="flex flex-col sm:flex-row gap-4 justify-center items-center">
+            {/* Balance Card */}
+            <Card className="w-fit bg-card/80 backdrop-blur border-primary/30">
+              <CardContent className="p-4">
+                <div className="flex items-center gap-3">
+                  <Coins className="h-6 w-6 text-primary" />
+                  <div className="text-left">
+                    <div className="flex items-baseline gap-2">
+                      {isBalanceLoading ? (
+                        <div className="flex items-center gap-2">
+                          <div className="h-6 w-16 bg-muted animate-pulse rounded" />
+                          <span className="text-sm text-muted-foreground">
+                            VAIN
+                          </span>
+                        </div>
+                      ) : isBalanceError ? (
+                        <div className="flex items-center gap-2 text-destructive">
+                          <AlertCircle className="h-4 w-4" />
+                          <span className="text-sm">Error loading balance</span>
+                        </div>
+                      ) : (
+                        <>
+                          <span className="text-2xl font-bold text-primary">
+                            {availableBalance.toLocaleString()}
+                          </span>
+                          <span className="text-sm text-muted-foreground">
+                            VAIN
+                          </span>
+                        </>
+                      )}
                     </div>
-                    
-                    {/* Price */}
-                    <div 
-                      className="absolute -bottom-6 left-1/2 transform -translate-x-1/2 px-2 py-1 rounded text-xs font-bold border"
-                      style={{ 
-                        backgroundColor: `${getRarityColor(item.rarity)}15`,
-                        borderColor: getRarityColor(item.rarity),
-                        color: getRarityColor(item.rarity),
-                      }}
-                    >
-                      {item.cost >= 1000 ? `${item.cost/1000}k` : item.cost}
+                    <div className="text-xs text-muted-foreground">
+                      Available Balance
                     </div>
-
-                    {/* Rarity indicator */}
-                    <div 
-                      className="absolute -top-1 -right-1 w-3 h-3 rounded-full"
-                      style={{ backgroundColor: getRarityColor(item.rarity) }}
-                    />
-
-                    {/* Unavailable overlay */}
-                    {!item.isAvailable && (
-                      <div className="absolute inset-0 bg-gray-500/50 rounded-lg flex items-center justify-center">
-                        <span className="text-xs font-bold text-white bg-gray-800 px-2 py-1 rounded">
-                          Soon
-                        </span>
-                      </div>
-                    )}
                   </div>
-                </motion.div>
-              ))}
-            </motion.div>
-          </CardContent>
-        </Card>
+                  <Button
+                    variant="ghost"
+                    size="icon"
+                    onClick={handleRefresh}
+                    disabled={isRefreshing || isBalanceLoading}
+                    className="h-8 w-8"
+                  >
+                    <RefreshCw
+                      className={`h-4 w-4 ${
+                        isRefreshing ? "animate-spin" : ""
+                      }`}
+                    />
+                  </Button>
+                </div>
+              </CardContent>
+            </Card>
 
-        {/* Merchant Speech */}
-        <motion.div className="text-center">
-          <Card className="w-fit mx-auto bg-accent/20 backdrop-blur border-accent/40">
-            <CardContent className="p-3">
-              <motion.p
-                key={merchantSays}
-                initial={{ opacity: 0 }}
-                animate={{ opacity: 1 }}
-                className="text-accent-foreground font-medium"
-              >
-                "{merchantSays}"
-              </motion.p>
-            </CardContent>
-          </Card>
-        </motion.div>
-
-        {/* Item details on hover */}
-        <AnimatePresence>
-          {hoveredItem && (
-            <motion.div
-              className="fixed bottom-6 right-6 z-50"
-              initial={{ opacity: 0, scale: 0.8 }}
-              animate={{ opacity: 1, scale: 1 }}
-              exit={{ opacity: 0, scale: 0.8 }}
-            >
-              <Card className="bg-background/95 backdrop-blur border-primary/30">
+            {/* User Status */}
+            {isConnected && !isBalanceLoading && (
+              <Card className="w-fit bg-card/80 backdrop-blur border-accent/30">
                 <CardContent className="p-4">
                   <div className="flex items-center gap-3">
-                    <div className="text-2xl">{hoveredItem.preview}</div>
-                    <div>
-                      <div className="font-bold">{hoveredItem.name}</div>
-                      <div className="text-sm text-muted-foreground">
-                        {hoveredItem.description}
+                    <ShoppingBag className="h-5 w-5 text-accent" />
+                    <div className="text-left">
+                      <div className="text-sm font-medium text-accent">
+                        {currentVanityName || "No name set"}
                       </div>
-                      <div className="text-sm text-muted-foreground">
-                        {hoveredItem.cost.toLocaleString()} VAIN
+                      <div className="text-xs text-muted-foreground">
+                        {possibleNameChanges} name changes available
                       </div>
-                      <Badge 
-                        className="mt-1 text-xs"
-                        style={{ 
-                          backgroundColor: `${getRarityColor(hoveredItem.rarity)}20`,
-                          color: getRarityColor(hoveredItem.rarity),
-                        }}
-                      >
-                        {hoveredItem.rarity}
-                      </Badge>
-                      {!hoveredItem.isAvailable && (
-                        <div className="text-xs text-yellow-600 mt-1">
-                          Coming Soon
-                        </div>
-                      )}
                     </div>
                   </div>
                 </CardContent>
               </Card>
-            </motion.div>
-          )}
-        </AnimatePresence>
+            )}
+          </div>
+        </motion.div>
+
+        {/* Search Bar */}
+        <motion.div
+          className="max-w-md mx-auto"
+          initial={{ opacity: 0, y: 20 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ duration: 0.6, delay: 0.2 }}
+        >
+          <div className="relative">
+            <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+            <Input
+              type="text"
+              placeholder="Search items..."
+              value={searchQuery}
+              onChange={(e) => setSearchQuery(e.target.value)}
+              className="pl-10 bg-card/80 backdrop-blur border-primary/30 focus:border-primary"
+            />
+          </div>
+        </motion.div>
+
+        {/* Connection Status */}
+        {!isConnected && (
+          <motion.div
+            initial={{ opacity: 0, y: 20 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ duration: 0.6, delay: 0.4 }}
+          >
+            <Card className="max-w-md mx-auto bg-yellow-500/10 border-yellow-500/30">
+              <CardContent className="p-6 text-center">
+                <div className="text-4xl mb-4">🔌</div>
+                <h3 className="text-lg font-semibold text-yellow-600 mb-2">
+                  Wallet Not Connected
+                </h3>
+                <p className="text-sm text-muted-foreground mb-4">
+                  Connect your wallet to view your balance and make purchases
+                </p>
+                <Button
+                  variant="outline"
+                  className="border-yellow-500/30 text-yellow-600"
+                >
+                  Connect Wallet
+                </Button>
+              </CardContent>
+            </Card>
+          </motion.div>
+        )}
+
+        {/* Shop Items Container */}
+        <motion.div
+          initial={{ opacity: 0, y: 20 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ duration: 0.6, delay: 0.6 }}
+        >
+          <ShopItemsContainer
+            searchQuery={searchQuery}
+            userBalance={availableBalance}
+            onPurchase={handlePurchase}
+          />
+        </motion.div>
+
+        {/* Footer */}
+        <motion.div
+          initial={{ opacity: 0 }}
+          animate={{ opacity: 1 }}
+          transition={{ duration: 0.6, delay: 0.8 }}
+          className="text-center py-8"
+        >
+          <div className="space-y-2">
+            <p className="text-muted-foreground text-sm">
+              🔥 Burn VAIN tokens to earn shop credits
+            </p>
+            <p className="text-muted-foreground/70 text-xs">
+              All purchases are final • Items are non-transferable
+            </p>
+          </div>
+        </motion.div>
       </div>
     </div>
   );

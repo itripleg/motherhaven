@@ -12,6 +12,8 @@ interface IBurnManager {
 /**
  * @title VanityNameBurnManager
  * @dev Burn-to-earn paradigm: Users burn tokens to earn the right to set vanity names
+ * @author Your Team
+ * @notice This contract allows users to burn supported tokens to earn vanity name changes
  */
 contract VanityNameBurnManager is IBurnManager, Ownable, ReentrancyGuard {
     // =================================================================
@@ -35,6 +37,18 @@ contract VanityNameBurnManager is IBurnManager, Ownable, ReentrancyGuard {
     event BurnCostUpdated(uint256 oldCost, uint256 newCost);
 
     event BurnTokenUpdated(address indexed oldToken, address indexed newToken);
+
+    event ContractPaused(bool paused);
+
+    event NameReleased(string indexed name, address indexed previousOwner);
+
+    event BalanceAdjusted(
+        address indexed user,
+        uint256 oldBurnBalance,
+        uint256 newBurnBalance,
+        uint256 oldSpentBalance,
+        uint256 newSpentBalance
+    );
 
     // =================================================================
     //                       State Variables
@@ -67,11 +81,16 @@ contract VanityNameBurnManager is IBurnManager, Ownable, ReentrancyGuard {
     /// @dev Emergency pause mechanism
     bool public paused = false;
 
+    /// @dev Contract version for upgrades/migrations
+    string public constant VERSION = "1.0.0";
+
     // =================================================================
     //                         Constructor
     // =================================================================
 
-    constructor() Ownable(msg.sender) {}
+    constructor(address initialOwner) Ownable(initialOwner) {
+        require(initialOwner != address(0), "Invalid owner address");
+    }
 
     // =================================================================
     //                         Modifiers
@@ -101,6 +120,8 @@ contract VanityNameBurnManager is IBurnManager, Ownable, ReentrancyGuard {
 
     /**
      * @dev Called when users burn tokens - adds to their burn balance
+     * @param burner The address that burned tokens
+     * @param amount The amount of tokens burned
      */
     function notifyBurn(
         address burner,
@@ -120,6 +141,8 @@ contract VanityNameBurnManager is IBurnManager, Ownable, ReentrancyGuard {
 
     /**
      * @dev Check if this manager supports a specific token
+     * @param token The token address to check
+     * @return bool True if the token is supported
      */
     function supportsToken(
         address token
@@ -182,6 +205,8 @@ contract VanityNameBurnManager is IBurnManager, Ownable, ReentrancyGuard {
 
     /**
      * @dev Check if a name is available
+     * @param name The name to check
+     * @return bool True if the name is available
      */
     function isNameAvailable(
         string calldata name
@@ -200,6 +225,8 @@ contract VanityNameBurnManager is IBurnManager, Ownable, ReentrancyGuard {
 
     /**
      * @dev Get user's current vanity name
+     * @param user The user address
+     * @return string The user's vanity name
      */
     function getUserVanityName(
         address user
@@ -209,6 +236,8 @@ contract VanityNameBurnManager is IBurnManager, Ownable, ReentrancyGuard {
 
     /**
      * @dev Get user by vanity name
+     * @param name The vanity name to lookup
+     * @return address The owner of the name
      */
     function getUserByVanityName(
         string calldata name
@@ -218,6 +247,7 @@ contract VanityNameBurnManager is IBurnManager, Ownable, ReentrancyGuard {
 
     /**
      * @dev Get current cost per name change
+     * @return uint256 The cost in token wei
      */
     function getCostPerNameChange() external view returns (uint256) {
         return costPerNameChange;
@@ -225,6 +255,11 @@ contract VanityNameBurnManager is IBurnManager, Ownable, ReentrancyGuard {
 
     /**
      * @dev Get user's burn balance info
+     * @param user The user address
+     * @return totalBurned Total tokens burned by user
+     * @return totalSpent Total tokens spent on name changes
+     * @return availableBalance Available tokens for name changes
+     * @return possibleNameChanges Number of name changes possible
      */
     function getUserBurnInfo(
         address user
@@ -246,6 +281,8 @@ contract VanityNameBurnManager is IBurnManager, Ownable, ReentrancyGuard {
 
     /**
      * @dev Check if user can set a vanity name
+     * @param user The user address to check
+     * @return bool True if user has sufficient burn balance
      */
     function canUserSetName(address user) external view returns (bool) {
         if (burnToken == address(0)) return false;
@@ -257,9 +294,30 @@ contract VanityNameBurnManager is IBurnManager, Ownable, ReentrancyGuard {
 
     /**
      * @dev Get the current burn token address
+     * @return address The burn token contract address
      */
     function getBurnToken() external view returns (address) {
         return burnToken;
+    }
+
+    /**
+     * @dev Get contract information
+     * @return version Contract version
+     * @return tokenAddr Current burn token address
+     * @return cost Cost per name change
+     * @return isPaused Whether contract is paused
+     */
+    function getContractInfo()
+        external
+        view
+        returns (
+            string memory version,
+            address tokenAddr,
+            uint256 cost,
+            bool isPaused
+        )
+    {
+        return (VERSION, burnToken, costPerNameChange, paused);
     }
 
     // =================================================================
@@ -268,9 +326,13 @@ contract VanityNameBurnManager is IBurnManager, Ownable, ReentrancyGuard {
 
     /**
      * @dev Set the burn token address
+     * @param _burnToken The new burn token address
      */
     function setBurnToken(address _burnToken) external onlyOwner {
         require(_burnToken != address(0), "Burn token cannot be zero address");
+
+        // Optional: Check if the address has code (is a contract)
+        require(_burnToken.code.length > 0, "Burn token must be a contract");
 
         address oldToken = burnToken;
         burnToken = _burnToken;
@@ -280,9 +342,12 @@ contract VanityNameBurnManager is IBurnManager, Ownable, ReentrancyGuard {
 
     /**
      * @dev Update cost per name change
+     * @param newCost The new cost in token wei
      */
     function setCostPerNameChange(uint256 newCost) external onlyOwner {
         require(newCost > 0, "Cost must be greater than 0");
+        require(newCost <= 1000000 * 1e18, "Cost too high"); // Max 1M tokens
+
         uint256 oldCost = costPerNameChange;
         costPerNameChange = newCost;
         emit BurnCostUpdated(oldCost, newCost);
@@ -290,24 +355,33 @@ contract VanityNameBurnManager is IBurnManager, Ownable, ReentrancyGuard {
 
     /**
      * @dev Pause/unpause the contract
+     * @param _paused Whether to pause the contract
      */
     function setPaused(bool _paused) external onlyOwner {
         paused = _paused;
+        emit ContractPaused(_paused);
     }
 
     /**
      * @dev Emergency function to manually release a name
+     * @param name The name to release
      */
     function emergencyReleaseName(string calldata name) external onlyOwner {
-        address user = nameToUser[_toLowerCase(name)];
+        string memory lowerName = _toLowerCase(name);
+        address user = nameToUser[lowerName];
         require(user != address(0), "Name not reserved");
 
-        delete nameToUser[_toLowerCase(name)];
+        delete nameToUser[lowerName];
         delete userVanityNames[user];
+
+        emit NameReleased(name, user);
     }
 
     /**
      * @dev Emergency function to adjust user balances (for migrations/fixes)
+     * @param user The user to adjust
+     * @param newBurnBalance New burn balance
+     * @param newSpentBalance New spent balance
      */
     function emergencyAdjustBalance(
         address user,
@@ -318,8 +392,60 @@ contract VanityNameBurnManager is IBurnManager, Ownable, ReentrancyGuard {
             newSpentBalance <= newBurnBalance,
             "Spent cannot exceed burned"
         );
+
+        uint256 oldBurnBalance = userBurnBalance[user];
+        uint256 oldSpentBalance = userSpentBalance[user];
+
         userBurnBalance[user] = newBurnBalance;
         userSpentBalance[user] = newSpentBalance;
+
+        emit BalanceAdjusted(
+            user,
+            oldBurnBalance,
+            newBurnBalance,
+            oldSpentBalance,
+            newSpentBalance
+        );
+    }
+
+    /**
+     * @dev Batch adjust multiple user balances (for migrations)
+     * @param users Array of user addresses
+     * @param burnBalances Array of new burn balances
+     * @param spentBalances Array of new spent balances
+     */
+    function batchAdjustBalances(
+        address[] calldata users,
+        uint256[] calldata burnBalances,
+        uint256[] calldata spentBalances
+    ) external onlyOwner {
+        require(
+            users.length == burnBalances.length &&
+                users.length == spentBalances.length,
+            "Array length mismatch"
+        );
+        require(users.length <= 100, "Batch too large"); // Gas limit protection
+
+        for (uint256 i = 0; i < users.length; i++) {
+            require(
+                spentBalances[i] <= burnBalances[i],
+                "Spent cannot exceed burned"
+            );
+
+            uint256 oldBurnBalance = userBurnBalance[users[i]];
+            uint256 oldSpentBalance = userSpentBalance[users[i]];
+
+            userBurnBalance[users[i]] = burnBalances[i];
+            userSpentBalance[users[i]] = spentBalances[i];
+
+            emit BalanceAdjusted(
+                users[i],
+                oldBurnBalance,
+                burnBalances[i],
+                oldSpentBalance,
+                spentBalances[i]
+            );
+        }
     }
 
     // =================================================================
@@ -328,6 +454,8 @@ contract VanityNameBurnManager is IBurnManager, Ownable, ReentrancyGuard {
 
     /**
      * @dev Convert string to lowercase for case-insensitive comparison
+     * @param str The string to convert
+     * @return string The lowercase string
      */
     function _toLowerCase(
         string memory str
@@ -349,6 +477,8 @@ contract VanityNameBurnManager is IBurnManager, Ownable, ReentrancyGuard {
 
     /**
      * @dev Validate name format (alphanumeric + underscore only)
+     * @param name The name to validate
+     * @return bool True if name format is valid
      */
     function _isValidName(string memory name) internal pure returns (bool) {
         bytes memory nameBytes = bytes(name);
