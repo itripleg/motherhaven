@@ -1,3 +1,4 @@
+// app/faucet/page.tsx
 "use client";
 import React, { useState, useEffect } from "react";
 import {
@@ -10,7 +11,7 @@ import {
 } from "wagmi";
 import { formatEther } from "viem";
 import { motion } from "framer-motion";
-import { ConnectButton } from "@/components/ConnectButton"; // Assuming you have this component
+import { ConnectButton } from "@/components/ConnectButton";
 import {
   Card,
   CardContent,
@@ -22,16 +23,18 @@ import {
 import { Button } from "@/components/ui/button";
 import { Progress } from "@/components/ui/progress";
 import { Badge } from "@/components/ui/badge";
-import { useToast } from "@/hooks/use-toast"; // Assuming you have this hook
+import { useToast } from "@/hooks/use-toast";
 import {
   Timer,
   Droplets,
   AlertCircle,
   ExternalLink,
   Sparkles,
+  Zap,
+  Vault,
 } from "lucide-react";
-import FAUCET_ABI from "@/contracts/final/Faucet_abi.json"; // Make sure this path is correct
-import { FAUCET_ADDRESS } from "@/types";
+import GRAND_VAULT_ABI from "./GrandVault_abi.json";
+import { FAUCET_ADDRESS } from "@/types/contracts";
 
 // Define a clear type for the button's state
 type ButtonState = {
@@ -39,12 +42,13 @@ type ButtonState = {
   disabled: boolean;
 };
 
-const FujiFaucetPage = () => {
+const GrandVaultFaucetPage = () => {
   const { address, isConnected } = useAccount();
   const { toast } = useToast();
   const [timeLeft, setTimeLeft] = useState<number>(0);
   const [mounted, setMounted] = useState(false);
   const [lastUpdate, setLastUpdate] = useState<Date | null>(null);
+  const [isGaslessRequest, setIsGaslessRequest] = useState(false);
 
   // Handle client-side mounting to avoid hydration errors
   useEffect(() => {
@@ -54,40 +58,36 @@ const FujiFaucetPage = () => {
   // Get current block number for more accurate timing
   const { data: currentBlockNumber } = useBlockNumber({ watch: true });
 
-  // Read faucet balance
-  const { data: faucetBalance, refetch: refetchBalance } = useBalance({
+  // Read vault balance
+  const { data: vaultBalance, refetch: refetchBalance } = useBalance({
     address: FAUCET_ADDRESS,
   });
 
-  // Read contract data
-  const { data: isWhitelisted, refetch: refetchWhitelisted } = useReadContract({
+  // Read contract data using GrandVault ABI
+  const { data: userInfo, refetch: refetchUserInfo } = useReadContract({
     address: FAUCET_ADDRESS,
-    abi: FAUCET_ABI,
-    functionName: "whitelisted",
+    abi: GRAND_VAULT_ABI,
+    functionName: "getUserInfo",
     args: address ? [address] : undefined,
     query: {
-      enabled: !!address, // FIX: 'enabled' moved into 'query' object
+      enabled: !!address,
     },
   });
 
-  const { data: nextDripBlock, refetch: refetchNextDrip } = useReadContract({
+  const { data: vaultInfo, refetch: refetchVaultInfo } = useReadContract({
     address: FAUCET_ADDRESS,
-    abi: FAUCET_ABI,
-    functionName: "getNextDripBlock",
-    args: address ? [address] : undefined,
-    query: {
-      enabled: !!address, // FIX: 'enabled' moved into 'query' object
-    },
+    abi: GRAND_VAULT_ABI,
+    functionName: "getVaultInfo",
   });
 
-  const { data: dripAmount } = useReadContract({
-    address: FAUCET_ADDRESS,
-    abi: FAUCET_ABI,
-    functionName: "dripAmount",
-  }) as { data: bigint | undefined };
+  // Extract user info safely
+  const isWhitelisted = userInfo ? (userInfo as any)[0] : false;
+  const canDrip = userInfo ? (userInfo as any)[1] : false;
+  const nextDripBlock = userInfo ? (userInfo as any)[2] : 0n;
 
-  // FIX: Safely handle the 'unknown' type from useReadContract
-  const isWhitelistedBool = isWhitelisted === true;
+  // Extract vault info safely
+  const currentBalance = vaultInfo ? (vaultInfo as any)[0] : 0n;
+  const dripAmount = vaultInfo ? (vaultInfo as any)[2] : 0n;
 
   // Write contract interaction
   const { writeContract, data: hash, error: writeError } = useWriteContract();
@@ -107,8 +107,8 @@ const FujiFaucetPage = () => {
       });
       // Refetch all relevant data
       refetchBalance();
-      refetchWhitelisted();
-      refetchNextDrip();
+      refetchUserInfo();
+      refetchVaultInfo();
       setLastUpdate(new Date());
     }
   }, [
@@ -116,8 +116,8 @@ const FujiFaucetPage = () => {
     dripAmount,
     toast,
     refetchBalance,
-    refetchWhitelisted,
-    refetchNextDrip,
+    refetchUserInfo,
+    refetchVaultInfo,
     mounted,
   ]);
 
@@ -136,7 +136,7 @@ const FujiFaucetPage = () => {
   useEffect(() => {
     if (!mounted || !isConnected) return;
     const interval = setInterval(() => {
-      Promise.all([refetchBalance(), refetchWhitelisted(), refetchNextDrip()])
+      Promise.all([refetchBalance(), refetchUserInfo(), refetchVaultInfo()])
         .then(() => {
           setLastUpdate(new Date());
         })
@@ -145,24 +145,58 @@ const FujiFaucetPage = () => {
         });
     }, 30000); // 30 seconds
     return () => clearInterval(interval);
-  }, [
-    mounted,
-    isConnected,
-    refetchBalance,
-    refetchWhitelisted,
-    refetchNextDrip,
-  ]);
+  }, [mounted, isConnected, refetchBalance, refetchUserInfo, refetchVaultInfo]);
 
   const handleDripRequest = () => {
     writeContract({
       address: FAUCET_ADDRESS,
-      abi: FAUCET_ABI,
+      abi: GRAND_VAULT_ABI,
       functionName: "requestDrip",
     });
   };
 
-  const hasSufficientBalance =
-    faucetBalance && dripAmount ? faucetBalance.value >= dripAmount : false;
+  const handleGaslessRequest = async () => {
+    if (!address) return;
+
+    setIsGaslessRequest(true);
+    try {
+      const response = await fetch("/api/gasless-drip", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ address }),
+      });
+
+      const data = await response.json();
+
+      if (data.success) {
+        toast({
+          title: "Success!",
+          description: `${data.amount} AVAX sent to your wallet (gasless)`,
+        });
+        // Refresh data
+        refetchBalance();
+        refetchUserInfo();
+        refetchVaultInfo();
+        setLastUpdate(new Date());
+      } else {
+        toast({
+          title: "Error",
+          description: data.error,
+          variant: "destructive",
+        });
+      }
+    } catch (error) {
+      toast({
+        title: "Error",
+        description: "Failed to request gasless drip",
+        variant: "destructive",
+      });
+    } finally {
+      setIsGaslessRequest(false);
+    }
+  };
+
+  const hasSufficientBalance = currentBalance >= dripAmount;
 
   // Update time left every second
   useEffect(() => {
@@ -199,16 +233,16 @@ const FujiFaucetPage = () => {
     )}:${String(secs).padStart(2, "0")}`;
   };
 
-  const progressValue = timeLeft > 0 ? ((43200 - timeLeft) / 43200) * 100 : 100; // Assuming 12-hour cooldown (43200 seconds)
+  const progressValue = timeLeft > 0 ? ((43200 - timeLeft) / 43200) * 100 : 100; // Assuming 24-hour cooldown (86400 seconds)
 
   // Get button state
   const getButtonState = (): ButtonState => {
-    if (isDripping) return { text: "Requesting...", disabled: true };
-    if (!isWhitelistedBool)
-      // FIX: Use the type-safe boolean
+    if (isDripping || isGaslessRequest)
+      return { text: "Requesting...", disabled: true };
+    if (!isWhitelisted)
       return { text: "Address Not Whitelisted", disabled: true };
     if (!hasSufficientBalance)
-      return { text: "Insufficient Faucet Balance", disabled: true };
+      return { text: "Insufficient Vault Balance", disabled: true };
     if (timeLeft > 0)
       return { text: `Wait ${formatTimeLeft(timeLeft)}`, disabled: true };
     return { text: "Request AVAX", disabled: false };
@@ -219,8 +253,8 @@ const FujiFaucetPage = () => {
     return (
       <div className="min-h-screen animated-bg flex items-center justify-center">
         <div className="text-center">
-          <Droplets className="h-12 w-12 text-blue-400 mx-auto mb-4 animate-pulse" />
-          <p className="text-white text-lg">Loading Fuji Faucet...</p>
+          <Vault className="h-12 w-12 text-blue-400 mx-auto mb-4 animate-pulse" />
+          <p className="text-white text-lg">Loading Grand Vault...</p>
         </div>
       </div>
     );
@@ -229,7 +263,6 @@ const FujiFaucetPage = () => {
   const buttonState = getButtonState();
 
   return (
-    // This is the merged layout structure
     <div className="min-h-screen animated-bg floating-particles">
       <div className="relative z-10 container mx-auto p-6 pt-24">
         <motion.div
@@ -242,9 +275,9 @@ const FujiFaucetPage = () => {
             <div>
               <h1 className="text-4xl font-bold text-white mb-2 flex items-center gap-3">
                 <div className="p-3 bg-blue-500/20 rounded-xl border border-blue-500/30">
-                  <Droplets className="h-8 w-8 text-blue-400" />
+                  <Vault className="h-8 w-8 text-blue-400" />
                 </div>
-                Fuji Testnet Faucet
+                Grand Vault Faucet
                 <Badge
                   className="bg-green-500/20 text-green-400 border-green-500/30"
                   variant="outline"
@@ -253,7 +286,7 @@ const FujiFaucetPage = () => {
                 </Badge>
               </h1>
               <p className="text-gray-400 text-lg">
-                Get test AVAX for development on the Fuji testnet
+                Get test AVAX from trading fees collected in the Grand Vault
               </p>
             </div>
             {lastUpdate && (
@@ -274,12 +307,18 @@ const FujiFaucetPage = () => {
           <Card className="unified-card w-full max-w-md">
             <CardHeader className="text-center">
               <CardTitle className="flex items-center justify-center gap-2 text-2xl">
-                <Droplets className="h-6 w-6 text-blue-400" />
-                AVAX Faucet
+                <Vault className="h-6 w-6 text-blue-400" />
+                Grand Vault
               </CardTitle>
               <CardDescription>
-                Request test AVAX tokens for Fuji testnet development
+                Request test AVAX tokens from collected trading fees
               </CardDescription>
+              <div className="mt-3 p-2 bg-gray-500/10 border border-gray-500/30 rounded text-center">
+                <p className="text-xs text-gray-400">Contract Address:</p>
+                <p className="font-mono text-sm text-gray-300 break-all">
+                  {FAUCET_ADDRESS}
+                </p>
+              </div>
             </CardHeader>
             <CardContent className="space-y-6">
               {!isConnected ? (
@@ -295,7 +334,7 @@ const FujiFaucetPage = () => {
                   </div>
                   <ConnectButton />
                 </div>
-              ) : !isWhitelistedBool ? ( // FIX: Use the type-safe boolean
+              ) : !isWhitelisted ? (
                 <div className="text-center space-y-4">
                   <div className="p-6 bg-red-500/10 border border-red-500/30 rounded-lg">
                     <AlertCircle className="h-8 w-8 text-red-400 mx-auto mb-3" />
@@ -334,11 +373,11 @@ const FujiFaucetPage = () => {
                     </div>
                     <div className="flex justify-between items-center">
                       <span className="text-sm text-gray-400">
-                        Faucet balance:
+                        Vault balance:
                       </span>
                       <span className="font-mono text-blue-400 font-medium">
-                        {faucetBalance
-                          ? Number(faucetBalance.formatted).toFixed(4)
+                        {vaultBalance
+                          ? Number(vaultBalance.formatted).toFixed(4)
                           : "0"}{" "}
                         AVAX
                       </span>
@@ -348,7 +387,7 @@ const FujiFaucetPage = () => {
                     <div className="flex items-center gap-2 text-sm text-red-400 bg-red-500/10 border border-red-500/30 rounded-lg p-3">
                       <AlertCircle className="h-4 w-4 flex-shrink-0" />
                       <span>
-                        The faucet has insufficient funds. Try again later.
+                        The vault has insufficient funds. Try again later.
                       </span>
                     </div>
                   )}
@@ -356,32 +395,51 @@ const FujiFaucetPage = () => {
               )}
             </CardContent>
 
-            {isConnected &&
-              isWhitelistedBool && ( // FIX: Use the type-safe boolean
-                <CardFooter>
-                  <Button
-                    className={`w-full h-12 text-lg font-bold transition-all duration-300 ${
-                      buttonState.disabled
-                        ? "bg-gray-700 text-gray-400 cursor-not-allowed"
-                        : "btn-primary hover:scale-105"
-                    }`}
-                    disabled={buttonState.disabled}
-                    onClick={handleDripRequest}
-                  >
-                    {isDripping ? (
-                      <>
-                        <Timer className="h-5 w-5 animate-spin mr-2" />
-                        Processing...
-                      </>
-                    ) : (
-                      <>
-                        <Droplets className="h-5 w-5 mr-2" />
-                        {buttonState.text}
-                      </>
-                    )}
-                  </Button>
-                </CardFooter>
-              )}
+            {isConnected && isWhitelisted && (
+              <CardFooter className="flex flex-col gap-2">
+                <Button
+                  className={`w-full h-12 text-lg font-bold transition-all duration-300 ${
+                    buttonState.disabled
+                      ? "bg-gray-700 text-gray-400 cursor-not-allowed"
+                      : "btn-primary hover:scale-105"
+                  }`}
+                  disabled={buttonState.disabled}
+                  onClick={handleDripRequest}
+                >
+                  {isDripping ? (
+                    <>
+                      <Timer className="h-5 w-5 animate-spin mr-2" />
+                      Processing...
+                    </>
+                  ) : (
+                    <>
+                      <Droplets className="h-5 w-5 mr-2" />
+                      {buttonState.text}
+                    </>
+                  )}
+                </Button>
+
+                {/* Gasless option */}
+                {/* <Button
+                  variant="outline"
+                  className="w-full h-10 text-sm font-medium"
+                  disabled={buttonState.disabled || isGaslessRequest}
+                  onClick={handleGaslessRequest}
+                >
+                  {isGaslessRequest ? (
+                    <>
+                      <Timer className="h-4 w-4 animate-spin mr-2" />
+                      Requesting gasless...
+                    </>
+                  ) : (
+                    <>
+                      <Zap className="h-4 w-4 mr-2" />
+                      Request Gasless (Zero Balance OK)
+                    </>
+                  )}
+                </Button> */}
+              </CardFooter>
+            )}
           </Card>
         </motion.div>
 
@@ -396,11 +454,11 @@ const FujiFaucetPage = () => {
               <div className="space-y-2">
                 <h3 className="text-2xl font-bold text-gradient flex items-center justify-center gap-2">
                   <Sparkles className="h-6 w-6 text-blue-400" />
-                  Need More AVAX?
+                  Powered by Trading Fees
                 </h3>
                 <p className="text-muted-foreground">
-                  This faucet is for development. For mainnet AVAX, use official
-                  exchanges.
+                  This vault is currently collecting all trading fees from our
+                  DEX.
                 </p>
               </div>
               <div className="flex flex-col sm:flex-row gap-4 justify-center">
@@ -414,13 +472,13 @@ const FujiFaucetPage = () => {
                   Avalanche Docs
                 </a>
                 <a
-                  href="https://testnet.snowtrace.io/address/0x0B50C987D357a8000FCD88f7eC6D35A88775AfD2"
+                  href={`https://testnet.snowtrace.io/address/${FAUCET_ADDRESS}`}
                   target="_blank"
                   rel="noopener noreferrer"
                   className="inline-flex items-center justify-center px-6 py-3 text-lg font-medium border border-gray-600 rounded-lg hover:bg-gray-700 transition-colors"
                 >
                   <ExternalLink className="h-5 w-5 mr-2" />
-                  Testnet Explorer
+                  View on Explorer
                 </a>
               </div>
             </CardContent>
@@ -431,4 +489,4 @@ const FujiFaucetPage = () => {
   );
 };
 
-export default FujiFaucetPage;
+export default GrandVaultFaucetPage;

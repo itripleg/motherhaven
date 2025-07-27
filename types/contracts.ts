@@ -27,7 +27,7 @@ export const FACTORY_ADDRESS: Address =
     : ADDRESSES.MAINNET.FACTORY;
 
 // Additional constants
-export const FAUCET_ADDRESS = "0x0B50C987D357a8000FCD88f7eC6D35A88775AfD2";
+export const FAUCET_ADDRESS = "0xc445CE6C2Ab4bcdd2f4Ea0C8009e774947fd063F";
 
 // Network info
 export const CURRENT_NETWORK = process.env.NEXT_PUBLIC_NETWORK || "testnet";
