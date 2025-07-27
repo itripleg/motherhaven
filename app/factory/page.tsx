@@ -1,7 +1,7 @@
-// app/factory/page.tsx - FINAL: Complete integration with Purchase tab
+// app/factory/page.tsx - CLEAN VERSION: Zero Firestore reads, contract stats only
 "use client";
 
-import { useState, useEffect, useCallback } from "react";
+import { useState, useEffect, useCallback, useRef } from "react";
 import { motion } from "framer-motion";
 import { Container } from "@/components/craft";
 import { useToast } from "@/hooks/use-toast";
@@ -9,15 +9,10 @@ import { useWriteContract, useWaitForTransactionReceipt } from "wagmi";
 import { zeroAddress, parseEther } from "viem";
 import { storage, db } from "@/firebase";
 import { ref, uploadBytes, getDownloadURL } from "firebase/storage";
-import {
-  collection,
-  getDocs,
-  getCountFromServer,
-  doc,
-  setDoc,
-} from "firebase/firestore";
+import { doc, setDoc } from "firebase/firestore";
 import { FACTORY_ADDRESS, FACTORY_ABI, FACTORY_CONSTANTS } from "@/types";
 import { useFactoryConfigContext } from "@/contexts/FactoryConfigProvider";
+import { useFactoryContract } from "@/final-hooks/useFactoryContract";
 
 // Import our components
 import { FactoryHeader } from "./components/FactoryHeader";
@@ -63,15 +58,20 @@ export default function FactoryPage() {
   const { config: factoryConfig, isLoading: configLoading } =
     useFactoryConfigContext();
 
-  // Real platform statistics
+  // Get contract data for platform stats - no Firestore!
+  const { useAllTokens } = useFactoryContract();
+  const { tokens: allTokenAddresses, isLoading: tokensLoading } =
+    useAllTokens();
+
+  // Contract-only platform statistics
   const [platformStats, setPlatformStats] = useState({
     totalTokens: 0,
-    activeTraders: 0,
-    totalVolume: "0",
+    totalCollateral: "0",
+    avgPrice: "0",
     loading: true,
   });
 
-  // Token creation state with better state management
+  // Token creation state
   const [tokenInfo, setTokenInfo] =
     useState<TokenCreationInfo>(DEFAULT_TOKEN_INFO);
 
@@ -122,6 +122,43 @@ export default function FactoryPage() {
       hash: transactionData,
     });
 
+  // Refs to prevent duplicate operations
+  const toastShown = useRef(false);
+
+  // Get platform stats from contract reads - NO FIRESTORE!
+  useEffect(() => {
+    if (tokensLoading) {
+      setPlatformStats((prev) => ({ ...prev, loading: true }));
+      return;
+    }
+
+    if (!allTokenAddresses) {
+      setPlatformStats({
+        totalTokens: 0,
+        totalCollateral: "0",
+        avgPrice: "0.00001",
+        loading: false,
+      });
+      return;
+    }
+
+    console.log(
+      "📊 Contract stats: Found",
+      allTokenAddresses.length,
+      "tokens from contract"
+    );
+
+    // Simple contract-based stats - ZERO Firebase reads
+    setPlatformStats({
+      totalTokens: allTokenAddresses.length,
+      totalCollateral: "Available",
+      avgPrice: "0.00001", // Initial price from contract constants
+      loading: false,
+    });
+
+    console.log("✅ Platform stats loaded from contract only");
+  }, [allTokenAddresses, tokensLoading]);
+
   // Robust state handler that preserves all fields
   const handleTokenInfoChange = useCallback(
     (updatedInfo: TokenCreationInfo | Partial<TokenCreationInfo>) => {
@@ -151,50 +188,6 @@ export default function FactoryPage() {
     },
     []
   );
-
-  // Fetch real platform statistics
-  useEffect(() => {
-    const fetchPlatformStats = async () => {
-      try {
-        const tokensCollection = collection(db, "tokens");
-        const tokensSnapshot = await getCountFromServer(tokensCollection);
-        const totalTokens = tokensSnapshot.data().count;
-
-        const tradesCollection = collection(db, "trades");
-        const tradesSnapshot = await getDocs(tradesCollection);
-
-        const uniqueTraders = new Set();
-        let totalVolumeWei = 0;
-
-        tradesSnapshot.docs.forEach((doc) => {
-          const data = doc.data();
-          uniqueTraders.add(data.trader?.toLowerCase());
-          if (data.ethAmount) {
-            totalVolumeWei += parseFloat(data.ethAmount) / 1e18;
-          }
-        });
-
-        setPlatformStats({
-          totalTokens,
-          activeTraders: uniqueTraders.size,
-          totalVolume: totalVolumeWei.toFixed(1),
-          loading: false,
-        });
-      } catch (error) {
-        console.error("Error fetching platform stats:", error);
-        setPlatformStats({
-          totalTokens: 1200,
-          activeTraders: 450,
-          totalVolume: "125.7",
-          loading: false,
-        });
-      }
-    };
-
-    if (mounted) {
-      fetchPlatformStats();
-    }
-  }, [mounted]);
 
   // Handle hydration
   useEffect(() => {
@@ -271,16 +264,30 @@ export default function FactoryPage() {
     }
   }, [error, toast]);
 
-  // FIXED: Handle successful transaction with proper Firebase save (prevent infinite loop)
+  // Handle successful transaction - only Firestore WRITE, no reads
   useEffect(() => {
-    if (receipt && !isConfirming && transactionData) {
+    console.log("🎯 Receipt useEffect triggered:", {
+      hasReceipt: !!receipt,
+      isConfirming,
+      hasTransactionData: !!transactionData,
+      toastAlreadyShown: toastShown.current,
+    });
+
+    if (receipt && !isConfirming && transactionData && !toastShown.current) {
+      console.log("✅ Processing successful transaction...");
+      toastShown.current = true; // Prevent duplicate toasts
+
       // Extract token address from transaction receipt
       const tokenAddress = receipt.logs?.[0]?.address || transactionData;
 
       if (tokenAddress) {
-        // Save complete token data to Firebase including image position
+        // Save complete token data to Firebase - WRITE only, no reads
         const saveTokenToFirebase = async () => {
           try {
+            console.log(
+              "🔥 FIRESTORE WRITE: Saving token to Firebase:",
+              tokenAddress
+            );
             const tokenDocRef = doc(db, "tokens", tokenAddress.toLowerCase());
 
             const tokenData = {
@@ -313,16 +320,15 @@ export default function FactoryPage() {
 
             await setDoc(tokenDocRef, tokenData);
 
-            console.log("Token data saved to Firebase:", tokenData);
+            console.log("✅ Token data saved to Firebase successfully");
 
-            // FIXED: Only show toast once by using transaction hash as key
             toast({
               title: "🎉 Token Created Successfully!",
               description: "Your token is now live and ready for trading!",
               duration: 10000,
             });
           } catch (saveError) {
-            console.error("Error saving to Firebase:", saveError);
+            console.error("❌ Error saving to Firebase:", saveError);
             toast({
               title: "Token Created",
               description:
@@ -337,8 +343,15 @@ export default function FactoryPage() {
 
       setIsCreating(false);
       setUploadingImage(false);
+    } else {
+      console.log("⏭️ Skipping receipt processing:", {
+        hasReceipt: !!receipt,
+        isConfirming,
+        hasTransactionData: !!transactionData,
+        toastAlreadyShown: toastShown.current,
+      });
     }
-  }, [receipt?.transactionHash, isConfirming]); // FIXED: Only depend on transaction hash and confirming state
+  }, [receipt?.transactionHash, isConfirming, transactionData]);
 
   // Upload image to Firebase Storage
   const uploadImage = async (file: File): Promise<string> => {
@@ -347,7 +360,7 @@ export default function FactoryPage() {
     return await getDownloadURL(uploadTask.ref);
   };
 
-  // UPDATED: Calculate completion percentage including purchase validation
+  // Calculate completion percentage including purchase validation
   const getCompletionPercentage = () => {
     let completed = 0;
 
@@ -381,8 +394,8 @@ export default function FactoryPage() {
     return Math.min(completed, 100);
   };
 
-  // UPDATED: Check if form is valid for submission (includes purchase validation)
-  const isFormValid = () => {
+  // Check if form is valid for submission - memoized
+  const isFormValid = useCallback(() => {
     // Basic info is required
     if (!tokenInfo.name || !tokenInfo.ticker) return false;
 
@@ -393,7 +406,12 @@ export default function FactoryPage() {
         parseFloat(tokenInfo.purchase.amount || "0") > 0);
 
     return isPurchaseValid;
-  };
+  }, [
+    tokenInfo.name,
+    tokenInfo.ticker,
+    tokenInfo.purchase.enabled,
+    tokenInfo.purchase.amount,
+  ]);
 
   // Handle token creation with proper image upload timing
   const handleTokenCreation = useCallback(async () => {
@@ -404,6 +422,7 @@ export default function FactoryPage() {
       let imageUrl = "";
 
       resetContract();
+      toastShown.current = false; // Reset toast flag for new creation
 
       // Upload image if present
       if (tokenInfo.image) {
@@ -495,6 +514,7 @@ export default function FactoryPage() {
   // Retry function
   const handleRetry = useCallback(() => {
     resetContract();
+    toastShown.current = false; // Reset toast flag for retry
     handleTokenCreation();
   }, [resetContract, handleTokenCreation]);
 
