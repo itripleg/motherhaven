@@ -4,7 +4,7 @@
 import { useState, useEffect, useRef } from "react";
 import { Container } from "@/components/craft";
 import { useAccount } from "wagmi";
-import { getAddressGreeting } from "@/hooks/addressGreetings";
+import { useAddressGreeting } from "@/hooks/addressGreetings";
 import { motion, AnimatePresence } from "framer-motion";
 import { SearchContainer } from "./components/core/SearchContainer";
 import { TokenContainer } from "./components/core/TokenContainer";
@@ -18,18 +18,16 @@ export default function DexPage() {
   const cameraRef = useRef<any>(null);
   const controlRef = useRef<any>(null);
   const [showSecret, setShowSecret] = useState(false);
-  const [greeting, setGreeting] = useState("");
   const [searchMode, setSearchMode] = useState("token");
   const [searchQuery, setSearchQuery] = useState("");
+
+  // Use the enhanced greeting hook that checks for vanity names
+  const greeting = useAddressGreeting(account?.address);
 
   const handleSecretFound = () => {
     setShowSecret(true);
     setTimeout(() => setShowSecret(false), 160000);
   };
-
-  useEffect(() => {
-    setGreeting(getAddressGreeting(account?.address));
-  }, [account?.address]);
 
   // Handle search query changes
   const handleSearchQueryChange = (query: string) => {
@@ -62,6 +60,7 @@ export default function DexPage() {
             <AnimatePresence mode="wait">
               {!showSecret && (
                 <motion.div
+                  key={greeting} // Add key to trigger re-animation when greeting changes
                   initial={{ opacity: 0, scale: 0.95 }}
                   animate={{ opacity: 1, scale: 1 }}
                   exit={{ opacity: 0, scale: 0.95 }}
@@ -71,6 +70,23 @@ export default function DexPage() {
                   <h1 className="text-5xl md:text-7xl font-bold text-white leading-tight text-left">
                     {greeting || "Catch the flow!"}
                   </h1>
+
+                  {/* Optional: Show if using vanity name */}
+                  {account?.address && greeting.includes("Hey there,") && (
+                    <motion.div
+                      initial={{ opacity: 0, y: 10 }}
+                      animate={{ opacity: 1, y: 0 }}
+                      transition={{ delay: 0.3 }}
+                      className="text-left"
+                    >
+                      <div className="inline-flex items-center gap-2 px-3 py-1 bg-primary/20 rounded-full border border-primary/30">
+                        <span className="text-primary text-sm">👑</span>
+                        <span className="text-primary text-sm font-medium">
+                          Vanity Name Active
+                        </span>
+                      </div>
+                    </motion.div>
+                  )}
                 </motion.div>
               )}
             </AnimatePresence>

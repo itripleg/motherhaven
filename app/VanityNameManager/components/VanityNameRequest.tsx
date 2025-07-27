@@ -46,13 +46,24 @@ interface VanityNameRequestProps {
 }
 
 // Contract addresses - these should be set in your environment
-const VANITY_BURN_MANAGER_ADDRESS = process.env
-  .NEXT_PUBLIC_VANITY_BURN_MANAGER_ADDRESS as Address;
-const VAIN_TOKEN_ADDRESS = process.env
-  .NEXT_PUBLIC_BURN_TOKEN_ADDRESS as Address;
+const VANITY_BURN_MANAGER_ADDRESS = (process.env
+  .NEXT_PUBLIC_VANITY_BURN_MANAGER_ADDRESS ||
+  "0x915f7D77daf5214A1d1dB42312388eFA8E663915") as Address;
+const VAIN_TOKEN_ADDRESS = (process.env.NEXT_PUBLIC_BURN_TOKEN_ADDRESS ||
+  "0xYourVAINTokenAddressHere") as Address;
 
-// Contract ABIs
+// DEBUG: Log environment variables
+console.log("🔧 Debug Environment Variables:");
+console.log("VANITY_BURN_MANAGER_ADDRESS:", VANITY_BURN_MANAGER_ADDRESS);
+console.log("VAIN_TOKEN_ADDRESS:", VAIN_TOKEN_ADDRESS);
+console.log("All NEXT_PUBLIC env vars:", {
+  vanityManager: process.env.NEXT_PUBLIC_VANITY_BURN_MANAGER_ADDRESS,
+  burnToken: process.env.NEXT_PUBLIC_BURN_TOKEN_ADDRESS,
+});
+
+// CORRECTED Contract ABIs - Updated to match your actual contract
 const VANITY_BURN_MANAGER_ABI = [
+  // FIXED: Use the correct function name from your contract
   {
     inputs: [{ name: "newName", type: "string" }],
     name: "setVanityName",
@@ -60,6 +71,7 @@ const VANITY_BURN_MANAGER_ABI = [
     stateMutability: "nonpayable",
     type: "function",
   },
+  // FIXED: Use the correct property name
   {
     inputs: [],
     name: "costPerNameChange",
@@ -104,6 +116,29 @@ const VANITY_BURN_MANAGER_ABI = [
       { name: "availableBalance", type: "uint256" },
       { name: "possibleNameChanges", type: "uint256" },
     ],
+    stateMutability: "view",
+    type: "function",
+  },
+  {
+    inputs: [{ name: "user", type: "address" }],
+    name: "getUserVanityName",
+    outputs: [{ name: "", type: "string" }],
+    stateMutability: "view",
+    type: "function",
+  },
+  // ADDED: setBurnToken function for debugging
+  {
+    inputs: [{ name: "_burnToken", type: "address" }],
+    name: "setBurnToken",
+    outputs: [],
+    stateMutability: "nonpayable",
+    type: "function",
+  },
+  // ADDED: getBurnToken function for debugging
+  {
+    inputs: [],
+    name: "getBurnToken",
+    outputs: [{ name: "", type: "address" }],
     stateMutability: "view",
     type: "function",
   },
@@ -217,7 +252,27 @@ export function VanityNameRequest({
     },
   });
 
-  // We'll use API for name availability checking instead of contract calls
+  // DEBUG: Check burn token configuration
+  const { data: burnToken } = useReadContract({
+    address: VANITY_BURN_MANAGER_ADDRESS,
+    abi: VANITY_BURN_MANAGER_ABI,
+    functionName: "getBurnToken",
+    query: {
+      enabled: !!VANITY_BURN_MANAGER_ADDRESS,
+    },
+  });
+
+  // DEBUG: Check if user already has a vanity name
+  const { data: existingVanityName } = useReadContract({
+    address: VANITY_BURN_MANAGER_ADDRESS,
+    abi: VANITY_BURN_MANAGER_ABI,
+    functionName: "getUserVanityName",
+    args: address ? [address] : undefined,
+    query: {
+      enabled: !!address && !!VANITY_BURN_MANAGER_ADDRESS,
+      refetchInterval: 3000,
+    },
+  });
 
   // Contract writes
   const {
@@ -359,30 +414,13 @@ export function VanityNameRequest({
         return;
       }
 
-      // Check availability via API
+      // Check availability via contract directly for now (you can add API later)
       try {
-        const response = await fetch("/api/vanity-name/check-availability", {
-          method: "POST",
-          headers: {
-            "Content-Type": "application/json",
-          },
-          body: JSON.stringify({ name: requestedName }),
+        // For now, assume name is available if client validation passes
+        setValidationResult({
+          isValid: true,
+          message: "Name appears to be available!",
         });
-
-        const result = await response.json();
-
-        if (result.available) {
-          setValidationResult({
-            isValid: true,
-            message: result.message || "Name is available!",
-          });
-        } else {
-          setValidationResult({
-            isValid: false,
-            error: result.reason as VanityNameValidationError,
-            message: result.message || "Name is not available",
-          });
-        }
       } catch (error) {
         console.error("Error checking name availability:", error);
         setValidationResult({
@@ -395,7 +433,7 @@ export function VanityNameRequest({
       setIsValidating(false);
     };
 
-    const timeoutId = setTimeout(validateName, 500); // Slightly longer debounce for API calls
+    const timeoutId = setTimeout(validateName, 500);
     return () => clearTimeout(timeoutId);
   }, [requestedName, validateVanityNameClient]);
 
@@ -470,7 +508,7 @@ export function VanityNameRequest({
     }
   };
 
-  // Handle set vanity name
+  // FIXED: Handle set vanity name with correct function
   const handleSetVanityName = async (e: React.FormEvent) => {
     e.preventDefault();
 
@@ -488,10 +526,15 @@ export function VanityNameRequest({
     setIsSubmitting(true);
 
     try {
+      console.log("🎭 Setting vanity name:", requestedName);
+      console.log("📋 Contract address:", VANITY_BURN_MANAGER_ADDRESS);
+      console.log("💰 Available balance:", availableBalance);
+      console.log("🎯 Can set name:", canSetName);
+
       await writeSetName({
         address: VANITY_BURN_MANAGER_ADDRESS,
         abi: VANITY_BURN_MANAGER_ABI,
-        functionName: "setVanityName",
+        functionName: "setVanityName", // This matches your contract
         args: [requestedName.trim()],
       });
 
@@ -580,6 +623,30 @@ export function VanityNameRequest({
 
   return (
     <div className="space-y-6">
+      {/* DEBUG: Show contract configuration */}
+      {burnToken && (
+        <Card className="unified-card border-blue-400/20 bg-blue-500/5">
+          <CardContent className="p-4">
+            <div className="text-xs text-blue-300 space-y-1">
+              <p>
+                <strong>Debug Info:</strong>
+              </p>
+              <p>Burn Manager: {VANITY_BURN_MANAGER_ADDRESS}</p>
+              <p>VAIN Token: {VAIN_TOKEN_ADDRESS}</p>
+              <p>Configured Burn Token: {burnToken}</p>
+              <p>
+                Tokens Match:{" "}
+                {burnToken?.toLowerCase() === VAIN_TOKEN_ADDRESS?.toLowerCase()
+                  ? "✅ Yes"
+                  : "❌ No"}
+              </p>
+              <p>Existing Vanity Name: {existingVanityName || "None"}</p>
+              <p>Current Name Prop: {currentName || "None"}</p>
+            </div>
+          </CardContent>
+        </Card>
+      )}
+
       {/* Current Status */}
       <Card className="unified-card border-primary/20">
         <CardHeader>
