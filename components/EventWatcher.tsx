@@ -148,15 +148,13 @@ export function EventWatcher() {
       }
 
       toast({
-        title: (
-          <div className="flex items-center gap-2">
-            {titleIcon}
-            {title}
-          </div>
-        ),
+        title,
         description: (
           <div className="space-y-2">
-            <p className="text-sm">{description}</p>
+            <div className="flex items-center gap-2">
+              {titleIcon}
+              <span className="text-sm">{description}</span>
+            </div>
             <div className="flex items-center gap-4 pt-2 border-t border-border/50">
               {/* View on DEX Link */}
               {tokenAddress && (
