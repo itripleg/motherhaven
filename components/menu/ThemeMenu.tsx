@@ -2,6 +2,7 @@
 "use client";
 
 import { Check, Palette } from "lucide-react";
+import Link from "next/link";
 import { useColorTheme } from "@/contexts/ColorThemeProvider";
 import { getCurrentThemeName, applyThemePreset } from "./menuUtils";
 import { presetThemes } from "@/app/theme/presetThemes";
@@ -25,6 +26,12 @@ export function ThemeMenu({ isDesktop = false }: ThemeMenuProps) {
         <Palette className="h-4 w-4 text-primary" />
         <div className="flex-1">
           <div className="font-medium">Themes</div>
+          <Link
+            href="/theme"
+            className="text-xs text-muted-foreground hover:text-primary transition-colors"
+          >
+            Check out the editor
+          </Link>
         </div>
       </div>
       <div

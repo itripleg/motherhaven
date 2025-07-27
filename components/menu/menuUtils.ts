@@ -1,10 +1,6 @@
 // components/menu/menuUtils.ts
-import {
-  navItems,
-  themePresets,
-  type NavItem,
-  type ThemePreset,
-} from "./menuData";
+import { navItems, type NavItem } from "./menuData";
+import { presetThemes } from "@/app/theme/presetThemes";
 
 export const isActiveRoute = (href: string, pathname: string): boolean => {
   // Exact match for most routes
@@ -74,7 +70,7 @@ export const getCurrentThemeName = (colors: any[]): string => {
   // Simple heuristic to detect current theme
   const currentPrimary = colors[0];
 
-  for (const preset of themePresets) {
+  for (const preset of presetThemes) {
     const presetPrimary = preset.colors[0];
     if (
       Math.abs(currentPrimary.hue - presetPrimary.hue) < 10 &&
@@ -88,7 +84,7 @@ export const getCurrentThemeName = (colors: any[]): string => {
 };
 
 export const applyThemePreset = (
-  preset: ThemePreset,
+  preset: (typeof presetThemes)[0],
   colors: any[],
   applyColors: any
 ): void => {

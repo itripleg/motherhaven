@@ -52,6 +52,38 @@ interface AnimatedSliderProps {
   suffix?: string;
 }
 
+// Shake animation for tactile feedback on tap/click
+const tapShakeVariants = {
+  tap: {
+    x: [0, -2, 2, -2, 2, -1, 1, 0],
+    transition: {
+      duration: 0.3,
+      ease: "easeInOut",
+    },
+  },
+  idle: {
+    x: 0,
+  },
+};
+
+// Enhanced shake for primary demo buttons on tap/click
+const primaryTapShakeVariants = {
+  tap: {
+    x: [0, -3, 3, -2, 2, -1, 1, 0],
+    y: [0, -1, 1, -1, 1, 0],
+    scale: [1, 0.95, 1],
+    transition: {
+      duration: 0.4,
+      ease: "easeInOut",
+    },
+  },
+  idle: {
+    x: 0,
+    y: 0,
+    scale: 1,
+  },
+};
+
 const AnimatedSlider: React.FC<AnimatedSliderProps> = ({
   value,
   targetValue,
@@ -65,14 +97,12 @@ const AnimatedSlider: React.FC<AnimatedSliderProps> = ({
   const [currentValue, setCurrentValue] = useState(value);
   const [isAnimating, setIsAnimating] = useState(false);
 
-  // Animate to new value when targetValue changes
   useEffect(() => {
     if (Math.abs(targetValue - currentValue) > 0.1) {
       setIsAnimating(true);
-
       const controls = animate(currentValue, targetValue, {
         duration: 0.8,
-        ease: [0.23, 1, 0.32, 1], // Custom easing for smooth feel
+        ease: [0.23, 1, 0.32, 1],
         onUpdate: (latest) => {
           setCurrentValue(Math.round(latest));
         },
@@ -81,12 +111,10 @@ const AnimatedSlider: React.FC<AnimatedSliderProps> = ({
           setIsAnimating(false);
         },
       });
-
       return controls.stop;
     }
   }, [targetValue, currentValue]);
 
-  // Update current value when manually changed
   const handleValueChange = (newValues: number[]) => {
     const newValue = newValues[0];
     setCurrentValue(newValue);
@@ -130,7 +158,6 @@ const ThemeCustomizer = () => {
   const { toast } = useToast();
   const { colors, applyColors, resetToDefault } = useColorTheme();
 
-  // Local state
   const [mounted, setMounted] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
   const [lastSaved, setLastSaved] = useState<Date | null>(null);
@@ -138,12 +165,10 @@ const ThemeCustomizer = () => {
   const [targetColors, setTargetColors] = useState(colors);
   const [isPresetAnimating, setIsPresetAnimating] = useState(false);
 
-  // Handle hydration
   useEffect(() => {
     setMounted(true);
   }, []);
 
-  // Sync with global colors
   useEffect(() => {
     setLocalColors(colors);
     setTargetColors(colors);
@@ -158,29 +183,23 @@ const ThemeCustomizer = () => {
     newColors[index] = { ...newColors[index], [property]: value };
     setLocalColors(newColors);
     setTargetColors(newColors);
-
-    // Apply immediately to global theme
     applyColors(newColors);
   };
 
   const applyPreset = (preset: (typeof presetThemes)[0]) => {
     setIsPresetAnimating(true);
-
     const newColors = localColors.map((color, index) => ({
       ...color,
       ...preset.colors[index],
     }));
 
-    // Set target values for animation
     setTargetColors(newColors);
 
-    // Apply to global theme with a slight delay to show animation first
     setTimeout(() => {
       setLocalColors(newColors);
       applyColors(newColors);
     }, 100);
 
-    // Show preset animation feedback
     setTimeout(() => {
       setIsPresetAnimating(false);
       toast({
@@ -192,8 +211,6 @@ const ThemeCustomizer = () => {
 
   const resetToDefaults = () => {
     setIsPresetAnimating(true);
-
-    // Get default colors and animate to them
     const defaultColors = [
       { hue: 263, saturation: 60, lightness: 50 },
       { hue: 240, saturation: 5, lightness: 11 },
@@ -214,7 +231,6 @@ const ThemeCustomizer = () => {
     }, 100);
   };
 
-  // Save theme to Firebase
   const saveTheme = async () => {
     if (!address || !isConnected) {
       toast({
@@ -228,7 +244,6 @@ const ThemeCustomizer = () => {
     setIsSaving(true);
     try {
       const userDocRef = doc(db, "users", address.toLowerCase());
-
       const userDoc = await getDoc(userDocRef);
       const userData = userDoc.exists() ? userDoc.data() : {};
 
@@ -252,7 +267,6 @@ const ThemeCustomizer = () => {
       }
 
       setLastSaved(new Date());
-
       toast({
         title: "Theme Saved! 🎨",
         description: "Your custom theme is now saved to your account",
@@ -269,7 +283,6 @@ const ThemeCustomizer = () => {
     }
   };
 
-  // Don't render until mounted to prevent hydration mismatch
   if (!mounted) {
     return (
       <div className="min-h-screen animated-bg floating-particles">
@@ -353,53 +366,48 @@ const ThemeCustomizer = () => {
 
           {/* Action Buttons */}
           <div className="flex items-center gap-2">
-            {/* Last Saved */}
             {lastSaved && (
               <span className="text-xs text-muted-foreground">
                 Saved {lastSaved.toLocaleTimeString()}
               </span>
             )}
 
-            <motion.div whileHover={{ scale: 1.02 }} whileTap={{ scale: 0.98 }}>
-              <Button
-                onClick={saveTheme}
-                disabled={!isConnected || isSaving}
-                variant="outline"
-                size="sm"
-                className="flex items-center gap-2 transition-all duration-300 hover:shadow-lg hover:shadow-primary/20"
+            <Button
+              onClick={saveTheme}
+              disabled={!isConnected || isSaving}
+              variant="outline"
+              size="sm"
+              className="flex items-center gap-2 transition-all duration-300 hover:shadow-lg hover:shadow-primary/20"
+            >
+              <motion.div
+                animate={isSaving ? { rotate: 360 } : {}}
+                transition={{
+                  duration: 1,
+                  repeat: isSaving ? Infinity : 0,
+                  ease: "linear",
+                }}
               >
-                <motion.div
-                  animate={isSaving ? { rotate: 360 } : {}}
-                  transition={{
-                    duration: 1,
-                    repeat: isSaving ? Infinity : 0,
-                    ease: "linear",
-                  }}
-                >
-                  <Save className="h-4 w-4" />
-                </motion.div>
-                {isSaving ? "Saving..." : "Save Theme"}
-              </Button>
-            </motion.div>
+                <Save className="h-4 w-4" />
+              </motion.div>
+              {isSaving ? "Saving..." : "Save Theme"}
+            </Button>
 
-            <motion.div whileHover={{ scale: 1.02 }} whileTap={{ scale: 0.98 }}>
-              <Button
-                onClick={resetToDefaults}
-                variant="outline"
-                size="sm"
-                className="flex items-center gap-2 transition-all duration-300 hover:shadow-lg hover:shadow-orange-500/20"
-                disabled={isPresetAnimating}
+            <Button
+              onClick={resetToDefaults}
+              variant="outline"
+              size="sm"
+              className="flex items-center gap-2 transition-all duration-300 hover:shadow-lg hover:shadow-orange-500/20"
+              disabled={isPresetAnimating}
+            >
+              <motion.div
+                animate={isPresetAnimating ? { rotate: 360 } : {}}
+                transition={{ duration: 0.8 }}
+                whileHover={{ rotate: 15 }}
               >
-                <motion.div
-                  animate={isPresetAnimating ? { rotate: 360 } : {}}
-                  transition={{ duration: 0.8 }}
-                  whileHover={{ rotate: 15 }}
-                >
-                  <RotateCcw className="h-4 w-4" />
-                </motion.div>
-                Reset
-              </Button>
-            </motion.div>
+                <RotateCcw className="h-4 w-4" />
+              </motion.div>
+              Reset
+            </Button>
           </div>
         </motion.div>
 
@@ -424,14 +432,6 @@ const ThemeCustomizer = () => {
                     {presetThemes.map((preset, index) => (
                       <motion.div
                         key={preset.name}
-                        whileHover={{
-                          scale: 1.02,
-                          y: -2,
-                        }}
-                        whileTap={{
-                          scale: 0.98,
-                          y: 0,
-                        }}
                         initial={{ opacity: 0, y: 20 }}
                         animate={{ opacity: 1, y: 0 }}
                         transition={{
@@ -469,22 +469,11 @@ const ThemeCustomizer = () => {
                                 />
                               ))}
                             </div>
-                            <motion.span
-                              className="font-medium"
-                              initial={{ x: 0 }}
-                              whileHover={{ x: 2 }}
-                              transition={{ duration: 0.2 }}
-                            >
-                              {preset.name}
-                            </motion.span>
+                            <span className="font-medium">{preset.name}</span>
                           </div>
-                          <motion.span
-                            className="text-sm text-muted-foreground text-left group-hover:text-foreground/80 transition-colors duration-300"
-                            initial={{ opacity: 0.7 }}
-                            whileHover={{ opacity: 1 }}
-                          >
+                          <span className="text-sm text-muted-foreground text-left group-hover:text-foreground/80 transition-colors duration-300">
                             {preset.description}
-                          </motion.span>
+                          </span>
                         </Button>
                       </motion.div>
                     ))}
@@ -569,7 +558,6 @@ const ThemeCustomizer = () => {
                           label="Hue"
                           suffix="°"
                         />
-
                         <AnimatedSlider
                           value={color.saturation}
                           targetValue={
@@ -584,7 +572,6 @@ const ThemeCustomizer = () => {
                           label="Saturation"
                           suffix="%"
                         />
-
                         <AnimatedSlider
                           value={color.lightness}
                           targetValue={
@@ -620,15 +607,11 @@ const ThemeCustomizer = () => {
               </CardHeader>
               <CardContent className="space-y-4">
                 {/* Sample Components */}
-                <motion.div
-                  className="space-y-3"
-                  animate={isPresetAnimating ? { scale: [1, 1.02, 1] } : {}}
-                  transition={{ duration: 0.8 }}
-                >
+                <div className="space-y-3">
                   <motion.div
-                    whileHover={{ scale: 1.02, y: -1 }}
-                    whileTap={{ scale: 0.98 }}
-                    transition={{ type: "spring", stiffness: 400, damping: 25 }}
+                    variants={primaryTapShakeVariants}
+                    whileTap="tap"
+                    animate="idle"
                   >
                     <Button className="w-full shadow-lg hover:shadow-xl hover:shadow-primary/25 transition-all duration-300">
                       Primary Button
@@ -636,9 +619,9 @@ const ThemeCustomizer = () => {
                   </motion.div>
 
                   <motion.div
-                    whileHover={{ scale: 1.02, y: -1 }}
-                    whileTap={{ scale: 0.98 }}
-                    transition={{ type: "spring", stiffness: 400, damping: 25 }}
+                    variants={tapShakeVariants}
+                    whileTap="tap"
+                    animate="idle"
                   >
                     <Button
                       variant="secondary"
@@ -649,9 +632,9 @@ const ThemeCustomizer = () => {
                   </motion.div>
 
                   <motion.div
-                    whileHover={{ scale: 1.02, y: -1 }}
-                    whileTap={{ scale: 0.98 }}
-                    transition={{ type: "spring", stiffness: 400, damping: 25 }}
+                    variants={tapShakeVariants}
+                    whileTap="tap"
+                    animate="idle"
                   >
                     <Button
                       variant="outline"
@@ -660,7 +643,7 @@ const ThemeCustomizer = () => {
                       Outline Button
                     </Button>
                   </motion.div>
-                </motion.div>
+                </div>
 
                 <motion.div
                   animate={isPresetAnimating ? { scale: [1, 1.02, 1] } : {}}

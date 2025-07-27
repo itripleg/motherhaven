@@ -18,7 +18,7 @@ export const presetThemes = [
     colors: [
       { hue: 25, saturation: 85, lightness: 55 },
       { hue: 30, saturation: 8, lightness: 12 },
-      { hue: 45, saturation: 75, lightness: 20 },
+      { hue: 45, saturation: 75, lightness: 10 },
       { hue: 30, saturation: 10, lightness: 90 },
     ],
   },
@@ -50,6 +50,16 @@ export const presetThemes = [
       { hue: 10, saturation: 8, lightness: 12 },
       { hue: 350, saturation: 60, lightness: 25 },
       { hue: 0, saturation: 5, lightness: 90 },
+    ],
+  },
+  {
+    name: "Diamond Dogs",
+    description: "Mercenary nation phantom pain",
+    colors: [
+      { hue: 200, saturation: 15, lightness: 45 },
+      { hue: 0, saturation: 0, lightness: 8 },
+      { hue: 0, saturation: 0, lightness: 15 },
+      { hue: 45, saturation: 95, lightness: 60 },
     ],
   },
 ];
