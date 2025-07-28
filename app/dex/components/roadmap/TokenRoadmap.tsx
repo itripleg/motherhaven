@@ -1,11 +1,12 @@
-// app/dex/components/roadmap/TokenRoadmap.tsx - UPDATED: Added editable column titles
+// app/dex/components/roadmap/TokenRoadmap.tsx - CLEAN: Tabbed interface for admins
 "use client";
 
 import * as React from "react";
 import { motion, AnimatePresence } from "framer-motion";
-import { Plus, Map, Crown, Pencil, Check, X } from "lucide-react";
+import { Plus, Map, Crown, Pencil, Check, X, Star } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import {
   collection,
   onSnapshot,
@@ -29,6 +30,7 @@ import { RoadmapItem as RoadmapItemType } from "./types";
 import { DroppableColumn } from "./DroppableColumn";
 import { AdminForm } from "./AdminForm";
 import { RoadmapItem } from "./RoadmapItem";
+import { FeaturePostsList } from "./feature-posts/FeaturePostsList";
 import {
   DndContext,
   DragEndEvent,
@@ -95,7 +97,7 @@ export function TokenRoadmap({
     null
   );
   const [mounted, setMounted] = React.useState(false);
-  const [showAdminForm, setShowAdminForm] = React.useState(false);
+  const [activeTab, setActiveTab] = React.useState("posts");
 
   // Header editing state
   const [isEditingTitle, setIsEditingTitle] = React.useState(false);
@@ -267,6 +269,7 @@ export function TokenRoadmap({
       handleCancelSubtitleEdit();
     }
   };
+
   // Handle column title updates
   const handleTitleUpdate = async (
     status: RoadmapItemType["status"],
@@ -324,7 +327,6 @@ export function TokenRoadmap({
         createdAt: new Date().toISOString(),
       });
 
-      setShowAdminForm(false);
       toast({
         title: "Item added",
         description: "The roadmap item has been added successfully.",
@@ -471,7 +473,7 @@ export function TokenRoadmap({
     );
   }
 
-  // Compact view (for sidebar)
+  // Compact view (for sidebar) - Show feature posts only for non-creators
   if (compact) {
     return (
       <div className="h-full bg-background/50 backdrop-blur-sm rounded-xl overflow-hidden">
@@ -480,151 +482,64 @@ export function TokenRoadmap({
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-2">
               <Map className="h-4 w-4 text-primary" />
-              {isEditingTitle ? (
-                <div className="flex items-center gap-2 flex-1">
-                  <Input
-                    value={editTitle}
-                    onChange={(e) => setEditTitle(e.target.value)}
-                    onKeyDown={handleTitleKeyDown}
-                    className="font-medium text-sm bg-transparent border-none p-0 h-auto focus-visible:ring-1 focus-visible:ring-primary"
-                    maxLength={60}
-                    autoFocus
-                    onBlur={handleSaveTitle}
-                  />
-                  <Button
-                    variant="ghost"
-                    size="icon"
-                    className="h-4 w-4 text-green-500 hover:bg-green-500/20"
-                    onClick={handleSaveTitle}
-                  >
-                    <Check className="h-3 w-3" />
-                  </Button>
-                  <Button
-                    variant="ghost"
-                    size="icon"
-                    className="h-4 w-4 text-muted-foreground hover:bg-muted/20"
-                    onClick={handleCancelTitleEdit}
-                  >
-                    <X className="h-3 w-3" />
-                  </Button>
-                </div>
-              ) : (
-                <div className="flex items-center gap-2 group">
-                  <span className="font-medium text-sm">{headers.title}</span>
-                  {isCreator && (
-                    <Button
-                      variant="ghost"
-                      size="icon"
-                      className="h-4 w-4 text-muted-foreground/60 hover:text-muted-foreground hover:bg-muted/20 opacity-70 hover:opacity-100 transition-all duration-200"
-                      onClick={handleStartTitleEdit}
-                      title="Edit title"
-                    >
-                      <Pencil className="h-3 w-3" />
-                    </Button>
-                  )}
-                </div>
-              )}
+              <span className="font-medium text-sm">{headers.title}</span>
               {isCreator && <Crown className="h-3 w-3 text-primary" />}
             </div>
-
-            {isCreator && (
-              <Button
-                variant="ghost"
-                size="icon"
-                onClick={() => setShowAdminForm(!showAdminForm)}
-                className="h-6 w-6 text-primary hover:bg-primary/20"
-              >
-                <Plus className="h-3 w-3" />
-              </Button>
-            )}
           </div>
         </div>
 
-        {/* Admin Form */}
-        <AnimatePresence>
-          {showAdminForm && (
-            <motion.div
-              initial={{ opacity: 0, height: 0 }}
-              animate={{ opacity: 1, height: "auto" }}
-              exit={{ opacity: 0, height: 0 }}
-              className="border-b border-border/20 bg-primary/5"
-            >
-              <div className="p-3">
-                <AdminForm
-                  isAdmin={isCreator}
-                  onCustomSubmit={handleAddTokenRoadmapItem}
-                />
-              </div>
-            </motion.div>
-          )}
-        </AnimatePresence>
-
-        {/* Compact Roadmap */}
+        {/* Content - Show feature posts for non-creators, roadmap for creators */}
         <div className="flex-1 overflow-y-auto p-3">
-          {items.length === 0 ? (
+          {!isCreator ? (
+            <FeaturePostsList
+              address={address}
+              isConnecting={isConnecting}
+              isAdmin={false}
+              tokenAddress={tokenAddress}
+            />
+          ) : items.length === 0 ? (
             <div className="text-center py-8 space-y-2">
               <div className="text-2xl opacity-30">🚀</div>
               <p className="text-xs text-muted-foreground">
-                Add your first roadmap item
+                No roadmap items yet
               </p>
             </div>
           ) : (
-            <DndContext
-              sensors={sensors}
-              onDragStart={handleDragStart}
-              onDragEnd={handleDragEnd}
-            >
-              <div className="space-y-4">
-                {statusKeys.map((status) => {
-                  const statusItems = getItemsByStatus(status);
-                  if (statusItems.length === 0) return null;
+            <div className="space-y-4">
+              {statusKeys.map((status) => {
+                const statusItems = getItemsByStatus(status);
+                if (statusItems.length === 0) return null;
 
-                  return (
-                    <div key={status} className="space-y-2">
-                      <h4 className="text-xs font-medium text-muted-foreground uppercase tracking-wide">
-                        {columnTitles[status]} ({statusItems.length})
-                      </h4>
-                      <div className="space-y-2">
-                        {statusItems.map((item) => (
-                          <RoadmapItem
-                            key={item.id}
-                            item={item}
-                            onUpvote={handleUpvote}
-                            isConnecting={isConnecting}
-                            address={address}
-                            isExpanded={expandedItemId === item.id}
-                            onExpand={setExpandedItemId}
-                            collection="tokenRoadmapItems"
-                          />
-                        ))}
-                      </div>
+                return (
+                  <div key={status} className="space-y-2">
+                    <h4 className="text-xs font-medium text-muted-foreground uppercase tracking-wide">
+                      {columnTitles[status]} ({statusItems.length})
+                    </h4>
+                    <div className="space-y-2">
+                      {statusItems.map((item) => (
+                        <RoadmapItem
+                          key={item.id}
+                          item={item}
+                          onUpvote={handleUpvote}
+                          isConnecting={isConnecting}
+                          address={address}
+                          isExpanded={expandedItemId === item.id}
+                          onExpand={setExpandedItemId}
+                          collection="tokenRoadmapItems"
+                        />
+                      ))}
                     </div>
-                  );
-                })}
-              </div>
-
-              <DragOverlay>
-                {activeItem ? (
-                  <RoadmapItem
-                    item={activeItem}
-                    onUpvote={handleUpvote}
-                    isConnecting={isConnecting}
-                    address={address}
-                    isExpanded={false}
-                    onExpand={() => {}}
-                    isDragging={true}
-                    collection="tokenRoadmapItems"
-                  />
-                ) : null}
-              </DragOverlay>
-            </DndContext>
+                  </div>
+                );
+              })}
+            </div>
           )}
         </div>
       </div>
     );
   }
 
-  // Full roadmap view (for main area or modal)
+  // Full roadmap view with clean tabs for admins
   return (
     <div className="space-y-6">
       {/* Header */}
@@ -726,73 +641,138 @@ export function TokenRoadmap({
               </div>
             )}
           </div>
-          {/* {isCreator && (
-            <Badge
-              className="bg-primary/20 text-primary border-primary/30"
-              variant="outline"
-            >
-              Creator Access
-            </Badge>
-          )}
-          {!isCreator && (
-            <Badge
-              className="bg-secondary/20 text-secondary-foreground border-secondary/30"
-              variant="outline"
-            >
-              Read Only
-            </Badge>
-          )} */}
         </div>
       </div>
 
-      {/* Admin Form */}
-      {isCreator && (
-        <AdminForm
-          isAdmin={isCreator}
-          onCustomSubmit={handleAddTokenRoadmapItem}
-        />
-      )}
+      {/* Admin Tabs OR Non-Admin Content */}
+      {isCreator ? (
+        // ADMIN VIEW: Tabs to choose between creating posts or roadmap items
+        <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
+          <TabsList className="grid w-full grid-cols-2 mb-6">
+            <TabsTrigger value="posts" className="flex items-center gap-2">
+              <Star className="h-4 w-4" />
+              Manage Feature Posts
+            </TabsTrigger>
+            <TabsTrigger value="roadmap" className="flex items-center gap-2">
+              <Map className="h-4 w-4" />
+              Manage Roadmap Items
+            </TabsTrigger>
+          </TabsList>
 
-      {/* Full Roadmap Grid */}
-      <DndContext
-        sensors={sensors}
-        onDragStart={handleDragStart}
-        onDragEnd={handleDragEnd}
-      >
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
-          {statusKeys.map((status) => (
-            <DroppableColumn
-              key={status}
-              status={status}
-              items={getItemsByStatus(status)}
-              onUpvote={handleUpvote}
-              isConnecting={isConnecting}
+          <TabsContent value="posts" className="mt-0">
+            <FeaturePostsList
               address={address}
-              expandedItemId={expandedItemId}
-              onExpand={setExpandedItemId}
-              collection="tokenRoadmapItems"
-              isCreator={isCreator}
-              columnTitle={columnTitles[status]}
-              onTitleUpdate={handleTitleUpdate}
+              isConnecting={isConnecting}
+              isAdmin={isCreator}
+              tokenAddress={tokenAddress}
             />
-          ))}
+          </TabsContent>
+
+          <TabsContent value="roadmap" className="mt-0">
+            <div className="space-y-6">
+              {/* Admin Form for Roadmap Items */}
+              <AdminForm
+                isAdmin={isCreator}
+                onCustomSubmit={handleAddTokenRoadmapItem}
+              />
+
+              {/* Full Roadmap Grid */}
+              <DndContext
+                sensors={sensors}
+                onDragStart={handleDragStart}
+                onDragEnd={handleDragEnd}
+              >
+                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
+                  {statusKeys.map((status) => (
+                    <DroppableColumn
+                      key={status}
+                      status={status}
+                      items={getItemsByStatus(status)}
+                      onUpvote={handleUpvote}
+                      isConnecting={isConnecting}
+                      address={address}
+                      expandedItemId={expandedItemId}
+                      onExpand={setExpandedItemId}
+                      collection="tokenRoadmapItems"
+                      isCreator={isCreator}
+                      columnTitle={columnTitles[status]}
+                      onTitleUpdate={handleTitleUpdate}
+                    />
+                  ))}
+                </div>
+
+                <DragOverlay>
+                  {activeItem ? (
+                    <RoadmapItem
+                      item={activeItem}
+                      onUpvote={handleUpvote}
+                      isConnecting={isConnecting}
+                      address={address}
+                      isExpanded={false}
+                      onExpand={() => {}}
+                      isDragging={true}
+                      collection="tokenRoadmapItems"
+                    />
+                  ) : null}
+                </DragOverlay>
+              </DndContext>
+            </div>
+          </TabsContent>
+        </Tabs>
+      ) : (
+        // NON-ADMIN VIEW: Feature posts above roadmap (no tabs)
+        <div className="space-y-8">
+          {/* Feature Posts Section - Carousel Mode */}
+          <FeaturePostsList
+            address={address}
+            isConnecting={isConnecting}
+            isAdmin={false}
+            tokenAddress={tokenAddress}
+            carousel={true}
+          />
+
+          {/* Development Roadmap Section */}
+          <DndContext
+            sensors={sensors}
+            onDragStart={handleDragStart}
+            onDragEnd={handleDragEnd}
+          >
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
+              {statusKeys.map((status) => (
+                <DroppableColumn
+                  key={status}
+                  status={status}
+                  items={getItemsByStatus(status)}
+                  onUpvote={handleUpvote}
+                  isConnecting={isConnecting}
+                  address={address}
+                  expandedItemId={expandedItemId}
+                  onExpand={setExpandedItemId}
+                  collection="tokenRoadmapItems"
+                  isCreator={false}
+                  columnTitle={columnTitles[status]}
+                  onTitleUpdate={handleTitleUpdate}
+                />
+              ))}
+            </div>
+
+            <DragOverlay>
+              {activeItem ? (
+                <RoadmapItem
+                  item={activeItem}
+                  onUpvote={handleUpvote}
+                  isConnecting={isConnecting}
+                  address={address}
+                  isExpanded={false}
+                  onExpand={() => {}}
+                  isDragging={true}
+                  collection="tokenRoadmapItems"
+                />
+              ) : null}
+            </DragOverlay>
+          </DndContext>
         </div>
-
-        <DragOverlay>
-          {activeItem ? (
-            <RoadmapItem
-              item={activeItem}
-              onUpvote={handleUpvote}
-              isConnecting={isConnecting}
-              address={address}
-              isExpanded={false}
-              onExpand={() => {}}
-              isDragging={true}
-              collection="tokenRoadmapItems"
-            />
-          ) : null}
-        </DragOverlay>
-      </DndContext>
+      )}
     </div>
   );
 }
