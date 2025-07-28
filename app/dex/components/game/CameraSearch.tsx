@@ -143,7 +143,7 @@ export const CameraSearch = ({
 
             <motion.div className="w-full">
               {/* <Skull className="w-16 h-16 text-red-500 mx-auto mb-4" /> */}
-              <OuijAi onResultChange={setOuijaResult} />
+              {/* <OuijAi onResultChange={setOuijaResult} /> */}
             </motion.div>
           </motion.div>
         )}
