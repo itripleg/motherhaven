@@ -358,7 +358,7 @@ export function FactoryProgress({
                     transition={{ type: "spring", stiffness: 200 }}
                   >
                     {status === "completed" ? (
-                      <CheckCircle2 className="h-4 w-4 text-primary" />
+                      <CheckCircle2 className="h-6 w-6 text-green-500" />
                     ) : (
                       <Circle
                         className={`
