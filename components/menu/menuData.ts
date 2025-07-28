@@ -13,11 +13,18 @@ export const navItems: NavItem[] = [
     iconName: "ArrowLeftRight",
     description: "Trade tokens",
   },
+
   {
     href: "/factory",
-    label: "Token Factory",
+    label: "Grand Factory",
     iconName: "Factory",
-    description: "Create tokens",
+    description: "Create tokenize community",
+  },
+  {
+    href: "/roadmap",
+    label: "Road to Riches",
+    iconName: "Map",
+    description: "Our roadmap",
   },
   {
     href: "/pet",
@@ -31,23 +38,17 @@ export const navItems: NavItem[] = [
     iconName: "Bot",
     description: "Transparent Volume Bots",
   },
-  {
-    href: "/games",
-    label: "Games",
-    iconName: "GamepadIcon",
-    description: "We're building games!",
-  },
+  // {
+  //   href: "/games",
+  //   label: "Games",
+  //   iconName: "GamepadIcon",
+  //   description: "We're building games!",
+  // },
   {
     href: "/faucet",
     label: "Faucet",
     iconName: "Droplets",
     description: "Get test tokens",
-  },
-  {
-    href: "/roadmap",
-    label: "Road to Riches",
-    iconName: "Map",
-    description: "Our roadmap",
   },
 ];
 

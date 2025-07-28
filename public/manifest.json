@@ -33,9 +33,9 @@
       ]
     },
     {
-      "name": "Token Factory",
+      "name": "Grand Factory",
       "short_name": "Factory",
-      "description": "Create new tokens",
+      "description": "Create new tokens and communities",
       "url": "/factory",
       "icons": [
         {

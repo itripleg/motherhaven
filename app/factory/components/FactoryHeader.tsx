@@ -90,7 +90,7 @@ export function FactoryHeader({ platformStats }: FactoryHeaderProps) {
                 transition={{ delay: 0.2, duration: 0.8 }}
                 className="text-4xl md:text-6xl lg:text-7xl font-bold text-gradient bg-gradient-to-r from-primary via-primary/80 to-primary/60 bg-clip-text text-transparent"
               >
-                Token Factory
+                Grand Factory
               </motion.h1>
             </div>
           </motion.div>
@@ -104,7 +104,8 @@ export function FactoryHeader({ platformStats }: FactoryHeaderProps) {
           >
             <div className="absolute inset-0 bg-gradient-to-r from-primary/20 via-primary/10 to-primary/20 blur-xl rounded-full" />
             <p className="relative text-sm md:text-lg text-foreground/80 max-w-2xl mx-auto leading-relaxed px-4">
-              Launch your token in minutes with our no-code platform.
+              Launch your Tokenized Community in minutes with our no-code
+              platform.
               <span className="text-primary font-semibold"> Fair launch</span>,
               <span className="text-primary font-semibold">
                 {" "}
