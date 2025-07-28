@@ -1,6 +1,17 @@
-// app/api/tvb/webhook/route.ts - SIMPLIFIED webhook with in-memory storage only
+// app/api/tvb/webhook/route.ts - HYBRID: Firebase for startup data, memory for real-time activity
 
 import { NextRequest, NextResponse } from "next/server";
+import {
+  collection,
+  doc,
+  setDoc,
+  getDoc,
+  getDocs,
+  query,
+  where,
+  serverTimestamp,
+} from "firebase/firestore";
+import { db } from "@/firebase";
 
 // Development mode toggle
 const DEV_MODE =
@@ -14,12 +25,25 @@ const BOT_SECRETS = {
   companion_cube: "companion_cube_secret_2024",
 };
 
-// SIMPLIFIED: In-memory storage only - no Firebase
-interface BotActivity {
+// HYBRID: Firebase for persistent bot profiles
+interface BotProfile {
   botName: string;
   displayName: string;
   avatarUrl: string;
   bio?: string;
+  character?: any;
+  config?: any;
+  walletAddress?: string;
+  createdAt: any;
+  lastStartup: string;
+  lastSeen?: string; // Added for heartbeat persistence
+}
+
+// HYBRID: In-memory for real-time status and activity
+interface BotRuntimeStatus {
+  botName: string;
+  displayName: string;
+  isOnline: boolean;
   lastSeen: string;
   lastAction: {
     type: string;
@@ -29,12 +53,9 @@ interface BotActivity {
   };
   totalActions: number;
   sessionStarted: string;
-  config?: any;
-  character?: any;
   isDevMode?: boolean;
-  walletAddress?: string;
 
-  // Session metrics
+  // Session metrics (real-time only)
   startingBalance?: number;
   currentBalance?: number;
   pnlAmount?: number;
@@ -42,82 +63,160 @@ interface BotActivity {
   sessionDurationMinutes?: number;
 }
 
-// SIMPLIFIED: Just in-memory storage
-const botActivities = new Map<string, BotActivity>();
+// HYBRID: Combined bot data for API responses
+interface BotData {
+  // Profile data (from Firebase)
+  botName: string;
+  displayName: string;
+  avatarUrl: string;
+  bio?: string;
+  character?: any;
+  config?: any;
+  walletAddress?: string;
+  createdAt: any;
+  lastStartup: string;
+
+  // Runtime status (from memory + Firebase)
+  isOnline: boolean;
+  lastSeen: string;
+  lastAction: {
+    type: string;
+    message: string;
+    details: any;
+    timestamp: string;
+  };
+  totalActions: number;
+  sessionStarted: string;
+  isDevMode?: boolean;
+  startingBalance?: number;
+  currentBalance?: number;
+  pnlAmount?: number;
+  pnlPercentage?: number;
+  sessionDurationMinutes?: number;
+}
+
+// In-memory storage for real-time data
+const botRuntimeStatus = new Map<string, BotRuntimeStatus>();
 const MAX_STORED_BOTS = 50;
 
-// SIMPLIFIED: Activity history (keep last 100 activities per bot)
-interface ActivityEntry {
-  id: string;
-  botName: string;
-  actionType: string;
-  message: string;
-  timestamp: string;
-  details: any;
-}
+// Firebase collections
+const BOT_PROFILES_COLLECTION = "bot_profiles";
 
-const recentActivities = new Map<string, ActivityEntry[]>();
-const MAX_ACTIVITIES_PER_BOT = 100;
-const MAX_GLOBAL_ACTIVITIES = 500;
+// Cache for Firebase bot profiles (to reduce reads)
+const profileCache = new Map<
+  string,
+  { profile: BotProfile; timestamp: number }
+>();
+const PROFILE_CACHE_DURATION = 5 * 60 * 1000; // 5 minutes
 
-function addActivity(botName: string, activity: ActivityEntry) {
-  // Add to bot-specific activities
-  if (!recentActivities.has(botName)) {
-    recentActivities.set(botName, []);
-  }
-
-  const botActivities = recentActivities.get(botName)!;
-  botActivities.unshift(activity); // Add to front
-
-  // Keep only latest activities per bot
-  if (botActivities.length > MAX_ACTIVITIES_PER_BOT) {
-    botActivities.splice(MAX_ACTIVITIES_PER_BOT);
-  }
-
-  // Global cleanup - remove oldest activities if we have too many total
-  const totalActivities = Array.from(recentActivities.values()).reduce(
-    (sum, arr) => sum + arr.length,
-    0
-  );
-
-  if (totalActivities > MAX_GLOBAL_ACTIVITIES) {
-    // Remove oldest activities from least active bots
-    const sortedBots = Array.from(recentActivities.entries()).sort(
-      ([, a], [, b]) => {
-        const aLatest = new Date(a[0]?.timestamp || 0).getTime();
-        const bLatest = new Date(b[0]?.timestamp || 0).getTime();
-        return aLatest - bLatest; // Oldest first
-      }
+async function saveBotProfile(botData: BotProfile): Promise<void> {
+  try {
+    const docRef = doc(db, BOT_PROFILES_COLLECTION, botData.botName);
+    await setDoc(
+      docRef,
+      {
+        ...botData,
+        createdAt: serverTimestamp(),
+        updatedAt: serverTimestamp(),
+      },
+      { merge: true }
     );
 
-    for (const [botName, activities] of sortedBots) {
-      if (activities.length > 20) {
-        activities.splice(50); // Keep only 50 for less active bots
-        break;
-      }
-    }
+    // Update cache
+    profileCache.set(botData.botName, {
+      profile: botData,
+      timestamp: Date.now(),
+    });
+
+    console.log(`💾 Saved bot profile: ${botData.displayName}`);
+  } catch (error) {
+    console.error(
+      `❌ Failed to save bot profile for ${botData.botName}:`,
+      error
+    );
   }
 }
 
-// Cleanup old bot records
-function cleanupBotActivities() {
-  if (botActivities.size <= MAX_STORED_BOTS) return;
+async function loadBotProfile(botName: string): Promise<BotProfile | null> {
+  try {
+    // Check cache first
+    const cached = profileCache.get(botName);
+    if (cached && Date.now() - cached.timestamp < PROFILE_CACHE_DURATION) {
+      console.log(`📚 Using cached profile for ${botName}`);
+      return cached.profile;
+    }
 
-  const sortedBots = Array.from(botActivities.entries()).sort(
+    // Load from Firebase
+    const docRef = doc(db, BOT_PROFILES_COLLECTION, botName);
+    const docSnap = await getDoc(docRef);
+
+    if (docSnap.exists()) {
+      const profile = docSnap.data() as BotProfile;
+
+      // Update cache
+      profileCache.set(botName, {
+        profile,
+        timestamp: Date.now(),
+      });
+
+      console.log(
+        `📖 Loaded bot profile from Firebase: ${profile.displayName}`
+      );
+      return profile;
+    }
+
+    return null;
+  } catch (error) {
+    console.error(`❌ Failed to load bot profile for ${botName}:`, error);
+    return null;
+  }
+}
+
+async function loadAllBotProfiles(): Promise<BotProfile[]> {
+  try {
+    console.log("📖 Loading all bot profiles from Firebase...");
+
+    const profilesRef = collection(db, BOT_PROFILES_COLLECTION);
+    const snapshot = await getDocs(profilesRef);
+
+    const profiles: BotProfile[] = [];
+    snapshot.forEach((doc) => {
+      const profile = doc.data() as BotProfile;
+      profiles.push(profile);
+
+      // Update cache
+      profileCache.set(profile.botName, {
+        profile,
+        timestamp: Date.now(),
+      });
+    });
+
+    console.log(`📖 Loaded ${profiles.length} bot profiles from Firebase`);
+    return profiles;
+  } catch (error) {
+    console.error("❌ Failed to load bot profiles:", error);
+    return [];
+  }
+}
+
+// Cleanup old runtime status
+function cleanupRuntimeStatus() {
+  if (botRuntimeStatus.size <= MAX_STORED_BOTS) return;
+
+  const sortedBots = Array.from(botRuntimeStatus.entries()).sort(
     ([, a], [, b]) =>
       new Date(a.lastSeen).getTime() - new Date(b.lastSeen).getTime()
   );
 
   const botsToRemove = sortedBots.slice(
     0,
-    botActivities.size - MAX_STORED_BOTS
+    botRuntimeStatus.size - MAX_STORED_BOTS
   );
   botsToRemove.forEach(([botName]) => {
-    botActivities.delete(botName);
-    recentActivities.delete(botName);
+    botRuntimeStatus.delete(botName);
   });
 
-  console.log(`🧹 Cleaned up ${botsToRemove.length} old bot records`);
+  console.log(`🧹 Cleaned up ${botsToRemove.length} old runtime records`);
 }
 
 export async function POST(request: NextRequest) {
@@ -145,7 +244,7 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    // SIMPLIFIED: Authentication logic
+    // Authentication logic
     let isDevMode = false;
     let authPassed = false;
 
@@ -180,59 +279,29 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    // SIMPLIFIED: Get or create bot activity record
-    let botActivity = botActivities.get(botName);
     const now = timestamp || new Date().toISOString();
 
-    if (!botActivity) {
-      // First time seeing this bot
-      botActivity = {
+    // HYBRID: Handle startup action - save profile to Firebase
+    if (action === "startup") {
+      const profileData: BotProfile = {
         botName,
         displayName: displayName || botName,
         avatarUrl: avatarUrl || "",
         bio: bio || details?.bio,
-        lastSeen: now,
-        lastAction: {
-          type: action,
-          message: details?.message || `Bot ${botName} performed ${action}`,
-          details: details || {},
-          timestamp: now,
-        },
-        totalActions: 0,
-        sessionStarted: now,
         character: details?.character,
         config: details?.config,
-        isDevMode: isDevMode,
         walletAddress: walletAddress || details?.walletAddress,
+        createdAt: serverTimestamp(),
+        lastStartup: now,
       };
 
-      console.log(
-        `${isDevMode ? "🔧 DEV" : "🤖 PROD"} New bot registered: ${displayName}`
-      );
-    }
-
-    // Update dev mode status and basic info
-    botActivity.isDevMode = isDevMode;
-    if (bio) botActivity.bio = bio;
-    if (walletAddress) botActivity.walletAddress = walletAddress;
-
-    // Handle startup action specially
-    if (action === "startup") {
-      // Reset for new session
-      botActivity.sessionStarted = now;
-      botActivity.totalActions = 0;
-
-      // Update bot metadata from startup details
-      if (details?.bio) botActivity.bio = details.bio;
-      if (details?.character) botActivity.character = details.character;
-      if (details?.config) botActivity.config = details.config;
-      if (details?.startingBalance !== undefined)
-        botActivity.startingBalance = details.startingBalance;
-      if (details?.walletAddress)
-        botActivity.walletAddress = details.walletAddress;
+      // Save to Firebase (non-blocking)
+      saveBotProfile(profileData);
 
       console.log(
-        `${isDevMode ? "🔧 DEV" : "🚀 PROD"} ${displayName} started new session`
+        `${
+          isDevMode ? "🔧 DEV" : "🚀 PROD"
+        } ${displayName} startup - profile saved to Firebase`
       );
       if (details?.startingBalance !== undefined) {
         console.log(
@@ -242,73 +311,131 @@ export async function POST(request: NextRequest) {
       if (details?.tokensFound !== undefined) {
         console.log(`   🎯 Found ${details.tokensFound} tradeable tokens`);
       }
-    } else if (action !== "heartbeat") {
-      // Regular action - increment counter (don't count heartbeats)
-      botActivity.totalActions += 1;
     }
 
-    // Update session metrics if provided
-    if (details?.currentBalance !== undefined) {
-      botActivity.currentBalance = details.currentBalance;
+    // HYBRID: Update heartbeat in Firebase to maintain online status
+    if (action === "heartbeat" || action === "startup") {
+      // Update just the lastSeen timestamp in Firebase (lightweight update)
+      try {
+        const docRef = doc(db, BOT_PROFILES_COLLECTION, botName);
+        await setDoc(
+          docRef,
+          {
+            lastSeen: now,
+            isOnline: true,
+            updatedAt: serverTimestamp(),
+          },
+          { merge: true }
+        );
 
-      // Calculate P&L if we have starting balance
-      if (botActivity.startingBalance !== undefined) {
-        botActivity.pnlAmount =
-          details.currentBalance - botActivity.startingBalance;
-        botActivity.pnlPercentage =
-          botActivity.startingBalance > 0
-            ? (botActivity.pnlAmount / botActivity.startingBalance) * 100
-            : 0;
+        // Update cache with new lastSeen
+        const cached = profileCache.get(botName);
+        if (cached) {
+          cached.profile.lastSeen = now;
+          cached.timestamp = Date.now(); // Refresh cache timestamp
+        }
+
+        // Only log occasionally for heartbeats
+        if (action === "startup" || Math.random() < 0.01) {
+          // 1% of heartbeats
+          console.log(`💓 ${displayName}: heartbeat persisted to Firebase`);
+        }
+      } catch (error) {
+        console.error(`❌ Failed to update heartbeat for ${botName}:`, error);
       }
     }
 
-    // Calculate session duration
-    if (botActivity.sessionStarted) {
-      const sessionStart = new Date(botActivity.sessionStarted).getTime();
-      const currentTime = new Date(now).getTime();
-      botActivity.sessionDurationMinutes = Math.floor(
-        (currentTime - sessionStart) / (1000 * 60)
+    // HYBRID: Update runtime status in memory
+    let runtimeStatus = botRuntimeStatus.get(botName);
+
+    if (!runtimeStatus) {
+      // First time seeing this bot in this session
+      runtimeStatus = {
+        botName,
+        displayName: displayName || botName,
+        isOnline: true,
+        lastSeen: now,
+        lastAction: {
+          type: action,
+          message: details?.message || `Bot ${botName} performed ${action}`,
+          details: details || {},
+          timestamp: now,
+        },
+        totalActions: 0,
+        sessionStarted: now,
+        isDevMode: isDevMode,
+      };
+
+      console.log(
+        `${
+          isDevMode ? "🔧 DEV" : "🤖 PROD"
+        } New runtime session: ${displayName}`
       );
     }
 
-    // Update last seen and action
-    botActivity.lastSeen = now;
-    botActivity.lastAction = {
+    // Update runtime status
+    runtimeStatus.isDevMode = isDevMode;
+    runtimeStatus.lastSeen = now;
+    runtimeStatus.lastAction = {
       type: action,
       message: details?.message || `${action} action performed`,
       details: details || {},
       timestamp: now,
     };
 
-    // Store updated activity in memory
-    botActivities.set(botName, botActivity);
-
-    // Add to activity history (skip frequent heartbeats)
-    if (action !== "heartbeat" || Math.random() < 0.1) {
-      // Only log 10% of heartbeats
-      addActivity(botName, {
-        id: `${botName}_${now}_${Math.random().toString(36).substr(2, 9)}`,
-        botName,
-        actionType: action,
-        message: details?.message || `${action} action performed`,
-        timestamp: now,
-        details: details || {},
-      });
+    // Handle different action types
+    if (action === "startup") {
+      // Reset for new session
+      runtimeStatus.sessionStarted = now;
+      runtimeStatus.totalActions = 0;
+      if (details?.startingBalance !== undefined) {
+        runtimeStatus.startingBalance = details.startingBalance;
+      }
+    } else if (action !== "heartbeat") {
+      // Regular action - increment counter (don't count heartbeats)
+      runtimeStatus.totalActions += 1;
     }
+
+    // Update session metrics if provided
+    if (details?.currentBalance !== undefined) {
+      runtimeStatus.currentBalance = details.currentBalance;
+
+      // Calculate P&L if we have starting balance
+      if (runtimeStatus.startingBalance !== undefined) {
+        runtimeStatus.pnlAmount =
+          details.currentBalance - runtimeStatus.startingBalance;
+        runtimeStatus.pnlPercentage =
+          runtimeStatus.startingBalance > 0
+            ? (runtimeStatus.pnlAmount / runtimeStatus.startingBalance) * 100
+            : 0;
+      }
+    }
+
+    // Calculate session duration
+    if (runtimeStatus.sessionStarted) {
+      const sessionStart = new Date(runtimeStatus.sessionStarted).getTime();
+      const currentTime = new Date(now).getTime();
+      runtimeStatus.sessionDurationMinutes = Math.floor(
+        (currentTime - sessionStart) / (1000 * 60)
+      );
+    }
+
+    // Store updated runtime status
+    botRuntimeStatus.set(botName, runtimeStatus);
 
     // Periodic cleanup
     if (Math.random() < 0.01) {
       // 1% chance on each request
-      cleanupBotActivities();
+      cleanupRuntimeStatus();
     }
 
-    // SIMPLIFIED: Minimal logging
+    // Logging
     if (action === "heartbeat") {
       // Only log heartbeat occasionally to reduce noise
       if (Math.random() < 0.05) {
         // 5% of heartbeats
         console.log(
-          `💓 ${displayName}: heartbeat (${botActivity.totalActions} actions)`
+          `💓 ${displayName}: heartbeat (${runtimeStatus.totalActions} actions)`
         );
       }
     } else {
@@ -342,16 +469,16 @@ export async function POST(request: NextRequest) {
       message: "Bot activity recorded",
       devMode: isDevMode,
       botStatus: {
-        name: botActivity.botName,
-        displayName: botActivity.displayName,
+        name: runtimeStatus.botName,
+        displayName: runtimeStatus.displayName,
         isOnline: true,
-        lastSeen: botActivity.lastSeen,
-        totalActions: botActivity.totalActions,
-        sessionStarted: botActivity.sessionStarted,
+        lastSeen: runtimeStatus.lastSeen,
+        totalActions: runtimeStatus.totalActions,
+        sessionStarted: runtimeStatus.sessionStarted,
         isDevMode: isDevMode,
-        currentBalance: botActivity.currentBalance,
-        pnlAmount: botActivity.pnlAmount,
-        pnlPercentage: botActivity.pnlPercentage,
+        currentBalance: runtimeStatus.currentBalance,
+        pnlAmount: runtimeStatus.pnlAmount,
+        pnlPercentage: runtimeStatus.pnlPercentage,
       },
     });
   } catch (error) {
@@ -367,93 +494,138 @@ export async function GET(request: NextRequest) {
   try {
     const { searchParams } = new URL(request.url);
     const botName = searchParams.get("bot");
-    const includeHistory = searchParams.get("history") === "true";
-    const limit = parseInt(searchParams.get("limit") || "50");
 
-    // SIMPLIFIED: Better offline detection
-    const currentTime = Date.now();
-    const OFFLINE_THRESHOLD = 3 * 60 * 1000; // 3 minutes
+    // HYBRID: Combine Firebase profiles with runtime status
+    const combinedBots: BotData[] = [];
 
-    const botStatuses = Array.from(botActivities.values()).map((bot) => {
-      const lastSeenTime = new Date(bot.lastSeen).getTime();
-      const isOnline = currentTime - lastSeenTime < OFFLINE_THRESHOLD;
+    if (botName) {
+      // Get specific bot
+      const profile = await loadBotProfile(botName);
+      const runtime = botRuntimeStatus.get(botName);
 
-      return {
-        name: bot.botName,
-        displayName: bot.displayName,
-        avatarUrl: bot.avatarUrl,
-        bio: bot.bio,
-        isOnline,
-        lastSeen: bot.lastSeen,
-        lastAction: bot.lastAction,
-        totalActions: bot.totalActions,
-        sessionStarted: bot.sessionStarted,
-        character: bot.character,
-        config: bot.config,
-        isDevMode: bot.isDevMode || false,
-        walletAddress: bot.walletAddress,
+      if (profile || runtime) {
+        combinedBots.push({
+          // Firebase profile data (persistent)
+          botName: profile?.botName || runtime?.botName || botName,
+          displayName: profile?.displayName || runtime?.displayName || botName,
+          avatarUrl: profile?.avatarUrl || "/default.png",
+          bio: profile?.bio,
+          character: profile?.character,
+          config: profile?.config,
+          walletAddress: profile?.walletAddress,
+          createdAt: profile?.createdAt,
+          lastStartup: profile?.lastStartup || "",
 
-        // Session metrics
-        startingBalance: bot.startingBalance,
-        currentBalance: bot.currentBalance,
-        pnlAmount: bot.pnlAmount,
-        pnlPercentage: bot.pnlPercentage,
-        sessionDurationMinutes: bot.sessionDurationMinutes,
-      };
-    });
+          // Runtime status (memory + Firebase lastSeen)
+          isOnline: runtime
+            ? Date.now() - new Date(runtime.lastSeen).getTime() < 3 * 60 * 1000
+            : profile?.lastSeen
+            ? Date.now() - new Date(profile.lastSeen).getTime() < 3 * 60 * 1000
+            : false,
+          lastSeen:
+            runtime?.lastSeen ||
+            profile?.lastSeen ||
+            profile?.lastStartup ||
+            new Date().toISOString(),
+          lastAction: runtime?.lastAction || {
+            type: "unknown",
+            message: "No recent activity",
+            details: {},
+            timestamp: profile?.lastStartup || new Date().toISOString(),
+          },
+          totalActions: runtime?.totalActions || 0,
+          sessionStarted:
+            runtime?.sessionStarted ||
+            profile?.lastStartup ||
+            new Date().toISOString(),
+          isDevMode: runtime?.isDevMode || false,
+          startingBalance: runtime?.startingBalance,
+          currentBalance: runtime?.currentBalance,
+          pnlAmount: runtime?.pnlAmount,
+          pnlPercentage: runtime?.pnlPercentage,
+          sessionDurationMinutes: runtime?.sessionDurationMinutes,
+        });
+      }
+    } else {
+      // Get all bots - combine profiles with runtime status
+      const profiles = await loadAllBotProfiles();
+      const runtimeBots = Array.from(botRuntimeStatus.values());
 
-    // Filter by specific bot if requested
-    const filteredBots = botName
-      ? botStatuses.filter((bot) => bot.name === botName)
-      : botStatuses;
+      // Create a map of all unique bots
+      const allBotNames = new Set([
+        ...profiles.map((p) => p.botName),
+        ...runtimeBots.map((r) => r.botName),
+      ]);
 
-    // SIMPLIFIED: Basic metrics
-    const devBots = botStatuses.filter((bot) => bot.isDevMode).length;
-    const prodBots = botStatuses.filter((bot) => !bot.isDevMode).length;
-    const onlineBots = botStatuses.filter((bot) => bot.isOnline).length;
+      for (const name of allBotNames) {
+        const profile = profiles.find((p) => p.botName === name);
+        const runtime = runtimeBots.find((r) => r.botName === name);
+
+        combinedBots.push({
+          // Firebase profile data (persistent)
+          botName: profile?.botName || runtime?.botName || name,
+          displayName: profile?.displayName || runtime?.displayName || name,
+          avatarUrl: profile?.avatarUrl || "/default.png",
+          bio: profile?.bio,
+          character: profile?.character,
+          config: profile?.config,
+          walletAddress: profile?.walletAddress,
+          createdAt: profile?.createdAt,
+          lastStartup: profile?.lastStartup || "",
+
+          // Runtime status (memory + Firebase lastSeen)
+          isOnline: runtime
+            ? Date.now() - new Date(runtime.lastSeen).getTime() < 3 * 60 * 1000
+            : profile?.lastSeen
+            ? Date.now() - new Date(profile.lastSeen).getTime() < 3 * 60 * 1000
+            : false,
+          lastSeen:
+            runtime?.lastSeen ||
+            profile?.lastSeen ||
+            profile?.lastStartup ||
+            new Date().toISOString(),
+          lastAction: runtime?.lastAction || {
+            type: "startup",
+            message: "Bot profile loaded",
+            details: {},
+            timestamp: profile?.lastStartup || new Date().toISOString(),
+          },
+          totalActions: runtime?.totalActions || 0,
+          sessionStarted:
+            runtime?.sessionStarted ||
+            profile?.lastStartup ||
+            new Date().toISOString(),
+          isDevMode: runtime?.isDevMode || false,
+          startingBalance: runtime?.startingBalance,
+          currentBalance: runtime?.currentBalance,
+          pnlAmount: runtime?.pnlAmount,
+          pnlPercentage: runtime?.pnlPercentage,
+          sessionDurationMinutes: runtime?.sessionDurationMinutes,
+        });
+      }
+    }
+
+    // Calculate metrics
+    const onlineBots = combinedBots.filter((bot) => bot.isOnline).length;
+    const devBots = combinedBots.filter((bot) => bot.isDevMode).length;
+    const prodBots = combinedBots.filter((bot) => !bot.isDevMode).length;
 
     const response: any = {
       success: true,
-      bots: filteredBots,
-      totalBots: botStatuses.length,
+      bots: combinedBots,
+      totalBots: combinedBots.length,
       onlineBots: onlineBots,
       devMode: DEV_MODE,
       devBots: devBots,
       prodBots: prodBots,
       timestamp: new Date().toISOString(),
+      dataSource: "hybrid", // Firebase profiles + Memory runtime
     };
-
-    // SIMPLIFIED: Include activity history if requested (from memory only)
-    if (includeHistory) {
-      const activities: ActivityEntry[] = [];
-
-      if (botName) {
-        // Get activities for specific bot
-        const botActivities = recentActivities.get(botName) || [];
-        activities.push(...botActivities.slice(0, limit));
-      } else {
-        // Get recent activities from all bots
-        const allActivities: ActivityEntry[] = [];
-        for (const botActivities of recentActivities.values()) {
-          allActivities.push(...botActivities);
-        }
-
-        // Sort by timestamp and take most recent
-        allActivities.sort(
-          (a, b) =>
-            new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime()
-        );
-        activities.push(...allActivities.slice(0, limit));
-      }
-
-      response.activities = activities;
-      response.activityCount = activities.length;
-    }
 
     // Only log occasionally to reduce noise
     if (Math.random() < 0.1) {
       console.log(
-        `📊 Status: ${botStatuses.length} bots (${onlineBots} online, ${devBots} dev, ${prodBots} prod)`
+        `📊 Hybrid Status: ${combinedBots.length} bots (${onlineBots} online, ${devBots} dev, ${prodBots} prod)`
       );
     }
 
@@ -467,7 +639,7 @@ export async function GET(request: NextRequest) {
   }
 }
 
-// SIMPLIFIED: Basic cleanup endpoint
+// Cleanup endpoint
 export async function DELETE(request: NextRequest) {
   try {
     const { searchParams } = new URL(request.url);
@@ -476,22 +648,22 @@ export async function DELETE(request: NextRequest) {
     let clearedCount = 0;
 
     if (botName) {
-      // Clear specific bot
-      if (botActivities.has(botName)) {
-        botActivities.delete(botName);
-        recentActivities.delete(botName);
+      // Clear specific bot runtime status
+      if (botRuntimeStatus.has(botName)) {
+        botRuntimeStatus.delete(botName);
         clearedCount = 1;
       }
+      // Note: We don't delete Firebase profiles as they should persist
     } else {
-      // Clear all
-      clearedCount = botActivities.size;
-      botActivities.clear();
-      recentActivities.clear();
+      // Clear all runtime status
+      clearedCount = botRuntimeStatus.size;
+      botRuntimeStatus.clear();
+      profileCache.clear(); // Clear profile cache too
     }
 
     return NextResponse.json({
       success: true,
-      message: `Cleared ${clearedCount} bot records`,
+      message: `Cleared ${clearedCount} runtime records (profiles preserved)`,
     });
   } catch (error) {
     console.error("❌ TVB Cleanup error:", error);
