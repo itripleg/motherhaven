@@ -1,4 +1,5 @@
-// app/bots/components/BotCard.tsx
+// app/bots/components/BotCard.tsx - SIMPLIFIED with proper bio display
+
 "use client";
 import React from "react";
 import { motion } from "framer-motion";
@@ -13,44 +14,145 @@ import {
   MessageCircle,
   ExternalLink,
   Wallet,
+  TrendingUp,
+  TrendingDown,
+  DollarSign,
 } from "lucide-react";
 import { AddressComponent } from "@/components/AddressComponent";
-import { TVBBot } from "./helpers";
-import {
-  getStatusColor,
-  getMoodIcon,
-  getMoodColor,
-  getActionIcon,
-  getActionColor,
-  formatActionType,
-} from "./helpers";
+
+// SIMPLIFIED: Direct bot interface matching our API
+interface SimpleBot {
+  name: string;
+  displayName: string;
+  avatarUrl: string;
+  bio?: string;
+  isOnline: boolean;
+  lastSeen: string;
+  lastAction?: {
+    type: string;
+    message: string;
+    details: any;
+    timestamp: string;
+  };
+  totalActions: number;
+  sessionStarted: string;
+  character?: {
+    mood?: string;
+    personality?: string;
+  };
+  config?: any;
+  isDevMode?: boolean;
+  walletAddress?: string;
+
+  // Session metrics
+  startingBalance?: number;
+  currentBalance?: number;
+  pnlAmount?: number;
+  pnlPercentage?: number;
+  sessionDurationMinutes?: number;
+}
 
 interface BotCardProps {
-  bot: TVBBot;
+  bot: SimpleBot;
   index: number;
 }
 
+// SIMPLIFIED: Helper functions
+const getMoodIcon = (mood?: string): React.ReactElement => {
+  switch (mood?.toLowerCase()) {
+    case "bullish":
+      return <TrendingUp className="h-4 w-4" />;
+    case "aggressive":
+      return <TrendingUp className="h-4 w-4 text-red-400" />;
+    case "cautious":
+      return <TrendingDown className="h-4 w-4 text-blue-400" />;
+    case "bearish":
+      return <TrendingDown className="h-4 w-4" />;
+    case "neutral":
+      return <DollarSign className="h-4 w-4" />;
+    default:
+      return <DollarSign className="h-4 w-4" />;
+  }
+};
+
+const getMoodColor = (mood?: string): string => {
+  switch (mood?.toLowerCase()) {
+    case "bullish":
+      return "text-green-400";
+    case "aggressive":
+      return "text-red-400";
+    case "cautious":
+      return "text-blue-400";
+    case "bearish":
+      return "text-orange-400";
+    case "neutral":
+      return "text-gray-400";
+    default:
+      return "text-gray-400";
+  }
+};
+
+const getActionColor = (action?: string): string => {
+  switch (action?.toLowerCase()) {
+    case "buy":
+      return "text-green-400 bg-green-500/10";
+    case "sell":
+      return "text-red-400 bg-red-500/10";
+    case "hold":
+      return "text-yellow-400 bg-yellow-500/10";
+    case "create_token":
+      return "text-purple-400 bg-purple-500/10";
+    case "heartbeat":
+      return "text-blue-400 bg-blue-500/10";
+    case "startup":
+      return "text-orange-400 bg-orange-500/10";
+    case "error":
+      return "text-red-400 bg-red-500/10";
+    case "insufficient_funds":
+      return "text-red-400 bg-red-500/20";
+    default:
+      return "text-gray-400 bg-gray-500/10";
+  }
+};
+
+const getActionIcon = (action?: string): string => {
+  switch (action?.toLowerCase()) {
+    case "buy":
+      return "📈";
+    case "sell":
+      return "📉";
+    case "hold":
+      return "⏸️";
+    case "create_token":
+      return "🎨";
+    case "startup":
+      return "🚀";
+    case "heartbeat":
+      return "💓";
+    case "error":
+      return "⚠️";
+    case "insufficient_funds":
+      return "💸";
+    default:
+      return "🔄";
+  }
+};
+
+const formatActionType = (action?: string): string => {
+  if (!action) return "No Action";
+
+  switch (action.toLowerCase()) {
+    case "insufficient_funds":
+      return "Low Funds";
+    case "create_token":
+      return "Create Token";
+    default:
+      return action.replace(/_/g, " ").replace(/\b\w/g, (l) => l.toUpperCase());
+  }
+};
+
 const BotCard: React.FC<BotCardProps> = ({ bot, index }) => {
   const router = useRouter();
-  const [lastActionKey, setLastActionKey] = React.useState("");
-  const [lastMessageKey, setLastMessageKey] = React.useState("");
-
-  const { lastAction } = bot;
-
-  // Track action changes for subtle animations
-  React.useEffect(() => {
-    if (lastAction) {
-      const actionKey = `${lastAction.type}-${lastAction.timestamp}`;
-      const messageKey = `${lastAction.message}-${lastAction.timestamp}`;
-
-      if (actionKey !== lastActionKey) {
-        setLastActionKey(actionKey);
-      }
-      if (messageKey !== lastMessageKey) {
-        setLastMessageKey(messageKey);
-      }
-    }
-  }, [lastAction, lastActionKey, lastMessageKey]);
 
   const handleImageError = (
     e: React.SyntheticEvent<HTMLImageElement, Event>
@@ -72,29 +174,26 @@ const BotCard: React.FC<BotCardProps> = ({ bot, index }) => {
     router.push(`/bots/${bot.name}`);
   };
 
-  // Use bot's calculated session duration instead of frontend calculation
+  // SIMPLIFIED: Session uptime calculation
   const getSessionUptime = (): string => {
-    const sessionMinutes = lastAction?.details?.sessionDurationMinutes;
-
-    if (sessionMinutes !== undefined) {
-      const hours = Math.floor(sessionMinutes / 60);
-      const minutes = sessionMinutes % 60;
-      return hours > 0 ? `${hours}h` : `${minutes}m`;
+    if (bot.sessionDurationMinutes !== undefined) {
+      const hours = Math.floor(bot.sessionDurationMinutes / 60);
+      const minutes = bot.sessionDurationMinutes % 60;
+      return hours > 0 ? `${hours}h ${minutes}m` : `${minutes}m`;
     }
 
-    // Fallback to frontend calculation
-    const fallbackHours =
-      Math.floor(
-        (Date.now() - new Date(bot.sessionStarted).getTime()) / 3600000
-      ) || 0;
-    return `${fallbackHours}h`;
+    // Fallback calculation
+    const sessionHours = Math.floor(
+      (Date.now() - new Date(bot.sessionStarted).getTime()) / 3600000
+    );
+    return `${sessionHours}h`;
   };
 
-  // Extract token info from last action details
+  // SIMPLIFIED: Extract token info from last action
   const getTokenInfo = () => {
-    if (!lastAction?.details) return null;
+    if (!bot.lastAction?.details) return null;
 
-    const { details } = lastAction;
+    const { details } = bot.lastAction;
     const tokenSymbol = details.tokenSymbol;
     const tokenAddress = details.tokenAddress || details.contractAddress;
 
@@ -106,20 +205,27 @@ const BotCard: React.FC<BotCardProps> = ({ bot, index }) => {
       : null;
   };
 
-  // Extract bot wallet address from bot details
-  const getBotWalletAddress = (): string | null => {
-    return (
-      lastAction?.details?.walletAddress ||
-      lastAction?.details?.address ||
-      (bot as any).walletAddress ||
-      (bot as any).address ||
-      null
-    );
+  // SIMPLIFIED: P&L display
+  const getPnLDisplay = () => {
+    if (bot.pnlAmount === undefined || bot.pnlPercentage === undefined) {
+      return null;
+    }
+
+    const isPositive = bot.pnlAmount >= 0;
+    const color = isPositive ? "text-green-400" : "text-red-400";
+    const icon = isPositive ? "📈" : "📉";
+
+    return {
+      amount: bot.pnlAmount,
+      percentage: bot.pnlPercentage,
+      color,
+      icon,
+    };
   };
 
-  const uptimeDisplay = getSessionUptime();
   const tokenInfo = getTokenInfo();
-  const botWalletAddress = getBotWalletAddress();
+  const pnlInfo = getPnLDisplay();
+  const uptimeDisplay = getSessionUptime();
 
   return (
     <motion.div
@@ -143,21 +249,52 @@ const BotCard: React.FC<BotCardProps> = ({ bot, index }) => {
 
         {/* Content */}
         <div className="relative z-10 flex flex-col h-full">
-          {/* Header - Fixed Height */}
-          <CardHeader className="pb-3 flex-shrink-0 h-[140px]">
+          {/* Header */}
+          <CardHeader className="pb-3 flex-shrink-0">
+            {/* Status and Mood Row */}
             <div className="flex items-center justify-between mb-4">
-              {bot.character?.mood && (
-                <div className="flex items-center gap-2">
-                  {getMoodIcon(bot.character.mood)}
-                  <span
-                    className={`text-sm font-medium ${getMoodColor(
-                      bot.character.mood
-                    )}`}
+              {/* Online/Offline Status */}
+              <div className="flex items-center gap-2">
+                {bot.isOnline ? (
+                  <Wifi className="h-4 w-4 text-green-400" />
+                ) : (
+                  <WifiOff className="h-4 w-4 text-red-400" />
+                )}
+                <Badge
+                  className={`${
+                    bot.isOnline
+                      ? "bg-green-500/20 text-green-400 border-green-500/30"
+                      : "bg-red-500/20 text-red-400 border-red-500/30"
+                  }`}
+                  variant="outline"
+                >
+                  {bot.isOnline ? "Online" : "Offline"}
+                </Badge>
+              </div>
+
+              {/* Dev Mode + Mood */}
+              <div className="flex items-center gap-2">
+                {bot.isDevMode && (
+                  <Badge
+                    variant="outline"
+                    className="text-xs px-1 py-0 h-5 border-orange-500/50 text-orange-400"
                   >
-                    {bot.character.mood}
-                  </span>
-                </div>
-              )}
+                    DEV
+                  </Badge>
+                )}
+                {bot.character?.mood && (
+                  <div className="flex items-center gap-1">
+                    {getMoodIcon(bot.character.mood)}
+                    <span
+                      className={`text-xs font-medium ${getMoodColor(
+                        bot.character.mood
+                      )}`}
+                    >
+                      {bot.character.mood}
+                    </span>
+                  </div>
+                )}
+              </div>
             </div>
 
             {/* Bot Info */}
@@ -187,10 +324,10 @@ const BotCard: React.FC<BotCardProps> = ({ bot, index }) => {
             </div>
           </CardHeader>
 
-          {/* Content - Flexible Height */}
+          {/* Content */}
           <CardContent className="flex-1 flex flex-col space-y-4 pb-4">
-            {/* Bot Wallet Address Section */}
-            {botWalletAddress && (
+            {/* FIXED: Bot Wallet Address Section */}
+            {bot.walletAddress && (
               <div className="address-component flex-shrink-0">
                 <div className="p-2 bg-secondary/30 rounded-lg border border-border/30">
                   <div className="flex items-center gap-2 mb-1">
@@ -199,19 +336,19 @@ const BotCard: React.FC<BotCardProps> = ({ bot, index }) => {
                       Bot Wallet:
                     </span>
                   </div>
-                  <AddressComponent hash={botWalletAddress} type="address" />
+                  <AddressComponent hash={bot.walletAddress} type="address" />
                 </div>
               </div>
             )}
 
-            {/* Bio Section - Fixed Height */}
-            <div className="h-[60px] flex-shrink-0">
+            {/* FIXED: Bio Section - Always show, with better handling */}
+            <div className="h-[80px] flex-shrink-0">
               {bot.bio ? (
                 <div className="p-3 bg-secondary/30 rounded-lg border border-border/30 h-full overflow-hidden">
                   <p className="text-muted-foreground text-sm italic leading-tight overflow-hidden text-ellipsis">
                     &ldquo;
-                    {bot.bio.length > 80
-                      ? `${bot.bio.substring(0, 80)}...`
+                    {bot.bio.length > 125
+                      ? `${bot.bio.substring(0, 175)}...`
                       : bot.bio}
                     &rdquo;
                   </p>
@@ -219,31 +356,66 @@ const BotCard: React.FC<BotCardProps> = ({ bot, index }) => {
               ) : (
                 <div className="p-3 bg-secondary/20 rounded-lg border border-border/20 h-full flex items-center justify-center">
                   <p className="text-muted-foreground/70 text-sm italic">
-                    No bio available
+                    No personality description available
                   </p>
                 </div>
               )}
             </div>
 
-            {/* Stats Grid - Fixed Height */}
-            <div className="grid grid-cols-2 gap-3 flex-shrink-0 h-[60px]">
-              <div className="text-center p-2 bg-primary/10 rounded-lg flex flex-col justify-center border border-primary/20">
-                <p className="text-foreground font-bold text-lg">
+            {/* Stats Grid */}
+            <div className="grid grid-cols-2 gap-3 flex-shrink-0">
+              <div className="text-center p-3 bg-primary/10 rounded-lg flex flex-col justify-center border border-primary/20">
+                <p className="text-foreground font-bold text-xl">
                   {bot.totalActions || 0}
                 </p>
                 <p className="text-muted-foreground text-xs">Actions</p>
               </div>
-              <div className="text-center p-2 bg-secondary/30 rounded-lg flex flex-col justify-center border border-border/30">
-                <p className="text-foreground font-bold text-lg">
+              <div className="text-center p-3 bg-secondary/30 rounded-lg flex flex-col justify-center border border-border/30">
+                <p className="text-foreground font-bold text-xl">
                   {uptimeDisplay}
                 </p>
                 <p className="text-muted-foreground text-xs">Uptime</p>
               </div>
             </div>
 
-            {/* Last Action Info - Fixed Height */}
-            <div className="flex-shrink-0 space-y-2 h-[80px]">
-              {lastAction ? (
+            {/* SIMPLIFIED: Balance & P&L Section */}
+            {(bot.currentBalance !== undefined || pnlInfo) && (
+              <div className="grid grid-cols-2 gap-3 flex-shrink-0">
+                {/* Current Balance */}
+                {bot.currentBalance !== undefined && (
+                  <div className="text-center p-3 bg-blue-500/10 rounded-lg flex flex-col justify-center border border-blue-500/20">
+                    <p className="text-blue-400 font-bold text-lg">
+                      {bot.currentBalance.toFixed(4)}
+                    </p>
+                    <p className="text-blue-400/80 text-xs">AVAX</p>
+                  </div>
+                )}
+
+                {/* P&L */}
+                {pnlInfo && (
+                  <div
+                    className={`text-center p-3 rounded-lg flex flex-col justify-center border ${
+                      pnlInfo.amount >= 0
+                        ? "bg-green-500/10 border-green-500/20"
+                        : "bg-red-500/10 border-red-500/20"
+                    }`}
+                  >
+                    <p className={`font-bold text-lg ${pnlInfo.color}`}>
+                      {pnlInfo.amount >= 0 ? "+" : ""}
+                      {pnlInfo.amount.toFixed(6)}
+                    </p>
+                    <p className={`text-xs ${pnlInfo.color}/80`}>
+                      {pnlInfo.percentage >= 0 ? "+" : ""}
+                      {pnlInfo.percentage.toFixed(2)}%
+                    </p>
+                  </div>
+                )}
+              </div>
+            )}
+
+            {/* Last Action Section */}
+            <div className="flex-shrink-0 space-y-2">
+              {bot.lastAction ? (
                 <div className="space-y-2">
                   {/* Action Type and Time */}
                   <div className="flex items-center justify-between text-sm">
@@ -251,16 +423,16 @@ const BotCard: React.FC<BotCardProps> = ({ bot, index }) => {
                     <div className="flex items-center gap-2">
                       <div
                         className={`flex items-center gap-1 px-2 py-1 rounded-full text-xs ${getActionColor(
-                          lastAction.type
+                          bot.lastAction.type
                         )}`}
                       >
-                        {getActionIcon(lastAction.type)}
-                        <span>{formatActionType(lastAction.type)}</span>
+                        <span>{getActionIcon(bot.lastAction.type)}</span>
+                        <span>{formatActionType(bot.lastAction.type)}</span>
                       </div>
                       {/* Show ticker for buy/sell actions */}
                       {tokenInfo &&
-                        (lastAction.type === "buy" ||
-                          lastAction.type === "sell") && (
+                        (bot.lastAction.type === "buy" ||
+                          bot.lastAction.type === "sell") && (
                           <Link
                             href={`/dex/${tokenInfo.address}`}
                             className="flex items-center gap-1 px-2 py-1 bg-primary/20 text-primary hover:text-primary/80 rounded-full transition-colors border border-primary/30"
@@ -272,14 +444,6 @@ const BotCard: React.FC<BotCardProps> = ({ bot, index }) => {
                             <ExternalLink className="h-3 w-3" />
                           </Link>
                         )}
-                      {/* Fallback ticker display */}
-                      {!tokenInfo &&
-                        (lastAction.type === "buy" ||
-                          lastAction.type === "sell") && (
-                          <div className="px-2 py-1 bg-muted/30 text-muted-foreground rounded-full border border-border/30">
-                            <span className="text-xs">TOKEN</span>
-                          </div>
-                        )}
                     </div>
                   </div>
 
@@ -287,7 +451,7 @@ const BotCard: React.FC<BotCardProps> = ({ bot, index }) => {
                   <div className="flex items-center justify-between text-sm">
                     <span className="text-muted-foreground">When:</span>
                     <span className="text-foreground text-xs">
-                      {new Date(lastAction.timestamp).toLocaleTimeString()}
+                      {new Date(bot.lastAction.timestamp).toLocaleTimeString()}
                     </span>
                   </div>
                 </div>
@@ -300,31 +464,25 @@ const BotCard: React.FC<BotCardProps> = ({ bot, index }) => {
               )}
             </div>
 
-            {/* Message Section - Fixed Height with Subtle Animation */}
+            {/* SIMPLIFIED: Message Section */}
             <div className="flex-shrink-0">
-              {lastAction?.message ? (
-                <div className="p-3 bg-secondary/40 rounded-lg h-full overflow-hidden border border-border/30">
-                  <motion.div
-                    key={lastMessageKey}
-                    initial={{ y: 10, opacity: 0 }}
-                    animate={{ y: 0, opacity: 1 }}
-                    transition={{ duration: 0.5, ease: "easeOut" }}
-                    className="flex items-start gap-2 h-full"
-                  >
+              {bot.lastAction?.message ? (
+                <div className="p-3 bg-secondary/40 rounded-lg overflow-hidden border border-border/30">
+                  <div className="flex items-start gap-2">
                     <MessageCircle className="h-4 w-4 text-primary mt-0.5 flex-shrink-0" />
                     <p className="text-muted-foreground text-sm leading-tight overflow-hidden">
                       &ldquo;
-                      {lastAction.message.length > 60
-                        ? `${lastAction.message.substring(0, 60)}...`
-                        : lastAction.message}
+                      {bot.lastAction.message.length > 80
+                        ? `${bot.lastAction.message.substring(0, 80)}...`
+                        : bot.lastAction.message}
                       &rdquo;
                     </p>
-                  </motion.div>
+                  </div>
                 </div>
               ) : (
                 <div className="p-3 bg-secondary/20 rounded-lg h-full flex items-center justify-center border border-border/20">
                   <p className="text-muted-foreground/70 text-sm italic">
-                    No message
+                    No recent message
                   </p>
                 </div>
               )}

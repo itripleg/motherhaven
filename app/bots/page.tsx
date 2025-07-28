@@ -1,13 +1,8 @@
-// app/bots/page.tsx - OPTIMIZED with reduced API calls and smart caching
+// app/bots/page.tsx - SIMPLIFIED with direct API calls, no Firebase
+
 "use client";
 
-import React, {
-  useState,
-  useEffect,
-  useCallback,
-  useMemo,
-  useRef,
-} from "react";
+import React, { useState, useEffect, useCallback, useMemo } from "react";
 import { motion } from "framer-motion";
 import { Card, CardContent } from "@/components/ui/card";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
@@ -17,70 +12,64 @@ import { AlertCircle } from "lucide-react";
 import PageHeader from "./components/PageHeader";
 import BotFleetTab from "./components/BotFleetTab";
 import LiveActivityFeed from "./components/LiveActivityFeed";
-import { TVBBot, FleetStats } from "./components/helpers";
 
-// OPTIMIZATION: Smart caching and request management
-interface CachedData {
-  bots: TVBBot[];
-  timestamp: number;
-  isValid: boolean;
+// SIMPLIFIED: Bot interfaces
+interface SimpleBotActivity {
+  id: string;
+  botName: string;
+  actionType: string;
+  message: string;
+  timestamp: string;
+  details: any;
 }
 
-const CACHE_DURATION = 15000; // 15 seconds cache (reduced from 30s)
-const REFRESH_INTERVAL = 10000; // 10 seconds refresh (reduced from 30s)
-const OFFLINE_THRESHOLD = 4 * 60 * 1000; // 4 minutes offline threshold
+interface SimpleBot {
+  name: string;
+  displayName: string;
+  avatarUrl: string;
+  bio?: string;
+  isOnline: boolean;
+  lastSeen: string;
+  lastAction?: {
+    type: string;
+    message: string;
+    details: any;
+    timestamp: string;
+  };
+  totalActions: number;
+  sessionStarted: string;
+  character?: any;
+  config?: any;
+  isDevMode?: boolean;
+  walletAddress?: string;
+
+  // Session metrics
+  startingBalance?: number;
+  currentBalance?: number;
+  pnlAmount?: number;
+  pnlPercentage?: number;
+  sessionDurationMinutes?: number;
+}
+
+interface FleetStats {
+  totalActions: number;
+  activeBots: number;
+  totalBots: number;
+}
+
+const REFRESH_INTERVAL = 5000; // 5 seconds - much more frequent since it's just an API call
 const MAX_CONSECUTIVE_FAILURES = 3;
 
 const TVBPage = () => {
-  const [bots, setBots] = useState<TVBBot[]>([]);
+  const [bots, setBots] = useState<SimpleBot[]>([]);
+  const [activities, setActivities] = useState<SimpleBotActivity[]>([]);
   const [isLoading, setIsLoading] = useState<boolean>(true);
   const [error, setError] = useState<string | null>(null);
   const [activeTab, setActiveTab] = useState<string>("fleet");
   const [lastUpdate, setLastUpdate] = useState<Date | null>(null);
+  const [consecutiveFailures, setConsecutiveFailures] = useState(0);
 
-  // OPTIMIZATION: Advanced caching and request management
-  const cacheRef = useRef<CachedData>({
-    bots: [],
-    timestamp: 0,
-    isValid: false,
-  });
-  const requestInFlightRef = useRef<boolean>(false);
-  const consecutiveFailuresRef = useRef<number>(0);
-  const lastSuccessfulFetchRef = useRef<number>(0);
-  const refreshIntervalRef = useRef<NodeJS.Timeout | null>(null);
-  const isPageVisibleRef = useRef<boolean>(true);
-  const abortControllerRef = useRef<AbortController | null>(null);
-
-  // OPTIMIZATION: Request deduplication to prevent duplicate API calls
-  const requestCacheRef = useRef<Map<string, Promise<any>>>(new Map());
-
-  // OPTIMIZATION: Request deduplication helper
-  const fetchWithDeduplication = useCallback(
-    async (url: string, options: RequestInit = {}) => {
-      const cacheKey = `${url}_${JSON.stringify(options.headers || {})}`;
-
-      // Return existing promise if request is already in flight
-      if (requestCacheRef.current.has(cacheKey)) {
-        console.log("🤖 TVB: Using deduplicated request for", url);
-        return requestCacheRef.current.get(cacheKey);
-      }
-
-      // Create new request
-      const promise = fetch(url, options)
-        .then((response) => response.json())
-        .finally(() => {
-          // Clean up cache entry when request completes
-          requestCacheRef.current.delete(cacheKey);
-        });
-
-      // Cache the promise
-      requestCacheRef.current.set(cacheKey, promise);
-      console.log("🤖 TVB: Starting new request for", url);
-
-      return promise;
-    },
-    []
-  );
+  // Generate fixed star positions for background
   const fixedStars = useMemo(() => {
     return Array.from({ length: 30 }).map((_, i) => ({
       id: i,
@@ -91,246 +80,95 @@ const TVBPage = () => {
     }));
   }, []);
 
-  // OPTIMIZATION: Page visibility detection to pause updates when tab is hidden
+  // SIMPLIFIED: Direct API fetch
+  const fetchBots = useCallback(async (includeActivities = false) => {
+    try {
+      console.log("🤖 TVB: Fetching bot data from simplified API...");
+
+      const url = new URL("/api/tvb/webhook", window.location.origin);
+      if (includeActivities) {
+        url.searchParams.set("history", "true");
+        url.searchParams.set("limit", "50");
+      }
+
+      const response = await fetch(url.toString());
+
+      if (!response.ok) {
+        throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+      }
+
+      const data = await response.json();
+
+      if (!data.success) {
+        throw new Error(data.error || "API returned unsuccessful response");
+      }
+
+      console.log("🤖 TVB: API Response:", {
+        totalBots: data.totalBots,
+        onlineBots: data.onlineBots,
+        devBots: data.devBots,
+        prodBots: data.prodBots,
+        activitiesIncluded: !!data.activities,
+      });
+
+      // Update bots
+      setBots(data.bots || []);
+
+      // Update activities if included
+      if (data.activities) {
+        setActivities(data.activities || []);
+      }
+
+      setLastUpdate(new Date());
+      setError(null);
+      setConsecutiveFailures(0);
+
+      console.log(`🤖 TVB: Successfully loaded ${data.bots?.length || 0} bots`);
+    } catch (err) {
+      const errorMessage =
+        err instanceof Error ? err.message : "Failed to fetch bots";
+      console.error("🤖 TVB: Error fetching bots:", errorMessage);
+
+      setConsecutiveFailures((prev) => prev + 1);
+      setError(errorMessage);
+
+      // Don't clear bots on error - keep showing cached data
+    } finally {
+      setIsLoading(false);
+    }
+  }, []);
+
+  // Initial load
   useEffect(() => {
-    const handleVisibilityChange = () => {
-      isPageVisibleRef.current = !document.hidden;
-
-      if (isPageVisibleRef.current) {
-        console.log("🤖 TVB: Page visible - resuming updates");
-        // Immediately fetch when page becomes visible if cache is stale
-        const now = Date.now();
-        if (now - cacheRef.current.timestamp > CACHE_DURATION) {
-          fetchBots();
-        }
-      } else {
-        console.log("🤖 TVB: Page hidden - pausing updates");
-      }
-    };
-
-    document.addEventListener("visibilitychange", handleVisibilityChange);
-    return () =>
-      document.removeEventListener("visibilitychange", handleVisibilityChange);
-  }, []);
-
-  // OPTIMIZATION: Smart cache management
-  const isCacheValid = useCallback(() => {
-    const now = Date.now();
-    return (
-      cacheRef.current.isValid &&
-      now - cacheRef.current.timestamp < CACHE_DURATION
-    );
-  }, []);
-
-  const updateCache = useCallback((newBots: TVBBot[]) => {
-    cacheRef.current = {
-      bots: newBots,
-      timestamp: Date.now(),
-      isValid: true,
-    };
-  }, []);
-
-  // OPTIMIZATION: Generate fixed star positions that won't change on re-renders
-  const processBotsData = useCallback((rawBots: any[]): TVBBot[] => {
-    const currentTime = Date.now();
-
-    return rawBots.map((bot) => {
-      const lastSeenTime = new Date(bot.lastSeen).getTime();
-      const timeSinceLastSeen = currentTime - lastSeenTime;
-
-      // OPTIMIZATION: More sophisticated online detection
-      let isOnline = timeSinceLastSeen < OFFLINE_THRESHOLD;
-
-      // Additional check: if bot hasn't sent heartbeat recently, consider offline
-      if (bot.lastAction?.type === "heartbeat") {
-        const lastActionTime = new Date(bot.lastAction.timestamp).getTime();
-        const timeSinceLastAction = currentTime - lastActionTime;
-        isOnline = isOnline && timeSinceLastAction < OFFLINE_THRESHOLD;
-      }
-
-      return {
-        ...bot,
-        isOnline,
-        lastSeenFormatted: new Date(bot.lastSeen).toLocaleTimeString(),
-        timeSinceLastSeen: Math.floor(timeSinceLastSeen / 1000), // seconds
-      };
-    });
-  }, []);
-
-  // OPTIMIZATION: Enhanced bot data processing with offline detection
-  const fetchBots = useCallback(
-    async (force: boolean = false) => {
-      // Don't fetch if page is hidden and not forced
-      if (!isPageVisibleRef.current && !force) {
-        console.log("🤖 TVB: Skipping fetch - page hidden");
-        return;
-      }
-
-      // Use cache if valid and not forced
-      if (!force && isCacheValid()) {
-        console.log("🤖 TVB: Using cached data");
-        setBots(cacheRef.current.bots);
-        setLastUpdate(new Date(cacheRef.current.timestamp));
-        setIsLoading(false);
-        return;
-      }
-
-      // Prevent concurrent requests
-      if (requestInFlightRef.current) {
-        console.log("🤖 TVB: Request already in flight, skipping");
-        return;
-      }
-
-      // Check for backoff after consecutive failures
-      if (consecutiveFailuresRef.current >= MAX_CONSECUTIVE_FAILURES) {
-        const timeSinceLastSuccess =
-          Date.now() - lastSuccessfulFetchRef.current;
-        const backoffTime = Math.min(
-          60000,
-          Math.pow(2, consecutiveFailuresRef.current) * 1000
-        ); // Exponential backoff, max 1 minute
-
-        if (timeSinceLastSuccess < backoffTime) {
-          console.log(
-            `🤖 TVB: In backoff period (${Math.ceil(
-              (backoffTime - timeSinceLastSuccess) / 1000
-            )}s remaining)`
-          );
-          return;
-        }
-      }
-
-      requestInFlightRef.current = true;
-
-      // Cancel previous request if exists
-      if (abortControllerRef.current) {
-        abortControllerRef.current.abort();
-      }
-
-      // Create new abort controller
-      abortControllerRef.current = new AbortController();
-
-      try {
-        console.log(
-          "🤖 TVB: Fetching bot fleet data...",
-          force ? "(forced)" : ""
-        );
-        setError(null);
-
-        if (bots.length === 0) {
-          setIsLoading(true);
-        }
-
-        const response = await fetchWithDeduplication("/api/tvb/webhook", {
-          method: "GET",
-          headers: {
-            "X-Request-Source": "bots-page-optimized",
-            "X-Cache-Control": force ? "no-cache" : "use-cache",
-          },
-          signal: abortControllerRef.current.signal,
-        });
-
-        if (!response.success) {
-          throw new Error(`API Error: ${response.error || "Unknown error"}`);
-        }
-
-        const data = response;
-        console.log("🤖 TVB: API Response:", {
-          success: data.success,
-          totalBots: data.totalBots,
-          onlineBots: data.onlineBots,
-          devBots: data.devBots,
-          prodBots: data.prodBots,
-        });
-
-        if (data.success && Array.isArray(data.bots)) {
-          const processedBots = processBotsData(data.bots);
-
-          // Update cache
-          updateCache(processedBots);
-
-          setBots(processedBots);
-          setLastUpdate(new Date());
-          lastSuccessfulFetchRef.current = Date.now();
-          consecutiveFailuresRef.current = 0; // Reset failure count on success
-
-          console.log(
-            `🤖 TVB: Successfully loaded ${processedBots.length} bots`
-          );
-        } else {
-          console.warn("🤖 TVB: Invalid response format:", data);
-          setBots([]);
-        }
-      } catch (err) {
-        // Don't log errors for aborted requests
-        if (err instanceof Error && err.name === "AbortError") {
-          console.log("🤖 TVB: Request aborted");
-          return;
-        }
-
-        console.error("🤖 TVB: Error fetching bots:", err);
-        consecutiveFailuresRef.current += 1;
-
-        const errorMessage =
-          err instanceof Error ? err.message : "Failed to fetch bots";
-        setError(errorMessage);
-
-        // Use cached data if available during errors
-        if (cacheRef.current.isValid) {
-          console.log("🤖 TVB: Using cached data due to error");
-          setBots(cacheRef.current.bots);
-          setLastUpdate(new Date(cacheRef.current.timestamp));
-        } else {
-          setBots([]);
-        }
-      } finally {
-        setIsLoading(false);
-        requestInFlightRef.current = false;
-      }
-    },
-    [isCacheValid, updateCache, processBotsData, bots.length]
-  );
-
-  // OPTIMIZATION: Smart refresh interval management
-  useEffect(() => {
-    // Initial fetch
-    fetchBots(true);
-
-    // Set up interval with adaptive timing
-    const setupInterval = () => {
-      if (refreshIntervalRef.current) {
-        clearInterval(refreshIntervalRef.current);
-      }
-
-      refreshIntervalRef.current = setInterval(() => {
-        // Only fetch if page is visible
-        if (isPageVisibleRef.current) {
-          fetchBots();
-        }
-      }, REFRESH_INTERVAL);
-    };
-
-    setupInterval();
-
-    return () => {
-      if (refreshIntervalRef.current) {
-        clearInterval(refreshIntervalRef.current);
-      }
-      if (abortControllerRef.current) {
-        abortControllerRef.current.abort();
-      }
-      // Clear request cache on unmount
-      requestCacheRef.current.clear();
-    };
+    fetchBots(true); // Include activities on initial load
   }, [fetchBots]);
 
-  // OPTIMIZATION: Manual refresh with force flag
+  // SIMPLIFIED: Regular refresh interval
+  useEffect(() => {
+    // Don't set up interval if we have too many consecutive failures
+    if (consecutiveFailures >= MAX_CONSECUTIVE_FAILURES) {
+      console.log("🤖 TVB: Too many failures, pausing auto-refresh");
+      return;
+    }
+
+    const interval = setInterval(() => {
+      // Only fetch activities for the activity tab
+      const shouldIncludeActivities = activeTab === "activity";
+      fetchBots(shouldIncludeActivities);
+    }, REFRESH_INTERVAL);
+
+    return () => clearInterval(interval);
+  }, [fetchBots, activeTab, consecutiveFailures]);
+
+  // Manual refresh
   const handleRefresh = useCallback(() => {
     console.log("🤖 TVB: Manual refresh triggered");
-    fetchBots(true);
+    setConsecutiveFailures(0); // Reset failure count
+    setIsLoading(true);
+    fetchBots(true); // Always include activities on manual refresh
   }, [fetchBots]);
 
-  // OPTIMIZATION: Memoized fleet stats calculation
+  // SIMPLIFIED: Fleet stats calculation
   const fleetStats: FleetStats = useMemo(() => {
     return {
       totalActions: bots.reduce((sum, bot) => sum + (bot.totalActions || 0), 0),
@@ -339,15 +177,15 @@ const TVBPage = () => {
     };
   }, [bots]);
 
-  // OPTIMIZATION: Show loading only on initial load
-  if (isLoading && bots.length === 0 && !cacheRef.current.isValid) {
+  // SIMPLIFIED: Show loading only on initial load
+  if (isLoading && bots.length === 0) {
     return (
       <div className="min-h-screen animated-bg floating-particles flex items-center justify-center">
         <div className="text-center">
           <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary mx-auto mb-4"></div>
           <p className="text-foreground">Loading TVB Fleet...</p>
           <p className="text-muted-foreground text-sm mt-2">
-            Fetching bot status from optimized API...
+            Fetching bot status from simplified API...
           </p>
         </div>
       </div>
@@ -387,7 +225,7 @@ const TVBPage = () => {
           isLoading={isLoading}
         />
 
-        {/* OPTIMIZATION: Enhanced error state with cache info */}
+        {/* SIMPLIFIED: Error state */}
         {error && (
           <motion.div
             initial={{ opacity: 0, y: 20 }}
@@ -403,20 +241,15 @@ const TVBPage = () => {
                       Connection Error
                     </h3>
                     <p className="text-destructive/80 text-sm">{error}</p>
-                    {cacheRef.current.isValid && (
-                      <p className="text-muted-foreground text-xs mt-1">
-                        Showing cached data from{" "}
-                        {new Date(
-                          cacheRef.current.timestamp
-                        ).toLocaleTimeString()}
-                      </p>
-                    )}
+                    <p className="text-muted-foreground text-xs mt-1">
+                      Consecutive failures: {consecutiveFailures}
+                      {consecutiveFailures >= MAX_CONSECUTIVE_FAILURES &&
+                        " (Auto-refresh paused)"}
+                    </p>
                   </div>
                   <div className="text-right text-xs text-muted-foreground">
-                    <p>Failures: {consecutiveFailuresRef.current}</p>
-                    <p>
-                      Cache: {cacheRef.current.isValid ? "Valid" : "Invalid"}
-                    </p>
+                    <p>API: Simplified</p>
+                    <p>Storage: In-memory</p>
                   </div>
                 </div>
               </CardContent>
@@ -424,13 +257,37 @@ const TVBPage = () => {
           </motion.div>
         )}
 
-        {/* OPTIMIZATION: Cache status indicator for debugging */}
+        {/* SIMPLIFIED: Status info for development */}
         {process.env.NODE_ENV === "development" && (
-          <div className="mb-4 text-xs text-muted-foreground">
-            Cache: {isCacheValid() ? "Valid" : "Stale"} | Age:{" "}
-            {Math.floor((Date.now() - cacheRef.current.timestamp) / 1000)}s |
-            Failures: {consecutiveFailuresRef.current} | Page Visible:{" "}
-            {isPageVisibleRef.current ? "Yes" : "No"}
+          <div className="mb-4 text-xs text-muted-foreground bg-secondary/20 rounded-lg p-3 border border-border/30">
+            <h4 className="font-medium mb-2">
+              🚀 Simplified Architecture Status
+            </h4>
+            <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+              <div>
+                <p className="font-medium">Data Source</p>
+                <p className="text-green-400">Direct API</p>
+              </div>
+              <div>
+                <p className="font-medium">Storage</p>
+                <p className="text-blue-400">In-Memory</p>
+              </div>
+              <div>
+                <p className="font-medium">Refresh Rate</p>
+                <p className="text-blue-400">{REFRESH_INTERVAL / 1000}s</p>
+              </div>
+              <div>
+                <p className="font-medium">Firebase</p>
+                <p className="text-green-400">Eliminated</p>
+              </div>
+            </div>
+            <div className="mt-2 pt-2 border-t border-border/30">
+              <p>
+                Last Update: {lastUpdate?.toLocaleTimeString() || "Never"} |
+                Failures: {consecutiveFailures} | Bots: {bots.length} |
+                Activities: {activities.length}
+              </p>
+            </div>
           </div>
         )}
 
@@ -462,32 +319,32 @@ const TVBPage = () => {
 
           {/* Activity Tab */}
           <TabsContent value="activity" className="space-y-6">
-            <LiveActivityFeed bots={bots} />
+            <LiveActivityFeed bots={bots} activities={activities} />
           </TabsContent>
         </Tabs>
 
-        {/* OPTIMIZATION: Performance info footer for development */}
+        {/* SIMPLIFIED: Performance info footer for development */}
         {process.env.NODE_ENV === "development" && (
           <div className="mt-8 p-4 bg-secondary/20 rounded-lg border border-border/30">
             <h4 className="text-sm font-medium text-foreground mb-2">
-              🚀 Optimization Stats
+              📊 Simplified Performance Stats
             </h4>
             <div className="grid grid-cols-2 md:grid-cols-4 gap-4 text-xs text-muted-foreground">
               <div>
-                <p className="font-medium">Refresh Interval</p>
-                <p>{REFRESH_INTERVAL / 1000}s (faster for trading)</p>
+                <p className="font-medium">Architecture</p>
+                <p>Direct API → In-Memory → UI</p>
               </div>
               <div>
-                <p className="font-medium">Cache Duration</p>
-                <p>{CACHE_DURATION / 1000}s</p>
+                <p className="font-medium">Eliminated</p>
+                <p>Firebase, Complex hooks, Caching layers</p>
               </div>
               <div>
-                <p className="font-medium">Offline Threshold</p>
-                <p>{OFFLINE_THRESHOLD / 60000}min</p>
+                <p className="font-medium">Benefits</p>
+                <p>Instant updates, Zero DB costs, Simple debugging</p>
               </div>
               <div>
-                <p className="font-medium">Request Management</p>
-                <p>Smart caching + visibility detection + deduplication</p>
+                <p className="font-medium">Memory Usage</p>
+                <p>~50 bots max, ~500 activities max</p>
               </div>
             </div>
           </div>

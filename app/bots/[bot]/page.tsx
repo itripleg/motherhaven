@@ -1,83 +1,83 @@
-// app/bots/[bot]/page.tsx - OPTIMIZED with reduced Firebase calls and smart caching
+// app/bots/[bot]/page.tsx - SIMPLIFIED with direct API calls, no Firebase
+
 "use client";
 
-import React, {
-  useState,
-  useEffect,
-  useCallback,
-  useMemo,
-  useRef,
-} from "react";
+import React, { useState, useEffect, useCallback, useMemo } from "react";
 import { useParams } from "next/navigation";
 import { motion } from "framer-motion";
 import Link from "next/link";
 import { Button } from "@/components/ui/button";
-import { ArrowLeft, RefreshCw, Activity, Database, Clock } from "lucide-react";
+import { ArrowLeft, RefreshCw, Activity, Clock } from "lucide-react";
 
-import {
-  BotStatus,
-  ActivityLog as ActivityLogType,
-} from "../components/detailHelpers";
+// Import simplified components
 import BotHeader from "../components/BotHeader";
 import PerformanceStats from "../components/PerformanceStats";
 import BotConfiguration from "../components/BotConfiguration";
 import ActivityLog from "../components/ActivityLog";
 import InlineBotSelector from "../components/InlineBotSelector";
 
-// OPTIMIZATION: Use the new optimized hook
-import { useBotActivity } from "@/hooks/useBotActivities";
-
-// OPTIMIZATION: Enhanced caching for bot status data
-interface CachedBotStatus {
-  bot: BotStatus | null;
-  timestamp: number;
-  isValid: boolean;
+// SIMPLIFIED: Direct interfaces matching our API
+interface SimpleBotActivity {
+  id: string;
+  botName: string;
+  actionType: string;
+  message: string;
+  timestamp: string;
+  details: any;
 }
 
-const BOT_STATUS_CACHE_DURATION = 8000; // 8 seconds
-const BOT_STATUS_REFRESH_INTERVAL = 5000; // 5 seconds for near real-time updates
-const MAX_REFRESH_FAILURES = 3;
+interface SimpleBot {
+  name: string;
+  displayName: string;
+  avatarUrl: string;
+  bio?: string;
+  isOnline: boolean;
+  lastSeen: string;
+  lastAction?: {
+    type: string;
+    message: string;
+    details: any;
+    timestamp: string;
+  };
+  totalActions: number;
+  sessionStarted: string;
+  character?: any;
+  config?: any;
+  isDevMode?: boolean;
+  walletAddress?: string;
+
+  // Session metrics
+  startingBalance?: number;
+  currentBalance?: number;
+  pnlAmount?: number;
+  pnlPercentage?: number;
+  sessionDurationMinutes?: number;
+}
+
+// SIMPLIFIED: Convert API activities to component format
+interface ActivityLogEntry {
+  id: string;
+  action: string;
+  message: string;
+  timestamp: Date;
+  tokenSymbol?: string;
+  amount?: string;
+}
+
+const REFRESH_INTERVAL = 5000; // 5 seconds
+const MAX_CONSECUTIVE_FAILURES = 3;
 
 const BotDetailPage = () => {
-  const [bot, setBot] = useState<BotStatus | null>(null);
+  const [bot, setBot] = useState<SimpleBot | null>(null);
+  const [activities, setActivities] = useState<SimpleBotActivity[]>([]);
   const [isLoading, setIsLoading] = useState<boolean>(true);
-  const [showConfig, setShowConfig] = useState<boolean>(false);
   const [lastUpdate, setLastUpdate] = useState<Date | null>(null);
-  const [refreshFailures, setRefreshFailures] = useState<number>(0);
+  const [error, setError] = useState<string | null>(null);
+  const [consecutiveFailures, setConsecutiveFailures] = useState(0);
+  const [showConfig, setShowConfig] = useState<boolean>(false);
 
   const params = useParams();
   const botName = params.bot as string;
-
-  // OPTIMIZATION: Enhanced caching for bot status
-  const botCacheRef = useRef<CachedBotStatus>({
-    bot: null,
-    timestamp: 0,
-    isValid: false,
-  });
-  const refreshTimeoutRef = useRef<NodeJS.Timeout | null>(null);
-  const isPageVisibleRef = useRef<boolean>(true);
-  const abortControllerRef = useRef<AbortController | null>(null);
-
-  // OPTIMIZATION: Request deduplication to prevent duplicate API calls
-  const requestCacheRef = useRef<Map<string, Promise<any>>>(new Map());
-
-  // OPTIMIZATION: Use optimized hook with polling instead of realtime
-  const {
-    activities: persistentActivities,
-    loading: activitiesLoading,
-    error: activitiesError,
-    statistics: activityStats,
-    refresh: refreshActivities,
-    lastFetch: activitiesLastFetch,
-    cacheAge: activitiesCacheAge,
-    getCacheStats,
-  } = useBotActivity(botName, {
-    limitCount: 50,
-    realTime: false, // OPTIMIZATION: Use polling instead of realtime
-    cacheDuration: 60000, // 1 minute cache
-    pollingInterval: 90000, // 90 seconds polling
-    enableSharedCache: true,
-  });
 
   // Generate fixed star positions that won't change on re-renders
   const fixedStars = useMemo(() => {
@@ -90,247 +90,112 @@ const BotDetailPage = () => {
     }));
   }, []);
 
-  // OPTIMIZATION: Request deduplication helper
-  const fetchWithDeduplication = useCallback(
-    async (url: string, options: RequestInit = {}) => {
-      const cacheKey = `${url}_${JSON.stringify(options.headers || {})}`;
+  // SIMPLIFIED: Direct API fetch for specific bot
+  const fetchBotDetails = useCallback(async () => {
+    if (!botName) return;
 
-      // Return existing promise if request is already in flight
-      if (requestCacheRef.current.has(cacheKey)) {
-        console.log(`🤖 TVB: Using deduplicated request for bot ${botName}`);
-        return requestCacheRef.current.get(cacheKey);
+    try {
+      console.log(`🤖 TVB: Fetching details for bot ${botName}...`);
+
+      // Fetch bot status and activities in one call
+      const url = new URL("/api/tvb/webhook", window.location.origin);
+      url.searchParams.set("bot", botName);
+      url.searchParams.set("history", "true");
+      url.searchParams.set("limit", "50");
+
+      const response = await fetch(url.toString());
+
+      if (!response.ok) {
+        throw new Error(`HTTP ${response.status}: ${response.statusText}`);
       }
 
-      // Create new request
-      const promise = fetch(url, options)
-        .then((response) => response.json())
-        .finally(() => {
-          // Clean up cache entry when request completes
-          requestCacheRef.current.delete(cacheKey);
-        });
+      const data = await response.json();
 
-      // Cache the promise
-      requestCacheRef.current.set(cacheKey, promise);
-      console.log(`🤖 TVB: Starting new request for bot ${botName}`);
-
-      return promise;
-    },
-    [botName]
-  );
-
-  // OPTIMIZATION: Smart cache management for bot status
-  const isBotCacheValid = useCallback(() => {
-    const now = Date.now();
-    return (
-      botCacheRef.current.isValid &&
-      now - botCacheRef.current.timestamp < BOT_STATUS_CACHE_DURATION
-    );
-  }, []);
-
-  const updateBotCache = useCallback((newBot: BotStatus | null) => {
-    botCacheRef.current = {
-      bot: newBot,
-      timestamp: Date.now(),
-      isValid: true,
-    };
-  }, []);
-
-  // OPTIMIZATION: Enhanced bot details fetching with smart caching
-  const fetchBotDetails = useCallback(
-    async (force: boolean = false) => {
-      if (!botName) return;
-
-      // Don't fetch if page is hidden and not forced
-      if (!isPageVisibleRef.current && !force) {
-        console.log(`🤖 TVB: Skipping bot fetch for ${botName} - page hidden`);
-        return;
+      if (!data.success) {
+        throw new Error(data.error || "API returned unsuccessful response");
       }
 
-      // Use cache if valid and not forced
-      if (!force && isBotCacheValid()) {
-        console.log(`🤖 TVB: Using cached bot data for ${botName}`);
-        setBot(botCacheRef.current.bot);
-        setLastUpdate(new Date(botCacheRef.current.timestamp));
-        setIsLoading(false);
-        return;
+      console.log("🤖 TVB: Bot detail response:", {
+        botsFound: data.bots?.length || 0,
+        activitiesFound: data.activities?.length || 0,
+      });
+
+      // Find the specific bot
+      const specificBot = data.bots?.find((b: SimpleBot) => b.name === botName);
+
+      if (specificBot) {
+        setBot(specificBot);
+        setActivities(data.activities || []);
+        setLastUpdate(new Date());
+        setError(null);
+        setConsecutiveFailures(0);
+
+        console.log(`🤖 TVB: Successfully loaded ${specificBot.displayName}`);
+      } else {
+        console.warn(`🤖 TVB: Bot ${botName} not found in response`);
+        setBot(null);
+        setError(`Bot "${botName}" not found`);
       }
+    } catch (err) {
+      const errorMessage =
+        err instanceof Error ? err.message : "Failed to fetch bot details";
+      console.error(`🤖 TVB: Error fetching bot ${botName}:`, errorMessage);
 
-      // Check for backoff after consecutive failures
-      if (refreshFailures >= MAX_REFRESH_FAILURES) {
-        const backoffTime = Math.min(
-          300000,
-          Math.pow(2, refreshFailures) * 1000
-        ); // Max 5 minutes
-        console.log(
-          `🤖 TVB: In backoff period for ${botName} (${refreshFailures} failures)`
-        );
-        return;
-      }
+      setConsecutiveFailures((prev) => prev + 1);
+      setError(errorMessage);
 
-      // Cancel previous request if exists
-      if (abortControllerRef.current) {
-        abortControllerRef.current.abort();
-      }
+      // Don't clear bot data on error - keep showing cached data
+    } finally {
+      setIsLoading(false);
+    }
+  }, [botName]);
 
-      abortControllerRef.current = new AbortController();
+  // Initial load
+  useEffect(() => {
+    fetchBotDetails();
+  }, [fetchBotDetails]);
 
-      try {
-        console.log(
-          `🤖 TVB: Fetching bot details for ${botName}...`,
-          force ? "(forced)" : ""
-        );
+  // SIMPLIFIED: Regular refresh interval
+  useEffect(() => {
+    // Don't set up interval if we have too many consecutive failures
+    if (consecutiveFailures >= MAX_CONSECUTIVE_FAILURES) {
+      console.log("🤖 TVB: Too many failures, pausing auto-refresh");
+      return;
+    }
 
-        const response = await fetchWithDeduplication("/api/tvb/webhook", {
-          method: "GET",
-          headers: {
-            "X-Request-Source": "bot-detail-page",
-            "X-Bot-Name": botName,
-            "X-Cache-Control": force ? "no-cache" : "use-cache",
-          },
-          signal: abortControllerRef.current.signal,
-        });
+    const interval = setInterval(() => {
+      fetchBotDetails();
+    }, REFRESH_INTERVAL);
 
-        if (!response.success) {
-          throw new Error(`API Error: ${response.error || "Unknown error"}`);
-        }
+    return () => clearInterval(interval);
+  }, [fetchBotDetails, consecutiveFailures]);
 
-        const data = response;
+  // Manual refresh
+  const handleRefresh = useCallback(() => {
+    console.log(`🤖 TVB: Manual refresh triggered for ${botName}`);
+    setConsecutiveFailures(0);
+    setIsLoading(true);
+    fetchBotDetails();
+  }, [fetchBotDetails, botName]);
 
-        if (data.success && Array.isArray(data.bots)) {
-          const specificBot = data.bots.find((b: any) => b.name === botName);
-
-          if (specificBot) {
-            updateBotCache(specificBot);
-            setBot(specificBot);
-            setLastUpdate(new Date());
-            setRefreshFailures(0); // Reset on success
-
-            console.log(
-              `🤖 TVB: Successfully loaded bot details for ${botName}`
-            );
-          } else {
-            console.warn(`🤖 TVB: Bot ${botName} not found in response`);
-            setBot(null);
-          }
-        } else {
-          console.warn("🤖 TVB: Invalid response format:", data);
-          setBot(null);
-        }
-      } catch (err) {
-        // Don't log errors for aborted requests
-        if (err instanceof Error && err.name === "AbortError") {
-          console.log(`🤖 TVB: Bot fetch aborted for ${botName}`);
-          return;
-        }
-
-        console.error(
-          `🤖 TVB: Error fetching bot details for ${botName}:`,
-          err
-        );
-        setRefreshFailures((prev) => prev + 1);
-
-        // Use cached data if available during errors
-        if (botCacheRef.current.isValid) {
-          console.log(
-            `🤖 TVB: Using cached bot data for ${botName} due to error`
-          );
-          setBot(botCacheRef.current.bot);
-          setLastUpdate(new Date(botCacheRef.current.timestamp));
-        } else {
-          setBot(null);
-        }
-      } finally {
-        setIsLoading(false);
-      }
-    },
-    [botName, isBotCacheValid, updateBotCache, refreshFailures]
-  );
-
-  // Convert persistent activities to the format expected by ActivityLog component
-  const activityLog = useMemo((): ActivityLogType[] => {
-    return persistentActivities.map((activity) => ({
-      id: activity.id || `${activity.botName}-${activity.timestamp}`,
+  // SIMPLIFIED: Convert activities to ActivityLog format
+  const activityLog = useMemo((): ActivityLogEntry[] => {
+    return activities.map((activity) => ({
+      id: activity.id,
       action: activity.actionType,
       message: activity.message,
       timestamp: new Date(activity.timestamp),
-      tokenSymbol: activity.tokenSymbol,
-      amount: activity.tradeAmount
-        ? `${activity.tradeAmount} AVAX`
+      tokenSymbol: activity.details?.tokenSymbol,
+      amount: activity.details?.amountAvax
+        ? `${activity.details.amountAvax} AVAX`
         : activity.details?.readableAmount
-        ? `${activity.details.readableAmount} ${activity.tokenSymbol}`
+        ? `${activity.details.readableAmount} ${activity.details.tokenSymbol}`
         : undefined,
     }));
-  }, [persistentActivities]);
+  }, [activities]);
 
-  // OPTIMIZATION: Page visibility detection
-  useEffect(() => {
-    const handleVisibilityChange = () => {
-      isPageVisibleRef.current = !document.hidden;
-
-      if (isPageVisibleRef.current) {
-        console.log(`🤖 TVB: Bot page ${botName} visible - resuming updates`);
-        // Check if we need to refresh immediately
-        const now = Date.now();
-        if (now - botCacheRef.current.timestamp > BOT_STATUS_CACHE_DURATION) {
-          fetchBotDetails();
-        }
-      } else {
-        console.log(`🤖 TVB: Bot page ${botName} hidden - pausing updates`);
-      }
-    };
-
-    document.addEventListener("visibilitychange", handleVisibilityChange);
-    return () =>
-      document.removeEventListener("visibilitychange", handleVisibilityChange);
-  }, [botName, fetchBotDetails]);
-
-  // OPTIMIZATION: Smart refresh interval management
-  useEffect(() => {
-    // Initial fetch
-    fetchBotDetails(true);
-
-    // Set up interval
-    const setupInterval = () => {
-      if (refreshTimeoutRef.current) {
-        clearTimeout(refreshTimeoutRef.current);
-      }
-
-      const scheduleNext = () => {
-        refreshTimeoutRef.current = setTimeout(() => {
-          if (isPageVisibleRef.current) {
-            fetchBotDetails();
-          }
-          scheduleNext(); // Schedule next update
-        }, BOT_STATUS_REFRESH_INTERVAL);
-      };
-
-      scheduleNext();
-    };
-
-    setupInterval();
-
-    return () => {
-      if (refreshTimeoutRef.current) {
-        clearTimeout(refreshTimeoutRef.current);
-      }
-      if (abortControllerRef.current) {
-        abortControllerRef.current.abort();
-      }
-      // Clear request cache on unmount
-      requestCacheRef.current.clear();
-    };
-  }, [fetchBotDetails]);
-
-  // Handle refresh for both bot details and activities
-  const handleRefresh = useCallback(() => {
-    console.log(`🤖 TVB: Manual refresh triggered for ${botName}`);
-    setRefreshFailures(0); // Reset failures on manual refresh
-    fetchBotDetails(true);
-    refreshActivities();
-  }, [fetchBotDetails, refreshActivities, botName]);
-
-  // OPTIMIZATION: Smart loading states
-  if (isLoading && !bot && !botCacheRef.current.isValid) {
+  // SIMPLIFIED: Show loading only on initial load
+  if (isLoading && !bot) {
     return (
       <div className="min-h-screen animated-bg floating-particles flex items-center justify-center">
         <div className="text-center">
@@ -339,14 +204,15 @@ const BotDetailPage = () => {
             Loading bot details for &ldquo;{botName}&rdquo;...
           </p>
           <p className="text-muted-foreground text-sm mt-2">
-            Fetching from optimized API with smart caching...
+            Fetching from simplified API...
           </p>
         </div>
       </div>
     );
   }
 
-  if (!bot) {
+  // SIMPLIFIED: Bot not found state
+  if (!bot && !isLoading) {
     return (
       <div className="min-h-screen animated-bg floating-particles flex items-center justify-center text-center">
         <div className="px-4">
@@ -354,12 +220,14 @@ const BotDetailPage = () => {
           <p className="text-muted-foreground mb-4">
             Could not find bot &ldquo;{botName}&rdquo; in the active fleet.
           </p>
-          {refreshFailures > 0 && (
-            <div className="mb-4 p-3 bg-orange-500/10 rounded-lg border border-orange-500/30">
-              <p className="text-orange-400 text-sm">
-                Connection issues detected ({refreshFailures} failures). The bot
-                may be offline or experiencing connectivity problems.
-              </p>
+          {error && (
+            <div className="mb-4 p-3 bg-red-500/10 rounded-lg border border-red-500/30">
+              <p className="text-red-400 text-sm">{error}</p>
+              {consecutiveFailures > 0 && (
+                <p className="text-red-400/70 text-xs mt-1">
+                  Connection failures: {consecutiveFailures}
+                </p>
+              )}
             </div>
           )}
           <div className="space-y-2">
@@ -422,20 +290,20 @@ const BotDetailPage = () => {
           </Link>
 
           <div className="flex flex-col sm:flex-row items-start sm:items-center gap-2 sm:gap-3 w-full sm:w-auto">
-            {/* OPTIMIZATION: Enhanced status indicators */}
+            {/* SIMPLIFIED: Status indicators */}
             <div className="flex items-center gap-2 text-xs text-muted-foreground">
               {lastUpdate && (
                 <div className="flex items-center gap-1">
                   <RefreshCw className="h-3 w-3" />
-                  <span className="hidden sm:inline">Bot data:</span>
+                  <span className="hidden sm:inline">Updated:</span>
                   {lastUpdate.toLocaleTimeString()}
                 </div>
               )}
-              {activitiesLastFetch > 0 && (
+              {activities.length > 0 && (
                 <div className="flex items-center gap-1">
                   <Activity className="h-3 w-3" />
                   <span className="hidden sm:inline">Activities:</span>
-                  {new Date(activitiesLastFetch).toLocaleTimeString()}
+                  {activities.length}
                 </div>
               )}
             </div>
@@ -445,81 +313,18 @@ const BotDetailPage = () => {
               variant="outline"
               size="sm"
               className="border-border text-foreground hover:bg-secondary w-full sm:w-auto"
-              disabled={isLoading || activitiesLoading}
+              disabled={isLoading}
             >
               <RefreshCw
-                className={`h-4 w-4 mr-1 ${
-                  isLoading || activitiesLoading ? "animate-spin" : ""
-                }`}
+                className={`h-4 w-4 mr-1 ${isLoading ? "animate-spin" : ""}`}
               />
               Refresh
             </Button>
           </div>
         </motion.div>
 
-        {/* OPTIMIZATION: Cache status for debugging (development only) */}
-        {process.env.NODE_ENV === "development" && (
-          <motion.div
-            initial={{ opacity: 0, y: -10 }}
-            animate={{ opacity: 1, y: 0 }}
-            className="bg-secondary/20 rounded-lg p-3 border border-border/30"
-          >
-            <h4 className="text-xs font-medium text-foreground mb-2 flex items-center gap-2">
-              <Database className="h-3 w-3" />
-              🚀 Optimization Status
-            </h4>
-            <div className="grid grid-cols-2 md:grid-cols-4 gap-3 text-xs text-muted-foreground">
-              <div>
-                <p className="font-medium">Bot Cache</p>
-                <p
-                  className={
-                    isBotCacheValid() ? "text-green-400" : "text-orange-400"
-                  }
-                >
-                  {isBotCacheValid() ? "Valid" : "Stale"}
-                  {botCacheRef.current.timestamp > 0 && (
-                    <span className="block">
-                      {Math.floor(
-                        (Date.now() - botCacheRef.current.timestamp) / 1000
-                      )}
-                      s old
-                    </span>
-                  )}
-                </p>
-              </div>
-              <div>
-                <p className="font-medium">Activities Cache</p>
-                <p className="text-blue-400">
-                  {Math.floor(activitiesCacheAge / 1000)}s old
-                </p>
-              </div>
-              <div>
-                <p className="font-medium">Refresh Failures</p>
-                <p
-                  className={
-                    refreshFailures > 0 ? "text-red-400" : "text-green-400"
-                  }
-                >
-                  {refreshFailures}
-                </p>
-              </div>
-              <div>
-                <p className="font-medium">Data Source</p>
-                <p className="text-blue-400">Polling (90s)</p>
-              </div>
-            </div>
-            {getCacheStats && (
-              <div className="mt-2 pt-2 border-t border-border/30">
-                <p className="text-xs text-muted-foreground">
-                  Global cache: {JSON.stringify(getCacheStats(), null, 2)}
-                </p>
-              </div>
-            )}
-          </motion.div>
-        )}
-
-        {/* Error states for activities */}
-        {activitiesError && (
+        {/* SIMPLIFIED: Error state */}
+        {error && (
           <motion.div
             initial={{ opacity: 0, y: 20 }}
             animate={{ opacity: 1, y: 0 }}
@@ -528,14 +333,45 @@ const BotDetailPage = () => {
             <div className="flex items-center gap-2">
               <Activity className="h-4 w-4 text-orange-400" />
               <div>
-                <p className="text-orange-400 font-medium">
-                  Activity Feed Issue
-                </p>
-                <p className="text-orange-400/80 text-sm">{activitiesError}</p>
+                <p className="text-orange-400 font-medium">Connection Issue</p>
+                <p className="text-orange-400/80 text-sm">{error}</p>
                 <p className="text-muted-foreground text-xs mt-1">
-                  Bot status is still updating normally. Activities may be
-                  cached.
+                  Showing cached data. Auto-refresh every{" "}
+                  {REFRESH_INTERVAL / 1000}s.
+                  {consecutiveFailures > 0 &&
+                    ` (${consecutiveFailures} failures)`}
                 </p>
+              </div>
+            </div>
+          </motion.div>
+        )}
+
+        {/* SIMPLIFIED: Development status */}
+        {process.env.NODE_ENV === "development" && (
+          <motion.div
+            initial={{ opacity: 0, y: -10 }}
+            animate={{ opacity: 1, y: 0 }}
+            className="bg-secondary/20 rounded-lg p-3 border border-border/30"
+          >
+            <h4 className="text-xs font-medium text-foreground mb-2 flex items-center gap-2">
+              🚀 Simplified Bot Detail Status
+            </h4>
+            <div className="grid grid-cols-2 md:grid-cols-4 gap-3 text-xs text-muted-foreground">
+              <div>
+                <p className="font-medium">Data Source</p>
+                <p className="text-green-400">Direct API</p>
+              </div>
+              <div>
+                <p className="font-medium">Activities</p>
+                <p className="text-blue-400">{activities.length} loaded</p>
+              </div>
+              <div>
+                <p className="font-medium">Refresh Rate</p>
+                <p className="text-blue-400">{REFRESH_INTERVAL / 1000}s</p>
+              </div>
+              <div>
+                <p className="font-medium">Firebase</p>
+                <p className="text-green-400">Eliminated</p>
               </div>
             </div>
           </motion.div>
@@ -550,30 +386,34 @@ const BotDetailPage = () => {
           <InlineBotSelector currentBotName={botName} />
         </motion.div>
 
-        {/* Bot Header - Mobile Optimized */}
-        <motion.div
-          initial={{ opacity: 0, y: -20 }}
-          animate={{ opacity: 1, y: 0 }}
-          className="overflow-hidden"
-        >
-          <BotHeader
-            bot={bot}
-            showConfig={showConfig}
-            onToggleConfig={() => setShowConfig(!showConfig)}
-          />
-        </motion.div>
+        {/* Bot Header */}
+        {bot && (
+          <motion.div
+            initial={{ opacity: 0, y: -20 }}
+            animate={{ opacity: 1, y: 0 }}
+            className="overflow-hidden"
+          >
+            <BotHeader
+              bot={bot}
+              showConfig={showConfig}
+              onToggleConfig={() => setShowConfig(!showConfig)}
+            />
+          </motion.div>
+        )}
 
         {/* Performance Stats */}
-        <motion.div
-          initial={{ opacity: 0, y: 20 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ delay: 0.1 }}
-        >
-          <PerformanceStats bot={bot} />
-        </motion.div>
+        {bot && (
+          <motion.div
+            initial={{ opacity: 0, y: 20 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ delay: 0.1 }}
+          >
+            <PerformanceStats bot={bot} />
+          </motion.div>
+        )}
 
         {/* Bot Configuration */}
-        {bot.config && (
+        {bot && bot.config && (
           <motion.div
             initial={{ opacity: 0, y: 20 }}
             animate={{ opacity: 1, y: 0 }}
@@ -583,7 +423,7 @@ const BotDetailPage = () => {
           </motion.div>
         )}
 
-        {/* Activity Log with optimization info */}
+        {/* Activity Log */}
         <motion.div
           initial={{ opacity: 0, y: 20 }}
           animate={{ opacity: 1, y: 0 }}
@@ -595,23 +435,56 @@ const BotDetailPage = () => {
               <Activity className="h-5 w-5 text-primary" />
               Activity Log ({activityLog.length} events)
             </h3>
-            {/* OPTIMIZATION: Show data freshness */}
             <div className="text-xs text-muted-foreground flex items-center gap-2">
               <Clock className="h-3 w-3" />
               <span>
-                {activitiesLoading
+                {isLoading
                   ? "Updating..."
-                  : `Updated ${Math.floor(activitiesCacheAge / 1000)}s ago`}
+                  : lastUpdate
+                  ? `Updated ${Math.floor(
+                      (Date.now() - lastUpdate.getTime()) / 1000
+                    )}s ago`
+                  : "Never updated"}
               </span>
-              {activityStats && (
-                <span className="hidden sm:inline">
-                  • {activityStats.personalityActions} personality actions
-                </span>
-              )}
             </div>
           </div>
           <ActivityLog logs={activityLog} />
         </motion.div>
+
+        {/* SIMPLIFIED: Performance footer for development */}
+        {process.env.NODE_ENV === "development" && (
+          <div className="mt-8 p-4 bg-secondary/20 rounded-lg border border-border/30">
+            <h4 className="text-sm font-medium text-foreground mb-2">
+              📊 Simplified Detail Page Stats
+            </h4>
+            <div className="grid grid-cols-2 md:grid-cols-4 gap-4 text-xs text-muted-foreground">
+              <div>
+                <p className="font-medium">Architecture</p>
+                <p>Bot-specific API → Direct state → UI</p>
+              </div>
+              <div>
+                <p className="font-medium">Eliminated</p>
+                <p>useBotActivities hook, Firebase queries, Complex caching</p>
+              </div>
+              <div>
+                <p className="font-medium">Real-time Updates</p>
+                <p>5s refresh, instant webhook → API → UI</p>
+              </div>
+              <div>
+                <p className="font-medium">Data Flow</p>
+                <p>1 API call → Bot + Activities</p>
+              </div>
+            </div>
+            <div className="mt-2 pt-2 border-t border-border/30">
+              <p>
+                Bot: {bot?.displayName || "Not loaded"} | Activities:{" "}
+                {activities.length} | Last Update:{" "}
+                {lastUpdate?.toLocaleTimeString() || "Never"} | Failures:{" "}
+                {consecutiveFailures}
+              </p>
+            </div>
+          </div>
+        )}
       </div>
     </div>
   );
