@@ -1,4 +1,4 @@
-// app/factory/components/FactoryProgress.tsx - UPDATED: Added Purchase tab to progress tracking
+// app/factory/components/FactoryProgress.tsx - UPDATED: Allow access to all tabs at any time
 import { motion } from "framer-motion";
 import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
@@ -145,11 +145,8 @@ export function FactoryProgress({
   };
 
   const canAccessTab = (tabId: string) => {
-    if (tabId === "info") return true;
-    if (tabId === "purchase") return tokenInfo.name && tokenInfo.ticker; // Requires basic info
-    if (tabId === "tokenomics") return true;
-    if (tabId === "preview") return true; // Always accessible
-    return false;
+    // All tabs are now accessible at any time
+    return true;
   };
 
   // Calculate updated completion percentage
@@ -314,8 +311,6 @@ export function FactoryProgress({
                       ? "bg-primary/10 border-primary/50 shadow-primary/20 shadow-sm hover:bg-primary/15"
                       : status === "current"
                       ? "bg-primary/5 border-primary/30 shadow-primary/10 shadow-sm hover:bg-primary/10"
-                      : !canAccess
-                      ? "bg-secondary/30 border-border/30 opacity-50 cursor-not-allowed"
                       : "bg-secondary/30 border-border/30 hover:bg-secondary/50"
                   }
                 `}
@@ -458,9 +453,7 @@ export function FactoryProgress({
                           &ldquo;FOX&rdquo;)
                         </li>
                         <li>• Set initial purchase amount or disable it</li>
-                        <li>
-                          • You can customize images and description anytime
-                        </li>
+                        <li>• Upload an image and add description</li>
                       </ul>
                     </div>
                   )}
@@ -510,12 +503,12 @@ export function FactoryProgress({
                       </p>
                       <ul className="text-xs space-y-1 ml-4">
                         <li>
-                          • Add a professional image and description for better
+                          • Upload an image and add description for better
                           appeal
                         </li>
                         <li>
-                          • Review tokenomics - everything is pre-configured for
-                          fairness
+                          • Review tokenomics - everything is currently
+                          pre-configured for while we test
                         </li>
                         <li>
                           • Your token will be tradable immediately after
