@@ -5,7 +5,6 @@ import { useTokenData } from "@/final-hooks/useTokenData";
 import { useTrades } from "@/final-hooks/useTrades";
 import { Address } from "viem";
 import { TokenChart } from "./chart/TokenChart";
-import { StreamlinedChartComponent } from "@/app/debug/trade/components/StreamlinedChartComponent";
 
 interface TokenPriceChartsProps {
   address: string;
@@ -47,11 +46,6 @@ export function TokenPriceCharts({ address }: TokenPriceChartsProps) {
   return (
     <div className="grid gap-4 md:grid-cols-1 ">
       <TokenChart token={token} />
-      {/* <StreamlinedChartComponent
-        token={token}
-        tokenExists={true}
-        refreshKey={0}
-      /> */}
     </div>
   );
 }
