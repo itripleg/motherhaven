@@ -32,12 +32,12 @@ export const navItems: NavItem[] = [
     iconName: "Heart",
     description: "Feed & care for Testy",
   },
-  {
-    href: "/bots",
-    label: "Bots",
-    iconName: "Bot",
-    description: "Transparent Volume Bots",
-  },
+  // {
+  //   href: "/bots",
+  //   label: "Bots",
+  //   iconName: "Bot",
+  //   description: "Transparent Volume Bots",
+  // },
   // {
   //   href: "/games",
   //   label: "Games",
