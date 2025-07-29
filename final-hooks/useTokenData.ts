@@ -144,6 +144,15 @@ export function useTokenData(tokenAddress?: Address) {
 
       // Last trade info
       lastTrade: firestoreData.lastTrade,
+
+      // FIXED: Include statistics from Firestore
+      statistics: firestoreData.statistics || {
+        totalSupply: "0",
+        currentPrice: priceFormatted || "0",
+        volumeETH: "0",
+        tradeCount: 0,
+        uniqueHolders: 0,
+      },
     };
   }, [
     tokenAddress,
@@ -154,7 +163,7 @@ export function useTokenData(tokenAddress?: Address) {
     collateralFormatted,
   ]);
 
-  // Statistics from Firestore (aggregated data)
+  // Statistics from Firestore (aggregated data) - UPDATED to use firestoreData.statistics directly
   const statistics = useMemo(() => {
     if (!firestoreData?.statistics) {
       return {

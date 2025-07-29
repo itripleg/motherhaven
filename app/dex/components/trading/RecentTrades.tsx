@@ -1,12 +1,12 @@
 // ===========================
-// Themed RecentTrades Component
+// Optimized RecentTrades Component
 // ===========================
 
 "use client";
 
 import React from "react";
-import { useTrades } from "@/contexts/TradesContext";
-import { formatUnits } from "viem";
+import { useTrades } from "@/final-hooks/useTrades";
+import { formatUnits, Address } from "viem";
 import { formatDistanceToNow, parseISO } from "date-fns";
 import { ArrowUpRight, ArrowDownLeft, Activity } from "lucide-react";
 import { Skeleton } from "@/components/ui/skeleton";
@@ -104,7 +104,8 @@ const formatAmount = (amount: string, decimals: number = 6): string => {
 };
 
 export default function RecentTrades({ tokenAddress }: RecentTradesProps) {
-  const { trades, loading, error } = useTrades(tokenAddress);
+  // OPTIMIZED: Only fetch 20 trades instead of 100
+  const { trades, loading, error } = useTrades(tokenAddress as Address, 20);
 
   // Filter and validate trades
   const validTrades = React.useMemo(() => {
@@ -169,7 +170,7 @@ export default function RecentTrades({ tokenAddress }: RecentTradesProps) {
           <ScrollArea className="flex-1">
             <div className="space-y-2 p-4">
               <AnimatePresence>
-                {validTrades.slice(0, 20).map((trade, index) => {
+                {validTrades.map((trade, index) => {
                   // Additional validation at render time
                   const tokenAmount = parseFloat(trade.tokenAmount);
                   const ethAmount = parseFloat(trade.ethAmount);
@@ -246,15 +247,15 @@ export default function RecentTrades({ tokenAddress }: RecentTradesProps) {
                 })}
               </AnimatePresence>
 
-              {/* Show more indicator if there are many trades */}
-              {validTrades.length > 20 && (
+              {/* Show count indicator if there are trades */}
+              {validTrades.length > 0 && (
                 <motion.div
                   initial={{ opacity: 0 }}
                   animate={{ opacity: 1 }}
                   className="text-center py-3"
                 >
                   <div className="text-xs text-muted-foreground">
-                    Showing latest 20 of {validTrades.length} trades
+                    Showing latest {validTrades.length} trades
                   </div>
                 </motion.div>
               )}

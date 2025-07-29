@@ -29,7 +29,10 @@ export function ChartAnalytics({
 
   // Calculate analytics
   const analytics = useMemo(() => {
-    // Filter valid trades
+    // Get trade count from token statistics (more accurate than counting visible trades)
+    const tradeCountFromToken = token.statistics?.tradeCount || 0;
+
+    // Filter valid trades for volume and buy pressure calculations
     const validTrades = trades.filter((trade) => {
       const price = parseFloat(trade.pricePerToken);
       return (
@@ -37,7 +40,8 @@ export function ChartAnalytics({
       );
     });
 
-    if (validTrades.length === 0) {
+    // If no statistics available and no valid trades, return empty state
+    if (tradeCountFromToken === 0 && validTrades.length === 0) {
       return {
         tradeCount: 0,
         totalVolume: "0.0000",
@@ -47,17 +51,28 @@ export function ChartAnalytics({
       };
     }
 
-    // Calculate volume in AVAX
-    const totalVolumeWei = validTrades.reduce((sum, trade) => {
-      if (!trade.ethAmount) return sum;
-      const ethAmount = parseFloat(trade.ethAmount);
-      if (isNaN(ethAmount) || ethAmount <= 0) return sum;
-      return sum + ethAmount;
-    }, 0);
+    // Calculate volume - use token statistics if available, otherwise calculate from visible trades
+    let totalVolumeAVAX = 0;
+    if (token.statistics?.volumeETH) {
+      // Use pre-calculated volume from token statistics
+      totalVolumeAVAX = parseFloat(token.statistics.volumeETH);
+    } else if (validTrades.length > 0) {
+      // Fallback: calculate from visible trades
+      const totalVolumeWei = validTrades.reduce((sum, trade) => {
+        if (!trade.ethAmount) return sum;
+        const ethAmount = parseFloat(trade.ethAmount);
+        if (isNaN(ethAmount) || ethAmount <= 0) return sum;
+        return sum + ethAmount;
+      }, 0);
+      totalVolumeAVAX = totalVolumeWei / 1e18;
+    }
 
-    const totalVolumeAVAX = totalVolumeWei / 1e18;
-    const buyTrades = validTrades.filter((t) => t.type === "buy");
-    const buyPressure = buyTrades.length / validTrades.length;
+    // Calculate buy pressure from visible trades (this is still accurate from recent trades)
+    let buyPressure = 0;
+    if (validTrades.length > 0) {
+      const buyTrades = validTrades.filter((t) => t.type === "buy");
+      buyPressure = buyTrades.length / validTrades.length;
+    }
 
     // Calculate price change from genesis to latest trade
     let priceChange = 0;
@@ -82,13 +97,13 @@ export function ChartAnalytics({
     }
 
     return {
-      tradeCount: validTrades.length,
+      tradeCount: tradeCountFromToken, // Use accurate count from token statistics
       totalVolume: totalVolumeAVAX.toFixed(4),
       buyPressure,
       priceChange,
       priceDirection,
     };
-  }, [trades, chartData.points]);
+  }, [trades, chartData.points, token.statistics]);
 
   // Get current price for display
   const getCurrentPrice = () => {
