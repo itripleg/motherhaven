@@ -1,4 +1,5 @@
-// Import the functions you need from the SDKs you need
+// firebase.ts
+
 import { initializeApp } from "firebase/app";
 import { getFirestore } from "firebase/firestore";
 import { getStorage } from "firebase/storage";
@@ -26,5 +27,3 @@ const db = getFirestore(app);
 const storage = getStorage(app);
 
 export { db, storage };
-
-
