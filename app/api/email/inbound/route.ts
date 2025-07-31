@@ -1,127 +1,156 @@
-// app/api/email/inbox/route.ts
+// app/api/email/inbound/route.ts
 import { NextRequest, NextResponse } from "next/server";
 import { db } from "@/firebase";
-import {
-  collection,
-  query,
-  where,
-  orderBy,
-  limit,
-  getDocs,
-} from "firebase/firestore";
+import { collection, addDoc, serverTimestamp } from "firebase/firestore";
 
-// Admin address - must match the one in your hook
-const ADMIN_ADDRESS = "0xd85327505Ab915AB0C1aa5bC6768bF4002732258";
+// Function to extract text content from HTML
+function extractTextFromHtml(html: string): string {
+  // Simple HTML to text conversion
+  return html
+    .replace(/<br\s*\/?>/gi, "\n")
+    .replace(/<p[^>]*>/gi, "\n")
+    .replace(/<\/p>/gi, "\n")
+    .replace(/<[^>]*>/g, "")
+    .replace(/\n\s*\n/g, "\n\n")
+    .trim();
+}
 
-export async function GET(request: NextRequest) {
+// Function to parse SendGrid Inbound Parse payload
+function parseInboundEmail(formData: FormData) {
+  return {
+    to: formData.get("to") as string,
+    from: formData.get("from") as string,
+    subject: formData.get("subject") as string,
+    text: formData.get("text") as string,
+    html: formData.get("html") as string,
+    attachments: formData.get("attachments") as string, // JSON string of attachment info
+    envelope: formData.get("envelope") as string, // JSON string with SMTP envelope
+    charsets: formData.get("charsets") as string, // JSON string of character sets
+    SPF: formData.get("SPF") as string, // SPF check result
+    headers: formData.get("headers") as string, // Raw email headers
+  };
+}
+
+export async function POST(request: NextRequest) {
   try {
-    // Get query parameters
-    const { searchParams } = new URL(request.url);
-    const address = searchParams.get("address");
-    const limitParam = searchParams.get("limit");
-    const isReadParam = searchParams.get("isRead");
-    const searchQuery = searchParams.get("search");
+    // SendGrid Inbound Parse sends form data, not JSON
+    const formData = await request.formData();
 
-    // Parse limit with default and max
-    const requestedLimit = limitParam ? parseInt(limitParam, 10) : 50;
-    const messageLimit = Math.min(Math.max(requestedLimit, 1), 100); // Between 1 and 100
+    // Parse the inbound email data
+    const emailData = parseInboundEmail(formData);
 
-    // Validate admin access
-    if (!address || address !== ADMIN_ADDRESS) {
+    // Basic validation
+    if (!emailData.to || !emailData.from) {
       return NextResponse.json(
-        {
-          success: false,
-          error: "Unauthorized: Only admin can view inbox",
-        },
-        { status: 403 }
+        { error: "Missing required email fields" },
+        { status: 400 }
       );
     }
 
-    // Build Firestore query
-    const inboxQuery = query(
-      collection(db, "inbox"),
-      where("to", "==", "admin@motherhaven.app"), // Assuming admin receives at admin@
-      orderBy("receivedAt", "desc"),
-      limit(messageLimit)
+    // Check if this email is for your domain
+    const recipientEmail = emailData.to.toLowerCase();
+    const isForYourDomain = recipientEmail.includes("@motherhaven.app");
+
+    if (!isForYourDomain) {
+      console.log(`Email not for motherhaven.app domain: ${emailData.to}`);
+      return NextResponse.json({
+        message: "Email not for motherhaven.app domain, ignored",
+      });
+    }
+
+    // Extract the local part (before @) for logging
+    const localPart = recipientEmail.split("@")[0];
+    console.log(
+      `Received email for: ${localPart}@motherhaven.app from ${emailData.from}`
     );
 
-    // Note: Firestore doesn't support complex filtering with orderBy on different fields
-    // So we'll filter isRead and search in memory after fetching
-    const inboxSnapshot = await getDocs(inboxQuery);
-
-    // Transform Firestore documents to InboxMessage format
-    let messages = inboxSnapshot.docs.map((doc) => {
-      const data = doc.data();
-
-      // Convert Firestore timestamps to ISO strings
-      const receivedAt = data.receivedAt?.toDate
-        ? data.receivedAt.toDate().toISOString()
-        : data.receivedAt || new Date().toISOString();
-
-      return {
-        id: doc.id,
-        from: data.from || "",
-        fromName: data.fromName || undefined,
-        to: data.to || "",
-        subject: data.subject || "",
-        htmlContent: data.htmlContent || undefined,
-        textContent: data.textContent || undefined,
-        isRead: data.isRead || false,
-        receivedAt,
-        messageId: data.messageId || undefined,
-      };
-    });
-
-    // Apply filters in memory (since Firestore has limitations with complex queries)
-
-    // Filter by read status
-    if (isReadParam !== null) {
-      const isReadFilter = isReadParam === "true";
-      messages = messages.filter((msg) => msg.isRead === isReadFilter);
+    // Parse envelope for additional metadata
+    let envelopeData = null;
+    try {
+      envelopeData = emailData.envelope ? JSON.parse(emailData.envelope) : null;
+    } catch (e) {
+      console.warn("Failed to parse envelope data:", e);
     }
 
-    // Filter by search query
-    if (searchQuery) {
-      const query = searchQuery.toLowerCase();
-      messages = messages.filter(
-        (msg) =>
-          msg.subject.toLowerCase().includes(query) ||
-          msg.from.toLowerCase().includes(query) ||
-          (msg.fromName && msg.fromName.toLowerCase().includes(query)) ||
-          (msg.textContent && msg.textContent.toLowerCase().includes(query))
-      );
+    // Extract sender name from "Name <email@domain.com>" format
+    let fromName: string | undefined;
+    let fromEmail = emailData.from;
+
+    const fromMatch = emailData.from.match(/^(.+?)\s*<(.+?)>$/);
+    if (fromMatch) {
+      fromName = fromMatch[1].trim().replace(/"/g, ""); // Remove quotes
+      fromEmail = fromMatch[2].trim();
+    }
+
+    // Generate text content if only HTML is provided
+    let textContent = emailData.text;
+    if (!textContent && emailData.html) {
+      textContent = extractTextFromHtml(emailData.html);
+    }
+
+    // Create inbox message document
+    const inboxMessage = {
+      from: fromEmail,
+      fromName: fromName || undefined,
+      to: recipientEmail,
+      subject: emailData.subject || "(No Subject)",
+      htmlContent: emailData.html || undefined,
+      textContent: textContent || undefined,
+      isRead: false,
+      receivedAt: serverTimestamp(),
+      messageId: envelopeData?.messageId || undefined,
+
+      // Additional metadata for debugging/analytics
+      spfResult: emailData.SPF || undefined,
+      originalTo: emailData.to, // Keep original recipient field
+      envelope: envelopeData || undefined,
+    };
+
+    // Save to Firestore
+    const docRef = await addDoc(collection(db, "inbox"), inboxMessage);
+
+    console.log(
+      `All motherhaven.app emails saved to inbox: ${docRef.id} from ${fromEmail} to ${recipientEmail}`
+    );
+
+    // Handle attachments if present
+    if (emailData.attachments) {
+      try {
+        const attachmentsData = JSON.parse(emailData.attachments);
+        console.log(
+          `Email has ${Object.keys(attachmentsData).length} attachments`
+        );
+
+        // TODO: Process attachments
+        // You might want to save attachment files to Firebase Storage
+        // and update the document with attachment metadata
+      } catch (e) {
+        console.warn("Failed to parse attachments:", e);
+      }
     }
 
     return NextResponse.json({
       success: true,
-      data: messages,
-      message: `Retrieved ${messages.length} messages`,
+      message: "Inbound email processed successfully",
+      messageId: docRef.id,
     });
   } catch (error) {
-    console.error("Inbox API error:", error);
-
-    // Handle specific Firestore errors
-    if (error instanceof Error) {
-      // Check if it's a missing index error
-      if (error.message.includes("index")) {
-        return NextResponse.json(
-          {
-            success: false,
-            error:
-              "Database index required. Please create composite index for inbox collection.",
-            details: "Create index: to (Ascending), receivedAt (Descending)",
-          },
-          { status: 500 }
-        );
-      }
-    }
+    console.error("Inbound email processing error:", error);
 
     return NextResponse.json(
       {
         success: false,
-        error: "Failed to fetch inbox messages",
+        error: "Failed to process inbound email",
       },
       { status: 500 }
     );
   }
+}
+
+// Handle GET requests for webhook verification
+export async function GET() {
+  return NextResponse.json({
+    message: "SendGrid Inbound Parse webhook endpoint is active",
+    timestamp: new Date().toISOString(),
+  });
 }
