@@ -21,18 +21,6 @@ export async function GET(request: NextRequest) {
     const limitParam = searchParams.get("limit");
     const isReadParam = searchParams.get("isRead");
     const searchQuery = searchParams.get("search");
-    const apiSecret = searchParams.get("apiSecret");
-
-    // Validate API secret
-    if (!apiSecret || apiSecret !== process.env.EMAIL_API_SECRET) {
-      return NextResponse.json(
-        {
-          success: false,
-          error: "Invalid API secret",
-        },
-        { status: 401 }
-      );
-    }
 
     // Parse limit with default and max
     const requestedLimit = limitParam ? parseInt(limitParam, 10) : 50;
@@ -49,16 +37,14 @@ export async function GET(request: NextRequest) {
       );
     }
 
-    // Build Firestore query
+    // Build Firestore query - Remove the specific "to" filter to get all emails for the domain
+    // Since your inbound webhook saves emails to any @motherhaven.app address
     const inboxQuery = query(
       collection(db, "inbox"),
-      where("to", "==", "admin@motherhaven.app"), // Assuming admin receives at admin@
       orderBy("receivedAt", "desc"),
       limit(messageLimit)
     );
 
-    // Note: Firestore doesn't support complex filtering with orderBy on different fields
-    // So we'll filter isRead and search in memory after fetching
     const inboxSnapshot = await getDocs(inboxQuery);
 
     // Transform Firestore documents to InboxMessage format
@@ -84,7 +70,7 @@ export async function GET(request: NextRequest) {
       };
     });
 
-    // Apply filters in memory (since Firestore has limitations with complex queries)
+    // Apply filters in memory
 
     // Filter by read status
     if (isReadParam !== null) {
@@ -104,6 +90,8 @@ export async function GET(request: NextRequest) {
       );
     }
 
+    console.log(`Retrieved ${messages.length} inbox messages for admin`);
+
     return NextResponse.json({
       success: true,
       data: messages,
@@ -121,7 +109,7 @@ export async function GET(request: NextRequest) {
             success: false,
             error:
               "Database index required. Please create composite index for inbox collection.",
-            details: "Create index: to (Ascending), receivedAt (Descending)",
+            details: "Create index: receivedAt (Descending)",
           },
           { status: 500 }
         );

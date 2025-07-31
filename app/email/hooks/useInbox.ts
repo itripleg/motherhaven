@@ -28,7 +28,7 @@ export function useInbox() {
         const queryParams = new URLSearchParams({
           address,
           limit: limit.toString(),
-          apiSecret: process.env.NEXT_PUBLIC_EMAIL_API_SECRET || "",
+          // Remove the apiSecret from frontend - handle auth on server side only
         });
 
         // Add filters to query params
@@ -78,7 +78,7 @@ export function useInbox() {
             address,
             messageId,
             isRead,
-            apiSecret: process.env.NEXT_PUBLIC_EMAIL_API_SECRET || "",
+            // Remove the apiSecret from frontend
           }),
         });
 

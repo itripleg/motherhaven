@@ -91,19 +91,17 @@ export async function POST(request: NextRequest) {
     // Create inbox message document
     const inboxMessage = {
       from: fromEmail,
-      fromName: fromName || undefined,
+      ...(fromName && { fromName }), // ✅ Only include if truthy
       to: recipientEmail,
       subject: emailData.subject || "(No Subject)",
-      htmlContent: emailData.html || undefined,
-      textContent: textContent || undefined,
+      ...(emailData.html && { htmlContent: emailData.html }),
+      ...(textContent && { textContent }),
       isRead: false,
       receivedAt: serverTimestamp(),
-      messageId: envelopeData?.messageId || undefined,
-
-      // Additional metadata for debugging/analytics
-      spfResult: emailData.SPF || undefined,
-      originalTo: emailData.to, // Keep original recipient field
-      envelope: envelopeData || undefined,
+      ...(envelopeData?.messageId && { messageId: envelopeData.messageId }),
+      ...(emailData.SPF && { spfResult: emailData.SPF }),
+      originalTo: emailData.to,
+      ...(envelopeData && { envelope: envelopeData }),
     };
 
     // Save to Firestore

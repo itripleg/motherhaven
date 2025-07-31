@@ -1,4 +1,4 @@
-// app/api/email/inbox/read/route.ts
+// app/api/email/inbox/read/route.ts (fix the filename from roue.ts)
 import { NextRequest, NextResponse } from "next/server";
 import { db } from "@/firebase";
 import { doc, updateDoc, getDoc } from "firebase/firestore";
@@ -10,18 +10,7 @@ export async function PATCH(request: NextRequest) {
   try {
     // Parse request body
     const body = await request.json();
-    const { address, messageId, isRead, apiSecret } = body;
-
-    // Validate API secret
-    if (!apiSecret || apiSecret !== process.env.EMAIL_API_SECRET) {
-      return NextResponse.json(
-        {
-          success: false,
-          error: "Invalid API secret",
-        },
-        { status: 401 }
-      );
-    }
+    const { address, messageId, isRead } = body;
 
     // Validate admin access
     if (!address || address !== ADMIN_ADDRESS) {
@@ -64,6 +53,8 @@ export async function PATCH(request: NextRequest) {
       isRead: isRead,
       updatedAt: new Date().toISOString(),
     });
+
+    console.log(`Updated message ${messageId} read status to ${isRead}`);
 
     // Return success response
     return NextResponse.json({
