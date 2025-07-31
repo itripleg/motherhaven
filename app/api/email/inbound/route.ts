@@ -49,14 +49,6 @@ export async function POST(request: NextRequest) {
 
     // Check if this email is for your domain
     const recipientEmail = emailData.to.toLowerCase();
-    const isForYourDomain = recipientEmail.includes("@motherhaven.app");
-
-    if (!isForYourDomain) {
-      console.log(`Email not for motherhaven.app domain: ${emailData.to}`);
-      return NextResponse.json({
-        message: "Email not for motherhaven.app domain, ignored",
-      });
-    }
 
     // Extract the local part (before @) for logging
     const localPart = recipientEmail.split("@")[0];
