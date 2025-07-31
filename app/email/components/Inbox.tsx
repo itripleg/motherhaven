@@ -110,6 +110,38 @@ export function Inbox() {
     }
   };
 
+  // Convert HTML to plain text
+  const htmlToPlainText = (html: string) => {
+    // Create a temporary div to parse HTML
+    const tempDiv = document.createElement("div");
+    tempDiv.innerHTML = html;
+
+    // Replace common HTML elements with text equivalents
+    const content = html
+      .replace(/<br\s*\/?>/gi, "\n")
+      .replace(/<\/p>/gi, "\n\n")
+      .replace(/<p[^>]*>/gi, "")
+      .replace(/<\/div>/gi, "\n")
+      .replace(/<div[^>]*>/gi, "")
+      .replace(/<h[1-6][^>]*>/gi, "")
+      .replace(/<\/h[1-6]>/gi, "\n")
+      .replace(/<li[^>]*>/gi, "• ")
+      .replace(/<\/li>/gi, "\n")
+      .replace(/<ul[^>]*>|<\/ul>/gi, "")
+      .replace(/<ol[^>]*>|<\/ol>/gi, "")
+      .replace(/<strong[^>]*>|<\/strong>/gi, "")
+      .replace(/<b[^>]*>|<\/b>/gi, "")
+      .replace(/<em[^>]*>|<\/em>/gi, "")
+      .replace(/<i[^>]*>|<\/i>/gi, "")
+      .replace(/<[^>]*>/g, "");
+
+    // Clean up whitespace
+    return content
+      .replace(/\n\s*\n/g, "\n\n")
+      .replace(/^\s+|\s+$/g, "")
+      .trim();
+  };
+
   // Handle refresh
   const handleRefresh = () => {
     if (isAdmin) {
@@ -367,19 +399,16 @@ export function Inbox() {
 
                   <Separator />
 
-                  {/* Message Content */}
+                  {/* Message Content - converted to plain text for better readability */}
                   <div className="space-y-3">
                     <p className="text-sm text-muted-foreground">Content</p>
-                    <div className="max-h-96 overflow-y-auto p-4 bg-muted/30 rounded-lg border">
+                    <div className="max-h-96 overflow-y-auto p-4 bg-background border rounded-lg">
                       {selectedMessage.htmlContent ? (
-                        <div
-                          className="prose prose-sm max-w-none"
-                          dangerouslySetInnerHTML={{
-                            __html: selectedMessage.htmlContent,
-                          }}
-                        />
+                        <pre className="whitespace-pre-wrap font-sans text-sm text-foreground leading-relaxed">
+                          {htmlToPlainText(selectedMessage.htmlContent)}
+                        </pre>
                       ) : selectedMessage.textContent ? (
-                        <pre className="whitespace-pre-wrap font-sans text-sm text-foreground">
+                        <pre className="whitespace-pre-wrap font-sans text-sm text-foreground leading-relaxed">
                           {selectedMessage.textContent}
                         </pre>
                       ) : (

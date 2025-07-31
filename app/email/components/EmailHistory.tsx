@@ -15,14 +15,6 @@ import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import {
-  Table,
-  TableBody,
-  TableCell,
-  TableHead,
-  TableHeader,
-  TableRow,
-} from "@/components/ui/table";
-import {
   BarChart3,
   RefreshCw,
   Mail,
@@ -37,7 +29,6 @@ import {
   Calendar,
   User,
   Eye,
-  ExternalLink,
 } from "lucide-react";
 import { useEmailStats, useEmailHistory } from "../hooks/useEmail";
 import { EmailMessage, EMAIL_STATUSES } from "../types";
@@ -105,11 +96,28 @@ export function EmailHistory() {
     return text.substring(0, maxLength) + "...";
   };
 
-  // Extract plain text from HTML
+  // Extract plain text from HTML with better formatting
   const extractTextFromHtml = (html: string) => {
-    const div = document.createElement("div");
-    div.innerHTML = html;
-    return div.textContent || div.innerText || "";
+    // Create a temporary div to parse HTML
+    const tempDiv = document.createElement("div");
+    tempDiv.innerHTML = html;
+
+    // Replace common HTML elements with text equivalents
+    const content = html
+      .replace(/<br\s*\/?>/gi, "\n")
+      .replace(/<\/p>/gi, "\n\n")
+      .replace(/<p[^>]*>/gi, "")
+      .replace(/<\/div>/gi, "\n")
+      .replace(/<div[^>]*>/gi, "")
+      .replace(/<h[1-6][^>]*>/gi, "")
+      .replace(/<\/h[1-6]>/gi, "\n")
+      .replace(/<[^>]*>/g, "");
+
+    // Clean up whitespace
+    return content
+      .replace(/\n\s*\n/g, "\n\n")
+      .replace(/^\s+|\s+$/g, "")
+      .trim();
   };
 
   // Handle refresh
@@ -298,7 +306,7 @@ export function EmailHistory() {
                       initial={{ opacity: 0, y: 20 }}
                       animate={{ opacity: 1, y: 0 }}
                       transition={{ delay: index * 0.05 }}
-                      className="unified-card border-primary/20 bg-primary/5 hover:bg-primary/10 transition-colors"
+                      className="unified-card border-primary/20 bg-card hover:bg-card/80 transition-colors"
                     >
                       <div className="p-4">
                         <div className="flex items-start justify-between">
@@ -409,15 +417,15 @@ export function EmailHistory() {
                                   </div>
                                 </div>
 
-                                {/* Email Content */}
+                                {/* Email Content with better background and formatting */}
                                 {email.htmlContent && (
                                   <div>
                                     <p className="text-muted-foreground mb-2 text-sm">
                                       Content:
                                     </p>
-                                    <div className="p-4 bg-background/50 rounded-lg border max-h-60 overflow-y-auto">
+                                    <div className="p-4 bg-background border rounded-lg max-h-60 overflow-y-auto">
                                       <div
-                                        className="prose prose-sm max-w-none"
+                                        className="prose prose-sm max-w-none dark:prose-invert"
                                         dangerouslySetInnerHTML={{
                                           __html: email.htmlContent,
                                         }}
@@ -426,19 +434,23 @@ export function EmailHistory() {
                                   </div>
                                 )}
 
-                                {/* Text Content */}
-                                {email.textContent && (
-                                  <div>
-                                    <p className="text-muted-foreground mb-2 text-sm">
-                                      Plain Text:
-                                    </p>
-                                    <div className="p-4 bg-background/50 rounded-lg border max-h-40 overflow-y-auto">
-                                      <pre className="whitespace-pre-wrap font-sans text-sm text-foreground">
-                                        {email.textContent}
-                                      </pre>
+                                {/* Plain text version if we want to show both */}
+                                {email.textContent &&
+                                  email.textContent !==
+                                    extractTextFromHtml(
+                                      email.htmlContent || ""
+                                    ) && (
+                                    <div>
+                                      <p className="text-muted-foreground mb-2 text-sm">
+                                        Plain Text:
+                                      </p>
+                                      <div className="p-4 bg-muted/20 border rounded-lg max-h-40 overflow-y-auto">
+                                        <pre className="whitespace-pre-wrap font-sans text-sm text-foreground">
+                                          {email.textContent}
+                                        </pre>
+                                      </div>
                                     </div>
-                                  </div>
-                                )}
+                                  )}
                               </div>
                             </motion.div>
                           )}

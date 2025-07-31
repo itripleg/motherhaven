@@ -16,7 +16,6 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Badge } from "@/components/ui/badge";
-import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import {
   Mail,
@@ -25,10 +24,8 @@ import {
   AtSign,
   FileText,
   Eye,
-  EyeOff,
   Loader2,
   AlertTriangle,
-  CheckCircle,
   Crown,
 } from "lucide-react";
 import { useEmail } from "../hooks/useEmail";
@@ -52,7 +49,6 @@ export function ComposeEmail() {
   });
 
   const [activeTab, setActiveTab] = useState<"compose" | "preview">("compose");
-  const [showPreview, setShowPreview] = useState(false);
   const [errors, setErrors] = useState<Record<string, string>>({});
 
   // Form validation
@@ -62,7 +58,6 @@ export function ComposeEmail() {
     if (!formData.to.trim()) {
       newErrors.to = "Recipient email(s) are required";
     } else {
-      // Split by comma and validate each email
       const emails = formData.to
         .split(",")
         .map((email) => email.trim())
@@ -84,7 +79,7 @@ export function ComposeEmail() {
       newErrors.subject = "Subject must be less than 200 characters";
     }
 
-    if (!formData.htmlContent.trim() && !formData.textContent.trim()) {
+    if (!formData.htmlContent.trim()) {
       newErrors.content = "Email content is required";
     }
 
@@ -121,22 +116,6 @@ export function ComposeEmail() {
       });
       setErrors({});
       setActiveTab("compose");
-    }
-  };
-
-  // Auto-generate text content from HTML
-  const generateTextContent = () => {
-    if (formData.htmlContent) {
-      // Simple HTML to text conversion
-      const textContent = formData.htmlContent
-        .replace(/<br\s*\/?>/gi, "\n")
-        .replace(/<p[^>]*>/gi, "\n")
-        .replace(/<\/p>/gi, "\n")
-        .replace(/<[^>]*>/g, "")
-        .replace(/\n\s*\n/g, "\n\n")
-        .trim();
-
-      setFormData((prev) => ({ ...prev, textContent }));
     }
   };
 
@@ -212,7 +191,6 @@ export function ComposeEmail() {
           <TabsContent value="compose" className="space-y-6">
             {/* From Section */}
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-              {/* From Name */}
               <div className="space-y-2">
                 <Label htmlFor="fromName">From Name</Label>
                 <div className="flex items-center gap-2">
@@ -235,7 +213,6 @@ export function ComposeEmail() {
                 )}
               </div>
 
-              {/* From Email */}
               <div className="space-y-2">
                 <Label htmlFor="fromEmail">From Email</Label>
                 <div className="flex items-center gap-2">
@@ -257,26 +234,12 @@ export function ComposeEmail() {
                 {errors.fromEmail && (
                   <p className="text-sm text-red-500">{errors.fromEmail}</p>
                 )}
-                <p className="text-xs text-muted-foreground">
-                  Must be from @motherhaven.app domain
-                </p>
               </div>
-            </div>
-
-            {/* Preview of sender */}
-            <div className="p-3 bg-muted/30 rounded-lg border">
-              <p className="text-sm text-muted-foreground">
-                Will appear as:{" "}
-                <span className="text-foreground font-medium">
-                  {formData.fromName || "Your Name"} &lt;{formData.fromEmail}
-                  &gt;
-                </span>
-              </p>
             </div>
 
             {/* To Section */}
             <div className="space-y-2">
-              <Label htmlFor="to">To (Recipients)</Label>
+              <Label htmlFor="to">To</Label>
               <div className="flex items-center gap-2">
                 <AtSign className="h-4 w-4 text-muted-foreground" />
                 <Input
@@ -291,9 +254,6 @@ export function ComposeEmail() {
                 />
               </div>
               {errors.to && <p className="text-sm text-red-500">{errors.to}</p>}
-              <p className="text-xs text-muted-foreground">
-                Separate multiple email addresses with commas
-              </p>
             </div>
 
             {/* Subject Section */}
@@ -312,25 +272,11 @@ export function ComposeEmail() {
               {errors.subject && (
                 <p className="text-sm text-red-500">{errors.subject}</p>
               )}
-              <p className="text-xs text-muted-foreground text-right">
-                {formData.subject.length}/200 characters
-              </p>
             </div>
 
             {/* Content Section */}
             <div className="space-y-4">
-              <div className="flex items-center justify-between">
-                <Label htmlFor="htmlContent">Email Content (HTML)</Label>
-                <Button
-                  type="button"
-                  variant="ghost"
-                  size="sm"
-                  onClick={generateTextContent}
-                  className="text-xs"
-                >
-                  Generate Text Version
-                </Button>
-              </div>
+              <Label htmlFor="htmlContent">Email Content</Label>
               <Textarea
                 id="htmlContent"
                 value={formData.htmlContent}
@@ -340,7 +286,7 @@ export function ComposeEmail() {
                     htmlContent: e.target.value,
                   }))
                 }
-                className={`min-h-[200px] font-mono text-sm ${
+                className={`min-h-[300px] font-mono text-sm ${
                   errors.content ? "border-red-500" : ""
                 }`}
                 placeholder="<p>Your email content here...</p>"
@@ -348,26 +294,6 @@ export function ComposeEmail() {
               {errors.content && (
                 <p className="text-sm text-red-500">{errors.content}</p>
               )}
-            </div>
-
-            {/* Text Content (Optional) */}
-            <div className="space-y-2">
-              <Label htmlFor="textContent">Plain Text Version (Optional)</Label>
-              <Textarea
-                id="textContent"
-                value={formData.textContent}
-                onChange={(e) =>
-                  setFormData((prev) => ({
-                    ...prev,
-                    textContent: e.target.value,
-                  }))
-                }
-                className="min-h-[100px] font-mono text-sm"
-                placeholder="Plain text fallback for email clients that don't support HTML"
-              />
-              <p className="text-xs text-muted-foreground">
-                Automatically generated if left empty
-              </p>
             </div>
 
             {/* Action Buttons */}
@@ -419,17 +345,6 @@ export function ComposeEmail() {
                 <p>
                   <strong>To:</strong> {formData.to || "recipient@example.com"}
                 </p>
-                {formData.to.includes(",") && (
-                  <p className="text-xs text-muted-foreground">
-                    {
-                      formData.to
-                        .split(",")
-                        .map((email) => email.trim())
-                        .filter((email) => email).length
-                    }{" "}
-                    recipients
-                  </p>
-                )}
                 <p>
                   <strong>Subject:</strong>{" "}
                   {formData.subject || "Email subject"}
@@ -440,7 +355,7 @@ export function ComposeEmail() {
             {/* Email Content Preview */}
             <div className="border rounded-lg">
               <div className="p-4 border-b bg-muted/10">
-                <h4 className="font-medium text-foreground">HTML Preview</h4>
+                <h4 className="font-medium text-foreground">Content Preview</h4>
               </div>
               <div className="p-6">
                 {formData.htmlContent ? (
@@ -455,22 +370,6 @@ export function ComposeEmail() {
                 )}
               </div>
             </div>
-
-            {/* Text Preview */}
-            {formData.textContent && (
-              <div className="border rounded-lg">
-                <div className="p-4 border-b bg-muted/10">
-                  <h4 className="font-medium text-foreground">
-                    Plain Text Preview
-                  </h4>
-                </div>
-                <div className="p-6">
-                  <pre className="whitespace-pre-wrap font-sans text-sm text-foreground">
-                    {formData.textContent}
-                  </pre>
-                </div>
-              </div>
-            )}
 
             {/* Send from Preview */}
             <div className="flex items-center gap-4 pt-4">

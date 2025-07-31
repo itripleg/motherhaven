@@ -166,7 +166,7 @@ export async function POST(request: NextRequest) {
       sentAt: null,
       failureReason: null,
       senderAddress,
-      fromName: fromName || "Mother Haven",
+      fromName: fromName || "Big Boss",
       fromEmail: finalFromEmail,
     };
 
