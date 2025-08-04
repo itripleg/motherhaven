@@ -1,4 +1,4 @@
-// app/dex/page.tsx
+// app/dex/page.tsx - FIXED: Remove key prop to prevent re-animations
 "use client";
 
 import { useState, useEffect, useRef } from "react";
@@ -60,7 +60,7 @@ export default function DexPage() {
             <AnimatePresence mode="wait">
               {!showSecret && (
                 <motion.div
-                  key={greeting} // Add key to trigger re-animation when greeting changes
+                  // 🔧 REMOVED: key={greeting} - this was causing re-animations
                   initial={{ opacity: 0, scale: 0.95 }}
                   animate={{ opacity: 1, scale: 1 }}
                   exit={{ opacity: 0, scale: 0.95 }}
@@ -68,7 +68,7 @@ export default function DexPage() {
                   className="space-y-4"
                 >
                   <h1 className="text-5xl md:text-7xl font-bold text-white leading-tight text-left">
-                    {greeting || "Catch the flow!"}
+                    {greeting}
                   </h1>
 
                   {/* Optional: Show if using vanity name */}

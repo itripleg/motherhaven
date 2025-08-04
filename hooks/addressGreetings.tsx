@@ -1,6 +1,7 @@
-// hooks/addressGreetings.tsx
+// hooks/addressGreetings.tsx - FIXED: Prevents unnecessary re-renders
 import { useReadContract } from "wagmi";
 import { Address } from "viem";
+import { useMemo } from "react";
 
 const addressGreetings = [
   // Fuck boy
@@ -16,6 +17,7 @@ const addressGreetings = [
   "Bet big! ",
   "Fold or play! ",
   "Nice hand! ",
+  "In the trenches!",
 
   // Skateboarder
   "Shred the chain! ",
@@ -78,34 +80,57 @@ export function useVanityName(address?: Address) {
     query: {
       enabled: !!address && !!VANITY_BURN_MANAGER_ADDRESS,
       refetchInterval: 10000, // Refetch every 10 seconds
+      // 🔧 ADDED: Prevent unnecessary refetches
+      staleTime: 30000, // Data is fresh for 30 seconds
+      gcTime: 5 * 60 * 1000, // Keep in cache for 5 minutes
     },
   });
 
   return vanityName && vanityName.trim() !== "" ? vanityName : null;
 }
 
-// Enhanced greeting function that uses vanity names
-export function useAddressGreeting(address?: Address) {
-  const vanityName = useVanityName(address);
-
-  // If user has a vanity name, use personalized greeting
-  if (vanityName) {
-    const randomVanityGreeting =
-      vanityNameGreetings[
-        Math.floor(Math.random() * vanityNameGreetings.length)
-      ];
-    return `${randomVanityGreeting}${vanityName}!`;
-  }
-
-  // Fallback to original random greeting
-  return getAddressGreeting(address);
+// 🔧 FIXED: Generate truly random greeting but keep it stable for the session
+function useStableRandomGreeting(address?: Address) {
+  return useMemo(() => {
+    // Generate truly random greeting regardless of address
+    const index = Math.floor(Math.random() * addressGreetings.length);
+    return addressGreetings[index];
+  }, [address]); // Only recalculate when address changes (including undefined to defined)
 }
 
-// Original function for backwards compatibility
+// 🔧 FIXED: Generate truly random vanity greeting but keep it stable for the session
+function useStableVanityGreeting(vanityName: string | null) {
+  return useMemo(() => {
+    if (!vanityName) return null;
+
+    // Generate truly random greeting on first render, but keep it stable
+    const index = Math.floor(Math.random() * vanityNameGreetings.length);
+    return vanityNameGreetings[index];
+  }, [vanityName]); // Only recalculate when vanityName changes
+}
+
+// 🔧 FIXED: Enhanced greeting function that uses vanity names WITHOUT re-renders
+export function useAddressGreeting(address?: Address) {
+  const vanityName = useVanityName(address);
+  const stableRandomGreeting = useStableRandomGreeting(address);
+  const stableVanityGreeting = useStableVanityGreeting(vanityName);
+
+  // 🔧 FIXED: Memoize the final greeting
+  return useMemo(() => {
+    // If user has a vanity name, use personalized greeting
+    if (vanityName && stableVanityGreeting) {
+      return `${stableVanityGreeting}${vanityName}!`;
+    }
+
+    // Always return the stable random greeting (even for non-connected users)
+    return stableRandomGreeting;
+  }, [vanityName, stableVanityGreeting, stableRandomGreeting]);
+}
+
+// Original function for backwards compatibility - truly random each call
 export function getAddressGreeting(address?: string) {
   const randomGreeting =
     addressGreetings[Math.floor(Math.random() * addressGreetings.length)];
-
   return randomGreeting;
 }
 
@@ -113,13 +138,15 @@ export function getAddressGreeting(address?: string) {
 export function useDisplayName(address?: Address) {
   const vanityName = useVanityName(address);
 
-  if (vanityName) {
-    return vanityName;
-  }
+  return useMemo(() => {
+    if (vanityName) {
+      return vanityName;
+    }
 
-  if (address) {
-    return `${address.slice(0, 6)}...${address.slice(-4)}`;
-  }
+    if (address) {
+      return `${address.slice(0, 6)}...${address.slice(-4)}`;
+    }
 
-  return "Guest";
+    return "Guest";
+  }, [vanityName, address]); // Only recalculate when these change
 }

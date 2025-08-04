@@ -1,4 +1,4 @@
-// app/dex/components/core/TokenGrid.tsx - FIXED: Conditional scroll strategy
+// app/dex/components/core/TokenGrid.tsx - UPDATED: 4 columns on md+ screens
 import { motion } from "framer-motion";
 import { TokenCard } from "./TokenCard";
 import { Token } from "@/types";
@@ -15,18 +15,29 @@ interface TokenGridProps {
   gridLayout?: GridLayout;
 }
 
-// Configuration for different layouts
+// Configuration for different layouts - UPDATED: Changed default to 4 columns on md+
 const LAYOUT_CONFIG = {
   3: {
     cardWidth: 300,
     gap: 24,
     classes: "grid gap-6 p-2 grid-cols-1 md:grid-cols-2 lg:grid-cols-3",
   },
-  4: { cardWidth: 300, gap: 20, classes: "grid gap-5 p-2" },
-  5: { cardWidth: 300, gap: 16, classes: "grid gap-4 p-2" },
+  4: {
+    cardWidth: 300,
+    gap: 20,
+    classes:
+      "grid gap-5 p-2 grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4", // UPDATED: Better responsive breakpoints
+  },
+  5: {
+    cardWidth: 300,
+    gap: 16,
+    classes:
+      "grid gap-4 p-2 grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5", // UPDATED: Added xl breakpoint
+  },
 } as const;
 
-export const TokenGrid = ({ tokens, gridLayout = 3 }: TokenGridProps) => {
+export const TokenGrid = ({ tokens, gridLayout = 4 }: TokenGridProps) => {
+  // UPDATED: Changed default from 3 to 4
   const tokenAddresses = tokens.map((token) => token.address as Address);
   const [isTransitioning, setIsTransitioning] = useState(false);
   const [previousLayout, setPreviousLayout] = useState(gridLayout);
@@ -56,7 +67,7 @@ export const TokenGrid = ({ tokens, gridLayout = 3 }: TokenGridProps) => {
   // Check if we're on mobile
   const isMobile = typeof window !== "undefined" && window.innerWidth < 1024;
 
-  // Determine scroll strategy based on layout
+  // Determine scroll strategy based on layout - UPDATED: Now 3-col is internal scroll, 4&5 are page scroll
   const useInternalScroll = gridLayout === 3 || isMobile;
   const usePageScroll = !useInternalScroll;
 
@@ -156,19 +167,19 @@ export const TokenGrid = ({ tokens, gridLayout = 3 }: TokenGridProps) => {
   if (useInternalScroll) {
     // 3-COLUMN LAYOUT: Use internal scrolling with contained height
     return (
-      <div 
+      <div
         className="h-full max-h-[80vh] overflow-y-scroll relative"
         style={{
-          scrollbarWidth: 'thin',
-          scrollbarColor: 'hsl(var(--border)) transparent'
+          scrollbarWidth: "thin",
+          scrollbarColor: "hsl(var(--border)) transparent",
         }}
       >
         <div style={getContainerStyles()}>
           <motion.div
             className={`${config.classes}`}
-            style={{ 
-              ...getGridStyles(), 
-              ...maskStyles
+            style={{
+              ...getGridStyles(),
+              ...maskStyles,
             }}
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}
@@ -240,13 +251,13 @@ export const TokenGrid = ({ tokens, gridLayout = 3 }: TokenGridProps) => {
   } else {
     // 4 & 5 COLUMN LAYOUTS: Use natural page scroll with horizontal breakout
     return (
-      <div className="relative" style={{ overflow: 'visible' }}>
+      <div className="relative" style={{ overflow: "visible" }}>
         <div style={getContainerStyles()}>
           <motion.div
             className={`${config.classes}`}
-            style={{ 
+            style={{
               ...getGridStyles(),
-              overflow: 'visible'
+              overflow: "visible",
             }}
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}

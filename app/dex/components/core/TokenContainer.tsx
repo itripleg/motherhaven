@@ -1,4 +1,4 @@
-// app/dex/components/tokens/TokenContainer.tsx
+// app/dex/components/core/TokenContainer.tsx - FIXED: Default to 4 columns
 import { useState, useEffect } from "react";
 import React from "react";
 import { TokenTabs } from "./TokenTabs";
@@ -196,7 +196,7 @@ const GridLayoutButton = ({
   ];
 
   const currentLayoutConfig =
-    layouts.find((l) => l.value === currentLayout) || layouts[0];
+    layouts.find((l) => l.value === currentLayout) || layouts[1]; // UPDATED: Default to 4-column (index 1)
   const CurrentIcon = currentLayoutConfig.icon;
 
   const cycleLayout = () => {
@@ -279,11 +279,11 @@ export const TokenContainer: React.FC<TokenContainerProps> = ({
       : SortDirection.DESC;
   });
 
-  // Add grid layout state
+  // 🔧 UPDATED: Change default from "3" to "4"
   const [gridLayout, setGridLayout] = useState<GridLayout>(() => {
-    const saved = loadFromStorage(STORAGE_KEYS.GRID_LAYOUT, "3");
+    const saved = loadFromStorage(STORAGE_KEYS.GRID_LAYOUT, "4"); // CHANGED: Default to "4"
     const layout = parseInt(saved) as GridLayout;
-    return [3, 4, 5].includes(layout) ? layout : 3;
+    return [3, 4, 5].includes(layout) ? layout : 4; // CHANGED: Fallback to 4
   });
 
   const [tokens, setTokens] = useState<Token[]>([]);
