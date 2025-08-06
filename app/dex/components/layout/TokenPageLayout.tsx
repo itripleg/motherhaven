@@ -1,4 +1,4 @@
-// app/dex/components/layout/TokenPageLayout.tsx
+// app/dex/components/layout/TokenPageLayout.tsx - Updated with better positioned back button
 "use client";
 
 import React, { useState } from "react";
@@ -60,7 +60,7 @@ export function TokenPageLayout({ token }: TokenPageLayoutProps) {
             initial={{ opacity: 0, x: -20 }}
             animate={{ opacity: 1, x: 0 }}
             transition={{ duration: 0.6, delay: 0.2 }}
-            className="xl:col-span-3 space-y-8"
+            className="xl:col-span-3 space-y-8 relative"
           >
             <AnimatePresence mode="wait">
               {showRoadmap ? (
@@ -72,18 +72,21 @@ export function TokenPageLayout({ token }: TokenPageLayoutProps) {
                   transition={{ duration: 0.4 }}
                   className="space-y-4"
                 >
-                  {/* Simple header with just back button */}
-                  <div className="flex items-center justify-between">
-                    <div className="flex items-center gap-3">
-                      <motion.button
-                        whileHover={{ scale: 1.05 }}
-                        whileTap={{ scale: 0.95 }}
-                        onClick={() => setShowRoadmap(false)}
-                        className="flex items-center gap-2 px-4 py-2 text-sm bg-secondary hover:bg-secondary/80 rounded-lg transition-colors"
-                      >
-                        ← Back to Trading
-                      </motion.button>
-                    </div>
+                  {/* Back button positioned in same location as roadmap button */}
+                  <div className="flex justify-end mb-6">
+                    <motion.button
+                      whileHover={{ scale: 1.05 }}
+                      whileTap={{ scale: 0.95 }}
+                      onClick={() => setShowRoadmap(false)}
+                      className="flex items-center gap-2 px-4 py-2 text-sm bg-secondary hover:bg-secondary/80 rounded-lg transition-all duration-200 border border-border/30 hover:border-primary/30"
+                      style={{
+                        background:
+                          "linear-gradient(135deg, rgba(139, 92, 246, 0.1) 0%, rgba(139, 92, 246, 0.05) 100%)",
+                        boxShadow: "0 0 8px rgba(139, 92, 246, 0.2)",
+                      }}
+                    >
+                      ← Back to Trading
+                    </motion.button>
                   </div>
 
                   <TokenRoadmap

@@ -18,7 +18,7 @@ export function TokenMainArea({ token, onRoadmapClick }: TokenMainAreaProps) {
     <>
       {/* Roadmap Button */}
       {onRoadmapClick && (
-        <div className="flex justify-end mb-6">
+        <div className="flex justify-end mb-6 animate-pulse">
           <motion.button
             whileHover={{ scale: 1.05 }}
             whileTap={{ scale: 0.95 }}
